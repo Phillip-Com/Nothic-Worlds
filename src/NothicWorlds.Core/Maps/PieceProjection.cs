@@ -71,6 +71,24 @@ public sealed class PieceProjection
     /// <summary>The piece's height across, in degrees of arc.</summary>
     public double HeightDegrees => double.RadiansToDegrees(_height);
 
+    /// <summary>The piece's width across, in radians of arc (for the shader).</summary>
+    public double WidthRadians => _width;
+
+    /// <summary>The piece's height across, in radians of arc (for the shader).</summary>
+    public double HeightRadians => _height;
+
+    /// <summary>Cosine of the clockwise rotation (for the shader).</summary>
+    public double CosRotation => _cosRotation;
+
+    /// <summary>Sine of the clockwise rotation (for the shader).</summary>
+    public double SinRotation => _sinRotation;
+
+    /// <summary>
+    /// How far the piece's corners reach from its center, in radians of arc. Distances are true
+    /// in this projection, so nothing of the piece lies farther away than this.
+    /// </summary>
+    public double ReachRadians => Math.Sqrt(_width * _width + _height * _height) / 2.0;
+
     /// <summary>Unit vector from the globe's center to the piece's center.</summary>
     public Vector3 CenterDirection => ToVector(_center);
 

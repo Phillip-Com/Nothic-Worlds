@@ -81,6 +81,59 @@ public sealed class MapCalibration
     }
 
     /// <summary>
+    /// The reverse of <see cref="DrawnLatitude"/>: which true latitude is drawn where the map
+    /// type puts <paramref name="drawnLatitude"/>.
+    /// </summary>
+    public double TrueLatitude(double drawnLatitude)
+    {
+        return SolveIncreasing(DrawnLatitude, Math.Clamp(drawnLatitude, -90.0, 90.0), -90.0, 90.0);
+    }
+
+    /// <summary>
+    /// The reverse of <see cref="DrawnLongitude"/>: which true longitude is drawn where the map
+    /// type puts <paramref name="drawnLongitude"/>. Returned within [-180, 180).
+    /// </summary>
+    public double TrueLongitude(double drawnLongitude)
+    {
+        // Search one turn around the unwrapped curve, starting where the target could first
+        // appear, so the answer is continuous with the guides.
+        double target = Geometry.SphericalCoordinates.WrapLongitude(drawnLongitude);
+        double start = _longitudeCurve.Evaluate(-180.0);
+        while (target < start)
+        {
+            target += 360.0;
+        }
+
+        while (target >= start + 360.0)
+        {
+            target -= 360.0;
+        }
+
+        double result = SolveIncreasing(_longitudeCurve.Evaluate, target, -180.0, 180.0);
+        return Geometry.SphericalCoordinates.WrapLongitude(result);
+    }
+
+    // Finds x in [low, high] where the increasing function f(x) equals target (bisection).
+    private static double SolveIncreasing(
+        Func<double, double> f, double target, double low, double high)
+    {
+        for (int i = 0; i < 60; i++)
+        {
+            double middle = (low + high) / 2.0;
+            if (f(middle) < target)
+            {
+                low = middle;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return (low + high) / 2.0;
+    }
+
+    /// <summary>
     /// Moves latitude guide <paramref name="index"/> to be drawn at
     /// <paramref name="drawnAsDegrees"/>. The value is kept between its neighbors (and the
     /// poles), so lines can never cross.

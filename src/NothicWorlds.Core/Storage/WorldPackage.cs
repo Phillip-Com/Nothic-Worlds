@@ -56,7 +56,7 @@ public static class WorldPackage
         string path, World world, IReadOnlyDictionary<string, IAssetSource> assets)
     {
         string fullPath = Path.GetFullPath(path);
-        List<string> assetNames = ReferencedAssets(world);
+        List<string> assetNames = ReferencedAssetNames(world);
         foreach (string name in assetNames.Where(name => !assets.ContainsKey(name)))
         {
             throw new WorldFileException($"Couldn't save: the map image '{name}' is missing.");
@@ -112,7 +112,7 @@ public static class WorldPackage
             World world = WorldMapper.ToWorld(ReadDocument(archive));
 
             var assets = new Dictionary<string, IAssetSource>();
-            foreach (string name in ReferencedAssets(world))
+            foreach (string name in ReferencedAssetNames(world))
             {
                 ZipArchiveEntry entry = archive.GetEntry(name) ?? throw new WorldFileException(
                     $"The world file is damaged: its map image '{name}' is missing.");
@@ -215,7 +215,11 @@ public static class WorldPackage
         }
     }
 
-    private static List<string> ReferencedAssets(World world)
+    /// <summary>
+    /// The assets a world uses (its maps and every piece's source image): exactly the ones a
+    /// save writes. Images imported but not yet used aren't included.
+    /// </summary>
+    public static List<string> ReferencedAssetNames(World world)
     {
         // The main map and every piece's source image.
         return world.Bodies
