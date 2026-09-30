@@ -16,7 +16,8 @@ public readonly record struct GeoCoordinate
     {
         if (!double.IsFinite(latitudeDegrees))
         {
-            throw new ArgumentException("Latitude must be a finite number.", nameof(latitudeDegrees));
+            throw new ArgumentException(
+                "Latitude must be a finite number.", nameof(latitudeDegrees));
         }
 
         LatitudeDegrees = Math.Clamp(latitudeDegrees, -90.0, 90.0);

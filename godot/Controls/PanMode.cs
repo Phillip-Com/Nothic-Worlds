@@ -6,6 +6,8 @@ public enum PanMode
     /// <summary>Zoomed in close: panning slides across the planet's surface.</summary>
     Surface,
 
-    /// <summary>Zoomed out: panning slides the whole view, moving the planet across the screen.</summary>
+    /// <summary>
+    /// Zoomed out: panning slides the whole view, moving the planet across the screen.
+    /// </summary>
     View,
 }

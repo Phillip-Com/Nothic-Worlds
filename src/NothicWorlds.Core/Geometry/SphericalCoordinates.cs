@@ -11,7 +11,9 @@ namespace NothicWorlds.Core.Geometry;
 /// </remarks>
 public static class SphericalCoordinates
 {
-    /// <summary>Returns the unit-length direction from the sphere's center to a coordinate.</summary>
+    /// <summary>
+    /// Returns the unit-length direction from the sphere's center to a coordinate.
+    /// </summary>
     public static Vector3 ToDirection(GeoCoordinate coordinate)
     {
         double latitude = double.DegreesToRadians(coordinate.LatitudeDegrees);

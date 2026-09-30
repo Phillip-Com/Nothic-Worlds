@@ -31,7 +31,9 @@ public partial class PlanetCamera : Camera3D
     /// <summary>Closest the camera can get to the surface, as a fraction of the radius.</summary>
     [Export] public float MinAltitude { get; set; } = 0.05f;
 
-    /// <summary>Farthest the camera can get from its focus point, as a fraction of the radius.</summary>
+    /// <summary>
+    /// Farthest the camera can get from its focus point, as a fraction of the radius.
+    /// </summary>
     [Export] public float MaxAltitude { get; set; } = 8.0f;
 
     /// <summary>

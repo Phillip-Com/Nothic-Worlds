@@ -6,7 +6,8 @@ namespace NothicWorlds.Diagnostics;
 /// <summary>
 /// Automated performance check. It orbits and zooms the camera for a fixed time with VSync
 /// off, prints frame-rate and memory results, then quits. Main adds it when the app is started
-/// with <c>-- --benchmark</c>, e.g. <c>godot --path godot --resolution 1920x1080 -- --benchmark</c>.
+/// with <c>-- --benchmark</c>, e.g.
+/// <c>godot --path godot --resolution 1920x1080 -- --benchmark</c>.
 /// </summary>
 public partial class Benchmark : Node
 {

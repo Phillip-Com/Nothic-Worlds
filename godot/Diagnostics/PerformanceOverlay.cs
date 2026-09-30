@@ -57,11 +57,12 @@ public partial class PerformanceOverlay : CanvasLayer
 
         _secondsSinceRefresh = 0;
         double fps = Engine.GetFramesPerSecond();
+        double drawCalls = Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame);
         _label.Text =
             $"FPS: {fps:0} ({(fps > 0 ? 1000.0 / fps : 0):0.0} ms)\n" +
             $"Video memory: {Megabytes(Performance.Monitor.RenderVideoMemUsed):0} MB\n" +
             $"App memory: {Megabytes(Performance.Monitor.MemoryStatic):0} MB\n" +
-            $"Draw calls: {Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame):0}";
+            $"Draw calls: {drawCalls:0}";
     }
 
     private static double Megabytes(Performance.Monitor monitor)

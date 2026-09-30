@@ -18,7 +18,8 @@ public class SphericalCoordinatesTests
     public void ToDirection_KnownPoints(
         double latitude, double longitude, float x, float y, float z)
     {
-        Vector3 direction = SphericalCoordinates.ToDirection(new GeoCoordinate(latitude, longitude));
+        var coordinate = new GeoCoordinate(latitude, longitude);
+        Vector3 direction = SphericalCoordinates.ToDirection(coordinate);
 
         Assert.Equal(x, direction.X, VectorTolerance);
         Assert.Equal(y, direction.Y, VectorTolerance);
