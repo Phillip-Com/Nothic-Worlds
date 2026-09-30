@@ -216,6 +216,23 @@ onto spheres: areas near the equator are close to true size, and areas near the 
 **Notes:** One of the most complex features. Needs its own design review.
 **Implementation:** —
 
+**MAP-03 — Better wrapping for hand-drawn (flat) maps** · Idea · Base
+**Intent:** Hand-drawn and fantasy-tool maps (e.g. Inkarnate, Wonderdraft) should look right on
+the globe even when they're 2:1. Found by the owner while testing `MAP-01`: such maps look
+**pinched toward the poles**.
+**Why it happens (not a bug):** the supported layout (equirectangular) is deliberately stretched
+sideways toward the poles, and wrapping onto a globe undoes that stretch. Flat-drawn maps don't
+have the stretch built in, so land near the top and bottom gets squeezed. The equator is fine.
+Verified: on a true equirectangular test map, shapes come out correct.
+**Candidate approaches** (the owner picks during the design review; they can be combined):
+1. **Latitude coverage:** the user sets which latitudes the map covers (e.g. 60°N–60°S). Poles
+   outside that range get a fill such as ice or ocean. Simplest option, and it greatly reduces
+   pinching, since most fantasy maps don't include the poles.
+2. **Treat the map as Mercator:** reproject as if the map were drawn in a shape-preserving
+   projection. Shapes look as drawn, but it can't reach the poles.
+3. **Manual placement** (`MAP-02`): cut and position pieces by hand. Most flexible, most work.
+**Implementation:** —
+
 ### 4.4 Celestial Bodies (`BOD`)
 
 **BOD-01 — Suns, planets, and moons** · Idea · Base
