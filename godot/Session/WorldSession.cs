@@ -71,6 +71,9 @@ public partial class WorldSession : Node
     /// <summary>The planet's fill color.</summary>
     public RgbColor FillColor => MainBody.Surface.FillColor;
 
+    /// <summary>The current map's grid calibration (VISION.md MAP-05), or null.</summary>
+    public MapCalibration? Calibration => MainBody.Surface.Map?.Calibration;
+
     private Body MainBody => World.Bodies[0];
 
     public override void _Ready()
@@ -183,6 +186,7 @@ public partial class WorldSession : Node
         MainBody.Surface.Map = new SurfaceMap { AssetName = assetName, Projection = Projection };
         MapCheck = map.Check;
         Surface?.SetMap(map.Texture);
+        Surface?.SetCalibration(null);  // A new map starts uncalibrated.
         MarkChanged();
         return map;
     }
@@ -223,6 +227,61 @@ public partial class WorldSession : Node
         }
 
         ShowSurfaceSettings();
+    }
+
+    /// <summary>
+    /// Replaces the map's grid calibration (VISION.md MAP-05), or removes it with null. Does
+    /// nothing if there's no map. Cheap enough to call on every mouse movement while dragging.
+    /// </summary>
+    public void SetCalibration(MapCalibration? calibration)
+    {
+        if (MainBody.Surface.Map is not SurfaceMap map
+            || ReferenceEquals(map.Calibration, calibration))
+        {
+            return;
+        }
+
+        map.Calibration = calibration;
+        Surface?.SetCalibration(calibration);
+        MarkChanged();
+    }
+
+    /// <summary>
+    /// True while the Calibrate workspace is open (New and Open wait until it closes).
+    /// </summary>
+    public bool IsCalibrating { get; private set; }
+
+    /// <summary>
+    /// Starts calibrating: remembers the calibration before editing, so it can be cancelled.
+    /// </summary>
+    public CalibrationSnapshot BeginCalibration()
+    {
+        IsCalibrating = true;
+        return new CalibrationSnapshot(Calibration, HasUnsavedChanges);
+    }
+
+    /// <summary>Finishes calibrating (after Done or Cancel).</summary>
+    public void EndCalibration()
+    {
+        IsCalibrating = false;
+    }
+
+    /// <summary>
+    /// Puts back the calibration from <paramref name="snapshot"/>, and the unsaved state from
+    /// before editing (the workspace blocks other edits meanwhile, so nothing else changed).
+    /// </summary>
+    public void CancelCalibration(CalibrationSnapshot snapshot)
+    {
+        if (MainBody.Surface.Map is not SurfaceMap map)
+        {
+            return;
+        }
+
+        map.Calibration = snapshot.Calibration;
+        Surface?.SetCalibration(snapshot.Calibration);
+        _editVersion++;
+        HasUnsavedChanges = snapshot.WasUnsaved;
+        Changed?.Invoke();
     }
 
     /// <summary>Changes the color used where the map doesn't cover the globe.</summary>
@@ -309,6 +368,7 @@ public partial class WorldSession : Node
 
         Surface.Projection = Projection;
         Surface.FillColor = FillColor.ToGodot();
+        Surface.SetCalibration(Calibration);
     }
 
     private void MarkChanged()

@@ -40,6 +40,13 @@ uniform float map_aspect = 2.0;
 uniform vec3 fill_color : source_color = vec3(0.9, 0.93, 0.96);
 uniform float fill_blend_degrees = 3.0;
 
+// Grid calibration (VISION.md MAP-05): lookup tables from NothicWorlds.Core.Maps.MapCalibration.
+// Row 0 of each 1-pixel-tall table holds the drawn latitude (or longitude) in degrees, for true
+// latitudes -90..90 (or longitudes -180..180) evenly spaced across its width.
+uniform bool has_calibration = false;
+uniform sampler2D calibration_latitudes : filter_linear, repeat_disable;
+uniform sampler2D calibration_longitudes : filter_linear, repeat_disable;
+
 uniform vec3 base_color : source_color = vec3(0.13, 0.27, 0.45);
 uniform vec3 grid_color : source_color = vec3(0.75, 0.8, 0.9);
 uniform vec3 highlight_color : source_color = vec3(1.0, 0.8, 0.35);
@@ -186,7 +193,25 @@ vec2 keep_inside_map(vec2 uv, float lat, float theta, vec2 dx, vec2 dy) {
 	return uv;
 }
 
-vec3 sample_map(float lat, float lon) {
+// Reads a calibration table at `fraction` (0..1 across its range), hitting texel centers so
+// the ends map exactly to the first and last samples.
+float read_table(sampler2D table, float fraction) {
+	float width = float(textureSize(table, 0).x);
+	return texture(table, vec2((fraction * (width - 1.0) + 0.5) / width, 0.5)).r;
+}
+
+// Takes the TRUE latitude/longitude (radians). With a calibration, first looks up where they're
+// drawn in the map type's own grid; everything after works on those drawn values.
+vec3 sample_map(float true_lat, float true_lon) {
+	float lat = true_lat;
+	float lon = true_lon;
+	if (has_calibration) {
+		lat = radians(read_table(calibration_latitudes, true_lat / PI + 0.5));
+		// The table isn't wrapped (it stays smooth for blending); wrap into -180..180 here.
+		float drawn = read_table(calibration_longitudes, true_lon / (2.0 * PI) + 0.5);
+		lon = radians(mod(drawn + 180.0, 360.0) - 180.0);
+	}
+
 	// Where the map jumps from one image edge to another (the 180° line, or the split between
 	// two circles), the GPU sees a huge change in position and picks the blurriest mipmap,
 	// which shows up as a visible seam. So compute a second, continuous version across the

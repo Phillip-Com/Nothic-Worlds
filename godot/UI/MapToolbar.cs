@@ -28,6 +28,7 @@ public partial class MapToolbar : CanvasLayer
 
     private Button _importButton = null!;
     private Button _clearButton = null!;
+    private Button _calibrateButton = null!;
     private OptionButton _mapType = null!;
     private ColorPickerButton _fillColor = null!;
     private Control _fillColorControls = null!;
@@ -42,6 +43,9 @@ public partial class MapToolbar : CanvasLayer
 
     /// <summary>The open world that maps are applied to.</summary>
     [Export] public WorldSession? Session { get; set; }
+
+    /// <summary>The Calibrate workspace, opened by the Calibrate… button.</summary>
+    [Export] public CalibrationWorkspace? Calibration { get; set; }
 
     /// <summary>Space at the start of the toolbar row, where the File menu goes.</summary>
     public HBoxContainer MenuArea { get; } = new();
@@ -70,6 +74,12 @@ public partial class MapToolbar : CanvasLayer
         _clearButton = CreateButton("Clear Map", "Remove the map and show the grid");
         _clearButton.Pressed += () => Session?.ClearMap();
         controls.AddChild(_clearButton);
+
+        _calibrateButton = CreateButton(
+            "Calibrate…",
+            "Line the map up with the globe by dragging its latitude/longitude lines");
+        _calibrateButton.Pressed += () => Calibration?.Open();
+        controls.AddChild(_calibrateButton);
 
         controls.AddChild(CreateLabel("  Map type:"));
         _mapType = CreateMapTypeDropdown();
@@ -177,6 +187,7 @@ public partial class MapToolbar : CanvasLayer
         _fillColorControls.Visible = !MapProjections.CoversWholeGlobe(Session.Projection);
         _importButton.Disabled = Session.IsBusy;
         _clearButton.Disabled = Session.IsBusy || Session.MapCheck is null;
+        _calibrateButton.Disabled = Session.IsBusy || Session.MapCheck is null;
     }
 
     private void OnMapTypeSelected(long index)

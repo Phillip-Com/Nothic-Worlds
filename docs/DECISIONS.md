@@ -7,11 +7,11 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-09-30 | Grid calibration approach: **guide lines** (drag latitude/longitude lines to where they really are) | In PR | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) | Chosen over pin points and a mesh grid. VISION.md `MAP-05` |
-| 2026-09-30 | Calibration workspace: **side by side** (flat image + lines, live globe) | In PR | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) | Built in the next PR |
-| 2026-09-30 | Calibration works for **all map types** | In PR | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) | One method: it adjusts which latitude/longitude each type reads |
-| 2026-09-30 | Default guides: every **30° latitude** (60°S–60°N) and **60° longitude** | In PR | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) | |
-| 2026-09-30 | World file **format version 2** adds map calibration; version 1 files upgrade automatically | In PR | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) | docs/world-format.md version history |
+| 2026-09-30 | Grid calibration approach: **guide lines** (drag latitude/longitude lines to where they really are) | Merged | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) · `f10be33` | Chosen over pin points and a mesh grid. VISION.md `MAP-05` |
+| 2026-09-30 | Calibration workspace: **side by side** (flat image + lines, live globe) | Merged | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) · `f10be33` | Built in the next PR |
+| 2026-09-30 | Calibration works for **all map types** | Merged | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) · `f10be33` | One method: it adjusts which latitude/longitude each type reads |
+| 2026-09-30 | Default guides: every **30° latitude** (60°S–60°N) and **60° longitude** | Merged | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) · `f10be33` | |
+| 2026-09-30 | World file **format version 2** adds map calibration; version 1 files upgrade automatically | Merged | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) · `f10be33` | docs/world-format.md version history |
 | 2026-09-30 | Worlds save as **one `.nworld` file** (zip: `world.json` + assets) | Merged | [#7](https://github.com/Phillip-Com/Nothic-Worlds/pull/7) · `411d7ad` | Spec: docs/world-format.md. VISION.md `SAV-01` |
 | 2026-09-30 | The **original map image** is copied into the world file, unchanged | Merged | [#7](https://github.com/Phillip-Com/Nothic-Worlds/pull/7) · `411d7ad` | Can always be re-prepared at full quality |
 | 2026-09-30 | The **camera view** is saved with the world | Merged | [#7](https://github.com/Phillip-Com/Nothic-Worlds/pull/7) · `411d7ad` | Reopen where you left off |

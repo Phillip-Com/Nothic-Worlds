@@ -75,7 +75,7 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
 - **Complete** (PR #8 merged 2026-09-30).
 
 **Milestone 3: Map Fitting** · In Progress
-- **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace.
+- **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace (PR #10).
 - **Part 2:** `MAP-02` cut and place. It gets its own design review.
 
 ---
@@ -234,7 +234,7 @@ onto spheres: areas near the equator are close to true size, and areas near the 
   regional maps.
 **Implementation:** —
 
-**MAP-05 — Grid calibration (adjust how the map's lines project)** · In Progress (Core done, PR #9) · Base
+**MAP-05 — Grid calibration (adjust how the map's lines project)** · Implemented (M3) · Base
 **Intent:** Raised by the owner while testing `MAP-04`. The built-in map types require the image
 to follow their layout exactly, but most maps aren't that precise, and even a Gall–Peters map
 still looked slightly pinched at the poles. The user should be able to **adjust how the
@@ -272,8 +272,35 @@ bent locally; that would be the mesh-grid mode). The poles stay fixed.
   files upgrade automatically. Golden tests for **both** versions must pass forever.
 - Also: points exactly on a coverage edge (a polar map's rim) now count as on the map, despite
   rounding.
-**Still to do (next PR):** the Calibrate… workspace (side by side, draggable lines, live globe),
-the shader lookup tables, and saving calibrations through the session.
+**Implementation (workspace, PR #10):**
+- **`godot/UI/CalibrationWorkspace.cs`:** the toolbar's **Calibrate…** button (enabled when a
+  map is loaded) opens it. The left half is a solid panel with Add Latitude… / Add Longitude… /
+  Reset / Cancel / Done (buttons wrap on narrow windows). The **right half is a separate view of
+  the same 3D world**, centered on the planet. (Shifting the main view sideways stretched the
+  globe into an oval, the same wide-lens effect as the deferred `REN-02` issue.) The main 3D view
+  is paused meanwhile, so nothing renders twice. The preview camera mirrors the planet camera,
+  and mouse input passes through, so orbit and zoom still work. The true lat/long grid shows while
+  calibrating, and the toolbar is hidden (its map type and fill controls mustn't change
+  mid-calibration). **Esc** = Cancel, **Enter** = Done.
+- **`godot/UI/CalibrationCanvas.cs`:** draws the image with each guide line where the
+  calibration puts that true latitude/longitude: straight lines, curved meridians, or rings and
+  spokes, broken where they leave the map or jump between circles. Labels sit at 150°W / 45°S,
+  where lines are spread out. Hovering highlights a line. **Drag** converts the mouse position to
+  the map type's own latitude/longitude with `MapProjectionInverter` (exactly the new "drawn
+  as" value). **Right-click** removes a line.
+- **Session:** `WorldSession.SetCalibration` (tracked as an unsaved change), plus
+  `BeginCalibration` / `CancelCalibration`, which restores both the calibration and the prior
+  unsaved state. `IsCalibrating` blocks File → New/Open until Done or Cancel. A newly imported
+  map starts uncalibrated.
+- **Rendering:** `PlanetSurface.SetCalibration` bakes two 2048-sample lookup tables into
+  one-pixel-tall float textures, updated in place while dragging. The shader converts the true
+  latitude/longitude to drawn values first, and everything else (projection, seams, fill) is
+  unchanged.
+- **Verified in the running app** (simulated mouse input through the real input path): on a
+  Gall–Peters test map, unmoved guide lines sat exactly on the map's own drawn grid. Dragging 30°N
+  down recorded it drawn at 19.2° and updated the globe live. Save and reopen restored it (format
+  version 2). Esc restored everything. Robinson curves and Polar rings/spokes drew correctly.
+  Benchmark: ~208 fps with or without calibration.
 
 **MAP-03 — Better wrapping for hand-drawn (flat) maps** · Implemented (Flat map mode, M2) · Base
 **Intent:** Hand-drawn and fantasy-tool maps (e.g. Inkarnate, Wonderdraft) should look right on

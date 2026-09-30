@@ -54,6 +54,11 @@ layout the map was drawn in:
 Where a map doesn't cover the globe (a flat map's polar caps, a polar map's southern
 hemisphere), pick the color with **Fill color**.
 
+If a map doesn't line up exactly (most hand-drawn maps don't), use **Calibrate…**: drag each
+latitude/longitude line to where it really is on your map while watching the globe update, then
+**Done** (Enter) or **Cancel** (Esc). Right-click a line to remove it. Calibration is saved with
+the world.
+
 ## Repository layout
 
 ```
