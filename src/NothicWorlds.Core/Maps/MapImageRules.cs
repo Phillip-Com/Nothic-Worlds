@@ -8,6 +8,16 @@ namespace NothicWorlds.Core.Maps;
 /// </summary>
 public static class MapImageRules
 {
+    /// <summary>Image file types that can be imported (lowercase, without the dot).</summary>
+    public static readonly IReadOnlyList<string> SupportedExtensions =
+        ["png", "jpg", "jpeg", "webp"];
+
+    /// <summary>
+    /// Largest image file accepted. It guards against files that would need more memory to decode
+    /// than a typical laptop has. An 8192 × 4096 map is usually far smaller than this.
+    /// </summary>
+    public const long MaxFileBytes = 256L * 1024 * 1024;
+
     /// <summary>Largest width used on the globe (owner decision: 8192 × 4096).</summary>
     public const int MaxWidth = 8192;
 
