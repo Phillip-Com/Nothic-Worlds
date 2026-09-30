@@ -7,11 +7,11 @@ using NothicWorlds.Session;
 namespace NothicWorlds.UI;
 
 /// <summary>
-/// Top-left toolbar (VISION.md MAP-01, MAP-03, MAP-04) with a slot for the File menu,
-/// "Import Map…", "Clear Map", a "Map type" dropdown, and a "Fill color" picker (for map types
-/// that don't cover the whole globe), plus a message line underneath that other parts of the app
-/// can use too. Success messages fade after a few seconds. Warnings and errors stay until the
-/// next message.
+/// Top-left toolbar (VISION.md MAP-01, MAP-02, MAP-03, MAP-04) with a slot for the File menu,
+/// "Import Map…", "Clear Map", "Calibrate…", "Pieces…", a "Map type" dropdown, and a "Fill
+/// color" picker (for map types that don't cover the whole globe), plus a message line underneath
+/// that other parts of the app can use too. Success messages fade after a few seconds. Warnings
+/// and errors stay until the next message.
 /// </summary>
 /// <remarks>
 /// All edits go through <see cref="WorldSession"/>, so unsaved changes are tracked.
@@ -47,6 +47,9 @@ public partial class MapToolbar : CanvasLayer
     /// <summary>The Calibrate workspace, opened by the Calibrate… button.</summary>
     [Export] public CalibrationWorkspace? Calibration { get; set; }
 
+    /// <summary>The Pieces panel, shown and hidden by the Pieces… button.</summary>
+    [Export] public PiecesPanel? Pieces { get; set; }
+
     /// <summary>Space at the start of the toolbar row, where the File menu goes.</summary>
     public HBoxContainer MenuArea { get; } = new();
 
@@ -80,6 +83,18 @@ public partial class MapToolbar : CanvasLayer
             "Line the map up with the globe by dragging its latitude/longitude lines");
         _calibrateButton.Pressed += () => Calibration?.Open();
         controls.AddChild(_calibrateButton);
+
+        var piecesButton = CreateButton(
+            "Pieces…", "Cut pieces from the map or other images and place them on the globe");
+        piecesButton.ToggleMode = true;
+        piecesButton.Toggled += open =>
+        {
+            if (Pieces is not null)
+            {
+                Pieces.IsPanelOpen = open;
+            }
+        };
+        controls.AddChild(piecesButton);
 
         controls.AddChild(CreateLabel("  Map type:"));
         _mapType = CreateMapTypeDropdown();

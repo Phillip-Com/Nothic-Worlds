@@ -1,5 +1,6 @@
 using Godot;
 using NothicWorlds.Controls;
+using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Maps;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Storage;
@@ -22,6 +23,10 @@ namespace NothicWorlds.Session;
 public partial class WorldSession : Node
 {
     private Dictionary<string, IAssetSource> _assets = [];
+
+    // Each piece's baked texture, and the most recently decoded source image (for cutting).
+    private Dictionary<Guid, Texture2D> _pieceTextures = [];
+    private (string Name, Image Image)? _decodedSource;
 
     // The map type picked while no map is loaded; the next import uses it.
     private MapProjection _projectionWithoutMap = MapProjection.Mercator;
@@ -92,8 +97,11 @@ public partial class WorldSession : Node
         MapCheck = null;
         HasUnsavedChanges = false;
         _projectionWithoutMap = MapProjection.Mercator;
+        _pieceTextures = [];
+        ReleaseDecodedSource();
         Surface?.ClearMap();
         ShowSurfaceSettings();
+        ShowPieces();
         Camera?.SetView(null);
         Changed?.Invoke();
     }
@@ -153,8 +161,10 @@ public partial class WorldSession : Node
         HasUnsavedChanges = _editVersion != versionAtSave;
 
         // The saved assets now live in the world file, so later saves no longer depend on the
-        // original image files (which the user may move or delete).
-        foreach (string name in assets.Keys.Where(_assets.ContainsKey).ToList())
+        // original image files (which the user may move or delete). Only images the world
+        // uses are saved; an image imported for cutting but not used yet stays on disk.
+        foreach (string name in WorldPackage.ReferencedAssetNames(snapshot)
+            .Where(_assets.ContainsKey))
         {
             _assets[name] = new PackageAssetSource(fullPath, name);
         }
@@ -284,6 +294,183 @@ public partial class WorldSession : Node
         Changed?.Invoke();
     }
 
+    /// <summary>
+    /// True while the Cut editor is open. Set by the editor, so New/Open can wait until it closes.
+    /// </summary>
+    public bool IsCutting { get; set; }
+
+    /// <summary>The planet's map pieces, bottom to top (VISION.md MAP-02). Read only.</summary>
+    public IReadOnlyList<MapPiece> Pieces => MainBody.Surface.Pieces;
+
+    /// <summary>The main map's asset name, for cutting pieces from it, or null.</summary>
+    public string? MainMapAssetName => MainBody.Surface.Map?.AssetName;
+
+    /// <summary>
+    /// Registers an image file as a source for cutting pieces and returns its asset name. It's
+    /// saved with the world only once a piece uses it.
+    /// </summary>
+    /// <exception cref="MapLoadException">The file can't be used.</exception>
+    public string AddPieceSource(string imagePath)
+    {
+        MapImageLoader.ValidateFile(imagePath);
+        string assetName = WorldPackage.CreateAssetName(Path.GetExtension(imagePath));
+        _assets[assetName] = new FileAssetSource(Path.GetFullPath(imagePath));
+        return assetName;
+    }
+
+    /// <summary>
+    /// Decodes a source image at full resolution for cutting, keeping the most recent one in
+    /// memory so several cuts from the same image don't decode it again. Don't dispose it.
+    /// </summary>
+    /// <exception cref="MapLoadException">The image can't be read.</exception>
+    public async Task<Image> GetPieceSourceAsync(string assetName)
+    {
+        if (_decodedSource is { Name: var name, Image: var cached } && name == assetName)
+        {
+            return cached;
+        }
+
+        Image image = await MapImageLoader.DecodeAsync(_assets[assetName], assetName);
+        ReleaseDecodedSource();
+        _decodedSource = (assetName, image);
+        return image;
+    }
+
+    /// <summary>Frees the source image kept for cutting (it can be hundreds of MB).</summary>
+    public void ReleaseDecodedSource()
+    {
+        _decodedSource?.Image.Dispose();
+        _decodedSource = null;
+    }
+
+    /// <summary>
+    /// Cuts a new piece from a source image and lays it on the globe, on top of the others.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The planet has the most pieces.</exception>
+    /// <exception cref="MapLoadException">The source image can't be read.</exception>
+    public async Task<MapPiece> AddPieceAsync(
+        string assetName, PieceOutline outline, GeoCoordinate center, double widthDegrees)
+    {
+        RequireIdle();
+        if (Pieces.Count >= SurfaceSettings.MaxPieces)
+        {
+            throw new InvalidOperationException(
+                $"A planet can have up to {SurfaceSettings.MaxPieces} pieces.");
+        }
+
+        SetBusy(true);
+        Texture2D texture;
+        try
+        {
+            Image source = await GetPieceSourceAsync(assetName);
+            using Image baked = await Task.Run(() => PieceTextureBaker.Bake(source, outline));
+            texture = ImageTexture.CreateFromImage(baked);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+
+        var piece = new MapPiece
+        {
+            Name = NextPieceName(),
+            AssetName = assetName,
+            Outline = outline,
+            Center = center,
+            WidthDegrees = Math.Clamp(widthDegrees,
+                PieceProjection.MinimumWidthDegrees, PieceProjection.MaximumWidthDegrees),
+        };
+        MainBody.Surface.Pieces.Add(piece);
+        _pieceTextures[piece.Id] = texture;
+        ShowPieces();
+        MarkChanged();
+        return piece;
+    }
+
+    /// <summary>Moves, turns, or resizes a piece. Cheap enough to call while dragging.</summary>
+    public void PlacePiece(
+        Guid id, GeoCoordinate center, double rotationDegrees, double widthDegrees)
+    {
+        if (FindPiece(id) is not MapPiece piece)
+        {
+            return;
+        }
+
+        piece.Center = center;
+        piece.RotationDegrees = ((rotationDegrees % 360) + 360) % 360;
+        piece.WidthDegrees = Math.Clamp(widthDegrees,
+            PieceProjection.MinimumWidthDegrees, PieceProjection.MaximumWidthDegrees);
+        ShowPieces();
+        MarkChanged();
+    }
+
+    /// <summary>Renames a piece. Empty names are ignored.</summary>
+    public void RenamePiece(Guid id, string name)
+    {
+        if (FindPiece(id) is MapPiece piece && !string.IsNullOrWhiteSpace(name)
+            && piece.Name != name.Trim())
+        {
+            piece.Name = name.Trim();
+            MarkChanged();
+        }
+    }
+
+    /// <summary>Removes a piece from the planet.</summary>
+    public void RemovePiece(Guid id)
+    {
+        if (FindPiece(id) is not MapPiece piece)
+        {
+            return;
+        }
+
+        MainBody.Surface.Pieces.Remove(piece);
+        _pieceTextures.Remove(id);
+        ShowPieces();
+        MarkChanged();
+    }
+
+    /// <summary>
+    /// Moves a piece up (positive) or down (negative) in the layer order; higher pieces cover
+    /// lower ones.
+    /// </summary>
+    public void MovePieceInOrder(Guid id, int steps)
+    {
+        List<MapPiece> pieces = MainBody.Surface.Pieces;
+        int index = pieces.FindIndex(p => p.Id == id);
+        int target = Math.Clamp(index + steps, 0, pieces.Count - 1);
+        if (index < 0 || target == index)
+        {
+            return;
+        }
+
+        MapPiece piece = pieces[index];
+        pieces.RemoveAt(index);
+        pieces.Insert(target, piece);
+        ShowPieces();
+        MarkChanged();
+    }
+
+    private MapPiece? FindPiece(Guid id) => MainBody.Surface.Pieces.Find(p => p.Id == id);
+
+    private string NextPieceName()
+    {
+        int number = 1;
+        while (Pieces.Any(p => p.Name == $"Piece {number}"))
+        {
+            number++;
+        }
+
+        return $"Piece {number}";
+    }
+
+    // Sends every piece that has a texture to the planet, bottom to top.
+    private void ShowPieces()
+    {
+        Surface?.SetPieces([.. Pieces
+            .Where(p => _pieceTextures.ContainsKey(p.Id))
+            .Select(p => (_pieceTextures[p.Id], PieceProjection.For(p)))]);
+    }
+
     /// <summary>Changes the color used where the map doesn't cover the globe.</summary>
     public void SetFillColor(RgbColor color)
     {
@@ -312,6 +499,7 @@ public partial class WorldSession : Node
         LoadedWorld loaded;
         LoadedMap? map = null;
         string? warning = null;
+        Dictionary<Guid, Texture2D> pieceTextures;
         try
         {
             loaded = await Task.Run(() => WorldPackage.Load(readPath));
@@ -330,6 +518,14 @@ public partial class WorldSession : Node
                     warning = $"Its map image couldn't be shown: {error.Message}";
                 }
             }
+
+            (pieceTextures, int failed) = await BakePiecesAsync(
+                loaded.World.Bodies[0].Surface.Pieces, loaded.Assets);
+            if (failed > 0)
+            {
+                warning = $"{warning} {failed} map piece(s) couldn't be shown (they're kept, " +
+                    "so saving won't lose them).".Trim();
+            }
         }
         finally
         {
@@ -337,6 +533,7 @@ public partial class WorldSession : Node
         }
 
         CloseCurrentWorld();
+        _pieceTextures = pieceTextures;
         World = loaded.World;
         _assets = new Dictionary<string, IAssetSource>(loaded.Assets);
         FilePath = savedPath;
@@ -353,10 +550,39 @@ public partial class WorldSession : Node
         }
 
         ShowSurfaceSettings();
+        ShowPieces();
         Camera?.SetView(World.View);
         _editVersion++;
         Changed?.Invoke();
         return warning;
+    }
+
+    // Bakes a texture for each piece, decoding each source image once. Pieces whose image can't
+    // be read are skipped (and counted), but kept in the world.
+    private static async Task<(Dictionary<Guid, Texture2D> Textures, int Failed)> BakePiecesAsync(
+        IReadOnlyList<MapPiece> pieces, IReadOnlyDictionary<string, IAssetSource> assets)
+    {
+        var textures = new Dictionary<Guid, Texture2D>();
+        int failed = 0;
+        foreach (IGrouping<string, MapPiece> group in pieces.GroupBy(p => p.AssetName))
+        {
+            try
+            {
+                using Image source = await MapImageLoader.DecodeAsync(assets[group.Key], group.Key);
+                foreach (MapPiece piece in group)
+                {
+                    using Image baked =
+                        await Task.Run(() => PieceTextureBaker.Bake(source, piece.Outline));
+                    textures[piece.Id] = ImageTexture.CreateFromImage(baked);
+                }
+            }
+            catch (MapLoadException)
+            {
+                failed += group.Count();
+            }
+        }
+
+        return (textures, failed);
     }
 
     private void ShowSurfaceSettings()
