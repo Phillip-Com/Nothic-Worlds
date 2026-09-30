@@ -57,7 +57,9 @@ in a top-down terrain view. Going smaller than a local region is not a goal.
 
 ## 3. Milestones
 
-**Milestone 1: Planet Viewer** · Planned
+**Milestone 1: Planet Viewer** · In Progress. Split into two PRs: **A** = planet, grid, camera,
+and performance tools (PR #3); **B** = map import. Saving is out of scope: the world file format
+gets its own design review.
 A single planet that the user can import a map image onto, with a working camera/movement system.
 The goal is to get the rough idea and the movement system in place. Nothing fancy.
 - One planet (sphere) rendered in 3D (`REN-01`)
@@ -79,22 +81,49 @@ Each entry uses this format:
 
 ### 4.1 Rendering & Navigation (`REN`)
 
-**REN-01 — 3D world rendering** · Planned (M1) · Base
+**REN-01 — 3D world rendering** · In Progress (single planet done in M1) · Base
 **Intent:** Render worlds and bodies in 3D. This grew from the original "3D render of a 2D world" concept.
-**Implementation:** —
+**Implementation (M1, PR #3):**
+- The planet is a `SphereMesh` (radius 1, 128×64 segments) in `godot/Scenes/main.tscn`, with one
+  sun (`DirectionalLight3D`) and soft ambient light so the night side stays readable.
+- `godot/Rendering/planet.gdshader` computes latitude/longitude **per pixel from the surface
+  direction**, not from the mesh's texture coordinates. It works on any planet mesh, so reuse it
+  (or its math) when the sphere is replaced by a sculptable mesh. With no map loaded, it draws a
+  15° lat/long grid with the equator and longitude 0 highlighted. Grid lines keep a constant
+  on-screen width at any zoom.
+- The axis convention (+Y north, longitude 0 faces +Z, 90° east faces +X) is shared with Core's
+  `SphericalCoordinates`. Keep the shader and Core in sync.
 
-**REN-02 — Multi-scale navigation (system → planet → local region)** · Planned (basic form in M1) · Base
+**REN-02 — Multi-scale navigation (system → planet → local region)** · In Progress (planet camera done in M1) · Base
 **Intent:** Move smoothly from viewing the whole star system down to a local region on a planet.
 M1 covers these camera controls for a single planet:
 - **Orbit:** drag to spin the globe / circle the camera around it
 - **Zoom:** scroll wheel to move closer or farther
 - **Pan:** when zoomed in close, slide the view sideways across the surface
-**Implementation:** —
+**Implementation (M1, PR #3):** `godot/Controls/PlanetCamera.cs`
+- Orbit and pan are separate controls (owner's choice): **left-drag orbits** at a steady
+  0.25°/pixel, and **right-drag pans** at a speed matched to altitude so the ground follows the
+  mouse. Scroll / E / Q / + / - zoom by a percentage per step. WASD/arrows pan. Home resets.
+- The camera always looks at the planet's center, north stays up, and latitude is limited to
+  ±89° so the view can't flip at the poles. Altitude ranges from 0.05 to 8 planet radii.
+- All movement eases toward a target (frame-rate independent). Longitude is kept unwrapped so
+  easing never takes the long way around.
+- Public `Orbit` / `Pan` / `Zoom` / `ResetView` methods can be reused by other code (the benchmark
+  already uses them).
+- Keys are defined once in `godot/Controls/InputActions.cs`, ready to be made rebindable later.
+- Position math uses Core's `GeoCoordinate` / `SphericalCoordinates`
+  (`src/NothicWorlds.Core/Geometry/`). Reuse these for pins, region outlines, and anything else
+  placed by latitude/longitude.
 
-**REN-03 — Performance tiers** · Idea · —
+**REN-03 — Performance tiers** · In Progress (measurement tools done) · —
 **Intent:** Keep requirements low with level-of-detail, quality settings, and rendering only what's
 visible. Heavier features go in an opt-in **Advanced** section.
-**Implementation:** —
+**Implementation (M1, PR #3):** measurement tools only. The tiers themselves aren't built yet.
+- `godot/Diagnostics/PerformanceOverlay.cs`: F3 shows FPS, video memory, app memory, and draw calls.
+- `godot/Diagnostics/Benchmark.cs`: run with `-- --benchmark`. It orbits and zooms for 10 s
+  with VSync off, then prints the results. Use it to catch performance regressions.
+- **Baseline (2026-09-29, Vega 10 laptop, 1920×1080 fullscreen, grid planet):** average
+  **207 fps**, slowest frame 10.1 ms (99 fps), 35 MB video memory, 42 MB app memory.
 
 **REN-04 — Top-down local region view** · Idea · Base
 **Intent:** Zoom down to a local region and see it as a top-down terrain view.

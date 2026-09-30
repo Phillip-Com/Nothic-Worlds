@@ -7,6 +7,9 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-09-29 | Camera: **separate controls**, with left-drag to orbit and right-drag to pan (not a single grab-the-surface drag) | In PR | [#3](https://github.com/Phillip-Com/Nothic-Worlds/pull/3) | VISION.md `REN-02` |
+| 2026-09-29 | Milestone 1 split into two PRs: A = planet + camera + performance tools, B = map import | In PR | [#3](https://github.com/Phillip-Com/Nothic-Worlds/pull/3) | VISION.md §3 |
+| 2026-09-29 | Milestone 1 does not save; the world file format gets its own design review | In PR | [#3](https://github.com/Phillip-Com/Nothic-Worlds/pull/3) | VISION.md §3 |
 | 2026-09-29 | Merged status is updated by the first commit of the next branch, not by a separate PR | Merged | [#2](https://github.com/Phillip-Com/Nothic-Worlds/pull/2) · `e0753c8` | CLAUDE.md §10 |
 | 2026-09-29 | Godot renderer: **Mobile** | Merged | [#1](https://github.com/Phillip-Com/Nothic-Worlds/pull/1) · `8f783ae` | Lighter than Forward+ but keeps compute shaders. Verify performance on the baseline laptop in M1. CLAUDE.md §9 |
 | 2026-09-29 | Project structure: `src/` Core library, `tests/`, `godot/`; all projects target net8.0 | Merged | [#1](https://github.com/Phillip-Com/Nothic-Worlds/pull/1) · `8f783ae` | CLAUDE.md §7, §9 |
