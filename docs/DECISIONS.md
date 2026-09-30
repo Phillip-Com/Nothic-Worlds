@@ -7,7 +7,7 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-09-29 | Merged status is updated by the first commit of the next branch, not by a separate PR | In PR | [#2](https://github.com/Phillip-Com/Nothic-Worlds/pull/2) | CLAUDE.md §10 |
+| 2026-09-29 | Merged status is updated by the first commit of the next branch, not by a separate PR | Merged | [#2](https://github.com/Phillip-Com/Nothic-Worlds/pull/2) · `e0753c8` | CLAUDE.md §10 |
 | 2026-09-29 | Godot renderer: **Mobile** | Merged | [#1](https://github.com/Phillip-Com/Nothic-Worlds/pull/1) · `8f783ae` | Lighter than Forward+ but keeps compute shaders. Verify performance on the baseline laptop in M1. CLAUDE.md §9 |
 | 2026-09-29 | Project structure: `src/` Core library, `tests/`, `godot/`; all projects target net8.0 | Merged | [#1](https://github.com/Phillip-Com/Nothic-Worlds/pull/1) · `8f783ae` | CLAUDE.md §7, §9 |
 | 2026-09-29 | Tech stack: **Godot 4.7.2 (.NET) + C#**, xUnit, `dotnet format` | Merged | [#1](https://github.com/Phillip-Com/Nothic-Worlds/pull/1) · `8f783ae` | Chosen over a TypeScript/Three.js web stack. CLAUDE.md §9 |
