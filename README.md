@@ -37,7 +37,8 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 
 Use **Import Map…** (top-left) to wrap a map image onto the planet. Set **Map type** to match it:
 **Flat map** (the default) for hand-drawn and fantasy-tool maps, or **Globe map** for 2:1
-equirectangular maps made for globes.
+equirectangular maps made for globes. Flat maps don't reach the poles, so pick the polar caps'
+color with **Pole color**.
 
 ## Repository layout
 

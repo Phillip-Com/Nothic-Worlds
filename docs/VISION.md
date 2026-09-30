@@ -242,22 +242,47 @@ the equator vertically.
 - The **map type** is chosen from a toolbar dropdown (**Flat map** / **Globe map**). It can be
   changed at any time and takes effect instantly.
 - **New imports default to Flat map**, which suits most DM and fantasy-tool maps.
-- **Polar caps** beyond the map's coverage: the map's top and bottom edges are **stretched to
-  the poles**. This is seamless for ocean or ice edges, but streaky if there's land along the edge.
+- **Polar caps** beyond the map's coverage are filled with a **Pole color the user picks**
+  (toolbar color picker, shown only for Flat maps), with a soft 3° blend where the map ends. The
+  owner first chose to stretch the map's edges to the poles, then switched after seeing the
+  streaks converge at the poles on their own map.
 **Implementation (M2, PR #5):**
 - **Math (Core, tested):** `src/NothicWorlds.Core/Maps/MapProjections.cs` provides
   `ToImagePosition` (globe position → map pixel, for either `MapProjection`) and
   `MercatorLatitudeLimit` (a 2:1 map covers ~66.5°N–66.5°S, 1:1 ~85°, 3:1 ~51°). Reuse
   `ToImagePosition` for anything that needs to find the map pixel under a globe position, such as
   pins or region outlines.
-- **Shader:** `planet.gdshader` `map_v()` mirrors the Core math. The `projection` and
-  `map_aspect` uniforms are set by `PlanetSurface.Projection` / `SetMap`. The map sampler now
-  **clamps** instead of repeating, so a stretched top edge never picks up the bottom edge's
-  colors.
-- **UI:** the Map type dropdown lives in `godot/UI/MapToolbar.cs`. Messages state the coverage
-  for flat maps. The 2:1 warning now applies only to Globe maps, and it suggests Flat map.
+- **Shader:** `planet.gdshader` `map_v()` mirrors the Core math, and `pole_cap()` fades to
+  `pole_color` past the coverage limit. The `projection`, `map_aspect`, and `pole_color`
+  uniforms are set by `PlanetSurface.Projection` / `SetMap` / `PoleColor`. The map sampler now
+  **clamps** instead of repeating, so the top edge never picks up the bottom edge's colors.
+- **Reading shader settings:** `PlanetSurface` falls back to the shader's own default for any
+  setting the material hasn't stored yet (`GetParameter`). This fixed a PR #4 bug where the first
+  G press did nothing before a map was loaded. Use the same pattern for any future shader
+  settings.
+- **UI:** the Map type dropdown and Pole color picker live in `godot/UI/MapToolbar.cs`. Messages
+  state the coverage for flat maps. The 2:1 warning now applies only to Globe maps, and it
+  suggests Flat map.
 - **Verified:** a flat-drawn test map of equal circles stays round in Flat mode (smaller toward
-  the poles) and turns into teardrops in Globe mode. The stretched cap uses only top-edge colors.
+  the poles) and turns into teardrops in Globe mode. The cap shows the pole color with a soft
+  blend, and the picker swatch matches it.
+
+**MAP-04 — Atlas map types** · Planned (next PR after #5) · Base
+**Intent:** Support popular atlas layouts as additional **Map type** options, so maps drawn in
+those styles wrap onto the globe correctly. The owner chose:
+- **Robinson:** classic school/wall atlas look
+- **Winkel tripel:** National Geographic's world map
+- **Mollweide:** full oval, equal-area
+- **Polar (azimuthal):** a circle centered on a pole; also the natural layout for flat worlds
+  (`BOD-02`)
+- **Two hemispheres:** two side-by-side circles, old-atlas and fantasy style
+- **Gall–Peters:** equal-area rectangle
+**Notes:** A map type only looks right if the image was drawn in that layout (e.g. traced from a
+Robinson template). For freehand maps, Flat map is usually best. Layout details (e.g. which pole
+the Polar map is centered on, and how Two hemispheres splits the globe) get a short owner review
+before building. Build on `MapProjections` (Core) and `map_v()` in the shader. The oval and
+circle types also need horizontal math, and some parts of the image are outside the map.
+**Implementation:** —
 
 ### 4.4 Celestial Bodies (`BOD`)
 
