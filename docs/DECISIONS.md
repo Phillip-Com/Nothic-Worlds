@@ -7,10 +7,10 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-09-29 | Imported maps are compressed with **S3TC** on the GPU | In PR | [#4](https://github.com/Phillip-Com/Nothic-Worlds/pull/4) | 8k map: ~137 MB video memory instead of ~497 MB, +~2 s load, slight blockiness. An uncompressed "high quality" option is in the Idea Inbox (Advanced tier). VISION.md `MAP-01` |
-| 2026-09-29 | Map size limit **8192 × 4096**; larger images are shrunk, keeping their proportions | In PR | [#4](https://github.com/Phillip-Com/Nothic-Worlds/pull/4) | VISION.md `MAP-01` |
-| 2026-09-29 | Maps that aren't 2:1 are **applied with a warning**, not rejected | In PR | [#4](https://github.com/Phillip-Com/Nothic-Worlds/pull/4) | VISION.md `MAP-01` |
-| 2026-09-29 | Map UI: top-left toolbar with Import Map… and Clear Map; grid hidden on maps, **G** toggles it | In PR | [#4](https://github.com/Phillip-Com/Nothic-Worlds/pull/4) | VISION.md `MAP-01` |
+| 2026-09-29 | Imported maps are compressed with **S3TC** on the GPU | Merged | [#4](https://github.com/Phillip-Com/Nothic-Worlds/pull/4) · `0f7af7c` | 8k map: ~137 MB video memory instead of ~497 MB, +~2 s load, slight blockiness. An uncompressed "high quality" option is in the Idea Inbox (Advanced tier). VISION.md `MAP-01` |
+| 2026-09-29 | Map size limit **8192 × 4096**; larger images are shrunk, keeping their proportions | Merged | [#4](https://github.com/Phillip-Com/Nothic-Worlds/pull/4) · `0f7af7c` | VISION.md `MAP-01` |
+| 2026-09-29 | Maps that aren't 2:1 are **applied with a warning**, not rejected | Merged | [#4](https://github.com/Phillip-Com/Nothic-Worlds/pull/4) · `0f7af7c` | VISION.md `MAP-01` |
+| 2026-09-29 | Map UI: top-left toolbar with Import Map… and Clear Map; grid hidden on maps, **G** toggles it | Merged | [#4](https://github.com/Phillip-Com/Nothic-Worlds/pull/4) · `0f7af7c` | VISION.md `MAP-01` |
 | 2026-09-29 | Camera: **separate controls**, with left-drag to orbit and right-drag to pan. Pan **auto-switches by zoom**: it slides the whole view when zoomed out and slides across the surface when close. An on-screen indicator shows orbiting/panning and the pan mode. | Merged | [#3](https://github.com/Phillip-Com/Nothic-Worlds/pull/3) · `1a9c203` | Revised after the owner tried the first version (pan felt the same as orbit). VISION.md `REN-02` |
 | 2026-09-29 | Milestone 1 split into two PRs: A = planet + camera + performance tools, B = map import | Merged | [#3](https://github.com/Phillip-Com/Nothic-Worlds/pull/3) · `1a9c203` | VISION.md §3 |
 | 2026-09-29 | Milestone 1 does not save; the world file format gets its own design review | Merged | [#3](https://github.com/Phillip-Com/Nothic-Worlds/pull/3) · `1a9c203` | VISION.md §3 |
