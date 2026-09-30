@@ -1,5 +1,6 @@
 using Godot;
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Model;
 using NothicWorlds.Interop;
 
 namespace NothicWorlds.Controls;
@@ -190,6 +191,43 @@ public partial class PlanetCamera : Camera3D
         _targetFocusOffset = Vector3.Zero;
     }
 
+    /// <summary>
+    /// Where the camera is heading, for saving with the world (VISION.md SAV-01).
+    /// </summary>
+    public CameraView GetView()
+    {
+        return new CameraView(
+            _targetLatitude,
+            SphericalCoordinates.WrapLongitude(_targetLongitude),
+            _targetAltitude,
+            _targetFocusOffset.X,
+            _targetFocusOffset.Y,
+            _targetFocusOffset.Z);
+    }
+
+    /// <summary>
+    /// Jumps straight to a saved view (no easing), or to the starting view if it's null. Values
+    /// are clamped to the camera's limits, so a hand-edited file can't break the camera.
+    /// </summary>
+    public void SetView(CameraView? view)
+    {
+        if (view is null)
+        {
+            ResetView();
+        }
+        else
+        {
+            _targetLatitude = Math.Clamp(view.LatitudeDegrees, -MaxLatitude, MaxLatitude);
+            _targetLongitude = view.LongitudeDegrees;
+            _targetAltitude = Mathf.Clamp((float)view.Altitude, MinAltitude, MaxAltitude);
+            var offset = new Vector3(
+                (float)view.FocusOffsetX, (float)view.FocusOffsetY, (float)view.FocusOffsetZ);
+            _targetFocusOffset = offset.LimitLength(PlanetRadius * (1.0f + MaxAltitude));
+        }
+
+        SnapToTarget();
+    }
+
     private void PanAcrossSurface(Vector2 screenDelta)
     {
         // Measured at the ground directly below the camera.
@@ -227,6 +265,13 @@ public partial class PlanetCamera : Camera3D
 
     private void HandleKeyboard(float delta)
     {
+        // Ctrl+key combinations are app shortcuts (e.g. Ctrl+S saves), not camera movement.
+        if (Input.IsKeyPressed(Key.Ctrl))
+        {
+            _keyboardPanning = false;
+            return;
+        }
+
         Vector2 pan = Input.GetVector(
             InputActions.CameraPanWest,
             InputActions.CameraPanEast,

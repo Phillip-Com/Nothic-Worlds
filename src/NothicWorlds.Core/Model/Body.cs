@@ -14,4 +14,15 @@ public sealed class Body
 
     /// <summary>What's drawn on the body's surface.</summary>
     public SurfaceSettings Surface { get; } = new();
+
+    /// <summary>Returns an independent copy of this body.</summary>
+    public Body Clone()
+    {
+        var copy = new Body { Id = Id, Name = Name, Kind = Kind };
+        copy.Surface.FillColor = Surface.FillColor;
+        copy.Surface.Map = Surface.Map is SurfaceMap map
+            ? new SurfaceMap { AssetName = map.AssetName, Projection = map.Projection }
+            : null;
+        return copy;
+    }
 }

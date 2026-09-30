@@ -208,6 +208,17 @@ public sealed class WorldPackageTests : IDisposable
         Assert.Empty(Directory.GetFiles(_folder));
     }
 
+    [Fact]
+    public void Save_ToAMissingFolder_ExplainsInPlainLanguage()
+    {
+        string path = Path.Combine(_folder, "no-such-folder", "world.nworld");
+
+        WorldFileException error = Assert.Throws<WorldFileException>(
+            () => WorldPackage.Save(path, World.CreateNew(), NoAssets()));
+
+        Assert.Equal("Couldn't save the world: the folder doesn't exist.", error.Message);
+    }
+
     // ----- Rejecting bad or future files -----
 
     [Fact]
