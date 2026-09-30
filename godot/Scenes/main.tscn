@@ -1,19 +1,10 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene format=3 uid="uid://dmoudsbhmy6dj"]
 
-[ext_resource type="Script" path="res://Scenes/Main.cs" id="1_main"]
-[ext_resource type="Shader" path="res://Rendering/planet.gdshader" id="2_planet"]
-[ext_resource type="Script" path="res://Controls/PlanetCamera.cs" id="3_camera"]
-[ext_resource type="Script" path="res://Diagnostics/PerformanceOverlay.cs" id="4_overlay"]
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_planet"]
-shader = ExtResource("2_planet")
-
-[sub_resource type="SphereMesh" id="SphereMesh_planet"]
-material = SubResource("ShaderMaterial_planet")
-radius = 1.0
-height = 2.0
-radial_segments = 128
-rings = 64
+[ext_resource type="Script" uid="uid://dq5gwnbmtxdu1" path="res://Scenes/Main.cs" id="1_main"]
+[ext_resource type="Shader" uid="uid://ba86op7q51e5" path="res://Rendering/planet.gdshader" id="2_planet"]
+[ext_resource type="Script" uid="uid://bjw3mq48xq4eq" path="res://Controls/PlanetCamera.cs" id="3_camera"]
+[ext_resource type="Script" uid="uid://drb6l6wugk8su" path="res://Diagnostics/PerformanceOverlay.cs" id="4_overlay"]
+[ext_resource type="Script" path="res://UI/CameraModeIndicator.cs" id="5_indicator"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -22,22 +13,43 @@ ambient_light_source = 2
 ambient_light_color = Color(0.55, 0.6, 0.75, 1)
 ambient_light_energy = 0.35
 
-[node name="Main" type="Node3D"]
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_planet"]
+render_priority = 0
+shader = ExtResource("2_planet")
+shader_parameter/base_color = Color(0.13, 0.27, 0.45, 1)
+shader_parameter/grid_color = Color(0.75, 0.8, 0.9, 1)
+shader_parameter/highlight_color = Color(1, 0.8, 0.35, 1)
+shader_parameter/grid_spacing_degrees = 15.0
+shader_parameter/grid_line_pixels = 1.2
+
+[sub_resource type="SphereMesh" id="SphereMesh_planet"]
+material = SubResource("ShaderMaterial_planet")
+radius = 1.0
+height = 2.0
+radial_segments = 128
+rings = 64
+
+[node name="Main" type="Node3D" unique_id=1552545889]
 script = ExtResource("1_main")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1045668579]
 environment = SubResource("Environment_space")
 
-[node name="Planet" type="MeshInstance3D" parent="."]
+[node name="Planet" type="MeshInstance3D" parent="." unique_id=245576071]
 mesh = SubResource("SphereMesh_planet")
 
-[node name="Sun" type="DirectionalLight3D" parent="."]
-rotation = Vector3(-0.61, -0.52, 0)
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=235107944]
+transform = Transform3D(0.8678192, 0.28464645, -0.4072668, 0, 0.819648, 0.57286745, 0.4968801, -0.49714535, 0.7113063, 0, 0, 0)
 
-[node name="PlanetCamera" type="Camera3D" parent="."]
+[node name="PlanetCamera" type="Camera3D" parent="." unique_id=2020288619]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3164401, 0, 2.0999744)
 near = 0.001
 far = 100.0
 script = ExtResource("3_camera")
 
-[node name="PerformanceOverlay" type="CanvasLayer" parent="."]
+[node name="PerformanceOverlay" type="CanvasLayer" parent="." unique_id=638997302]
 script = ExtResource("4_overlay")
+
+[node name="CameraModeIndicator" type="CanvasLayer" parent="." node_paths=PackedStringArray("Camera")]
+script = ExtResource("5_indicator")
+Camera = NodePath("../PlanetCamera")
