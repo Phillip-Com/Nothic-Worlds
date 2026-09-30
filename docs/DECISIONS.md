@@ -7,6 +7,7 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-09-30 | A world that **matches its saved file** counts as saved (e.g. after undoing back to it) | In PR | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) | VISION.md `UI-03` |
 | 2026-09-30 | **Undo/redo** brought forward, before map warping; covers **all world edits** (pieces, map type, fill color, calibration, Import/Clear Map) | In PR | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) | VISION.md `UI-03` |
 | 2026-09-30 | Undo/redo through an **Edit menu** (names what will be undone) plus Ctrl+Z and Ctrl+Y / Ctrl+Shift+Z | In PR | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) | |
 | 2026-09-30 | The **Delete** key deletes the selected piece; deleting **no longer asks first** because it can be undone | In PR | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) | |

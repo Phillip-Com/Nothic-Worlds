@@ -34,7 +34,7 @@ public partial class WorldSession : Node
     // The map type picked while no map is loaded; the next import uses it.
     private MapProjection _projectionWithoutMap = MapProjection.Mercator;
 
-    // Increases with every edit, so a save only clears "unsaved" if nothing changed meanwhile.
+    // Increases with every edit, so a gesture can tell whether it changed anything.
     private int _editVersion;
 
     // Undo/redo: snapshots of the planet's surface. While a gesture (a drag, or a calibration
@@ -44,6 +44,11 @@ public partial class WorldSession : Node
 
     // Copies of images only the undo history still needs (see AssetStash).
     private AssetStash? _stash;
+
+    // The surface as it is in the saved file (or as a new world started), so the world counts
+    // as saved whenever it matches again, e.g. after undoing back to it. Null when there's
+    // nothing to match (a recovered world is unsaved until it's saved).
+    private SurfaceSettings? _savedSurface;
 
     /// <summary>Raised when anything shown about the world changes (name, file, unsaved state,
     /// busy state, or contents).</summary>
@@ -67,7 +72,10 @@ public partial class WorldSession : Node
     /// <summary>Where the world is saved, or null if it never has been.</summary>
     public string? FilePath { get; private set; }
 
-    /// <summary>True if the world has changes that aren't saved.</summary>
+    /// <summary>
+    /// True if the world differs from its saved file. Undoing back to exactly what was saved
+    /// makes it false again.
+    /// </summary>
     public bool HasUnsavedChanges { get; private set; }
 
     /// <summary>True while a save or open is in progress.</summary>
@@ -114,6 +122,7 @@ public partial class WorldSession : Node
         FilePath = null;
         MapCheck = null;
         HasUnsavedChanges = false;
+        _savedSurface = MainBody.Surface.Clone();
         _projectionWithoutMap = MapProjection.Mercator;
         _pieceTextures = [];
         ResetHistory();
@@ -164,7 +173,6 @@ public partial class WorldSession : Node
         World.View = Camera?.GetView();
         World snapshot = World.Clone();
         var assets = new Dictionary<string, IAssetSource>(_assets);
-        int versionAtSave = _editVersion;
         List<string> neededByHistory = AssetsOnlyInHistory(snapshot, fullPath);
 
         SetBusy(true);
@@ -195,7 +203,8 @@ public partial class WorldSession : Node
         }
 
         FilePath = fullPath;
-        HasUnsavedChanges = _editVersion != versionAtSave;
+        _savedSurface = snapshot.Bodies[0].Surface;  // A private copy, made before saving.
+        UpdateUnsavedState();
 
         // The saved assets now live in the world file, so later saves no longer depend on the
         // original image files (which the user may move or delete). Only images the world
@@ -309,7 +318,7 @@ public partial class WorldSession : Node
     {
         IsCalibrating = true;
         BeginGesture("Calibrate Map");
-        return new CalibrationSnapshot(Calibration, HasUnsavedChanges);
+        return new CalibrationSnapshot(Calibration);
     }
 
     /// <summary>Finishes calibrating (after Done or Cancel).</summary>
@@ -334,7 +343,7 @@ public partial class WorldSession : Node
         Surface?.SetCalibration(snapshot.Calibration);
         _gesture = null;  // Nothing to undo: everything is back as it was.
         _editVersion++;
-        HasUnsavedChanges = snapshot.WasUnsaved;
+        UpdateUnsavedState();
         Changed?.Invoke();
     }
 
@@ -664,6 +673,7 @@ public partial class WorldSession : Node
         _assets = new Dictionary<string, IAssetSource>(loaded.Assets);
         FilePath = savedPath;
         HasUnsavedChanges = unsaved;
+        _savedSurface = unsaved ? null : World.Bodies[0].Surface.Clone();
         MapCheck = map?.Check;
         _projectionWithoutMap = MapProjection.Mercator;
         if (map is not null)
@@ -822,8 +832,14 @@ public partial class WorldSession : Node
     private void MarkChanged()
     {
         _editVersion++;
-        HasUnsavedChanges = true;
+        UpdateUnsavedState();
         Changed?.Invoke();
+    }
+
+    private void UpdateUnsavedState()
+    {
+        HasUnsavedChanges =
+            _savedSurface is null || !MainBody.Surface.HasSameContent(_savedSurface);
     }
 
     private void CloseCurrentWorld()

@@ -55,6 +55,74 @@ public class SurfaceSettingsTests
         Assert.Equal(MapProjection.Robinson, snapshot.Map!.Projection);
     }
 
+    [Fact]
+    public void HasSameContent_ForACopy_IsTrue()
+    {
+        SurfaceSettings original = Sample();
+
+        Assert.True(original.HasSameContent(original.Clone()));
+    }
+
+    [Fact]
+    public void HasSameContent_AfterChangingAndChangingBack_IsTrue()
+    {
+        SurfaceSettings saved = Sample();
+        SurfaceSettings current = saved.Clone();
+
+        current.Pieces[0].Center = new GeoCoordinate(-40, 90);
+        current.Pieces[0].Center = new GeoCoordinate(10, 20);
+
+        Assert.True(current.HasSameContent(saved));
+    }
+
+    [Fact]
+    public void HasSameContent_WithAnEqualButSeparateCalibration_IsTrue()
+    {
+        SurfaceSettings saved = Sample();
+        SurfaceSettings current = saved.Clone();
+
+        current.Map!.Calibration = MapCalibration.CreateDefault();
+
+        Assert.True(current.HasSameContent(saved));
+    }
+
+    [Theory]
+    [InlineData("fill")]
+    [InlineData("no map")]
+    [InlineData("map type")]
+    [InlineData("calibration")]
+    [InlineData("piece moved")]
+    [InlineData("piece turned")]
+    [InlineData("piece resized")]
+    [InlineData("piece renamed")]
+    [InlineData("piece added")]
+    [InlineData("pieces reordered")]
+    public void HasSameContent_NoticesEveryKindOfEdit(string edit)
+    {
+        SurfaceSettings saved = Sample();
+        saved.Pieces.Add(Piece("Second"));
+        SurfaceSettings current = saved.Clone();
+
+        switch (edit)
+        {
+            case "fill": current.FillColor = new RgbColor(0, 0, 0); break;
+            case "no map": current.Map = null; break;
+            case "map type": current.Map!.Projection = MapProjection.Polar; break;
+            case "calibration":
+                current.Map!.Calibration =
+                    MapCalibration.CreateDefault().WithLatitudeDrawnAs(0, -55);
+                break;
+            case "piece moved": current.Pieces[0].Center = new GeoCoordinate(11, 20); break;
+            case "piece turned": current.Pieces[0].RotationDegrees = 5; break;
+            case "piece resized": current.Pieces[0].WidthDegrees = 31; break;
+            case "piece renamed": current.Pieces[0].Name = "Other"; break;
+            case "piece added": current.Pieces.Add(Piece("Third")); break;
+            case "pieces reordered": current.Pieces.Reverse(); break;
+        }
+
+        Assert.False(current.HasSameContent(saved));
+    }
+
     private static SurfaceSettings Sample()
     {
         var surface = new SurfaceSettings

@@ -201,6 +201,8 @@ piece.
 - **Edit menu** beside File, naming what will be undone ("Undo Move Piece 1"), plus **Ctrl+Z**
   and **Ctrl+Y / Ctrl+Shift+Z**.
 - **Deleting doesn't ask first**, since it can be undone.
+- **Saved means "matches the file"** (owner, 2026-09-30): if the world is the same as its saved
+  version (after undoing back, or moving something back by hand), it counts as saved again.
 **Implementation (PR #14):**
 - **Snapshots, not per-edit undo code.** Before each edit, `WorldSession` records a copy of the
   planet's `SurfaceSettings` (small: no images) in a Core `Editing/UndoHistory<T>`, which is
@@ -216,6 +218,10 @@ piece.
   history needs lives in the file being saved over, it's copied to a temporary folder first
   (`Core/Storage/AssetStash.cs`), so undo can still bring it back and later saves still include it.
   The folder is deleted when the world closes.
+- **Saved state:** `WorldSession` keeps the surface as saved and compares with it after every
+  edit (`SurfaceSettings.HasSameContent`, tested for every kind of edit), so the • and the
+  close warning disappear when the world matches its file again. A recovery copy is deleted then
+  too. A recovered world stays unsaved until it's saved.
 - **UI:** `godot/UI/EditMenu.cs`. The Pieces panel's Delete button and the **Delete** key
   (`InputActions.DeleteSelection`) delete right away and say "Ctrl+Z to undo". Text fields keep
   their own Ctrl+Z and Delete while being edited.
