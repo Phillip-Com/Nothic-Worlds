@@ -18,6 +18,10 @@ uniform bool show_grid = true;
 uniform int projection = 1;
 // Map image width divided by height (used by the Mercator projection).
 uniform float map_aspect = 2.0;
+// Flat maps can't reach the poles. Beyond their coverage, the caps fade from the map's edge to
+// this color over `pole_blend_degrees` of latitude (owner's choice: a picked color).
+uniform vec3 pole_color : source_color = vec3(0.9, 0.93, 0.96);
+uniform float pole_blend_degrees = 3.0;
 
 uniform vec3 base_color : source_color = vec3(0.13, 0.27, 0.45);
 uniform vec3 grid_color : source_color = vec3(0.75, 0.8, 0.9);
@@ -40,7 +44,7 @@ float grid_line(float value, float spacing, float pixels) {
 
 // Vertical position in the map image (0 = top, 1 = bottom). Same math as
 // NothicWorlds.Core.Maps.MapProjections.ToImagePosition. Values beyond the map are clamped
-// to its edge, which stretches the edge's pixels over the poles.
+// to its edge; pole_cap() then fades those areas to the pole color.
 float map_v(float latitude) {
 	if (projection == 1) {
 		// Mercator grows without limit toward the poles; anything this far is outside the map.
@@ -71,12 +75,25 @@ vec3 sample_map(float latitude, float longitude) {
 	return textureGrad(surface_map, uv, dx, dy).rgb;
 }
 
+// 0 inside a flat map's coverage, rising to 1 within pole_blend_degrees beyond it. The limit is
+// the same as NothicWorlds.Core.Maps.MapProjections.MercatorLatitudeLimit.
+float pole_cap(float latitude) {
+	if (projection != 1) {
+		return 0.0;
+	}
+	float limit = degrees(atan(sinh(PI / map_aspect)));
+	return smoothstep(0.0, pole_blend_degrees, abs(latitude) - limit);
+}
+
 void fragment() {
 	vec3 direction = normalize(local_direction);
 	float latitude = degrees(asin(clamp(direction.y, -1.0, 1.0)));
 	float longitude = degrees(atan(direction.x, direction.z));
 
-	vec3 color = has_map ? sample_map(latitude, longitude) : base_color;
+	vec3 color = base_color;
+	if (has_map) {
+		color = mix(sample_map(latitude, longitude), pole_color, pole_cap(latitude));
+	}
 
 	if (show_grid) {
 		float grid = max(

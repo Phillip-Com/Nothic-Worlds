@@ -7,9 +7,10 @@ using NothicWorlds.Rendering;
 namespace NothicWorlds.UI;
 
 /// <summary>
-/// Top-left toolbar (VISION.md MAP-01, MAP-03) with "Import Map…", "Clear Map", and a
-/// "Map type" dropdown (Flat map / Globe map), plus a message line underneath. Success messages
-/// fade after a few seconds. Warnings and errors stay until the next action.
+/// Top-left toolbar (VISION.md MAP-01, MAP-03) with "Import Map…", "Clear Map", a "Map type"
+/// dropdown (Flat map / Globe map), and a "Pole color" picker (flat maps only), plus a message
+/// line underneath. Success messages fade after a few seconds. Warnings and errors stay until the
+/// next action.
 /// </summary>
 public partial class MapToolbar : CanvasLayer
 {
@@ -27,6 +28,7 @@ public partial class MapToolbar : CanvasLayer
     private Button _importButton = null!;
     private Button _clearButton = null!;
     private OptionButton _mapType = null!;
+    private Control _poleColorControls = null!;
     private Label _message = null!;
     private FileDialog _fileDialog = null!;
     private bool _isLoading;
@@ -70,6 +72,9 @@ public partial class MapToolbar : CanvasLayer
         _mapType = CreateMapTypeDropdown();
         controls.AddChild(_mapType);
 
+        _poleColorControls = new HBoxContainer();
+        controls.AddChild(_poleColorControls);
+
         _message = CreateLabel("");
         _message.Visible = false;
         _message.AutowrapMode = TextServer.AutowrapMode.WordSmart;
@@ -96,6 +101,9 @@ public partial class MapToolbar : CanvasLayer
         }
 
         Planet.Projection = DefaultProjection;
+        _poleColorControls.AddChild(CreateLabel("  Pole color:"));
+        _poleColorControls.AddChild(CreatePoleColorPicker(Planet));
+        UpdatePoleColorVisibility();
     }
 
     /// <summary>
@@ -149,6 +157,7 @@ public partial class MapToolbar : CanvasLayer
         }
 
         Planet.Projection = (MapProjection)_mapType.GetItemId((int)index);
+        UpdatePoleColorVisibility();
         if (Planet.HasMap)
         {
             DescribeMap("Now showing");
@@ -185,7 +194,7 @@ public partial class MapToolbar : CanvasLayer
             double limit = MapProjections.MercatorLatitudeLimit(aspectRatio);
             ShowMessage(
                 $"{lead}: {summary} as a flat map, covering about {limit:0}°N to {limit:0}°S. " +
-                "Beyond that, its top and bottom edges are stretched to the poles." +
+                "Beyond that, the poles are filled with the Pole color." +
                 $"{resizeNote} Press G to show the grid.",
                 MessageKind.Info);
             return;
@@ -252,6 +261,26 @@ public partial class MapToolbar : CanvasLayer
         dropdown.Select(dropdown.GetItemIndex((int)DefaultProjection));
         dropdown.ItemSelected += OnMapTypeSelected;
         return dropdown;
+    }
+
+    // Only flat maps have polar caps to fill, so the picker is hidden for globe maps.
+    private void UpdatePoleColorVisibility()
+    {
+        _poleColorControls.Visible = Planet is { Projection: MapProjection.Mercator };
+    }
+
+    private static ColorPickerButton CreatePoleColorPicker(PlanetSurface planet)
+    {
+        var picker = new ColorPickerButton
+        {
+            Color = planet.PoleColor,
+            EditAlpha = false,
+            CustomMinimumSize = new Vector2(40, 0),
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Color of the polar caps beyond a flat map's coverage",
+        };
+        picker.ColorChanged += color => planet.PoleColor = color;
+        return picker;
     }
 
     private static Button CreateButton(string text, string tooltip)
