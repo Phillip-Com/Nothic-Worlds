@@ -24,6 +24,19 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 | Open in Godot | Start Godot → **Import** → select `godot/project.godot` |
 | Run the app | In the Godot editor, press **Play** (F5) |
 
+## Controls
+
+| Action | Mouse | Keyboard |
+|--------|-------|----------|
+| Orbit | Left-drag | — |
+| Pan (slides the view when zoomed out, the surface when close) | Right-drag | WASD / arrow keys |
+| Zoom | Scroll wheel | E / Q or + / - |
+| Reset view | — | Home |
+| Toggle lat/long grid | — | G |
+| Performance overlay | — | F3 |
+
+Use **Import Map…** (top-left) to wrap a 2:1 equirectangular map image onto the planet.
+
 ## Repository layout
 
 ```

@@ -57,9 +57,9 @@ in a top-down terrain view. Going smaller than a local region is not a goal.
 
 ## 3. Milestones
 
-**Milestone 1: Planet Viewer** · In Progress. Split into two PRs: **A** = planet, grid, camera,
-and performance tools (PR #3); **B** = map import. Saving is out of scope: the world file format
-gets its own design review.
+**Milestone 1: Planet Viewer** · Complete once PR #4 merges. Split into two PRs: **A** = planet,
+grid, camera, and performance tools (PR #3); **B** = map import (PR #4). Saving is out of scope:
+the world file format gets its own design review.
 A single planet that the user can import a map image onto, with a working camera/movement system.
 The goal is to get the rough idea and the movement system in place. Nothing fancy.
 - One planet (sphere) rendered in 3D (`REN-01`)
@@ -145,6 +145,11 @@ visible. Heavier features go in an opt-in **Advanced** section.
   Measured with no other apps using the graphics chip. With the Godot editor open in the
   background, the same build scores ~125–130 fps, so close the editor before benchmarking. The
   camera indicator added ~12 MB of video memory (font/UI).
+- **Re-measured 2026-09-29 (M1 part B, nothing else running):** the laptop scored ~155 fps
+  on both the part A build and the part B build, so the 207 fps figure was a good day. Treat
+  ~150–160 fps as the realistic baseline, and compare builds back to back. With an **8k map**:
+  ~155 fps, **137 MB video memory** (S3TC), 45 MB app memory. The slowest frames sit around
+  60–70 fps in every build.
 
 **REN-04 — Top-down local region view** · Idea · Base
 **Intent:** Zoom down to a local region and see it as a top-down terrain view.
@@ -177,12 +182,32 @@ editing. This is separate from lore relationships (`LORE-04`).
 
 ### 4.3 Maps & Image Import (`MAP`)
 
-**MAP-01 — Import map image in a supported layout** · Planned (simple form in M1) · Base
+**MAP-01 — Import map image in a supported layout** · In Progress (equirectangular done in M1) · Base
 **Intent:** Import a flat map image and wrap it onto a globe. Supported preset layouts
 (map projections) can be wrapped onto a sphere with little stretching.
 **Notes:** M1 needs only the simplest case: one standard layout (probably equirectangular, a
-2:1 image where lines of latitude and longitude form a straight grid).
-**Implementation:** —
+2:1 image where lines of latitude and longitude form a straight grid). Other projections are
+future work.
+**Implementation (M1, PR #4):**
+- **Rules (Core, tested):** `src/NothicWorlds.Core/Maps/MapImageRules.cs`. The supported layout
+  is 2:1 (±1%). Images over **8192 × 4096** are shrunk, keeping their proportions (owner
+  decision). Images that aren't 2:1 are still applied, **with a warning** (owner decision).
+- **Loading:** `godot/Maps/MapImageLoader.cs`. It accepts PNG/JPG/WebP up to 256 MB and runs on a
+  background thread. It shrinks by repeated halving and then one cubic resize (a 16k image loads
+  in ~2 s; a single Lanczos resize took ~20 s). It builds mipmaps and compresses to **S3TC**
+  (owner decision: ~137 MB of graphics memory for an 8k map instead of ~497 MB, +~2 s load, slight
+  blockiness). If compression fails, it falls back to uncompressed. The CPU copy is freed right
+  after upload.
+- **Display:** `planet.gdshader` samples the map by per-pixel lat/long, and uses a mipmap
+  fix so there's no visible seam at the 180° line. `godot/Rendering/PlanetSurface.cs` applies
+  or clears the map. The grid is hidden when a map is loaded, and **G** toggles it (owner decision).
+- **UI:** `godot/UI/MapToolbar.cs` is the top-left toolbar with **Import Map…** (native file picker)
+  and **Clear Map**, plus a message line. Success messages fade after 6 s. Warnings and errors
+  stay until the next action. A failed import keeps the current map.
+- **Command line:** `-- --map=<path>` imports a map at startup (used for testing and
+  benchmarks).
+- **Verified orientation:** a generated test map with markers at 0°/0°, 45°N, 45°E, 45°W, and
+  180° shows north up, east to the right, and no seam.
 
 **MAP-02 — Manual map placement onto the globe** · Idea · Base
 **Intent:** For maps that aren't in a supported layout, the user cuts the image up and places it
@@ -330,4 +355,6 @@ answered, move the answer into the relevant entry above and remove the question 
 
 New raw ideas go here first, then get sorted into a feature area once reviewed.
 
-- _(empty)_
+- **High-quality textures option (Advanced tier):** a setting to keep maps uncompressed for
+  perfect quality on systems with more graphics memory (~497 MB for an 8k map vs ~137 MB
+  compressed). Raised during `MAP-01`.
