@@ -1,0 +1,17 @@
+# Store text files with LF line endings in the repo and working tree (see CLAUDE.md Section 6).
+* text=auto eol=lf
+
+# Binary files: never convert or diff as text
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.exr binary
+*.hdr binary
+*.ttf binary
+*.otf binary
+*.wav binary
+*.ogg binary
+*.mp3 binary
+*.glb binary
+*.res binary

@@ -1,0 +1,9 @@
+<!-- Core library: world data and simulation. Must never reference Godot (CLAUDE.md Section 9). -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Matches the Godot project's target framework so Godot can reference this library. -->
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+</Project>
