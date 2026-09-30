@@ -10,8 +10,8 @@ public sealed class WorldPackageTests : IDisposable
 {
     private const string AssetName = "assets/0123456789abcdef0123456789abcdef.png";
 
-    // A version 1 world file, exactly as this version writes it. If this test fails, the file
-    // format changed: that must be deliberate, with a new format version and a migration.
+    // A version 1 world file, exactly as the first release wrote it. It must load forever
+    // (upgraded on load). Never edit this.
     private const string GoldenV1Json = """
         {
           "formatVersion": 1,
@@ -28,6 +28,61 @@ public sealed class WorldPackageTests : IDisposable
                 "map": {
                   "asset": "assets/0123456789abcdef0123456789abcdef.png",
                   "projection": "winkel-tripel"
+                },
+                "fillColor": "#112233"
+              }
+            }
+          ],
+          "view": {
+            "latitude": 20,
+            "longitude": -45.5,
+            "altitude": 1.25,
+            "focusOffset": [
+              0.5,
+              0,
+              -0.25
+            ]
+          }
+        }
+        """;
+
+    // A version 2 world file (adds map calibration), exactly as this version writes it. If this
+    // test fails, the file format changed: that must be deliberate, with a new format version,
+    // a migration, and a new golden file. Never edit this.
+    private const string GoldenV2Json = """
+        {
+          "formatVersion": 2,
+          "id": "11111111-2222-3333-4444-555555555555",
+          "name": "Aerth",
+          "createdUtc": "2026-09-30T12:00:00+00:00",
+          "modifiedUtc": "2026-09-30T13:30:00+00:00",
+          "bodies": [
+            {
+              "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aerth",
+              "kind": "planet",
+              "surface": {
+                "map": {
+                  "asset": "assets/0123456789abcdef0123456789abcdef.png",
+                  "projection": "winkel-tripel",
+                  "calibration": {
+                    "latitudes": [
+                      {
+                        "latitude": 30,
+                        "drawnAs": 33.5
+                      }
+                    ],
+                    "longitudes": [
+                      {
+                        "longitude": -180,
+                        "drawnAs": -185
+                      },
+                      {
+                        "longitude": 0,
+                        "drawnAs": 2
+                      }
+                    ]
+                  }
                 },
                 "fillColor": "#112233"
               }
@@ -128,22 +183,69 @@ public sealed class WorldPackageTests : IDisposable
     // ----- The file format itself -----
 
     [Fact]
-    public void WrittenJson_MatchesTheGoldenVersion1File()
+    public void WrittenJson_MatchesTheGoldenVersion2File()
     {
         string path = PathFor("golden.nworld");
 
-        WorldPackage.Save(path, GoldenWorld(), AssetsFromImage());
+        WorldPackage.Save(path, CalibratedGoldenWorld(), AssetsFromImage());
 
-        Assert.Equal(Normalize(GoldenV1Json), Normalize(ReadEntry(path, "world.json")));
+        Assert.Equal(Normalize(GoldenV2Json), Normalize(ReadEntry(path, "world.json")));
     }
 
     [Fact]
-    public void GoldenVersion1File_LoadsAsExpected()
+    public void GoldenVersion2File_LoadsAsExpected()
     {
         string path = WriteRawPackage(
-            "golden-read.nworld", GoldenV1Json, (AssetName, _imageBytes));
+            "golden-v2.nworld", GoldenV2Json, (AssetName, _imageBytes));
 
-        AssertSameWorld(GoldenWorld(), WorldPackage.Load(path).World);
+        AssertSameWorld(CalibratedGoldenWorld(), WorldPackage.Load(path).World);
+    }
+
+    [Fact]
+    public void GoldenVersion1File_StillLoads_WithoutCalibration()
+    {
+        string path = WriteRawPackage(
+            "golden-v1.nworld", GoldenV1Json, (AssetName, _imageBytes));
+
+        World world = WorldPackage.Load(path).World;
+
+        AssertSameWorld(GoldenWorld(), world);
+        Assert.Null(world.Bodies[0].Surface.Map!.Calibration);
+    }
+
+    [Fact]
+    public void ResavingAVersion1File_WritesTheCurrentVersion()
+    {
+        string oldPath = WriteRawPackage("old.nworld", GoldenV1Json, (AssetName, _imageBytes));
+        LoadedWorld loaded = WorldPackage.Load(oldPath);
+        string newPath = PathFor("upgraded.nworld");
+
+        WorldPackage.Save(newPath, loaded.World, loaded.Assets);
+
+        Assert.Contains("\"formatVersion\": 2", ReadEntry(newPath, "world.json"));
+        AssertSameWorld(GoldenWorld(), WorldPackage.Load(newPath).World);
+    }
+
+    [Fact]
+    public void Calibration_SurvivesARoundTrip()
+    {
+        World original = CalibratedGoldenWorld();
+        MapCalibration calibration = original.Bodies[0].Surface.Map!.Calibration!;
+        string path = PathFor("calibrated.nworld");
+
+        WorldPackage.Save(path, original, AssetsFromImage());
+        MapCalibration loaded =
+            WorldPackage.Load(path).World.Bodies[0].Surface.Map!.Calibration!;
+
+        foreach (double lat in new[] { -80.0, -12.0, 30.0, 47.0 })
+        {
+            Assert.Equal(calibration.DrawnLatitude(lat), loaded.DrawnLatitude(lat), 1e-12);
+        }
+
+        foreach (double lon in new[] { -179.0, -45.0, 0.0, 179.0 })
+        {
+            Assert.Equal(calibration.DrawnLongitude(lon), loaded.DrawnLongitude(lon), 1e-12);
+        }
     }
 
     [Fact]
@@ -225,7 +327,7 @@ public sealed class WorldPackageTests : IDisposable
     public void Load_NewerFormatVersion_IsRefusedWithAClearMessage()
     {
         string path = WriteRawPackage(
-            "future.nworld", GoldenV1Json.Replace("\"formatVersion\": 1", "\"formatVersion\": 2"),
+            "future.nworld", GoldenV2Json.Replace("\"formatVersion\": 2", "\"formatVersion\": 3"),
             (AssetName, _imageBytes));
 
         WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
@@ -246,6 +348,20 @@ public sealed class WorldPackageTests : IDisposable
         string json = Normalize(GoldenV1Json).Replace(find, replace);
         Assert.NotEqual(Normalize(GoldenV1Json), json);  // The edit really applied.
         string path = WriteRawPackage("damaged.nworld", json, (AssetName, _imageBytes));
+
+        Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
+    }
+
+    [Theory]
+    [InlineData("\"drawnAs\": 33.5", "\"drawnAs\": 95")]      // Latitude drawn past the pole
+    [InlineData("\"drawnAs\": 2", "\"drawnAs\": 300")]        // Longitude moved half a turn
+    [InlineData("\"drawnAs\": -185", "\"drawnAs\": 10")]      // Longitudes out of order
+    [InlineData("\"drawnAs\": 33.5", "\"drawn\": 33.5")]      // Missing value
+    public void Load_DamagedCalibration_IsRejected(string find, string replace)
+    {
+        string json = Normalize(GoldenV2Json).Replace(find, replace);
+        Assert.NotEqual(Normalize(GoldenV2Json), json);  // The edit really applied.
+        string path = WriteRawPackage("damaged-v2.nworld", json, (AssetName, _imageBytes));
 
         Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
     }
@@ -328,6 +444,16 @@ public sealed class WorldPackageTests : IDisposable
         return world;
     }
 
+    // The golden world with the calibration in the version 2 golden file.
+    private static World CalibratedGoldenWorld()
+    {
+        World world = GoldenWorld();
+        world.Bodies[0].Surface.Map!.Calibration = MapCalibration.Create(
+            [new CalibrationGuide(30, 33.5)],
+            [new CalibrationGuide(-180, -185), new CalibrationGuide(0, 2)]);
+        return world;
+    }
+
     private static void AssertSameWorld(World expected, World actual)
     {
         Assert.Equal(expected.Id, actual.Id);
@@ -346,6 +472,10 @@ public sealed class WorldPackageTests : IDisposable
             Assert.Equal(e.Surface.FillColor, a.Surface.FillColor);
             Assert.Equal(e.Surface.Map?.AssetName, a.Surface.Map?.AssetName);
             Assert.Equal(e.Surface.Map?.Projection, a.Surface.Map?.Projection);
+            Assert.Equal(
+                e.Surface.Map?.Calibration?.Latitudes, a.Surface.Map?.Calibration?.Latitudes);
+            Assert.Equal(
+                e.Surface.Map?.Calibration?.Longitudes, a.Surface.Map?.Calibration?.Longitudes);
         }
     }
 

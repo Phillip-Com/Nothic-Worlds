@@ -13,4 +13,10 @@ public sealed class SurfaceMap
 
     /// <summary>The map type: how the image wraps onto the globe.</summary>
     public MapProjection Projection { get; set; } = MapProjection.Mercator;
+
+    /// <summary>
+    /// Guide-line adjustments for an imprecise map (VISION.md MAP-05), or null for none.
+    /// Immutable, so copies of the world can safely share it.
+    /// </summary>
+    public MapCalibration? Calibration { get; set; }
 }

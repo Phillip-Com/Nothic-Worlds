@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -46,8 +46,13 @@ internal static partial class WorldFormat
     };
 
     // Upgrades older documents one version at a time: entry 0 turns version 1 into version 2,
-    // and so on. Empty until format version 2 exists.
-    private static readonly Func<JsonObject, JsonObject>[] _migrations = [];
+    // and so on. See docs/world-format.md, "Version history".
+    private static readonly Func<JsonObject, JsonObject>[] _migrations =
+    [
+        // 1 → 2: maps gained an optional "calibration" (MAP-05). Version 1 maps simply have
+        // none, so nothing needs changing beyond the version number.
+        document => document,
+    ];
 
     public static string ProjectionName(MapProjection projection) => _projectionNames[projection];
 
