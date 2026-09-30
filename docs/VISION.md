@@ -77,7 +77,8 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
 **Milestone 3: Map Fitting** · In Progress
 - **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace (PR #10).
 - **Part 2:** `MAP-02` cut and place. Core first (PR #11), then the Cut editor, Pieces panel,
-  and live drawing (PR #12), then drag handles on the globe (PR #13), then point warping.
+  and live drawing (PR #12), then drag handles on the globe (PR #13), then undo/redo (`UI-03`,
+  PR #14, brought forward by the owner so warping has it from the start), then point warping.
 
 ---
 
@@ -190,6 +191,38 @@ which bodies orbit which. It likely lives in a side panel and doubles as a way t
 editing. This is separate from lore relationships (`LORE-04`).
 **Notes:** Tabled. Revisit when multiple bodies are introduced.
 **Implementation:** —
+
+**UI-03 — Undo and redo** · Implemented (PR #14) · Base
+**Intent (owner, 2026-09-30):** undo and redo for edits, "sooner rather than later", so mistakes
+(a bad drag, a deleted piece) are easy to take back. The **Delete** key removes the selected
+piece.
+**Design decisions (owner, 2026-09-30):**
+- **Covers all world edits:** pieces, map type, fill color, calibration, and Import/Clear Map.
+- **Edit menu** beside File, naming what will be undone ("Undo Move Piece 1"), plus **Ctrl+Z**
+  and **Ctrl+Y / Ctrl+Shift+Z**.
+- **Deleting doesn't ask first**, since it can be undone.
+**Implementation (PR #14):**
+- **Snapshots, not per-edit undo code.** Before each edit, `WorldSession` records a copy of the
+  planet's `SurfaceSettings` (small: no images) in a Core `Editing/UndoHistory<T>`, which is
+  generic and tested. Undo swaps the copy back (`SurfaceSettings.RestoreFrom`). Any new edit
+  gets undo by calling `RecordUndo("…")` first. **Reuse this for every future edit.**
+- **One step per action:** `BeginGesture` / `EndGesture` turn a whole drag (move, rotate,
+  resize) or a whole Calibrate session into one step. Rapid edits of the same thing merge into
+  one step when they come within a second (the fill color picker, number fields). The history
+  keeps 100 steps, clears on New/Open, and survives saving. Undo waits while a save, open, drag,
+  calibration, or cut is in progress.
+- **Images:** undoing Import/Clear Map reloads the other map image. Piece textures stay in memory
+  while the history still has the piece, so undoing a delete is instant. If an image only the
+  history needs lives in the file being saved over, it's copied to a temporary folder first
+  (`Core/Storage/AssetStash.cs`), so undo can still bring it back and later saves still include it.
+  The folder is deleted when the world closes.
+- **UI:** `godot/UI/EditMenu.cs`. The Pieces panel's Delete button and the **Delete** key
+  (`InputActions.DeleteSelection`) delete right away and say "Ctrl+Z to undo". Text fields keep
+  their own Ctrl+Z and Delete while being edited.
+- **Verified in the running app** (real keyboard and mouse input): drag → Ctrl+Z → Ctrl+Y;
+  Delete → Ctrl+Z (texture back instantly); five fill color changes undone in one step; Clear
+  Map → save over the file → Ctrl+Z reloaded the map from the temporary copy, and saving again
+  wrote it back into the file.
 
 ### 4.3 Maps & Image Import (`MAP`)
 
