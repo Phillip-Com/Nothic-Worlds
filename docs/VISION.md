@@ -67,10 +67,13 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
 - Camera: zoom in and out, pan, and move around the planet (`REN-02`, basic form)
 
 **Milestone 2: Maps + Saving** · In Progress (owner's choice, 2026-09-30)
-- **Part 1:** `MAP-03`, better wrapping for hand-drawn maps (Flat map mode) (PR #5)
-- **Part 2:** the **world save format**, so work persists between sessions. It's foundational,
-  because every later feature adds data to it. It gets its own design review before any code
-  (CLAUDE.md §9: engine-independent, documented, versioned).
+- **Part 1:** `MAP-03`, better wrapping for hand-drawn maps (Flat map mode) (PR #5). This grew
+  into `MAP-04`, atlas and circular map types (PR #6).
+- **Part 2:** the **world save format** (`SAV-01`, `SAV-02`), so work persists between sessions.
+  It's foundational, because every later feature adds data to it. Split into two PRs: the Core
+  format (PR #7), then the app side (File menu, unsaved changes, recovery copies).
+- **Then:** the map fitting tools, `MAP-05` (grid calibration) and `MAP-02` (cut and place). They
+  come after saving (owner's choice), so fitting work is never lost.
 
 ---
 
@@ -450,7 +453,35 @@ This is separate from the star system tree (`UI-02`).
 **Notes:** Tabled. Revisit when the lore features are further along.
 **Implementation:** —
 
-### 4.10 Sharing (`SHR`)
+### 4.10 Saving (`SAV`)
+
+**SAV-01 — Save and open worlds** · In Progress (Core format done) · Base
+**Intent:** A world persists between sessions. It's saved to and opened from a file, with
+nothing lost (CLAUDE.md §4: losing user data is the worst possible bug).
+**Design decisions (owner, 2026-09-30):**
+- **One `.nworld` file per world**, so a world is easy to back up, move, and later share.
+- The **original map image** is copied into the file unchanged, so it can always be re-prepared
+  at full quality.
+- The **camera view** is saved, so a world reopens where the user left off.
+**Implementation (Core, PR #7):** `src/NothicWorlds.Core/Model/` (World, Body, SurfaceSettings,
+SurfaceMap, RgbColor, CameraView) and `src/NothicWorlds.Core/Storage/` (`WorldPackage`). The
+format is specified in [world-format.md](world-format.md): a zip with `world.json` plus
+`assets/`. It's versioned (newer files are refused clearly, older ones upgraded), and uses fixed
+written names for enums. Saving is atomic: write, read back, swap, with a `.bak` of the previous
+save. Everything read is validated as untrusted input. Tests include round trips, a
+**golden version 1 file** (guards the format forever), failure mid-save leaving the old file
+untouched, and rejection of damaged, newer, or path-escaping files.
+**Still to do (next PR):** the app side: File menu (New / Open / Save / Save As, Ctrl+N/O/S,
+Ctrl+Shift+S), window title with an unsaved `•`, and `Documents\Nothic Worlds\` as the default
+folder.
+
+**SAV-02 — Unsaved-changes safety net** · Planned (next PR) · Base
+**Intent (owner's choice, 2026-09-30): manual saving with a safety net.** The user saves with
+Ctrl+S. The app warns before closing or opening another world with unsaved changes, and quietly
+keeps a **recovery copy every 5 minutes**, which it offers back after a crash.
+**Implementation:** —
+
+### 4.11 Sharing (`SHR`)
 
 **SHR-01 — Share a world with players** · Future · —
 **Intent:** Share the world with others in a tabletop setting, e.g. players viewing the world

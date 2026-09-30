@@ -11,16 +11,6 @@ namespace NothicWorlds.Maps;
 /// </summary>
 public static class MapImageLoader
 {
-    /// <summary>File types that can be imported (lowercase, without the dot).</summary>
-    public static readonly IReadOnlyList<string> SupportedExtensions =
-        ["png", "jpg", "jpeg", "webp"];
-
-    /// <summary>
-    /// Largest file accepted. It guards against files that would need more memory to decode than
-    /// a typical laptop has. An 8192 × 4096 map is usually far smaller than this.
-    /// </summary>
-    public const long MaxFileBytes = 256L * 1024 * 1024;
-
     /// <summary>
     /// Loads and prepares the image at <paramref name="path"/>. Must be called from the main
     /// thread, which is where the result is returned.
@@ -46,9 +36,10 @@ public static class MapImageLoader
     private static void ValidateFile(string path)
     {
         string extension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
-        if (!SupportedExtensions.Contains(extension))
+        if (!MapImageRules.SupportedExtensions.Contains(extension))
         {
-            string supported = string.Join(", ", SupportedExtensions).ToUpperInvariant();
+            string supported =
+                string.Join(", ", MapImageRules.SupportedExtensions).ToUpperInvariant();
             throw new MapLoadException($"only {supported} images are supported.");
         }
 
@@ -58,11 +49,11 @@ public static class MapImageLoader
             throw new MapLoadException("the file doesn't exist.");
         }
 
-        if (file.Length > MaxFileBytes)
+        if (file.Length > MapImageRules.MaxFileBytes)
         {
             throw new MapLoadException(
                 $"the file is {file.Length / (1024 * 1024)} MB. The limit is " +
-                $"{MaxFileBytes / (1024 * 1024)} MB.");
+                $"{MapImageRules.MaxFileBytes / (1024 * 1024)} MB.");
         }
     }
 
