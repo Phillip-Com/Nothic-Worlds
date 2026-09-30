@@ -1,12 +1,13 @@
 using Godot;
 using NothicWorlds.Controls;
+using NothicWorlds.Core.Maps;
 
 namespace NothicWorlds.Rendering;
 
 /// <summary>
 /// Controls what's drawn on the planet's surface through <c>planet.gdshader</c>: an imported
-/// map (VISION.md MAP-01) and/or the latitude/longitude grid. The grid shows by default, hides
-/// when a map is applied, and G toggles it.
+/// map (VISION.md MAP-01), how it wraps onto the globe (MAP-03), and the latitude/longitude grid.
+/// The grid shows by default, hides when a map is applied, and G toggles it.
 /// </summary>
 public partial class PlanetSurface : MeshInstance3D
 {
@@ -43,10 +44,21 @@ public partial class PlanetSurface : MeshInstance3D
         }
     }
 
+    /// <summary>
+    /// How the map image wraps onto the globe (VISION.md MAP-03). Changing it takes effect
+    /// immediately, with no reload.
+    /// </summary>
+    public MapProjection Projection
+    {
+        get => (MapProjection)(int)_material.GetShaderParameter("projection");
+        set => _material.SetShaderParameter("projection", (int)value);
+    }
+
     /// <summary>Wraps a map texture onto the planet and hides the grid.</summary>
     public void SetMap(Texture2D texture)
     {
         _material.SetShaderParameter("surface_map", texture);
+        _material.SetShaderParameter("map_aspect", (float)texture.GetWidth() / texture.GetHeight());
         _material.SetShaderParameter("has_map", true);
         HasMap = true;
         ShowGrid = false;
