@@ -77,7 +77,7 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
 **Milestone 3: Map Fitting** · In Progress
 - **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace (PR #10).
 - **Part 2:** `MAP-02` cut and place. Core first (PR #11), then the Cut editor, Pieces panel,
-  and live drawing (PR #12), then drag handles on the globe.
+  and live drawing (PR #12), then drag handles on the globe (PR #13), then point warping.
 
 ---
 
@@ -223,7 +223,7 @@ future work.
 - **Verified orientation:** a generated test map with markers at 0°/0°, 45°N, 45°E, 45°W, and
   180° shows north up, east to the right, and no seam.
 
-**MAP-02 — Manual map placement onto the globe** · In Progress (editor done, PR #12) · Base
+**MAP-02 — Manual map placement onto the globe** · In Progress (handles done, PR #13) · Base
 **Intent:** For maps that aren't in a supported layout, the user cuts the image up and places it
 onto the globe themselves, adjusting for distortion and distance. (Flat maps don't map one-to-one
 onto spheres: areas near the equator are close to true size, and areas near the poles are stretched.)
@@ -238,6 +238,14 @@ onto spheres: areas near the equator are close to true size, and areas near the 
 - **Placing:** directly **on the globe**. Drag to move, corner handles resize, a handle rotates.
 - **Sources:** pieces can come from **any image** (e.g. extra regional maps). Each piece
   remembers its source, and all are saved inside the world file.
+- **Handles work like other map makers (owner, 2026-09-30, after trying PR #12):** typing
+  numbers was hard to use as the main control. Click a piece to select it, drag it to move,
+  drag a corner to resize, drag a handle to rotate. The number fields stay for exact placement.
+- **Resizing keeps proportions** (owner, 2026-09-30). Stretching one way is done by warping.
+- **Warping (owner, 2026-09-30):** an Edit Points mode lets the user drag **every point of the
+  cut** on the globe (4 corners for a rectangle, each clicked point for a freeform cut), and the
+  image stretches smoothly to follow. What was cut out doesn't change. Needs world file format
+  version 4 (where each point was dragged to). Its own PR, after the handles.
 - **Count:** up to a few dozen, drawn **live** for instant feedback. The limit is **32 per
   planet**, to keep the Base tier fast; the cost is measured in the app PR.
 **How pieces sit on the globe:** like a sticker. Distances from the piece's center are true
@@ -293,7 +301,29 @@ earlier ones.
   and reopen restored both pieces and stored both images.
 - **Benchmark (32 pieces):** 32 large pieces (each about a third of an 8k map) cost about 20% of
   the frame rate: ~147 → ~118 fps, video memory 143 → 255 MB. This is well within Base.
-**Still to do (next PR):** drag handles on the globe (move, resize, rotate).
+**Implementation (handles, PR #13):**
+- **Core math** (`Core/Maps/PieceManipulation.cs`, tested without Godot): `PieceAt` finds the
+  topmost piece whose **cut shape** (not just its box) is under a point, so clicks go through the
+  empty part of a freeform piece's box (`PieceOutline.Contains`). `Move` rolls the piece along
+  the globe so the grabbed spot stays under the mouse without twisting. `Rotate` follows the
+  mouse's bearing around the center, and `Resize` scales with its distance from the center.
+  Each works from the drag's starting state, so long drags don't drift.
+  `SphericalCoordinates` gained `ArcDegrees` and `BearingDegrees`.
+- **`godot/Controls/GlobePicker.cs`:** screen ↔ planet surface (ray–sphere). Past the planet's
+  edge a drag uses the nearest edge point, so it keeps working. The Cut editor uses it too.
+- **`godot/Controls/PieceHandles.cs`:** draws the selected piece's box, curved to follow the
+  globe, with corner squares and a rotate handle a fixed screen distance above the top edge.
+  Parts on the far side are hidden. It works only while the Pieces panel shows, so left-drag
+  orbits as usual otherwise, and clicks that miss every piece still orbit. Shift snaps rotation
+  to 15°, Esc deselects, and the cursor shows what a drag will do. The node comes after the
+  camera in the scene, so it gets clicks first.
+- **Selection** lives in `PiecesPanel` (`SelectedPieceId`, `Select`, `SelectionChanged`), shared
+  by the list and the globe. The list is only rebuilt when names or order change, not on every
+  drag step.
+- **Verified in the running app** (simulated mouse input through the real input path): a click
+  selected a piece, and dragging the body, rotate handle, and corner moved, turned, and resized
+  it. Clicking empty space deselected it, and left-drag then orbited the camera.
+**Still to do (next PR):** point warping (Edit Points), world file format version 4.
 
 **MAP-05 — Grid calibration (adjust how the map's lines project)** · Implemented (M3) · Base
 **Intent:** Raised by the owner while testing `MAP-04`. The built-in map types require the image

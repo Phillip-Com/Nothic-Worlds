@@ -63,9 +63,19 @@ To place parts of a map by hand, open **Pieces…**. **Cut from Map…** or **Cu
 the Cut editor: drag a box (**Rectangle**), or click points around a region and click the first
 point again (**Freeform**). Scroll to zoom and right-drag to pan. **Add Piece** puts it on the
 globe: a cut from the main map starts exactly where it already shows, and one from another image
-starts in the middle of the view. Then set its latitude, longitude, rotation, and width in the
-panel. Pieces higher in the list cover lower ones. Up to 32 pieces per planet, all saved with the
-world.
+starts in the middle of the view.
+
+While the Pieces panel is open, click a piece on the globe to select it, then:
+
+| Action | How |
+|--------|-----|
+| Move | Drag the piece |
+| Resize (keeps proportions) | Drag a corner square |
+| Rotate | Drag the round handle above it (hold Shift to snap to 15°) |
+| Deselect | Click empty space or press Esc |
+
+The panel's fields set exact latitude, longitude, rotation, and width. Pieces higher in the list
+cover lower ones. Up to 32 pieces per planet, all saved with the world.
 
 ## Repository layout
 
