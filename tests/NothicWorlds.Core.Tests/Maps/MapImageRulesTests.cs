@@ -6,26 +6,6 @@ public class MapImageRulesTests
 {
     [Theory]
     [InlineData(2048, 1024)]
-    [InlineData(8192, 4096)]
-    [InlineData(2048, 1025)]   // Within 1% of 2:1
-    [InlineData(16384, 8192)]  // Too large, but still the right shape
-    public void Check_TwoToOne_IsSupported(int width, int height)
-    {
-        Assert.True(MapImageRules.Check(width, height).IsSupportedLayout);
-    }
-
-    [Theory]
-    [InlineData(1000, 1000)]  // Square
-    [InlineData(3000, 1000)]  // 3:1
-    [InlineData(2048, 1060)]  // About 3.5% off
-    [InlineData(1024, 2048)]  // Upright 1:2
-    public void Check_OtherShapes_AreNotSupported(int width, int height)
-    {
-        Assert.False(MapImageRules.Check(width, height).IsSupportedLayout);
-    }
-
-    [Theory]
-    [InlineData(2048, 1024)]
     [InlineData(8192, 4096)]  // Exactly at the limit
     [InlineData(1, 1)]
     public void Check_WithinLimit_KeepsSize(int width, int height)

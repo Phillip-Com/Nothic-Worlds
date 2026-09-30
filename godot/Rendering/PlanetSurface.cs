@@ -6,7 +6,8 @@ namespace NothicWorlds.Rendering;
 
 /// <summary>
 /// Controls what's drawn on the planet's surface through <c>planet.gdshader</c>: an imported
-/// map (VISION.md MAP-01), how it wraps onto the globe (MAP-03), and the latitude/longitude grid.
+/// map (VISION.md MAP-01), how it wraps onto the globe (MAP-03, MAP-04), and the
+/// latitude/longitude grid.
 /// The grid shows by default, hides when a map is applied, and G toggles it.
 /// </summary>
 public partial class PlanetSurface : MeshInstance3D
@@ -34,13 +35,14 @@ public partial class PlanetSurface : MeshInstance3D
     }
 
     /// <summary>
-    /// Color of the polar caps beyond a flat map's coverage (VISION.md MAP-03). It has no effect
-    /// on globe maps, which reach the poles.
+    /// Color used where the map doesn't cover the globe, e.g. a flat map's polar caps or a polar
+    /// map's southern hemisphere (VISION.md MAP-03, MAP-04). Map types that cover the whole
+    /// globe ignore it.
     /// </summary>
-    public Color PoleColor
+    public Color FillColor
     {
-        get => (Color)GetParameter("pole_color");
-        set => _material.SetShaderParameter("pole_color", value);
+        get => (Color)GetParameter("fill_color");
+        set => _material.SetShaderParameter("fill_color", value);
     }
 
     public override void _Ready()

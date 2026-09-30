@@ -259,11 +259,14 @@ would hide Godot's `Input` class.)
 | Build everything | `dotnet build NothicWorlds.sln` |
 | Run tests | `dotnet test NothicWorlds.sln` |
 | Check formatting | `dotnet format NothicWorlds.sln --verify-no-changes` |
+| Check line length (Git Bash; prints nothing if OK) | `awk 'length > 100 {print FILENAME":"FNR}' $(git ls-files '*.cs' '*.gdshader')` |
 | Run the app headless (smoke test) | `godot --headless --path godot --quit-after 30` |
 | Performance benchmark (opens fullscreen ~12 s) | `godot --path godot --fullscreen -- --benchmark` |
 
-Before opening a PR, the first four must succeed: the build has no errors, the tests pass, the
-formatting check makes no changes, and the headless run starts without errors. For PRs that
+Before opening a PR, the first five must succeed: the build has no errors, the tests pass, the
+formatting check makes no changes, the line-length check prints nothing, and the headless run
+starts without errors. The line-length check covers the **whole repo**, not just changed files,
+because `dotnet format` doesn't enforce the 100-character limit (Section 6). For PRs that
 affect rendering, also run the benchmark and report its numbers in the PR. Compare them with the
 baseline recorded under `REN-03` in VISION.md, and flag any drop. Other apps using the GPU
 (especially an open Godot editor) skew the results. If a drop shows up, benchmark the previous

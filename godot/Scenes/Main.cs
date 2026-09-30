@@ -9,7 +9,9 @@ namespace NothicWorlds.Scenes;
 /// Root of the main scene. Sets up app-wide input actions, and handles command-line options
 /// (given after <c>--</c>):
 /// <list type="bullet">
-/// <item><c>--map=&lt;path&gt;</c>: import a map image at startup, as if chosen with the button.</item>
+/// <item>
+/// <c>--map=&lt;path&gt;</c>: import a map image at startup, as if chosen with the button.
+/// </item>
 /// <item><c>--benchmark</c>: run the performance benchmark (after the map, if any, loads).</item>
 /// </list>
 /// </summary>
