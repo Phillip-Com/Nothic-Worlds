@@ -76,8 +76,8 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
 
 **Milestone 3: Map Fitting** · In Progress
 - **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace (PR #10).
-- **Part 2:** `MAP-02` cut and place. Core first (PR #11), then the Cut editor and on-globe
-  placement.
+- **Part 2:** `MAP-02` cut and place. Core first (PR #11), then the Cut editor, Pieces panel,
+  and live drawing (PR #12), then drag handles on the globe.
 
 ---
 
@@ -223,7 +223,7 @@ future work.
 - **Verified orientation:** a generated test map with markers at 0°/0°, 45°N, 45°E, 45°W, and
   180° shows north up, east to the right, and no seam.
 
-**MAP-02 — Manual map placement onto the globe** · In Progress (Core done, PR #11) · Base
+**MAP-02 — Manual map placement onto the globe** · In Progress (editor done, PR #12) · Base
 **Intent:** For maps that aren't in a supported layout, the user cuts the image up and places it
 onto the globe themselves, adjusting for distortion and distance. (Flat maps don't map one-to-one
 onto spheres: areas near the equator are close to true size, and areas near the poles are stretched.)
@@ -259,9 +259,41 @@ earlier ones.
 - **World file format version 3:** optional `surface.pieces`. Piece source images are saved and
   loaded like the main map. Versions 1 and 2 upgrade automatically; golden tests for all three
   versions pass.
-**Still to do (next PR):** the Cut editor (rectangle and freeform tools, any image), the pieces
-list, on-globe handles (move, resize, rotate), live shader drawing (up to 32), session edits,
-and a benchmark.
+**Implementation (editor, PR #12):**
+- **Drawing:** `planet.gdshader` draws up to 32 pieces in a loop after the map and before the
+  grid (`draw_pieces`), using the same atan2 sticker math as `PieceProjection`. Each piece is
+  skipped cheaply unless the pixel is within reach of its corners. Mip levels are chosen from the
+  pixel's size on the globe, so the loop has no seams. `PlanetSurface.SetPieces` fills the
+  uniform arrays; it's cheap enough to call on every edit.
+- **Textures:** `godot/Maps/PieceTextureBaker.cs` crops the piece's box from the **original**
+  image, applies the anti-aliased mask as transparency, shrinks it to at most 4096 px, and
+  compresses it (DXT5), like the main map. `WorldSession` bakes each piece when it's added, and
+  bakes all pieces when a world opens (decoding each source image once). A piece whose image
+  can't be read is kept (so saving doesn't lose it) and reported.
+- **Session edits** (`WorldSession`): `AddPieceSource` (registers an image; it's saved only once
+  a piece uses it), `AddPieceAsync`, `PlacePiece`, `RenamePiece`, `RemovePiece`,
+  `MovePieceInOrder`. The most recently decoded source image is kept in memory while cutting
+  and freed when the editor closes. After a save, only the images actually saved are repointed
+  to the world file (`WorldPackage.ReferencedAssetNames`, now public).
+- **Cut editor** (`godot/UI/CutEditor.cs`, `CutCanvas.cs`): full screen, with the 3D view
+  paused. Rectangle (drag a box) or freeform (click points; click the first point or press Enter
+  to close; Backspace removes a point). Scroll zooms around the mouse, right/middle-drag pans,
+  Fit to View resets. `IsCutting` blocks File → New/Open meanwhile. Esc cancels.
+- **Starting placement** (`Core/Maps/PieceStartingPlacement.cs`): a cut from the main map starts
+  **exactly where that part already shows**, including calibration (undone with the new
+  `MapCalibration.TrueLatitude` / `TrueLongitude`), so nothing appears to jump. Its width comes
+  from the arcs from its center to its left and right edges. Other images, and cuts outside a
+  map's outline, start at the middle of the view, 30° wide.
+- **Pieces panel** (`godot/UI/PiecesPanel.cs`, toolbar **Pieces…**): the list (top = drawn on
+  top), Cut from Map… / Cut from Image…, name, exact latitude/longitude/rotation/width fields,
+  Move Up / Move Down, and Delete… (confirmed). It hides whenever the toolbar does.
+- **Verified in the running app** (simulated mouse input): a rectangle cut from the main map
+  landed seamlessly over its source area; moving, rotating, and resizing it, plus a freeform
+  triangle cut from a second image, drew correctly with smooth edges and the right layering. Save
+  and reopen restored both pieces and stored both images.
+- **Benchmark (32 pieces):** 32 large pieces (each about a third of an 8k map) cost about 20% of
+  the frame rate: ~147 → ~118 fps, video memory 143 → 255 MB. This is well within Base.
+**Still to do (next PR):** drag handles on the globe (move, resize, rotate).
 
 **MAP-05 — Grid calibration (adjust how the map's lines project)** · Implemented (M3) · Base
 **Intent:** Raised by the owner while testing `MAP-04`. The built-in map types require the image
@@ -330,6 +362,8 @@ bent locally; that would be the mesh-grid mode). The poles stay fixed.
   down recorded it drawn at 19.2° and updated the globe live. Save and reopen restored it (format
   version 2). Esc restored everything. Robinson curves and Polar rings/spokes drew correctly.
   Benchmark: ~208 fps with or without calibration.
+- **Owner feedback, 2026-09-30:** after trying it hands-on, dragging the lines "feels fine for
+  now".
 
 **MAP-03 — Better wrapping for hand-drawn (flat) maps** · Implemented (Flat map mode, M2) · Base
 **Intent:** Hand-drawn and fantasy-tool maps (e.g. Inkarnate, Wonderdraft) should look right on
