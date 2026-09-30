@@ -178,6 +178,7 @@ global.json                    Pins the .NET SDK version
 .editorconfig                  Formatting and naming rules
 src/NothicWorlds.Core/         Plain C# library, NO Godot references
   Geometry/                    Shared math: coordinates on spheres, conversions
+  Maps/                        Map image rules (layout, size limits)
   Model/                       World data: bodies, maps, journals, calendars
   Simulation/                  Orbits, time, events, weather logic
   Storage/                     Save/load, format versioning, migrations
@@ -187,6 +188,7 @@ godot/                         The Godot project (references Core)
   Rendering/                   Shaders and drawing; reads simulation state, never owns it
   UI/                          Panels, tools, pop-ups
   Controls/                    Input actions, camera and tool controls
+  Maps/                        Loading and preparing map images (background thread)
   Diagnostics/                 Performance overlay (F3) and benchmark
   Interop/                     Conversions between Core types and Godot types
 docs/                          VISION.md, DECISIONS.md, design notes

@@ -16,6 +16,7 @@ public static class InputActions
     public const string CameraZoomOut = "camera_zoom_out";
     public const string CameraReset = "camera_reset";
     public const string TogglePerformanceOverlay = "toggle_performance_overlay";
+    public const string ToggleGrid = "toggle_grid";
 
     /// <summary>
     /// Adds all actions to Godot's input map. Safe to call more than once. Must run before any
@@ -31,6 +32,7 @@ public static class InputActions
         Add(CameraZoomOut, Key.Q, Key.Minus);
         Add(CameraReset, Key.Home);
         Add(TogglePerformanceOverlay, Key.F3);
+        Add(ToggleGrid, Key.G);
     }
 
     private static void Add(string action, params Key[] keys)
