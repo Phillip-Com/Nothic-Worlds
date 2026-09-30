@@ -7,6 +7,7 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-09-30 | Pre-PR checklist adds a **repo-wide line-length check** (100 characters) | In PR | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) | `dotnet format` doesn't enforce it; 9 old violations slipped through. CLAUDE.md §9 |
 | 2026-09-30 | Polar map: centered on the **north** pole, **equator** at the edge; the southern hemisphere uses the fill color | In PR | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) | VISION.md `MAP-04` |
 | 2026-09-30 | Two hemispheres: **west left, east right**, split at 0°/180° | In PR | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) | VISION.md `MAP-04` |
 | 2026-09-30 | Circular map types spread the map with **even spacing** (azimuthal equidistant) | In PR | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) | Rim isn't squished. VISION.md `MAP-04` |

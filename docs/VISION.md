@@ -221,6 +221,24 @@ future work.
 onto the globe themselves, adjusting for distortion and distance. (Flat maps don't map one-to-one
 onto spheres: areas near the equator are close to true size, and areas near the poles are stretched.)
 **Notes:** One of the most complex features. Needs its own design review.
+- **Owner, 2026-09-30** (after testing `MAP-04`): the user should be able to **cut out parts of
+  their image, move them around the globe, and resize them**. This is one of two ways to fit
+  imprecise maps; the other is `MAP-05`.
+- Best for maps of part of a world, maps with no consistent layout, and combining several
+  regional maps.
+**Implementation:** —
+
+**MAP-05 — Grid calibration (adjust how the map's lines project)** · Idea · Base
+**Intent:** Raised by the owner while testing `MAP-04`. The built-in map types require the image
+to follow their layout exactly, but most maps aren't that precise, and even a Gall–Peters map
+still looked slightly pinched at the poles. The user should be able to **adjust how the
+planet's horizontal and vertical lines (latitude/longitude) project onto their map**, adding
+guiding lines so the wrap follows their drawing.
+**Notes:** A likely design, to be reviewed before building: show the flat image with the grid
+drawn over it, and let the user drag lines (e.g. "my equator is here", "60°N is here") on top of
+the closest map type. The wrap then follows those lines. Best for whole-world maps that *almost*
+match a known layout. Works alongside `MAP-02`. The adjustments are user work, so they must be
+**saved** (depends on the world save format).
 **Implementation:** —
 
 **MAP-03 — Better wrapping for hand-drawn (flat) maps** · Implemented (Flat map mode, M2) · Base
@@ -312,6 +330,11 @@ circle types also need horizontal math, and some parts of the image are outside 
 - **Verified end-to-end:** test maps drawn with Core's formulas (a 15° grid plus markers) line up
   exactly under the app's own grid in every type. All four atlas types produce identical globes
   from very different images.
+**Owner feedback (2026-09-30):** tested with a Gall–Peters map. It works, but the image has to
+follow the layout very precisely, which many maps won't, and the poles still looked slightly
+pinched. The owner sees these types as good defaults for precise maps, with manual fitting
+needed for the rest. That led to `MAP-05` (grid calibration) and the expanded `MAP-02` (cut and
+place).
 
 ### 4.4 Celestial Bodies (`BOD`)
 
