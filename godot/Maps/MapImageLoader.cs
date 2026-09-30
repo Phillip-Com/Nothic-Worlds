@@ -1,0 +1,118 @@
+using Godot;
+using NothicWorlds.Core.Maps;
+
+namespace NothicWorlds.Maps;
+
+/// <summary>
+/// Loads a map image from disk and prepares it for the planet (VISION.md MAP-01). It checks the
+/// image against <see cref="MapImageRules"/>, shrinks it if it's too large, builds mipmaps
+/// (smaller copies the GPU uses when zoomed out), and compresses it to save graphics memory. The
+/// slow work runs on a background thread so the app stays responsive.
+/// </summary>
+public static class MapImageLoader
+{
+    /// <summary>File types that can be imported (lowercase, without the dot).</summary>
+    public static readonly IReadOnlyList<string> SupportedExtensions =
+        ["png", "jpg", "jpeg", "webp"];
+
+    /// <summary>
+    /// Largest file accepted. It guards against files that would need more memory to decode than
+    /// a typical laptop has. An 8192 × 4096 map is usually far smaller than this.
+    /// </summary>
+    public const long MaxFileBytes = 256L * 1024 * 1024;
+
+    /// <summary>
+    /// Loads and prepares the image at <paramref name="path"/>. Must be called from the main
+    /// thread, which is where the result is returned.
+    /// </summary>
+    /// <exception cref="MapLoadException">
+    /// The file is missing, unsupported, too large, or unreadable.
+    /// </exception>
+    public static async Task<LoadedMap> LoadAsync(string path)
+    {
+        ValidateFile(path);
+
+        (Image image, MapImageCheck check) = await Task.Run(() => LoadAndPrepare(path));
+
+        // Back on the main thread (Godot resumes awaits there): upload to the GPU, then free the
+        // CPU copy right away instead of waiting for .NET's garbage collector (it can be
+        // hundreds of MB).
+        using (image)
+        {
+            return new LoadedMap(ImageTexture.CreateFromImage(image), check);
+        }
+    }
+
+    private static void ValidateFile(string path)
+    {
+        string extension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
+        if (!SupportedExtensions.Contains(extension))
+        {
+            string supported = string.Join(", ", SupportedExtensions).ToUpperInvariant();
+            throw new MapLoadException($"only {supported} images are supported.");
+        }
+
+        var file = new FileInfo(path);
+        if (!file.Exists)
+        {
+            throw new MapLoadException("the file doesn't exist.");
+        }
+
+        if (file.Length > MaxFileBytes)
+        {
+            throw new MapLoadException(
+                $"the file is {file.Length / (1024 * 1024)} MB. The limit is " +
+                $"{MaxFileBytes / (1024 * 1024)} MB.");
+        }
+    }
+
+    private static (Image Image, MapImageCheck Check) LoadAndPrepare(string path)
+    {
+        Image? image = Image.LoadFromFile(path);
+        if (image is null || image.IsEmpty())
+        {
+            throw new MapLoadException(
+                "the image couldn't be read. It may be damaged or not really that file type.");
+        }
+
+        MapImageCheck check = MapImageRules.Check(image.GetWidth(), image.GetHeight());
+        if (check.NeedsResize)
+        {
+            ShrinkTo(image, check.TargetWidth, check.TargetHeight);
+        }
+
+        Error mipmapResult = image.GenerateMipmaps();
+        if (mipmapResult != Error.Ok)
+        {
+            throw new MapLoadException($"the image couldn't be prepared ({mipmapResult}).");
+        }
+
+        // S3TC compression (owner decision): an 8k map uses ~137 MB of graphics memory instead
+        // of ~497 MB on the baseline laptop, at the cost of ~2 s extra load time and slight
+        // blockiness on fine detail. If it fails, keep the uncompressed image instead of failing
+        // the import.
+        Error compressResult = image.Compress(Image.CompressMode.S3Tc, Image.CompressSource.Srgb);
+        if (compressResult != Error.Ok)
+        {
+            GD.PushWarning($"Map compression failed ({compressResult}); using it uncompressed.");
+        }
+
+        return (image, check);
+    }
+
+    private static void ShrinkTo(Image image, int width, int height)
+    {
+        // Halving (averaging each 2×2 block) is fast and high quality, so do that while the
+        // image is at least twice the target size. Then finish with one smaller resize. Resizing
+        // a 16k image in a single step took ~20 s on the baseline laptop.
+        while (image.GetWidth() >= width * 2 && image.GetHeight() >= height * 2)
+        {
+            image.ShrinkX2();
+        }
+
+        if (image.GetWidth() != width || image.GetHeight() != height)
+        {
+            image.Resize(width, height, Image.Interpolation.Cubic);
+        }
+    }
+}

@@ -10,6 +10,7 @@ namespace NothicWorlds.Diagnostics;
 public partial class PerformanceOverlay : CanvasLayer
 {
     private const double RefreshSeconds = 0.25;
+    private const int ScreenMargin = 12;
     private const double BytesPerMegabyte = 1024.0 * 1024.0;
 
     private Label _label = null!;
@@ -17,7 +18,14 @@ public partial class PerformanceOverlay : CanvasLayer
 
     public override void _Ready()
     {
-        _label = new Label { Position = new Vector2(10, 10) };
+        // Top-right, so it doesn't cover the map toolbar in the top-left.
+        _label = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Right,
+            GrowHorizontal = Control.GrowDirection.Begin,
+        };
+        _label.SetAnchorsAndOffsetsPreset(
+            Control.LayoutPreset.TopRight, Control.LayoutPresetMode.Minsize, ScreenMargin);
         _label.AddThemeColorOverride("font_color", Colors.White);
         _label.AddThemeColorOverride("font_shadow_color", Colors.Black);
         AddChild(_label);
