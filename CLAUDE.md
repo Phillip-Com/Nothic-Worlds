@@ -177,17 +177,23 @@ Directory.Build.props          Shared C# build settings (nullable, style checks,
 global.json                    Pins the .NET SDK version
 .editorconfig                  Formatting and naming rules
 src/NothicWorlds.Core/         Plain C# library, NO Godot references
+  Geometry/                    Shared math: coordinates on spheres, conversions
   Model/                       World data: bodies, maps, journals, calendars
   Simulation/                  Orbits, time, events, weather logic
   Storage/                     Save/load, format versioning, migrations
 tests/NothicWorlds.Core.Tests/ xUnit tests, mirroring Core's folders
 godot/                         The Godot project (references Core)
   Scenes/                      Scene files (.tscn) and their root scripts
-  Rendering/                   Draws simulation state; reads it, never owns it
+  Rendering/                   Shaders and drawing; reads simulation state, never owns it
   UI/                          Panels, tools, pop-ups
-  Input/                       Camera and tool controls
+  Controls/                    Input actions, camera and tool controls
+  Diagnostics/                 Performance overlay (F3) and benchmark
+  Interop/                     Conversions between Core types and Godot types
 docs/                          VISION.md, DECISIONS.md, design notes
 ```
+
+(The controls folder is named `Controls/`, not `Input/`. A namespace called `NothicWorlds.Input`
+would hide Godot's `Input` class.)
 
 - Subfolders are created when the first file needs them. Don't add empty placeholder folders.
 - Dependencies only point one way: `godot/` → `Core`, never the reverse.
@@ -213,8 +219,8 @@ docs/                          VISION.md, DECISIONS.md, design notes
   if the app is sold), its lightweight renderer that runs on integrated graphics, and its
   built-in 3D, UI, and networking.
 - **Renderer:** Godot's **Mobile** renderer. It's lighter than Forward+ and still supports the compute
-  shaders that sculpting and weather will likely need. Performance on the baseline laptop is
-  checked during Milestone 1.
+  shaders that sculpting and weather will likely need. Verified on the baseline laptop in
+  Milestone 1 (see `REN-03` in VISION.md).
 - **Language:** C# (latest language version) with nullable reference types enabled.
 - **.NET:** SDK 9 (pinned in `global.json`). All projects target **net8.0** to match Godot's
   .NET runtime. Core must never target a newer framework than the Godot project.
@@ -252,9 +258,14 @@ docs/                          VISION.md, DECISIONS.md, design notes
 | Run tests | `dotnet test NothicWorlds.sln` |
 | Check formatting | `dotnet format NothicWorlds.sln --verify-no-changes` |
 | Run the app headless (smoke test) | `godot --headless --path godot --quit-after 30` |
+| Performance benchmark (opens fullscreen ~12 s) | `godot --path godot --fullscreen -- --benchmark` |
 
-Before opening a PR, all four must succeed: the build has no errors, the tests pass, the
-formatting check makes no changes, and the headless run starts without errors. On this machine
+Before opening a PR, the first four must succeed: the build has no errors, the tests pass, the
+formatting check makes no changes, and the headless run starts without errors. For PRs that
+affect rendering, also run the benchmark and report its numbers in the PR. Compare them with the
+baseline recorded under `REN-03` in VISION.md, and flag any drop. Other apps using the GPU
+(especially an open Godot editor) skew the results. If a drop shows up, benchmark the previous
+commit under the same conditions before blaming the change. On this machine
 Godot is installed via winget. If the `godot` command isn't on PATH, use the full path to
 `Godot_v4.7.2-stable_mono_win64_console.exe` under
 `%LOCALAPPDATA%\Microsoft\WinGet\Packages\GodotEngine.GodotEngine.Mono_*`.
