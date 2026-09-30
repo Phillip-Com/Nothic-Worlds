@@ -7,6 +7,9 @@
 [ext_resource type="Script" path="res://UI/CameraModeIndicator.cs" id="5_indicator"]
 [ext_resource type="Script" path="res://Rendering/PlanetSurface.cs" id="6_surface"]
 [ext_resource type="Script" path="res://UI/MapToolbar.cs" id="7_toolbar"]
+[ext_resource type="Script" path="res://Session/WorldSession.cs" id="8_session"]
+[ext_resource type="Script" path="res://UI/FileMenu.cs" id="9_filemenu"]
+[ext_resource type="Script" path="res://Session/RecoveryService.cs" id="10_recovery"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -50,6 +53,11 @@ near = 0.001
 far = 100.0
 script = ExtResource("3_camera")
 
+[node name="WorldSession" type="Node" parent="." node_paths=PackedStringArray("Surface", "Camera")]
+script = ExtResource("8_session")
+Surface = NodePath("../Planet")
+Camera = NodePath("../PlanetCamera")
+
 [node name="PerformanceOverlay" type="CanvasLayer" parent="." unique_id=638997302]
 script = ExtResource("4_overlay")
 
@@ -57,6 +65,16 @@ script = ExtResource("4_overlay")
 script = ExtResource("5_indicator")
 Camera = NodePath("../PlanetCamera")
 
-[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("Planet")]
+[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session")]
 script = ExtResource("7_toolbar")
-Planet = NodePath("../Planet")
+Session = NodePath("../WorldSession")
+
+[node name="FileMenu" type="Node" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
+script = ExtResource("9_filemenu")
+Session = NodePath("../WorldSession")
+Toolbar = NodePath("../MapToolbar")
+
+[node name="RecoveryService" type="Node" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
+script = ExtResource("10_recovery")
+Session = NodePath("../WorldSession")
+Toolbar = NodePath("../MapToolbar")

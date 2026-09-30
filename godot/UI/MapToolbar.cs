@@ -1,25 +1,26 @@
-using System.Diagnostics;
 using Godot;
 using NothicWorlds.Core.Maps;
+using NothicWorlds.Interop;
 using NothicWorlds.Maps;
-using NothicWorlds.Rendering;
+using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
 
 /// <summary>
-/// Top-left toolbar (VISION.md MAP-01, MAP-03, MAP-04) with "Import Map…", "Clear Map", a
-/// "Map type" dropdown, and a "Fill color" picker (for map types that don't cover the whole
-/// globe), plus a message line underneath. Success messages fade after a few seconds. Warnings
-/// and errors stay until the next action.
+/// Top-left toolbar (VISION.md MAP-01, MAP-03, MAP-04) with a slot for the File menu,
+/// "Import Map…", "Clear Map", a "Map type" dropdown, and a "Fill color" picker (for map types
+/// that don't cover the whole globe), plus a message line underneath that other parts of the app
+/// can use too. Success messages fade after a few seconds. Warnings and errors stay until the
+/// next message.
 /// </summary>
+/// <remarks>
+/// All edits go through <see cref="WorldSession"/>, so unsaved changes are tracked.
+/// </remarks>
 public partial class MapToolbar : CanvasLayer
 {
     private const int ScreenMargin = 12;
     private const double InfoMessageSeconds = 6.0;
     private const float MessageWidth = 460.0f;
-
-    // New imports start as flat maps (owner decision), which suits hand-drawn maps.
-    private const MapProjection DefaultProjection = MapProjection.Mercator;
 
     private static readonly Color _infoColor = new(0.92f, 0.94f, 0.98f);
     private static readonly Color _warningColor = new(1.0f, 0.8f, 0.35f);
@@ -28,20 +29,22 @@ public partial class MapToolbar : CanvasLayer
     private Button _importButton = null!;
     private Button _clearButton = null!;
     private OptionButton _mapType = null!;
+    private ColorPickerButton _fillColor = null!;
     private Control _fillColorControls = null!;
     private Label _message = null!;
     private FileDialog _fileDialog = null!;
-    private bool _isLoading;
 
-    // The applied map, so its message can be updated when the map type changes.
+    // The imported file's name, for messages. Unknown for maps opened from a world file.
     private string? _mapFileName;
-    private MapImageCheck? _mapCheck;
 
     // Increases with every message, so an old auto-hide timer doesn't hide a newer message.
     private int _messageVersion;
 
-    /// <summary>The planet that maps are applied to.</summary>
-    [Export] public PlanetSurface? Planet { get; set; }
+    /// <summary>The open world that maps are applied to.</summary>
+    [Export] public WorldSession? Session { get; set; }
+
+    /// <summary>Space at the start of the toolbar row, where the File menu goes.</summary>
+    public HBoxContainer MenuArea { get; } = new();
 
     private enum MessageKind
     {
@@ -57,6 +60,7 @@ public partial class MapToolbar : CanvasLayer
 
         var controls = new HBoxContainer();
         layout.AddChild(controls);
+        controls.AddChild(MenuArea);
 
         _importButton = CreateButton(
             "Import Map…", "Wrap a map image (PNG, JPG, WebP) onto the planet");
@@ -64,8 +68,7 @@ public partial class MapToolbar : CanvasLayer
         controls.AddChild(_importButton);
 
         _clearButton = CreateButton("Clear Map", "Remove the map and show the grid");
-        _clearButton.Disabled = true;
-        _clearButton.Pressed += ClearMap;
+        _clearButton.Pressed += () => Session?.ClearMap();
         controls.AddChild(_clearButton);
 
         controls.AddChild(CreateLabel("  Map type:"));
@@ -73,6 +76,9 @@ public partial class MapToolbar : CanvasLayer
         controls.AddChild(_mapType);
 
         _fillColorControls = new HBoxContainer();
+        _fillColorControls.AddChild(CreateLabel("  Fill color:"));
+        _fillColor = CreateFillColorPicker();
+        _fillColorControls.AddChild(_fillColor);
         controls.AddChild(_fillColorControls);
 
         _message = CreateLabel("");
@@ -92,18 +98,35 @@ public partial class MapToolbar : CanvasLayer
         _fileDialog.FileSelected += path => _ = ImportAsync(path);
         AddChild(_fileDialog);
 
-        if (Planet is null)
+        if (Session is null)
         {
-            GD.PushError("MapToolbar has no planet assigned.");
+            GD.PushError("MapToolbar has no world session assigned.");
             _importButton.Disabled = true;
             _mapType.Disabled = true;
             return;
         }
 
-        Planet.Projection = DefaultProjection;
-        _fillColorControls.AddChild(CreateLabel("  Fill color:"));
-        _fillColorControls.AddChild(CreateFillColorPicker(Planet));
-        UpdateFillColorVisibility();
+        Session.Changed += SyncWithWorld;
+        Session.WorldClosed += _ => _mapFileName = null;
+        SyncWithWorld();
+    }
+
+    /// <summary>Shows an informational message that fades after a few seconds.</summary>
+    public void ShowInfo(string text, bool autoHide = true)
+    {
+        ShowMessage(text, MessageKind.Info, autoHide);
+    }
+
+    /// <summary>Shows a warning that stays until the next message.</summary>
+    public void ShowWarning(string text)
+    {
+        ShowMessage(text, MessageKind.Warning);
+    }
+
+    /// <summary>Shows an error that stays until the next message.</summary>
+    public void ShowError(string text)
+    {
+        ShowMessage(text, MessageKind.Error);
     }
 
     /// <summary>
@@ -112,88 +135,83 @@ public partial class MapToolbar : CanvasLayer
     /// </summary>
     public async Task ImportAsync(string path)
     {
-        if (_isLoading || Planet is null)
+        if (Session is null || Session.IsBusy)
         {
             return;
         }
 
         string fileName = Path.GetFileName(path);
-        SetLoading(true);
-        ShowMessage($"Loading {fileName}…", MessageKind.Info, autoHide: false);
-        var stopwatch = Stopwatch.StartNew();
+        ShowInfo($"Loading {fileName}…", autoHide: false);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
-            LoadedMap map = await MapImageLoader.LoadAsync(path);
-            Planet.SetMap(map.Texture);
+            await Session.ImportMapAsync(path);
             GD.Print($"Map imported: {fileName} in {stopwatch.Elapsed.TotalSeconds:0.00} s");
             _mapFileName = fileName;
-            _mapCheck = map.Check;
             DescribeMap("Map applied");
         }
         catch (MapLoadException error)
         {
-            ShowMessage($"Couldn't import {fileName}: {error.Message}", MessageKind.Error);
+            ShowError($"Couldn't import {fileName}: {error.Message}");
         }
         catch (Exception error)
         {
             GD.PushError($"Unexpected error importing {path}: {error}");
-            ShowMessage(
+            ShowError(
                 $"Couldn't import {fileName} because of an unexpected error. " +
-                "Details are in the log.",
-                MessageKind.Error);
-        }
-        finally
-        {
-            SetLoading(false);
+                "Details are in the log.");
         }
     }
 
-    private void OnMapTypeSelected(long index)
+    // Updates the controls to match the open world, e.g. after opening a file.
+    private void SyncWithWorld()
     {
-        if (Planet is null)
+        if (Session is null)
         {
             return;
         }
 
-        Planet.Projection = (MapProjection)_mapType.GetItemId((int)index);
-        UpdateFillColorVisibility();
-        if (Planet.HasMap)
+        _mapType.Select(_mapType.GetItemIndex((int)Session.Projection));
+        _fillColor.Color = Session.FillColor.ToGodot();
+        _fillColorControls.Visible = !MapProjections.CoversWholeGlobe(Session.Projection);
+        _importButton.Disabled = Session.IsBusy;
+        _clearButton.Disabled = Session.IsBusy || Session.MapCheck is null;
+    }
+
+    private void OnMapTypeSelected(long index)
+    {
+        if (Session is null)
+        {
+            return;
+        }
+
+        Session.SetProjection((MapProjection)_mapType.GetItemId((int)index));
+        if (Session.MapCheck is not null)
         {
             DescribeMap("Now showing");
         }
     }
 
-    private void ClearMap()
-    {
-        Planet?.ClearMap();
-        _mapFileName = null;
-        _mapCheck = null;
-        _clearButton.Disabled = true;
-        ShowMessage("Map cleared.", MessageKind.Info);
-    }
-
     // Explains how the current map is shown. `lead` starts the sentence ("Map applied", ...).
     private void DescribeMap(string lead)
     {
-        if (Planet is null || _mapFileName is null || _mapCheck is null)
+        if (Session?.MapCheck is not MapImageCheck check)
         {
             return;
         }
 
-        MapImageCheck check = _mapCheck;
-        MapProjection type = Planet.Projection;
+        MapProjection type = Session.Projection;
         string resizeNote = check.NeedsResize
             ? $" It was shrunk from {check.OriginalWidth} × {check.OriginalHeight} to fit the " +
               $"{MapImageRules.MaxWidth} × {MapImageRules.MaxHeight} size limit."
             : "";
-        string description = $"{lead}: {_mapFileName} ({check.TargetWidth} × " +
+        string description = $"{lead}: {_mapFileName ?? "the map"} ({check.TargetWidth} × " +
             $"{check.TargetHeight}) as a {DescriptiveName(type)}{CoverageNote(type, check)}";
 
         if (MapProjections.ShapeMatches(type, check.AspectRatio))
         {
-            ShowMessage(
-                $"{description}{resizeNote} Press G to show the grid.", MessageKind.Info);
+            ShowInfo($"{description}{resizeNote} Press G to show the grid.");
             return;
         }
 
@@ -201,10 +219,9 @@ public partial class MapToolbar : CanvasLayer
         string advice = type == MapProjection.Equirectangular
             ? " Use a 2:1 equirectangular map, or switch Map type to Flat map."
             : " Check that the map was drawn in this layout.";
-        ShowMessage(
+        ShowWarning(
             $"{description} But its shape is {check.AspectRatio:0.##}:1, and this map type " +
-            $"expects {expected:0.##}:1, so it will look stretched.{advice}{resizeNote}",
-            MessageKind.Warning);
+            $"expects {expected:0.##}:1, so it will look stretched.{advice}{resizeNote}");
     }
 
     // The rest of the sentence after the map type: what the map covers, and what uses the fill.
@@ -239,13 +256,6 @@ public partial class MapToolbar : CanvasLayer
             MapProjection.TwoHemispheres => "two-hemisphere map",
             _ => "map",
         };
-    }
-
-    private void SetLoading(bool isLoading)
-    {
-        _isLoading = isLoading;
-        _importButton.Disabled = isLoading;
-        _clearButton.Disabled = isLoading || Planet is not { HasMap: true };
     }
 
     private async void ShowMessage(string text, MessageKind kind, bool autoHide = true)
@@ -294,29 +304,20 @@ public partial class MapToolbar : CanvasLayer
         dropdown.AddSeparator("Circular");
         dropdown.AddItem("Polar (north)", (int)MapProjection.Polar);
         dropdown.AddItem("Two hemispheres", (int)MapProjection.TwoHemispheres);
-        dropdown.Select(dropdown.GetItemIndex((int)DefaultProjection));
         dropdown.ItemSelected += OnMapTypeSelected;
         return dropdown;
     }
 
-    // The picker only matters for map types that leave part of the globe uncovered.
-    private void UpdateFillColorVisibility()
-    {
-        _fillColorControls.Visible =
-            Planet is not null && !MapProjections.CoversWholeGlobe(Planet.Projection);
-    }
-
-    private static ColorPickerButton CreateFillColorPicker(PlanetSurface planet)
+    private ColorPickerButton CreateFillColorPicker()
     {
         var picker = new ColorPickerButton
         {
-            Color = planet.FillColor,
             EditAlpha = false,
             CustomMinimumSize = new Vector2(40, 0),
             FocusMode = Control.FocusModeEnum.None,
             TooltipText = "Color used where the map doesn't cover the globe",
         };
-        picker.ColorChanged += color => planet.FillColor = color;
+        picker.ColorChanged += color => Session?.SetFillColor(color.ToRgbColor());
         return picker;
     }
 

@@ -1,5 +1,6 @@
 using Godot;
 using NothicWorlds.Core.Maps;
+using NothicWorlds.Core.Storage;
 
 namespace NothicWorlds.Maps;
 
@@ -21,8 +22,23 @@ public static class MapImageLoader
     public static async Task<LoadedMap> LoadAsync(string path)
     {
         ValidateFile(path);
+        return await LoadAsync(new FileAssetSource(path), path);
+    }
 
-        (Image image, MapImageCheck check) = await Task.Run(() => LoadAndPrepare(path));
+    /// <summary>
+    /// Loads and prepares a map image from any source, e.g. an image stored inside a world file.
+    /// Must be called from the main thread, which is where the result is returned.
+    /// </summary>
+    /// <param name="source">Where to read the image's bytes.</param>
+    /// <param name="name">
+    /// The image's file or asset name; its extension says how to decode it.
+    /// </param>
+    /// <exception cref="MapLoadException">The image is unsupported or unreadable.</exception>
+    public static async Task<LoadedMap> LoadAsync(IAssetSource source, string name)
+    {
+        string extension = Path.GetExtension(name).TrimStart('.').ToLowerInvariant();
+        (Image image, MapImageCheck check) =
+            await Task.Run(() => Prepare(Decode(ReadAll(source), extension)));
 
         // Back on the main thread (Godot resumes awaits there): upload to the GPU, then free the
         // CPU copy right away instead of waiting for .NET's garbage collector (it can be
@@ -57,15 +73,45 @@ public static class MapImageLoader
         }
     }
 
-    private static (Image Image, MapImageCheck Check) LoadAndPrepare(string path)
+    private static byte[] ReadAll(IAssetSource source)
     {
-        Image? image = Image.LoadFromFile(path);
-        if (image is null || image.IsEmpty())
+        try
         {
+            using Stream stream = source.OpenRead();
+            using var bytes = new MemoryStream();
+            stream.CopyTo(bytes);
+            return bytes.ToArray();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException
+            or WorldFileException)
+        {
+            throw new MapLoadException($"the image couldn't be read ({error.Message}).");
+        }
+    }
+
+    private static Image Decode(byte[] bytes, string extension)
+    {
+        var image = new Image();
+        Error result = extension switch
+        {
+            "png" => image.LoadPngFromBuffer(bytes),
+            "jpg" or "jpeg" => image.LoadJpgFromBuffer(bytes),
+            "webp" => image.LoadWebpFromBuffer(bytes),
+            _ => Error.FileUnrecognized,
+        };
+
+        if (result != Error.Ok || image.IsEmpty())
+        {
+            image.Dispose();
             throw new MapLoadException(
                 "the image couldn't be read. It may be damaged or not really that file type.");
         }
 
+        return image;
+    }
+
+    private static (Image Image, MapImageCheck Check) Prepare(Image image)
+    {
         MapImageCheck check = MapImageRules.Check(image.GetWidth(), image.GetHeight());
         if (check.NeedsResize)
         {

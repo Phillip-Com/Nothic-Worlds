@@ -17,6 +17,10 @@ public static class InputActions
     public const string CameraReset = "camera_reset";
     public const string TogglePerformanceOverlay = "toggle_performance_overlay";
     public const string ToggleGrid = "toggle_grid";
+    public const string FileNew = "file_new";
+    public const string FileOpen = "file_open";
+    public const string FileSave = "file_save";
+    public const string FileSaveAs = "file_save_as";
 
     /// <summary>
     /// Adds all actions to Godot's input map. Safe to call more than once. Must run before any
@@ -33,6 +37,25 @@ public static class InputActions
         Add(CameraReset, Key.Home);
         Add(TogglePerformanceOverlay, Key.F3);
         Add(ToggleGrid, Key.G);
+        AddShortcut(FileNew, Key.N);
+        AddShortcut(FileOpen, Key.O);
+        AddShortcut(FileSave, Key.S);
+        AddShortcut(FileSaveAs, Key.S, shift: true);
+    }
+
+    // Ctrl (+ Shift) shortcuts. Unlike the camera keys, these follow the key's label, so Ctrl+S
+    // is the key marked S on any keyboard layout. Check them with exactMatch: true, so Ctrl+S
+    // doesn't also fire when Ctrl+Shift+S is pressed.
+    private static void AddShortcut(string action, Key key, bool shift = false)
+    {
+        if (InputMap.HasAction(action))
+        {
+            return;
+        }
+
+        InputMap.AddAction(action);
+        InputMap.ActionAddEvent(
+            action, new InputEventKey { Keycode = key, CtrlPressed = true, ShiftPressed = shift });
     }
 
     private static void Add(string action, params Key[] keys)
