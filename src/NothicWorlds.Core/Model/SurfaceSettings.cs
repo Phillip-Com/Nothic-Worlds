@@ -28,4 +28,31 @@ public sealed class SurfaceSettings
     /// southern hemisphere).
     /// </summary>
     public RgbColor FillColor { get; set; } = DefaultFillColor;
+
+    /// <summary>Returns an independent copy (e.g. a snapshot for undo).</summary>
+    public SurfaceSettings Clone()
+    {
+        var copy = new SurfaceSettings();
+        copy.RestoreFrom(this);
+        return copy;
+    }
+
+    /// <summary>
+    /// Makes these settings an independent copy of <paramref name="source"/> (e.g. to undo an
+    /// edit). Nothing is shared with the source except immutable parts.
+    /// </summary>
+    public void RestoreFrom(SurfaceSettings source)
+    {
+        FillColor = source.FillColor;
+        Map = source.Map is SurfaceMap map
+            ? new SurfaceMap
+            {
+                AssetName = map.AssetName,
+                Projection = map.Projection,
+                Calibration = map.Calibration,  // Immutable, safe to share.
+            }
+            : null;
+        Pieces.Clear();
+        Pieces.AddRange(source.Pieces.Select(piece => piece.Clone()));
+    }
 }
