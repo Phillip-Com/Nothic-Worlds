@@ -21,7 +21,12 @@ public sealed class Body
         var copy = new Body { Id = Id, Name = Name, Kind = Kind };
         copy.Surface.FillColor = Surface.FillColor;
         copy.Surface.Map = Surface.Map is SurfaceMap map
-            ? new SurfaceMap { AssetName = map.AssetName, Projection = map.Projection }
+            ? new SurfaceMap
+            {
+                AssetName = map.AssetName,
+                Projection = map.Projection,
+                Calibration = map.Calibration,  // Immutable, safe to share.
+            }
             : null;
         return copy;
     }

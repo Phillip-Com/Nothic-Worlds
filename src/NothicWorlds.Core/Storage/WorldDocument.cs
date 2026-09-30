@@ -1,8 +1,8 @@
 namespace NothicWorlds.Core.Storage;
 
-// The exact shape of world.json, format version 1 (docs/world-format.md). Kept separate from
-// the Model classes so the file format only changes on purpose. Property names are written in
-// camelCase.
+// The exact shape of world.json, current format version (docs/world-format.md). Kept separate
+// from the Model classes so the file format only changes on purpose. Property names are written
+// in camelCase.
 
 internal sealed class WorldDocument
 {
@@ -33,6 +33,25 @@ internal sealed class MapDocument
 {
     public required string Asset { get; init; }
     public required string Projection { get; init; }
+    public CalibrationDocument? Calibration { get; init; }  // Added in format version 2
+}
+
+internal sealed class CalibrationDocument
+{
+    public required List<LatitudeGuideDocument> Latitudes { get; init; }
+    public required List<LongitudeGuideDocument> Longitudes { get; init; }
+}
+
+internal sealed class LatitudeGuideDocument
+{
+    public required double Latitude { get; init; }
+    public required double DrawnAs { get; init; }
+}
+
+internal sealed class LongitudeGuideDocument
+{
+    public required double Longitude { get; init; }
+    public required double DrawnAs { get; init; }
 }
 
 internal sealed class ViewDocument

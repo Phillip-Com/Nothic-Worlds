@@ -72,8 +72,11 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
 - **Part 2:** the **world save format** (`SAV-01`, `SAV-02`), so work persists between sessions.
   It's foundational, because every later feature adds data to it. Split into two PRs: the Core
   format (PR #7), then the app side (File menu, unsaved changes, recovery copies) (PR #8).
-- **Then:** the map fitting tools, `MAP-05` (grid calibration) and `MAP-02` (cut and place). They
-  come after saving (owner's choice), so fitting work is never lost.
+- **Complete** (PR #8 merged 2026-09-30).
+
+**Milestone 3: Map Fitting** · In Progress
+- **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace.
+- **Part 2:** `MAP-02` cut and place. It gets its own design review.
 
 ---
 
@@ -231,7 +234,7 @@ onto spheres: areas near the equator are close to true size, and areas near the 
   regional maps.
 **Implementation:** —
 
-**MAP-05 — Grid calibration (adjust how the map's lines project)** · Idea · Base
+**MAP-05 — Grid calibration (adjust how the map's lines project)** · In Progress (Core done, PR #9) · Base
 **Intent:** Raised by the owner while testing `MAP-04`. The built-in map types require the image
 to follow their layout exactly, but most maps aren't that precise, and even a Gall–Peters map
 still looked slightly pinched at the poles. The user should be able to **adjust how the
@@ -242,7 +245,35 @@ drawn over it, and let the user drag lines (e.g. "my equator is here", "60°N is
 the closest map type. The wrap then follows those lines. Best for whole-world maps that *almost*
 match a known layout. Works alongside `MAP-02`. The adjustments are user work, so they must be
 **saved** (depends on the world save format).
-**Implementation:** —
+**Design decisions (owner, 2026-09-30):**
+- **Approach: guide lines.** Drag latitude and longitude lines on the flat image to where they
+  really are, and add lines at specific values. Pin points and a mesh grid were the alternatives,
+  possible later "advanced" modes.
+- **Workspace: side by side.** The flat image and lines on the left, the live globe on the right.
+- **All map types** can be calibrated.
+- **Default guides every 30°** of latitude (60°S–60°N) and every 60° of longitude.
+**How it works for every map type:** calibration doesn't bend the image. It changes which
+latitude/longitude the map type reads: "true latitude 30° is drawn where the map type puts
+33.5°". So one method covers all types: straight lines on rectangular types, curved meridians on
+Robinson/Mollweide/Winkel, and rings and spokes on Polar. Each line moves as a whole (it can't be
+bent locally; that would be the mesh-grid mode). The poles stay fixed.
+**Implementation (Core, PR #9):**
+- `src/NothicWorlds.Core/Maps/MapCalibration.cs` is **immutable** (every edit returns a new one,
+  ready for undo). It evaluates `DrawnLatitude` / `DrawnLongitude` through a smooth monotone curve
+  (`MonotoneCurve`, Fritsch–Carlson) that never reverses, so lines can't cross. Longitude wraps
+  smoothly across 180°. Edits: `WithLatitudeDrawnAs` / `WithLongitudeDrawnAs` (kept between
+  neighbors), `AddLatitude` / `AddLongitude` (start where the value is currently drawn),
+  `Remove…`. `Bake…Table` produces lookup tables for the shader.
+- `MapProjectionInverter.cs`: the image position → latitude/longitude, for any map type
+  (numerical: a cached coarse lattice, then Newton refinement). Returns null outside the map's
+  outline. Used to turn mouse drags into values. Reuse it for anything that needs "what's under
+  the mouse" on a flat map.
+- **World file format version 2** (first format change): optional `map.calibration`. Version 1
+  files upgrade automatically. Golden tests for **both** versions must pass forever.
+- Also: points exactly on a coverage edge (a polar map's rim) now count as on the map, despite
+  rounding.
+**Still to do (next PR):** the Calibrate… workspace (side by side, draggable lines, live globe),
+the shader lookup tables, and saving calibrations through the session.
 
 **MAP-03 — Better wrapping for hand-drawn (flat) maps** · Implemented (Flat map mode, M2) · Base
 **Intent:** Hand-drawn and fantasy-tool maps (e.g. Inkarnate, Wonderdraft) should look right on

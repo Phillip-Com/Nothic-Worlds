@@ -30,6 +30,8 @@ public class WorldTests
         Assert.Equal("assets/x.png", copy.Bodies[0].Surface.Map!.AssetName);
         Assert.Equal(MapProjection.Robinson, copy.Bodies[0].Surface.Map!.Projection);
         Assert.Equal(new RgbColor(9, 8, 7), copy.Bodies[0].Surface.FillColor);
+        Assert.Same(
+            original.Bodies[0].Surface.Map!.Calibration, copy.Bodies[0].Surface.Map!.Calibration);
     }
 
     [Fact]
@@ -57,6 +59,7 @@ public class WorldTests
         {
             AssetName = "assets/x.png",
             Projection = MapProjection.Robinson,
+            Calibration = MapCalibration.CreateDefault().WithLatitudeDrawnAs(0, -55),
         };
         world.Bodies[0].Surface.FillColor = new RgbColor(9, 8, 7);
         return world;

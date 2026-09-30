@@ -1,3 +1,4 @@
+using NothicWorlds.Core.Maps;
 using NothicWorlds.Core.Model;
 
 namespace NothicWorlds.Core.Storage;
@@ -54,9 +55,31 @@ internal static class WorldMapper
                 {
                     Asset = map.AssetName,
                     Projection = WorldFormat.ProjectionName(map.Projection),
+                    Calibration = map.Calibration is null ? null : ToDocument(map.Calibration),
                 },
                 FillColor = body.Surface.FillColor.ToHex(),
             },
+        };
+    }
+
+    private static CalibrationDocument ToDocument(MapCalibration calibration)
+    {
+        return new CalibrationDocument
+        {
+            Latitudes = calibration.Latitudes
+                .Select(g => new LatitudeGuideDocument
+                {
+                    Latitude = g.Degrees,
+                    DrawnAs = g.DrawnAsDegrees,
+                })
+                .ToList(),
+            Longitudes = calibration.Longitudes
+                .Select(g => new LongitudeGuideDocument
+                {
+                    Longitude = g.Degrees,
+                    DrawnAs = g.DrawnAsDegrees,
+                })
+                .ToList(),
         };
     }
 
@@ -95,10 +118,30 @@ internal static class WorldMapper
             {
                 AssetName = map.Asset,
                 Projection = WorldFormat.ParseProjection(map.Projection),
+                Calibration = map.Calibration is null ? null : ToCalibration(map.Calibration),
             };
         }
 
         return body;
+    }
+
+    private static MapCalibration ToCalibration(CalibrationDocument document)
+    {
+        Require(
+            document.Latitudes is not null && document.Longitudes is not null
+                && document.Latitudes.All(g => g is not null)
+                && document.Longitudes.All(g => g is not null),
+            "the map calibration is incomplete");
+        try
+        {
+            return MapCalibration.Create(
+                document.Latitudes!.Select(g => new CalibrationGuide(g.Latitude, g.DrawnAs)),
+                document.Longitudes!.Select(g => new CalibrationGuide(g.Longitude, g.DrawnAs)));
+        }
+        catch (ArgumentException error)
+        {
+            throw new WorldFileException($"The world data is damaged: {error.Message}");
+        }
     }
 
     private static CameraView ToView(ViewDocument document)
