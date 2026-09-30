@@ -7,9 +7,9 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-09-30 | Pieces are handled **like stamps in other map makers**: click to select, drag to move, corners resize, a handle rotates; number fields kept for exact values | In PR | [#13](https://github.com/Phillip-Com/Nothic-Worlds/pull/13) | Owner found typing numbers hard as the main control. VISION.md `MAP-02` |
-| 2026-09-30 | Corner resizing **keeps proportions**; stretching one way is done by warping | In PR | [#13](https://github.com/Phillip-Com/Nothic-Worlds/pull/13) | |
-| 2026-09-30 | **Warping**: drag every point of a piece's cut on the globe and the image stretches to follow | In PR | [#13](https://github.com/Phillip-Com/Nothic-Worlds/pull/13) | Recorded here; built in the next PR (world file format version 4) |
+| 2026-09-30 | Pieces are handled **like stamps in other map makers**: click to select, drag to move, corners resize, a handle rotates; number fields kept for exact values | Merged | [#13](https://github.com/Phillip-Com/Nothic-Worlds/pull/13) · `e79c89f` | Owner found typing numbers hard as the main control. VISION.md `MAP-02` |
+| 2026-09-30 | Corner resizing **keeps proportions**; stretching one way is done by warping | Merged | [#13](https://github.com/Phillip-Com/Nothic-Worlds/pull/13) · `e79c89f` | |
+| 2026-09-30 | **Warping**: drag every point of a piece's cut on the globe and the image stretches to follow | Merged | [#13](https://github.com/Phillip-Com/Nothic-Worlds/pull/13) · `e79c89f` | Recorded here; built in the next PR (world file format version 4) |
 | 2026-09-30 | Map pieces are cut with a **rectangle and freeform outlines** | Merged | [#11](https://github.com/Phillip-Com/Nothic-Worlds/pull/11) · `d837931` | VISION.md `MAP-02` |
 | 2026-09-30 | Pieces are moved, resized, and rotated **directly on the globe** | Merged | [#11](https://github.com/Phillip-Com/Nothic-Worlds/pull/11) · `d837931` | Built in the next PR |
 | 2026-09-30 | Pieces can come from **any imported image**, all saved inside the world file | Merged | [#11](https://github.com/Phillip-Com/Nothic-Worlds/pull/11) · `d837931` | |
