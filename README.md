@@ -35,10 +35,19 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 | Toggle lat/long grid | — | G |
 | Performance overlay | — | F3 |
 
-Use **Import Map…** (top-left) to wrap a map image onto the planet. Set **Map type** to match it:
-**Flat map** (the default) for hand-drawn and fantasy-tool maps, or **Globe map** for 2:1
-equirectangular maps made for globes. Flat maps don't reach the poles, so pick the polar caps'
-color with **Pole color**.
+Use **Import Map…** (top-left) to wrap a map image onto the planet. Set **Map type** to match the
+layout the map was drawn in:
+
+| Map type | For |
+|----------|-----|
+| **Flat map** (default) | Hand-drawn and fantasy-tool maps; keeps shapes as drawn |
+| **Globe map** | 2:1 equirectangular maps made for globes |
+| **Robinson**, **Winkel tripel**, **Mollweide**, **Gall–Peters** | Maps drawn in those atlas layouts |
+| **Polar (north)** | One circle: north pole in the center, equator at the edge |
+| **Two hemispheres** | Two circles: western hemisphere left, eastern right |
+
+Where a map doesn't cover the globe (a flat map's polar caps, a polar map's southern
+hemisphere), pick the color with **Fill color**.
 
 ## Repository layout
 

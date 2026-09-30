@@ -196,7 +196,9 @@ future work.
 - **Rules (Core, tested):** `src/NothicWorlds.Core/Maps/MapImageRules.cs`. The supported layout
   is 2:1 (±1%). Images over **8192 × 4096** are shrunk, keeping their proportions (owner
   decision). Images that aren't 2:1 are still applied, **with a warning** (owner decision). Since
-  `MAP-03`, the warning applies only to Globe maps, because Flat maps accept any shape.
+  `MAP-03`, the warning applies only to Globe maps, because Flat maps accept any shape. Since
+  `MAP-04`, the shape check lives in `MapProjections.ShapeMatches`, with an expected shape per map
+  type.
 - **Loading:** `godot/Maps/MapImageLoader.cs`. It accepts PNG/JPG/WebP up to 256 MB and runs on a
   background thread. It shrinks by repeated halving and then one cubic resize (a 16k image loads
   in ~2 s; a single Lanczos resize took ~20 s). It builds mipmaps and compresses to **S3TC**
@@ -252,22 +254,23 @@ the equator vertically.
   `MercatorLatitudeLimit` (a 2:1 map covers ~66.5°N–66.5°S, 1:1 ~85°, 3:1 ~51°). Reuse
   `ToImagePosition` for anything that needs to find the map pixel under a globe position, such as
   pins or region outlines.
-- **Shader:** `planet.gdshader` `map_v()` mirrors the Core math, and `pole_cap()` fades to
-  `pole_color` past the coverage limit. The `projection`, `map_aspect`, and `pole_color`
-  uniforms are set by `PlanetSurface.Projection` / `SetMap` / `PoleColor`. The map sampler now
+- **Shader:** `planet.gdshader` mirrors the Core math, and fades to the fill color past the
+  coverage limit. The `projection`, `map_aspect`, and fill color uniforms are set by
+  `PlanetSurface.Projection` / `SetMap` / `FillColor`. (In `MAP-04`, "Pole color" was renamed
+  "Fill color" because more map types leave areas uncovered.) The map sampler now
   **clamps** instead of repeating, so the top edge never picks up the bottom edge's colors.
 - **Reading shader settings:** `PlanetSurface` falls back to the shader's own default for any
   setting the material hasn't stored yet (`GetParameter`). This fixed a PR #4 bug where the first
   G press did nothing before a map was loaded. Use the same pattern for any future shader
   settings.
-- **UI:** the Map type dropdown and Pole color picker live in `godot/UI/MapToolbar.cs`. Messages
+- **UI:** the Map type dropdown and Fill color picker live in `godot/UI/MapToolbar.cs`. Messages
   state the coverage for flat maps. The 2:1 warning now applies only to Globe maps, and it
   suggests Flat map.
 - **Verified:** a flat-drawn test map of equal circles stays round in Flat mode (smaller toward
   the poles) and turns into teardrops in Globe mode. The cap shows the pole color with a soft
   blend, and the picker swatch matches it.
 
-**MAP-04 — Atlas map types** · Planned (next PR after #5) · Base
+**MAP-04 — Atlas map types** · Implemented (M2) · Base
 **Intent:** Support popular atlas layouts as additional **Map type** options, so maps drawn in
 those styles wrap onto the globe correctly. The owner chose:
 - **Robinson:** classic school/wall atlas look
@@ -282,7 +285,33 @@ Robinson template). For freehand maps, Flat map is usually best. Layout details 
 the Polar map is centered on, and how Two hemispheres splits the globe) get a short owner review
 before building. Build on `MapProjections` (Core) and `map_v()` in the shader. The oval and
 circle types also need horizontal math, and some parts of the image are outside the map.
-**Implementation:** —
+**Layout decisions (owner, 2026-09-30):**
+- **Polar** is centered on the **north** pole, with the **equator** at the circle's edge. The
+  southern hemisphere uses the fill color.
+- **Two hemispheres** puts **west on the left and east on the right**, split at 0° and 180°.
+- Inside the circles, the map is spread with **even spacing** (azimuthal equidistant), so the rim
+  isn't squished.
+**Implementation (M2, PR #6):**
+- **Math (Core, tested):** `MapProjections.ToImagePosition` covers all eight types. Also
+  `ExpectedAspectRatio` (Robinson ≈1.97, Winkel tripel ≈1.64, Mollweide 2, Gall–Peters ≈1.57,
+  Polar 1, Two hemispheres 2), `ShapeMatches` (5% tolerance for atlas and circular types, 1% for
+  Globe), and `CoversWholeGlobe` (false for Flat and Polar, which use the fill color).
+  Reference values in the tests come from a separate implementation, not the code under test.
+  Mismatched images are stretched to fit, with a warning.
+- **Shader:** one `project_*` function per type. Three things keep edges clean:
+  - **Seams (mipmap choice):** a second, continuous copy of the position picks the mipmap level at
+    the 180° line. Two hemispheres computes both circles and keeps its own.
+  - **Outline bleed:** `keep_inside_map` pulls samples just inside a circle's rim or the curved
+    side outlines, by the filter width, so background pixels outside the map never blend in.
+    Measured: a visible dark line (brightness dip of ~10/255) at the hemisphere splits is gone.
+  - **Mollweide's iterative solve** runs once per pixel (`mollweide_theta`), not four times.
+    That brought it from ~118 to ~165 fps, level with the other types.
+- **UI:** the dropdown is grouped (Flat / Globe, **Atlas**, **Circular**). The **Fill color**
+  picker shows for Flat and Polar. Messages name the type, state the coverage, and warn with
+  the expected shape when the image doesn't match.
+- **Verified end-to-end:** test maps drawn with Core's formulas (a 15° grid plus markers) line up
+  exactly under the app's own grid in every type. All four atlas types produce identical globes
+  from very different images.
 
 ### 4.4 Celestial Bodies (`BOD`)
 
