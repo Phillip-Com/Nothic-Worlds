@@ -190,6 +190,7 @@ godot/                         The Godot project (references Core)
   UI/                          Panels, tools, pop-ups
   Controls/                    Input actions, camera and tool controls
   Maps/                        Loading and preparing map images (background thread)
+  Session/                     The open world (all edits go through WorldSession), recovery
   Diagnostics/                 Performance overlay (F3) and benchmark
   Interop/                     Conversions between Core types and Godot types
 docs/                          VISION.md, DECISIONS.md, design notes

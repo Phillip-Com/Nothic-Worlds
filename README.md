@@ -34,6 +34,11 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 | Reset view | — | Home |
 | Toggle lat/long grid | — | G |
 | Performance overlay | — | F3 |
+| New world / Open / Save / Save As | **File** menu | Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S |
+
+Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
+before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers
+back after a crash.
 
 Use **Import Map…** (top-left) to wrap a map image onto the planet. Set **Map type** to match the
 layout the map was drawn in:

@@ -71,7 +71,7 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
   into `MAP-04`, atlas and circular map types (PR #6).
 - **Part 2:** the **world save format** (`SAV-01`, `SAV-02`), so work persists between sessions.
   It's foundational, because every later feature adds data to it. Split into two PRs: the Core
-  format (PR #7), then the app side (File menu, unsaved changes, recovery copies).
+  format (PR #7), then the app side (File menu, unsaved changes, recovery copies) (PR #8).
 - **Then:** the map fitting tools, `MAP-05` (grid calibration) and `MAP-02` (cut and place). They
   come after saving (owner's choice), so fitting work is never lost.
 
@@ -455,7 +455,7 @@ This is separate from the star system tree (`UI-02`).
 
 ### 4.10 Saving (`SAV`)
 
-**SAV-01 — Save and open worlds** · In Progress (Core format done) · Base
+**SAV-01 — Save and open worlds** · Implemented (M2) · Base
 **Intent:** A world persists between sessions. It's saved to and opened from a file, with
 nothing lost (CLAUDE.md §4: losing user data is the worst possible bug).
 **Design decisions (owner, 2026-09-30):**
@@ -471,15 +471,44 @@ written names for enums. Saving is atomic: write, read back, swap, with a `.bak`
 save. Everything read is validated as untrusted input. Tests include round trips, a
 **golden version 1 file** (guards the format forever), failure mid-save leaving the old file
 untouched, and rejection of damaged, newer, or path-escaping files.
-**Still to do (next PR):** the app side: File menu (New / Open / Save / Save As, Ctrl+N/O/S,
-Ctrl+Shift+S), window title with an unsaved `•`, and `Documents\Nothic Worlds\` as the default
-folder.
+**Implementation (app, PR #8):**
+- **`godot/Session/WorldSession.cs`** holds the open world. **Every edit goes through it**
+  (import or clear map, map type, fill color), so the Core model always matches the screen and
+  unsaved changes are always tracked. Save and open run in the background. A save works on a
+  `World.Clone()` snapshot, and only clears "unsaved" if nothing changed meanwhile. After saving,
+  assets are read from the saved file, so moving or deleting the original image is safe. If a
+  world's map image can't be shown on open, the world still opens and the image data is kept.
+  Reuse the session for any future world edit (journals, bodies, fitting adjustments).
+- **`godot/UI/FileMenu.cs`**: the File menu (New / Open / Save / Save As, Ctrl+N/O/S,
+  Ctrl+Shift+S, matched exactly so Ctrl+Shift+S isn't also Ctrl+S). It uses native file dialogs
+  starting in `Documents\Nothic Worlds\`, and sets the window title to `Name • — Nothic Worlds`
+  when there are unsaved changes.
+- The **world's name follows its file name** on save. Camera movement doesn't count as an
+  unsaved change, but the view is saved with every save.
+- `MapImageLoader` can load from any `IAssetSource`, including an image inside a world file.
+  `PlanetCamera.GetView/SetView` save and restore the view (clamped to the camera's limits).
+  Camera keys are ignored while Ctrl is held, so shortcuts don't move the view.
+- **Verified end to end** in the running app: import, edit, and save, with the saved image
+  byte-identical to the original (SHA-256). Reopening restores the map type, fill color, and
+  camera view. A save failure gives a plain-language message.
 
-**SAV-02 — Unsaved-changes safety net** · Planned (next PR) · Base
+**SAV-02 — Unsaved-changes safety net** · Implemented (M2) · Base
 **Intent (owner's choice, 2026-09-30): manual saving with a safety net.** The user saves with
 Ctrl+S. The app warns before closing or opening another world with unsaved changes, and quietly
 keeps a **recovery copy every 5 minutes**, which it offers back after a crash.
-**Implementation:** —
+**Implementation (PR #8):**
+- **Warning:** a "Save changes to “Name” before …?" dialog (Save / Don't Save / Cancel) before
+  New, Open, and closing the window. Closing is intercepted (`AutoAcceptQuit = false`). Choosing
+  Save on a never-saved world opens Save As, and cancelling that cancels the close.
+- **Recovery:** `godot/Session/RecoveryService.cs` writes a copy in the background every 5
+  minutes while there are unsaved changes, via Core `RecoveryStore` (a normal `.nworld` plus a
+  note with the original location, in the app's user-data folder). On the next start after a
+  crash, it offers **Recover / Discard** for the newest copy. A recovered world is marked unsaved
+  and keeps its original save location. Copies are deleted when the world is saved, or when its
+  changes are knowingly discarded. A copy that fails to recover is **kept**, never deleted.
+- **Verified end to end:** unsaved work with a simulated crash left a recovery copy, the next
+  start showed the offer, Recover restored the map, and saving then deleted the copy. The close
+  warning appears with unsaved changes.
 
 ### 4.11 Sharing (`SHR`)
 
