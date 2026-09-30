@@ -14,6 +14,7 @@
 [ext_resource type="Script" path="res://UI/PiecesPanel.cs" id="12_pieces"]
 [ext_resource type="Script" path="res://UI/CutEditor.cs" id="13_cut"]
 [ext_resource type="Script" path="res://Controls/PieceHandles.cs" id="14_handles"]
+[ext_resource type="Script" path="res://UI/EditMenu.cs" id="15_edit"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -107,3 +108,8 @@ script = ExtResource("14_handles")
 Session = NodePath("../WorldSession")
 Camera = NodePath("../PlanetCamera")
 Panel = NodePath("../PiecesPanel")
+
+[node name="EditMenu" type="Node" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
+script = ExtResource("15_edit")
+Session = NodePath("../WorldSession")
+Toolbar = NodePath("../MapToolbar")

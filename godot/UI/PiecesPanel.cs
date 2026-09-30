@@ -1,4 +1,5 @@
 using Godot;
+using NothicWorlds.Controls;
 using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Maps;
 using NothicWorlds.Core.Model;
@@ -10,7 +11,8 @@ namespace NothicWorlds.UI;
 /// <summary>
 /// The Pieces panel (VISION.md MAP-02), on the right of the screen: lists the planet's map
 /// pieces (the top of the list is drawn on top), starts new cuts, and edits the selected
-/// piece's name, position, rotation, and size with exact numbers.
+/// piece's name, position, rotation, and size with exact numbers. The Delete key removes the
+/// selected piece (Ctrl+Z brings it back).
 /// </summary>
 /// <remarks>
 /// All edits go through <see cref="WorldSession"/>, so unsaved changes are tracked.
@@ -18,6 +20,9 @@ namespace NothicWorlds.UI;
 public partial class PiecesPanel : CanvasLayer
 {
     private const int ScreenMargin = 12;
+
+    // Starts below the toolbar row, which can reach this far right on narrow windows.
+    private const int TopOffset = 56;
     private const float PanelWidth = 300.0f;
 
     private Label _heading = null!;
@@ -33,7 +38,6 @@ public partial class PiecesPanel : CanvasLayer
     private Button _upButton = null!;
     private Button _downButton = null!;
     private FileDialog _fileDialog = null!;
-    private ConfirmationDialog _deleteDialog = null!;
     private bool _open;
 
     // The pieces as listed (top of the list = drawn on top), and which one is selected.
@@ -76,6 +80,7 @@ public partial class PiecesPanel : CanvasLayer
         panel.SetAnchorsAndOffsetsPreset(
             Control.LayoutPreset.TopRight, Control.LayoutPresetMode.Minsize, ScreenMargin);
         panel.GrowHorizontal = Control.GrowDirection.Begin;  // Wider content grows leftward.
+        panel.OffsetTop = TopOffset;
         AddChild(panel);
 
         var margin = new MarginContainer();
@@ -118,9 +123,6 @@ public partial class PiecesPanel : CanvasLayer
         _fileDialog.FileSelected += path => _ = CutFromFileAsync(path);
         AddChild(_fileDialog);
 
-        _deleteDialog = new ConfirmationDialog { Title = "Delete Piece", OkButtonText = "Delete" };
-        _deleteDialog.Confirmed += DeleteSelected;
-        AddChild(_deleteDialog);
 
         if (Toolbar is not null)
         {
@@ -141,6 +143,18 @@ public partial class PiecesPanel : CanvasLayer
         Session.Changed += SyncWithWorld;
         SyncWithWorld();
         UpdateVisibility();
+    }
+
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        // Text fields get the Delete key first, so it only reaches here when none is being
+        // edited.
+        if (Visible && _selectedId is not null
+            && @event.IsActionPressed(InputActions.DeleteSelection))
+        {
+            DeleteSelected();
+            GetViewport().SetInputAsHandled();
+        }
     }
 
     // Name, position, rotation, and size of the selected piece, plus layer and delete buttons.
@@ -176,7 +190,9 @@ public partial class PiecesPanel : CanvasLayer
         _downButton.TooltipText = "Draw this piece below the one under it";
         buttons.AddChild(_upButton);
         buttons.AddChild(_downButton);
-        buttons.AddChild(CreateButton("Delete…", AskToDelete));
+        Button delete = CreateButton("Delete", DeleteSelected);
+        delete.TooltipText = "Remove this piece (Delete key). Ctrl+Z brings it back.";
+        buttons.AddChild(delete);
         details.AddChild(buttons);
         return details;
     }
@@ -335,22 +351,13 @@ public partial class PiecesPanel : CanvasLayer
         }
     }
 
-    private void AskToDelete()
-    {
-        if (SelectedPiece() is MapPiece piece)
-        {
-            _deleteDialog.DialogText = $"Delete \"{piece.Name}\" from the planet? Your saved " +
-                "world file isn't changed until you save.";
-            _deleteDialog.PopupCentered();
-        }
-    }
-
+    // No confirmation: deleting can be undone (owner decision).
     private void DeleteSelected()
     {
-        if (SelectedPiece() is MapPiece piece)
+        if (SelectedPiece() is MapPiece piece && Session is { IsBusy: false })
         {
-            Session?.RemovePiece(piece.Id);
-            Toolbar?.ShowInfo($"Deleted {piece.Name}.");
+            Session.RemovePiece(piece.Id);
+            Toolbar?.ShowInfo($"Deleted {piece.Name} (Ctrl+Z to undo).");
         }
     }
 

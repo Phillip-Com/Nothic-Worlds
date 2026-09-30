@@ -17,6 +17,7 @@ namespace NothicWorlds.Controls;
 /// <item>Click empty space, or press Esc, to deselect.</item>
 /// </list>
 /// Clicks that miss every piece and handle go on to the camera, so orbiting still works.
+/// Each drag is one undo step.
 /// </summary>
 /// <remarks>
 /// Must come after the camera in the scene: later nodes get unhandled input first.
@@ -81,6 +82,14 @@ public partial class PieceHandles : CanvasLayer
 
     public override void _Process(double delta)
     {
+        // A release can be missed (e.g. the window lost focus mid-drag); don't leave the drag,
+        // and its undo step, hanging.
+        if (_dragging != Part.None
+            && (!IsActive || !Input.IsMouseButtonPressed(MouseButton.Left)))
+        {
+            EndDrag();
+        }
+
         // The camera may be easing, so handles are redrawn every frame while something's
         // selected (cheap: a few dozen points).
         _overlay.QueueRedraw();
@@ -97,7 +106,6 @@ public partial class PieceHandles : CanvasLayer
     {
         if (!IsActive)
         {
-            _dragging = Part.None;
             return;
         }
 
@@ -122,7 +130,7 @@ public partial class PieceHandles : CanvasLayer
         if (!button.Pressed)
         {
             bool wasDragging = _dragging != Part.None;
-            _dragging = Part.None;
+            EndDrag();
             return wasDragging;
         }
 
@@ -151,12 +159,27 @@ public partial class PieceHandles : CanvasLayer
         }
 
         _dragging = part;
+        Session.BeginGesture(part switch
+        {
+            Part.Rotate => $"Rotate {piece.Name}",
+            Part.Corner => $"Resize {piece.Name}",
+            _ => $"Move {piece.Name}",
+        });
         _dragId = piece.Id;
         _grabbed = grabbed;
         _startCenter = piece.Center;
         _startRotation = piece.RotationDegrees;
         _startWidth = piece.WidthDegrees;
         return true;
+    }
+
+    private void EndDrag()
+    {
+        if (_dragging != Part.None)
+        {
+            _dragging = Part.None;
+            Session?.EndGesture();
+        }
     }
 
     private bool HandleMotion(InputEventMouseMotion motion)
