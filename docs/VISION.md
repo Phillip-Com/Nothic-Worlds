@@ -57,7 +57,7 @@ in a top-down terrain view. Going smaller than a local region is not a goal.
 
 ## 3. Milestones
 
-**Milestone 1: Planet Viewer** · Complete once PR #4 merges. Split into two PRs: **A** = planet,
+**Milestone 1: Planet Viewer** · Complete (PR #4 merged 2026-09-30). Split into two PRs: **A** = planet,
 grid, camera, and performance tools (PR #3); **B** = map import (PR #4). Saving is out of scope:
 the world file format gets its own design review.
 A single planet that the user can import a map image onto, with a working camera/movement system.
@@ -66,7 +66,11 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
 - Import an image and wrap it onto the planet (`MAP-01`, in its simplest form)
 - Camera: zoom in and out, pan, and move around the planet (`REN-02`, basic form)
 
-Later milestones are defined after Milestone 1 is reviewed.
+**Milestone 2: Maps + Saving** · In Progress (owner's choice, 2026-09-30)
+- **Part 1:** `MAP-03`, better wrapping for hand-drawn maps (Flat map mode) (PR #5)
+- **Part 2:** the **world save format**, so work persists between sessions. It's foundational,
+  because every later feature adds data to it. It gets its own design review before any code
+  (CLAUDE.md §9: engine-independent, documented, versioned).
 
 ---
 
@@ -191,7 +195,8 @@ future work.
 **Implementation (M1, PR #4):**
 - **Rules (Core, tested):** `src/NothicWorlds.Core/Maps/MapImageRules.cs`. The supported layout
   is 2:1 (±1%). Images over **8192 × 4096** are shrunk, keeping their proportions (owner
-  decision). Images that aren't 2:1 are still applied, **with a warning** (owner decision).
+  decision). Images that aren't 2:1 are still applied, **with a warning** (owner decision). Since
+  `MAP-03`, the warning applies only to Globe maps, because Flat maps accept any shape.
 - **Loading:** `godot/Maps/MapImageLoader.cs`. It accepts PNG/JPG/WebP up to 256 MB and runs on a
   background thread. It shrinks by repeated halving and then one cubic resize (a 16k image loads
   in ~2 s; a single Lanczos resize took ~20 s). It builds mipmaps and compresses to **S3TC**
@@ -216,7 +221,7 @@ onto spheres: areas near the equator are close to true size, and areas near the 
 **Notes:** One of the most complex features. Needs its own design review.
 **Implementation:** —
 
-**MAP-03 — Better wrapping for hand-drawn (flat) maps** · Idea · Base
+**MAP-03 — Better wrapping for hand-drawn (flat) maps** · Implemented (Flat map mode, M2) · Base
 **Intent:** Hand-drawn and fantasy-tool maps (e.g. Inkarnate, Wonderdraft) should look right on
 the globe even when they're 2:1. Found by the owner while testing `MAP-01`: such maps look
 **pinched toward the poles**.
@@ -231,6 +236,52 @@ Verified: on a true equirectangular test map, shapes come out correct.
 2. **Treat the map as Mercator:** reproject as if the map were drawn in a shape-preserving
    projection. Shapes look as drawn, but it can't reach the poles.
 3. **Manual placement** (`MAP-02`): cut and position pieces by hand. Most flexible, most work.
+**Chosen (owner, 2026-09-30):** approach 2, as a **"Flat map"** mode. The design review found
+that approach 1 only reduces pinching (at 60° land is still squeezed to half width) and squashes
+the equator vertically.
+- The **map type** is chosen from a toolbar dropdown (**Flat map** / **Globe map**). It can be
+  changed at any time and takes effect instantly.
+- **New imports default to Flat map**, which suits most DM and fantasy-tool maps.
+- **Polar caps** beyond the map's coverage are filled with a **Pole color the user picks**
+  (toolbar color picker, shown only for Flat maps), with a soft 3° blend where the map ends. The
+  owner first chose to stretch the map's edges to the poles, then switched after seeing the
+  streaks converge at the poles on their own map.
+**Implementation (M2, PR #5):**
+- **Math (Core, tested):** `src/NothicWorlds.Core/Maps/MapProjections.cs` provides
+  `ToImagePosition` (globe position → map pixel, for either `MapProjection`) and
+  `MercatorLatitudeLimit` (a 2:1 map covers ~66.5°N–66.5°S, 1:1 ~85°, 3:1 ~51°). Reuse
+  `ToImagePosition` for anything that needs to find the map pixel under a globe position, such as
+  pins or region outlines.
+- **Shader:** `planet.gdshader` `map_v()` mirrors the Core math, and `pole_cap()` fades to
+  `pole_color` past the coverage limit. The `projection`, `map_aspect`, and `pole_color`
+  uniforms are set by `PlanetSurface.Projection` / `SetMap` / `PoleColor`. The map sampler now
+  **clamps** instead of repeating, so the top edge never picks up the bottom edge's colors.
+- **Reading shader settings:** `PlanetSurface` falls back to the shader's own default for any
+  setting the material hasn't stored yet (`GetParameter`). This fixed a PR #4 bug where the first
+  G press did nothing before a map was loaded. Use the same pattern for any future shader
+  settings.
+- **UI:** the Map type dropdown and Pole color picker live in `godot/UI/MapToolbar.cs`. Messages
+  state the coverage for flat maps. The 2:1 warning now applies only to Globe maps, and it
+  suggests Flat map.
+- **Verified:** a flat-drawn test map of equal circles stays round in Flat mode (smaller toward
+  the poles) and turns into teardrops in Globe mode. The cap shows the pole color with a soft
+  blend, and the picker swatch matches it.
+
+**MAP-04 — Atlas map types** · Planned (next PR after #5) · Base
+**Intent:** Support popular atlas layouts as additional **Map type** options, so maps drawn in
+those styles wrap onto the globe correctly. The owner chose:
+- **Robinson:** classic school/wall atlas look
+- **Winkel tripel:** National Geographic's world map
+- **Mollweide:** full oval, equal-area
+- **Polar (azimuthal):** a circle centered on a pole; also the natural layout for flat worlds
+  (`BOD-02`)
+- **Two hemispheres:** two side-by-side circles, old-atlas and fantasy style
+- **Gall–Peters:** equal-area rectangle
+**Notes:** A map type only looks right if the image was drawn in that layout (e.g. traced from a
+Robinson template). For freehand maps, Flat map is usually best. Layout details (e.g. which pole
+the Polar map is centered on, and how Two hemispheres splits the globe) get a short owner review
+before building. Build on `MapProjections` (Core) and `map_v()` in the shader. The oval and
+circle types also need horizontal math, and some parts of the image are outside the map.
 **Implementation:** —
 
 ### 4.4 Celestial Bodies (`BOD`)

@@ -6,10 +6,22 @@
 // +Y is north, longitude 0 faces +Z, longitude 90 east faces +X.
 shader_type spatial;
 
-// Equirectangular (2:1) map: left edge is longitude -180, top edge is the north pole.
-uniform sampler2D surface_map : source_color, filter_linear_mipmap, repeat_enable;
+// Map image: its width always spans longitude -180 (left) to 180 (right). How its height maps
+// to latitude depends on `projection`. Clamped rather than repeating: repeating would blend the
+// bottom edge into the top when a flat map's edge is stretched over the poles.
+uniform sampler2D surface_map : source_color, filter_linear_mipmap, repeat_disable;
 uniform bool has_map = false;
 uniform bool show_grid = true;
+
+// Must match NothicWorlds.Core.Maps.MapProjection:
+// 0 = Equirectangular ("Globe map"), 1 = Mercator ("Flat map").
+uniform int projection = 1;
+// Map image width divided by height (used by the Mercator projection).
+uniform float map_aspect = 2.0;
+// Flat maps can't reach the poles. Beyond their coverage, the caps fade from the map's edge to
+// this color over `pole_blend_degrees` of latitude (owner's choice: a picked color).
+uniform vec3 pole_color : source_color = vec3(0.9, 0.93, 0.96);
+uniform float pole_blend_degrees = 3.0;
 
 uniform vec3 base_color : source_color = vec3(0.13, 0.27, 0.45);
 uniform vec3 grid_color : source_color = vec3(0.75, 0.8, 0.9);
@@ -30,8 +42,21 @@ float grid_line(float value, float spacing, float pixels) {
 	return 1.0 - clamp(distance_to_line / (fwidth(scaled) * pixels), 0.0, 1.0);
 }
 
+// Vertical position in the map image (0 = top, 1 = bottom). Same math as
+// NothicWorlds.Core.Maps.MapProjections.ToImagePosition. Values beyond the map are clamped
+// to its edge; pole_cap() then fades those areas to the pole color.
+float map_v(float latitude) {
+	if (projection == 1) {
+		// Mercator grows without limit toward the poles; anything this far is outside the map.
+		float lat = radians(clamp(latitude, -89.9, 89.9));
+		float y = log(tan(PI / 4.0 + lat / 2.0));
+		return clamp(0.5 - y / (2.0 * PI) * map_aspect, 0.0, 1.0);
+	}
+	return 0.5 - latitude / 180.0;
+}
+
 vec3 sample_map(float latitude, float longitude) {
-	vec2 uv = vec2(longitude / 360.0 + 0.5, 0.5 - latitude / 180.0);
+	vec2 uv = vec2(longitude / 360.0 + 0.5, map_v(latitude));
 
 	// At the 180° line, u jumps from 1 back to 0. The GPU sees that jump as a huge change and
 	// picks the blurriest mipmap for those pixels, which shows up as a visible seam. A second
@@ -50,12 +75,25 @@ vec3 sample_map(float latitude, float longitude) {
 	return textureGrad(surface_map, uv, dx, dy).rgb;
 }
 
+// 0 inside a flat map's coverage, rising to 1 within pole_blend_degrees beyond it. The limit is
+// the same as NothicWorlds.Core.Maps.MapProjections.MercatorLatitudeLimit.
+float pole_cap(float latitude) {
+	if (projection != 1) {
+		return 0.0;
+	}
+	float limit = degrees(atan(sinh(PI / map_aspect)));
+	return smoothstep(0.0, pole_blend_degrees, abs(latitude) - limit);
+}
+
 void fragment() {
 	vec3 direction = normalize(local_direction);
 	float latitude = degrees(asin(clamp(direction.y, -1.0, 1.0)));
 	float longitude = degrees(atan(direction.x, direction.z));
 
-	vec3 color = has_map ? sample_map(latitude, longitude) : base_color;
+	vec3 color = base_color;
+	if (has_map) {
+		color = mix(sample_map(latitude, longitude), pole_color, pole_cap(latitude));
+	}
 
 	if (show_grid) {
 		float grid = max(
