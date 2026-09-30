@@ -59,6 +59,14 @@ latitude/longitude line to where it really is on your map while watching the glo
 **Done** (Enter) or **Cancel** (Esc). Right-click a line to remove it. Calibration is saved with
 the world.
 
+To place parts of a map by hand, open **Pieces…**. **Cut from Map…** or **Cut from Image…** opens
+the Cut editor: drag a box (**Rectangle**), or click points around a region and click the first
+point again (**Freeform**). Scroll to zoom and right-drag to pan. **Add Piece** puts it on the
+globe: a cut from the main map starts exactly where it already shows, and one from another image
+starts in the middle of the view. Then set its latitude, longitude, rotation, and width in the
+panel. Pieces higher in the list cover lower ones. Up to 32 pieces per planet, all saved with the
+world.
+
 ## Repository layout
 
 ```

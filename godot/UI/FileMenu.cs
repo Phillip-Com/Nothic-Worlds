@@ -167,6 +167,12 @@ public partial class FileMenu : Node
             return;
         }
 
+        if (Session.IsCutting && item is MenuItem.New or MenuItem.Open)
+        {
+            Toolbar?.ShowInfo("Finish cutting first (Add Piece or Cancel).");
+            return;
+        }
+
         switch (item)
         {
             case MenuItem.New:

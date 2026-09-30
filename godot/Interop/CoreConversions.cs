@@ -14,6 +14,12 @@ public static class CoreConversions
         return new Godot.Vector3(vector.X, vector.Y, vector.Z);
     }
 
+    /// <summary>Converts a Godot vector to a Core (System.Numerics) vector.</summary>
+    public static System.Numerics.Vector3 ToNumerics(this Godot.Vector3 vector)
+    {
+        return new System.Numerics.Vector3(vector.X, vector.Y, vector.Z);
+    }
+
     /// <summary>Converts a Core color to a Godot color.</summary>
     public static Godot.Color ToGodot(this RgbColor color)
     {

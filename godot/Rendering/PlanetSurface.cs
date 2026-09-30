@@ -1,6 +1,8 @@
 using Godot;
 using NothicWorlds.Controls;
 using NothicWorlds.Core.Maps;
+using NothicWorlds.Core.Model;
+using NothicWorlds.Interop;
 
 namespace NothicWorlds.Rendering;
 
@@ -93,6 +95,47 @@ public partial class PlanetSurface : MeshInstance3D
         _material.SetShaderParameter("calibration_latitudes", _latitudeTable);
         _material.SetShaderParameter("calibration_longitudes", _longitudeTable);
         _material.SetShaderParameter("has_calibration", true);
+    }
+
+    /// <summary>
+    /// Shows map pieces on the planet (VISION.md MAP-02), bottom to top. Only the first
+    /// <see cref="SurfaceSettings.MaxPieces"/> are drawn. Cheap to call whenever a piece moves.
+    /// </summary>
+    public void SetPieces(IReadOnlyList<(Texture2D Texture, PieceProjection Projection)> pieces)
+    {
+        const int slots = SurfaceSettings.MaxPieces;
+        int count = Math.Min(pieces.Count, slots);
+        var textures = new Godot.Collections.Array();
+        var centers = new Vector3[slots];
+        var easts = new Vector3[slots];
+        var norths = new Vector3[slots];
+        var frames = new Vector4[slots];
+        var limits = new Vector2[slots];
+
+        for (int i = 0; i < count; i++)
+        {
+            (Texture2D texture, PieceProjection projection) = pieces[i];
+            textures.Add(texture);
+            centers[i] = projection.CenterDirection.ToGodot();
+            easts[i] = projection.EastDirection.ToGodot();
+            norths[i] = projection.NorthDirection.ToGodot();
+            frames[i] = new Vector4(
+                (float)projection.CosRotation,
+                (float)projection.SinRotation,
+                (float)(1.0 / projection.WidthRadians),
+                (float)(1.0 / projection.HeightRadians));
+            limits[i] = new Vector2(
+                (float)Math.Cos(Math.Min(projection.ReachRadians, Math.PI)),
+                (float)(projection.WidthRadians / Math.Max(texture.GetWidth(), 1)));
+        }
+
+        _material.SetShaderParameter("piece_textures", textures);
+        _material.SetShaderParameter("piece_centers", centers);
+        _material.SetShaderParameter("piece_easts", easts);
+        _material.SetShaderParameter("piece_norths", norths);
+        _material.SetShaderParameter("piece_frames", frames);
+        _material.SetShaderParameter("piece_limits", limits);
+        _material.SetShaderParameter("piece_count", count);
     }
 
     /// <summary>Wraps a map texture onto the planet and hides the grid.</summary>

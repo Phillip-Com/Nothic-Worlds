@@ -49,7 +49,39 @@ public static class MapImageLoader
         }
     }
 
-    private static void ValidateFile(string path)
+    /// <summary>
+    /// Makes a display copy of a decoded image, shrunk and compressed like a map, for showing
+    /// in the Cut editor. <paramref name="source"/> is left unchanged.
+    /// </summary>
+    /// <exception cref="MapLoadException">The copy couldn't be prepared.</exception>
+    public static async Task<LoadedMap> CreatePreviewAsync(Image source)
+    {
+        (Image image, MapImageCheck check) =
+            await Task.Run(() => Prepare((Image)source.Duplicate()));
+        using (image)
+        {
+            return new LoadedMap(ImageTexture.CreateFromImage(image), check);
+        }
+    }
+
+    /// <summary>
+    /// Decodes an image at full resolution, without shrinking or compressing it, on a background
+    /// thread. Used to cut map pieces from the original pixels (VISION.md MAP-02). The caller
+    /// disposes the result.
+    /// </summary>
+    /// <exception cref="MapLoadException">The image is unsupported or unreadable.</exception>
+    public static Task<Image> DecodeAsync(IAssetSource source, string name)
+    {
+        string extension = Path.GetExtension(name).TrimStart('.').ToLowerInvariant();
+        return Task.Run(() => Decode(ReadAll(source), extension));
+    }
+
+    /// <summary>
+    /// Checks that a file can be imported as an image: a supported type, present, and within the
+    /// size limit.
+    /// </summary>
+    /// <exception cref="MapLoadException">The file can't be used.</exception>
+    public static void ValidateFile(string path)
     {
         string extension = Path.GetExtension(path).TrimStart('.').ToLowerInvariant();
         if (!MapImageRules.SupportedExtensions.Contains(extension))
@@ -137,7 +169,11 @@ public static class MapImageLoader
         return (image, check);
     }
 
-    private static void ShrinkTo(Image image, int width, int height)
+    /// <summary>
+    /// Shrinks an image to the given size, fast and at high quality (repeated halving, then one
+    /// cubic resize).
+    /// </summary>
+    internal static void ShrinkTo(Image image, int width, int height)
     {
         // Halving (averaging each 2×2 block) is fast and high quality, so do that while the
         // image is at least twice the target size. Then finish with one smaller resize. Resizing

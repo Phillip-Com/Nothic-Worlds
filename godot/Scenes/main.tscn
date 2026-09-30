@@ -11,6 +11,8 @@
 [ext_resource type="Script" path="res://UI/FileMenu.cs" id="9_filemenu"]
 [ext_resource type="Script" path="res://Session/RecoveryService.cs" id="10_recovery"]
 [ext_resource type="Script" path="res://UI/CalibrationWorkspace.cs" id="11_calibration"]
+[ext_resource type="Script" path="res://UI/PiecesPanel.cs" id="12_pieces"]
+[ext_resource type="Script" path="res://UI/CutEditor.cs" id="13_cut"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -66,10 +68,11 @@ script = ExtResource("4_overlay")
 script = ExtResource("5_indicator")
 Camera = NodePath("../PlanetCamera")
 
-[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Calibration")]
+[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Calibration", "Pieces")]
 script = ExtResource("7_toolbar")
 Session = NodePath("../WorldSession")
 Calibration = NodePath("../CalibrationWorkspace")
+Pieces = NodePath("../PiecesPanel")
 
 [node name="FileMenu" type="Node" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
 script = ExtResource("9_filemenu")
@@ -85,4 +88,15 @@ Toolbar = NodePath("../MapToolbar")
 script = ExtResource("11_calibration")
 Session = NodePath("../WorldSession")
 Camera = NodePath("../PlanetCamera")
+Toolbar = NodePath("../MapToolbar")
+
+[node name="PiecesPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Cutter", "Toolbar")]
+script = ExtResource("12_pieces")
+Session = NodePath("../WorldSession")
+Cutter = NodePath("../CutEditor")
+Toolbar = NodePath("../MapToolbar")
+
+[node name="CutEditor" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
+script = ExtResource("13_cut")
+Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")

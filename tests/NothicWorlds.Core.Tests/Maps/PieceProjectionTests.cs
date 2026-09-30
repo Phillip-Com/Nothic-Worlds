@@ -120,6 +120,21 @@ public class PieceProjectionTests
     }
 
     [Fact]
+    public void Reach_IsTheDistanceToEachCorner()
+    {
+        var projection = new PieceProjection(new GeoCoordinate(20, 30), 35, 40, 1.6);
+        var center = new GeoCoordinate(20, 30);
+
+        foreach ((double u, double v) in new[] { (0.0, 0.0), (1.0, 0.0), (0.0, 1.0), (1.0, 1.0) })
+        {
+            double arc = Math.Acos(System.Numerics.Vector3.Dot(
+                SphericalCoordinates.ToDirection(center),
+                SphericalCoordinates.ToDirection(projection.FromBoxPosition(u, v))));
+            Assert.Equal(projection.ReachRadians, arc, 1e-5);
+        }
+    }
+
+    [Fact]
     public void Directions_AreUnitAndPerpendicular()
     {
         var projection = new PieceProjection(new GeoCoordinate(33, -70), 15, 20, 1.0);
