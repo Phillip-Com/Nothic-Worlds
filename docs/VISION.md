@@ -119,6 +119,11 @@ M1 covers these camera controls for a single planet:
   it gets pushed back out.
 - The indicator reads `PlanetCamera.CurrentAction` and `PlanetCamera.PanMode`. It updates its text
   only when something changes.
+**Known issue (deferred by the owner):** when the view is slid so the planet is near the screen
+edge, the planet looks stretched into an oval. This comes from the camera's wide 75° field of view.
+A narrower lens (~45–50°) would reduce it but changes the look of everything else, so the owner
+chose to keep 75° for now and fix it later. Possible fixes: a narrower field of view with
+retuned zoom limits, or rotating the camera toward the slid planet instead of sliding it.
 - All movement eases toward a target (frame-rate independent). Longitude is kept unwrapped so
   easing never takes the long way around.
 - Public `Orbit` / `Pan` / `Zoom` / `ResetView` methods can be reused by other code (the benchmark
