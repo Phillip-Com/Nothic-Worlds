@@ -25,6 +25,10 @@ public static class MapProjections
 
     private const double HalfPi = Math.PI / 2.0;
 
+    // Points exactly on a coverage edge (a flat map's top or bottom, a polar map's rim) count as
+    // on the map, even when rounding puts them a hair outside.
+    private const double EdgeTolerance = 1e-9;
+
     // Robinson's projection is defined by a table at every 5° of latitude (0° to 90°):
     // relative parallel length and relative distance from the equator.
     private static readonly double[] _robinsonLength =
@@ -165,7 +169,7 @@ public static class MapProjections
         // The width spans 2π, so the height spans 2π / aspectRatio.
         double u = 0.5 + longitude / (2.0 * Math.PI);
         double v = 0.5 - y / (2.0 * Math.PI) * aspectRatio;
-        bool isOutside = v < 0.0 || v > 1.0;
+        bool isOutside = v < -EdgeTolerance || v > 1.0 + EdgeTolerance;
         return new MapImagePosition(u, Math.Clamp(v, 0.0, 1.0), isOutside);
     }
 
@@ -231,7 +235,7 @@ public static class MapProjections
     {
         // Distance from the north pole, scaled so the equator is the circle's edge. Longitude 0
         // points down, and east runs counterclockwise (as seen looking down on the north pole).
-        bool isOutside = latitude < 0.0;
+        bool isOutside = latitude < -EdgeTolerance;
         double radius = (HalfPi - Math.Max(latitude, 0.0)) / HalfPi;
         double x = radius * Math.Sin(longitude);
         double y = -radius * Math.Cos(longitude);
