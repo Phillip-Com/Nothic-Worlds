@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 2** (see **Version history** at the end)
+**Current format version: 3** (see **Version history** at the end)
 
 ## Container
 
@@ -20,11 +20,11 @@ A `.nworld` file is a standard **zip archive** containing:
   which also blocks names that try to escape the archive (`../`).
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB.
 
-## `world.json` (version 2)
+## `world.json` (version 3)
 
 ```json
 {
-  "formatVersion": 2,
+  "formatVersion": 3,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -46,6 +46,21 @@ A `.nworld` file is a standard **zip archive** containing:
             ]
           }
         },
+        "pieces": [
+          {
+            "id": "99999999-8888-7777-6666-555555555555",
+            "name": "Northern Isles",
+            "asset": "assets/fedcba9876543210fedcba9876543210.png",
+            "outline": {
+              "sourceAspectRatio": 1.5,
+              "points": [[0.25, 0.25], [0.75, 0.25], [0.75, 0.5], [0.25, 0.5]]
+            },
+            "latitude": 55,
+            "longitude": -20.5,
+            "rotation": 15,
+            "width": 12.5
+          }
+        ],
         "fillColor": "#112233"
       }
     }
@@ -75,6 +90,14 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…map.calibration` | no | Grid calibration (`MAP-05`). Omitted means the map is read exactly as its type says. |
 | `…calibration.latitudes` | yes | Guides, south to north: `latitude` (true, between -90 and 90) is drawn where the map type puts `drawnAs`. Both increase strictly; the poles are fixed and not listed. |
 | `…calibration.longitudes` | yes | Guides, west to east: `longitude` in [-180, 180) is drawn at `drawnAs`, less than half a turn away. `drawnAs` increases strictly, and may run past ±180 so the order holds around the globe (the first + 360 must exceed the last). |
+| `bodies[].surface.pieces` | no | Pieces cut out of images and laid on the globe (`MAP-02`), bottom to top: later pieces cover earlier ones. Omitted when there are none. The app places up to 32 per planet. |
+| `…pieces[].id`, `name` | yes | GUID; display name (not empty) |
+| `…pieces[].asset` | yes | The source image's asset entry name (see Container). Saved with the world like the main map. |
+| `…pieces[].outline.points` | yes | 3 to 1000 `[u, v]` points on the source image (0–1 from its top-left), forming a closed outline. A rectangle cut is 4 points. Must enclose an area. |
+| `…pieces[].outline.sourceAspectRatio` | yes | The source image's width ÷ height, so the cut's true shape is known |
+| `…pieces[].latitude`, `longitude` | yes | Where the center of the outline's bounding box sits on the globe |
+| `…pieces[].rotation` | yes | Degrees, clockwise from "up = north" |
+| `…pieces[].width` | yes | Degrees of arc the bounding box spans left to right (0.1 to 180). The height follows from the box's true shape. |
 | `bodies[].surface.fillColor` | yes | `#RRGGBB`. Color where the map doesn't cover the globe |
 | `view` | no | Camera when saved. Omitted means the default view. |
 | `view.latitude`, `longitude` | yes | Degrees; camera direction from the focus point |
@@ -99,6 +122,12 @@ through the guides. For latitude, fixed anchors at (-90, -90) and (90, 90) are a
 longitude, the guides are repeated one turn west and east. Straight lines extend beyond the ends.
 (`MapCalibration` in Core.)
 
+Pieces are laid on the globe with an **azimuthal equidistant** projection around their center:
+a point at arc distance *d* and compass bearing *b* (clockwise from north) from the center sits at
+(*d*·sin *b*, *d*·cos *b*) in the piece's frame. That frame is then turned by `rotation`, and scaled
+so the bounding box spans `width` by `width` ÷ box aspect ratio. Box position (0, 0) is the
+top-left. (`PieceProjection` in Core.)
+
 ## Safe saving
 
 1. Write the complete new file next to the target as `<name>.nworld.saving`, and flush it to disk.
@@ -113,3 +142,4 @@ If anything fails, the existing world file is left untouched.
 |---------|---------|------------------------------------|
 | 1 | First release: world, one planet, map image + map type, fill color, camera view | — |
 | 2 | Added optional `map.calibration` (grid calibration, `MAP-05`) | Nothing to change: version 1 maps have no calibration |
+| 3 | Added optional `surface.pieces` (cut and place, `MAP-02`) | Nothing to change: version 2 surfaces have no pieces |

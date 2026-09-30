@@ -7,6 +7,11 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-09-30 | Map pieces are cut with a **rectangle and freeform outlines** | In PR | [#11](https://github.com/Phillip-Com/Nothic-Worlds/pull/11) | VISION.md `MAP-02` |
+| 2026-09-30 | Pieces are moved, resized, and rotated **directly on the globe** | In PR | [#11](https://github.com/Phillip-Com/Nothic-Worlds/pull/11) | Built in the next PR |
+| 2026-09-30 | Pieces can come from **any imported image**, all saved inside the world file | In PR | [#11](https://github.com/Phillip-Com/Nothic-Worlds/pull/11) | |
+| 2026-09-30 | Up to a **few dozen** pieces, drawn live; limit **32 per planet** | In PR | [#11](https://github.com/Phillip-Com/Nothic-Worlds/pull/11) | Cost measured in the app PR |
+| 2026-09-30 | World file **format version 3** adds map pieces; versions 1–2 upgrade automatically | In PR | [#11](https://github.com/Phillip-Com/Nothic-Worlds/pull/11) | docs/world-format.md version history |
 | 2026-09-30 | Grid calibration approach: **guide lines** (drag latitude/longitude lines to where they really are) | Merged | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) · `f10be33` | Chosen over pin points and a mesh grid. VISION.md `MAP-05` |
 | 2026-09-30 | Calibration workspace: **side by side** (flat image + lines, live globe) | Merged | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) · `f10be33` | Built in the next PR |
 | 2026-09-30 | Calibration works for **all map types** | Merged | [#9](https://github.com/Phillip-Com/Nothic-Worlds/pull/9) · `f10be33` | One method: it adjusts which latitude/longitude each type reads |

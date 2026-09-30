@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text;
+using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Maps;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Storage;
@@ -46,9 +47,8 @@ public sealed class WorldPackageTests : IDisposable
         }
         """;
 
-    // A version 2 world file (adds map calibration), exactly as this version writes it. If this
-    // test fails, the file format changed: that must be deliberate, with a new format version,
-    // a migration, and a new golden file. Never edit this.
+    // A version 2 world file (adds map calibration), exactly as that release wrote it. It must
+    // load forever (upgraded on load). Never edit this.
     private const string GoldenV2Json = """
         {
           "formatVersion": 2,
@@ -101,7 +101,97 @@ public sealed class WorldPackageTests : IDisposable
         }
         """;
 
+    private const string PieceAssetName = "assets/fedcba9876543210fedcba9876543210.png";
+
+    // A version 3 world file (adds map pieces), exactly as this version writes it. If this test
+    // fails, the file format changed: that must be deliberate, with a new format version, a
+    // migration, and a new golden file. Never edit this.
+    private const string GoldenV3Json = """
+        {
+          "formatVersion": 3,
+          "id": "11111111-2222-3333-4444-555555555555",
+          "name": "Aerth",
+          "createdUtc": "2026-09-30T12:00:00+00:00",
+          "modifiedUtc": "2026-09-30T13:30:00+00:00",
+          "bodies": [
+            {
+              "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aerth",
+              "kind": "planet",
+              "surface": {
+                "map": {
+                  "asset": "assets/0123456789abcdef0123456789abcdef.png",
+                  "projection": "winkel-tripel",
+                  "calibration": {
+                    "latitudes": [
+                      {
+                        "latitude": 30,
+                        "drawnAs": 33.5
+                      }
+                    ],
+                    "longitudes": [
+                      {
+                        "longitude": -180,
+                        "drawnAs": -185
+                      },
+                      {
+                        "longitude": 0,
+                        "drawnAs": 2
+                      }
+                    ]
+                  }
+                },
+                "pieces": [
+                  {
+                    "id": "99999999-8888-7777-6666-555555555555",
+                    "name": "Northern Isles",
+                    "asset": "assets/fedcba9876543210fedcba9876543210.png",
+                    "outline": {
+                      "sourceAspectRatio": 1.5,
+                      "points": [
+                        [
+                          0.25,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.5
+                        ],
+                        [
+                          0.25,
+                          0.5
+                        ]
+                      ]
+                    },
+                    "latitude": 55,
+                    "longitude": -20.5,
+                    "rotation": 15,
+                    "width": 12.5
+                  }
+                ],
+                "fillColor": "#112233"
+              }
+            }
+          ],
+          "view": {
+            "latitude": 20,
+            "longitude": -45.5,
+            "altitude": 1.25,
+            "focusOffset": [
+              0.5,
+              0,
+              -0.25
+            ]
+          }
+        }
+        """;
+
     private static readonly byte[] _imageBytes = Encoding.ASCII.GetBytes("pretend PNG bytes");
+    private static readonly byte[] _pieceBytes = Encoding.ASCII.GetBytes("pretend piece PNG");
 
     private readonly string _folder =
         Path.Combine(Path.GetTempPath(), "nothic-worlds-tests", Guid.NewGuid().ToString("N"));
@@ -183,13 +273,48 @@ public sealed class WorldPackageTests : IDisposable
     // ----- The file format itself -----
 
     [Fact]
-    public void WrittenJson_MatchesTheGoldenVersion2File()
+    public void WrittenJson_MatchesTheGoldenVersion3File()
     {
         string path = PathFor("golden.nworld");
 
-        WorldPackage.Save(path, CalibratedGoldenWorld(), AssetsFromImage());
+        WorldPackage.Save(path, PiecesGoldenWorld(), AssetsWithPiece());
 
-        Assert.Equal(Normalize(GoldenV2Json), Normalize(ReadEntry(path, "world.json")));
+        Assert.Equal(Normalize(GoldenV3Json), Normalize(ReadEntry(path, "world.json")));
+    }
+
+    [Fact]
+    public void GoldenVersion3File_LoadsAsExpected()
+    {
+        string path = WriteRawPackage("golden-v3.nworld", GoldenV3Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        LoadedWorld loaded = WorldPackage.Load(path);
+
+        AssertSameWorld(PiecesGoldenWorld(), loaded.World);
+        Assert.Equal(_pieceBytes, ReadAsset(loaded, PieceAssetName));
+    }
+
+    [Fact]
+    public void Save_IncludesEveryPiecesSourceImage()
+    {
+        string path = PathFor("pieces.nworld");
+
+        WorldPackage.Save(path, PiecesGoldenWorld(), AssetsWithPiece());
+
+        using ZipArchive archive = ZipFile.OpenRead(path);
+        Assert.Equal(
+            [AssetName, PieceAssetName, "world.json"],
+            archive.Entries.Select(entry => entry.FullName).Order());
+    }
+
+    [Fact]
+    public void Save_PieceImageMissing_FailsBeforeTouchingDisk()
+    {
+        string path = PathFor("missing-piece.nworld");
+
+        Assert.Throws<WorldFileException>(
+            () => WorldPackage.Save(path, PiecesGoldenWorld(), AssetsFromImage()));
+        Assert.Empty(Directory.GetFiles(_folder));
     }
 
     [Fact]
@@ -222,7 +347,7 @@ public sealed class WorldPackageTests : IDisposable
 
         WorldPackage.Save(newPath, loaded.World, loaded.Assets);
 
-        Assert.Contains("\"formatVersion\": 2", ReadEntry(newPath, "world.json"));
+        Assert.Contains("\"formatVersion\": 3", ReadEntry(newPath, "world.json"));
         AssertSameWorld(GoldenWorld(), WorldPackage.Load(newPath).World);
     }
 
@@ -327,7 +452,7 @@ public sealed class WorldPackageTests : IDisposable
     public void Load_NewerFormatVersion_IsRefusedWithAClearMessage()
     {
         string path = WriteRawPackage(
-            "future.nworld", GoldenV2Json.Replace("\"formatVersion\": 2", "\"formatVersion\": 3"),
+            "future.nworld", GoldenV3Json.Replace("\"formatVersion\": 3", "\"formatVersion\": 4"),
             (AssetName, _imageBytes));
 
         WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
@@ -348,6 +473,23 @@ public sealed class WorldPackageTests : IDisposable
         string json = Normalize(GoldenV1Json).Replace(find, replace);
         Assert.NotEqual(Normalize(GoldenV1Json), json);  // The edit really applied.
         string path = WriteRawPackage("damaged.nworld", json, (AssetName, _imageBytes));
+
+        Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
+    }
+
+    [Theory]
+    [InlineData("\"width\": 12.5", "\"width\": 0")]             // No size
+    [InlineData("\"width\": 12.5", "\"width\": 400")]           // Bigger than half the globe
+    [InlineData("\"sourceAspectRatio\": 1.5", "\"sourceAspectRatio\": -1")]
+    [InlineData("\"name\": \"Northern Isles\"", "\"name\": \"\"")]
+    [InlineData("fedcba9876543210fedcba9876543210.png\"", "../evil.png\"")]  // Path escape
+    [InlineData("0.25,", "7.5,")]  // Outline points off the image
+    public void Load_DamagedPiece_IsRejected(string find, string replace)
+    {
+        string json = Normalize(GoldenV3Json).Replace(find, replace);
+        Assert.NotEqual(Normalize(GoldenV3Json), json);  // The edit really applied.
+        string path = WriteRawPackage("damaged-v3.nworld", json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
 
         Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
     }
@@ -454,6 +596,32 @@ public sealed class WorldPackageTests : IDisposable
         return world;
     }
 
+    // The golden world with the calibration and the piece in the version 3 golden file.
+    private static World PiecesGoldenWorld()
+    {
+        World world = CalibratedGoldenWorld();
+        world.Bodies[0].Surface.Pieces.Add(new MapPiece
+        {
+            Id = Guid.Parse("99999999-8888-7777-6666-555555555555"),
+            Name = "Northern Isles",
+            AssetName = PieceAssetName,
+            Outline = PieceOutline.Rectangle(new(0.25, 0.25), new(0.75, 0.5), 1.5),
+            Center = new GeoCoordinate(55, -20.5),
+            RotationDegrees = 15,
+            WidthDegrees = 12.5,
+        });
+        return world;
+    }
+
+    private static Dictionary<string, IAssetSource> AssetsWithPiece()
+    {
+        return new Dictionary<string, IAssetSource>
+        {
+            [AssetName] = new BytesAssetSource(_imageBytes),
+            [PieceAssetName] = new BytesAssetSource(_pieceBytes),
+        };
+    }
+
     private static void AssertSameWorld(World expected, World actual)
     {
         Assert.Equal(expected.Id, actual.Id);
@@ -476,6 +644,20 @@ public sealed class WorldPackageTests : IDisposable
                 e.Surface.Map?.Calibration?.Latitudes, a.Surface.Map?.Calibration?.Latitudes);
             Assert.Equal(
                 e.Surface.Map?.Calibration?.Longitudes, a.Surface.Map?.Calibration?.Longitudes);
+            Assert.Equal(e.Surface.Pieces.Count, a.Surface.Pieces.Count);
+            for (int p = 0; p < e.Surface.Pieces.Count; p++)
+            {
+                MapPiece ep = e.Surface.Pieces[p];
+                MapPiece ap = a.Surface.Pieces[p];
+                Assert.Equal(ep.Id, ap.Id);
+                Assert.Equal(ep.Name, ap.Name);
+                Assert.Equal(ep.AssetName, ap.AssetName);
+                Assert.Equal(ep.Outline.Points, ap.Outline.Points);
+                Assert.Equal(ep.Outline.SourceAspectRatio, ap.Outline.SourceAspectRatio);
+                Assert.Equal(ep.Center, ap.Center);
+                Assert.Equal(ep.RotationDegrees, ap.RotationDegrees);
+                Assert.Equal(ep.WidthDegrees, ap.WidthDegrees);
+            }
         }
     }
 

@@ -76,7 +76,8 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
 
 **Milestone 3: Map Fitting** · In Progress
 - **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace (PR #10).
-- **Part 2:** `MAP-02` cut and place. It gets its own design review.
+- **Part 2:** `MAP-02` cut and place. Core first (PR #11), then the Cut editor and on-globe
+  placement.
 
 ---
 
@@ -222,7 +223,7 @@ future work.
 - **Verified orientation:** a generated test map with markers at 0°/0°, 45°N, 45°E, 45°W, and
   180° shows north up, east to the right, and no seam.
 
-**MAP-02 — Manual map placement onto the globe** · Idea · Base
+**MAP-02 — Manual map placement onto the globe** · In Progress (Core done, PR #11) · Base
 **Intent:** For maps that aren't in a supported layout, the user cuts the image up and places it
 onto the globe themselves, adjusting for distortion and distance. (Flat maps don't map one-to-one
 onto spheres: areas near the equator are close to true size, and areas near the poles are stretched.)
@@ -232,7 +233,35 @@ onto spheres: areas near the equator are close to true size, and areas near the 
   imprecise maps; the other is `MAP-05`.
 - Best for maps of part of a world, maps with no consistent layout, and combining several
   regional maps.
-**Implementation:** —
+**Design decisions (owner, 2026-09-30):**
+- **Cut shapes:** a rectangle (drag a box) **and** freeform (click points around a region).
+- **Placing:** directly **on the globe**. Drag to move, corner handles resize, a handle rotates.
+- **Sources:** pieces can come from **any image** (e.g. extra regional maps). Each piece
+  remembers its source, and all are saved inside the world file.
+- **Count:** up to a few dozen, drawn **live** for instant feedback. The limit is **32 per
+  planet**, to keep the Base tier fast; the cost is measured in the app PR.
+**How pieces sit on the globe:** like a sticker. Distances from the piece's center are true
+(azimuthal equidistant), so small pieces look exactly as drawn, and very large ones (over about a
+quarter of the globe) stretch toward their edges. Pieces sit on top of the map; later pieces cover
+earlier ones.
+**Implementation (Core, PR #11):**
+- `src/NothicWorlds.Core/Model/MapPiece.cs` holds the source asset, outline, center, rotation,
+  and width in degrees (the height follows from the cut's true shape). It lives in
+  `SurfaceSettings.Pieces`, and `Clone()` copies pieces independently.
+- `Maps/PieceOutline.cs` is **immutable**: rectangle or freeform (3–1000 points on the source
+  image), validated (inside the image, encloses an area). `RasterizeMask` draws the cut-out mask
+  with smooth, anti-aliased edges (a 4×4 samples-per-pixel scanline fill, fast even for long
+  outlines). Reuse it for any polygon mask.
+- `Maps/PieceProjection.cs` covers globe → box position (for drawing) and box → globe (for
+  handles), plus the center/east/north vectors for the shader. It uses **full precision, and
+  atan2 rather than acos** for distances. The acos version misplaced tiny pieces by up to ~5%
+  (caught by a test); the shader must use the same atan2 form.
+- **World file format version 3:** optional `surface.pieces`. Piece source images are saved and
+  loaded like the main map. Versions 1 and 2 upgrade automatically; golden tests for all three
+  versions pass.
+**Still to do (next PR):** the Cut editor (rectangle and freeform tools, any image), the pieces
+list, on-globe handles (move, resize, rotate), live shader drawing (up to 32), session edits,
+and a benchmark.
 
 **MAP-05 — Grid calibration (adjust how the map's lines project)** · Implemented (M3) · Base
 **Intent:** Raised by the owner while testing `MAP-04`. The built-in map types require the image

@@ -26,7 +26,26 @@ internal sealed class BodyDocument
 internal sealed class SurfaceDocument
 {
     public MapDocument? Map { get; init; }
+    public List<PieceDocument>? Pieces { get; init; }  // Added in format version 3
     public required string FillColor { get; init; }
+}
+
+internal sealed class PieceDocument
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required string Asset { get; init; }
+    public required OutlineDocument Outline { get; init; }
+    public required double Latitude { get; init; }
+    public required double Longitude { get; init; }
+    public required double Rotation { get; init; }
+    public required double Width { get; init; }
+}
+
+internal sealed class OutlineDocument
+{
+    public required double SourceAspectRatio { get; init; }
+    public required List<double[]> Points { get; init; }
 }
 
 internal sealed class MapDocument

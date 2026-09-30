@@ -1,3 +1,4 @@
+using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Maps;
 using NothicWorlds.Core.Model;
 
@@ -57,8 +58,68 @@ internal static class WorldMapper
                     Projection = WorldFormat.ProjectionName(map.Projection),
                     Calibration = map.Calibration is null ? null : ToDocument(map.Calibration),
                 },
+                Pieces = body.Surface.Pieces.Count == 0
+                    ? null
+                    : body.Surface.Pieces.Select(ToDocument).ToList(),
                 FillColor = body.Surface.FillColor.ToHex(),
             },
+        };
+    }
+
+    private static PieceDocument ToDocument(MapPiece piece)
+    {
+        return new PieceDocument
+        {
+            Id = piece.Id,
+            Name = piece.Name,
+            Asset = piece.AssetName,
+            Outline = new OutlineDocument
+            {
+                SourceAspectRatio = piece.Outline.SourceAspectRatio,
+                Points = piece.Outline.Points.Select(p => new[] { p.U, p.V }).ToList(),
+            },
+            Latitude = piece.Center.LatitudeDegrees,
+            Longitude = piece.Center.LongitudeDegrees,
+            Rotation = piece.RotationDegrees,
+            Width = piece.WidthDegrees,
+        };
+    }
+
+    private static MapPiece ToPiece(PieceDocument document)
+    {
+        Require(document?.Outline?.Points is not null, "a map piece is incomplete");
+        Require(WorldFormat.IsValidAssetName(document!.Asset),
+            $"invalid map piece image name '{document.Asset}'");
+        Require(document.Outline!.Points!.All(p => p is { Length: 2 }),
+            "a map piece's outline is invalid");
+        Require(double.IsFinite(document.Rotation) && double.IsFinite(document.Width)
+                && document.Width is >= PieceProjection.MinimumWidthDegrees
+                    and <= PieceProjection.MaximumWidthDegrees,
+            "a map piece's size or rotation is invalid");
+
+        PieceOutline outline;
+        GeoCoordinate center;
+        try
+        {
+            outline = PieceOutline.Create(
+                document.Outline.Points.Select(p => new ImagePoint(p[0], p[1])),
+                document.Outline.SourceAspectRatio);
+            center = new GeoCoordinate(document.Latitude, document.Longitude);
+        }
+        catch (ArgumentException error)
+        {
+            throw new WorldFileException($"The world data is damaged: {error.Message}");
+        }
+
+        return new MapPiece
+        {
+            Id = document.Id,
+            Name = RequireText(document.Name, "map piece name"),
+            AssetName = document.Asset,
+            Outline = outline,
+            Center = center,
+            RotationDegrees = document.Rotation,
+            WidthDegrees = document.Width,
         };
     }
 
@@ -109,6 +170,10 @@ internal static class WorldMapper
             Kind = WorldFormat.ParseBodyKind(document.Kind),
         };
         body.Surface.FillColor = fillColor;
+        if (document.Surface.Pieces is List<PieceDocument> pieces)
+        {
+            body.Surface.Pieces.AddRange(pieces.Select(ToPiece));
+        }
 
         if (document.Surface.Map is MapDocument map)
         {
