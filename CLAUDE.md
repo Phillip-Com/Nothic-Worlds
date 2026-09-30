@@ -27,6 +27,7 @@ design and feature decisions. Claude proposes and the owner decides.
 | `CLAUDE.md` (this file) | How code is written: rules, workflow, standards |
 | [docs/VISION.md](docs/VISION.md) | What we're building: goals, feature intent (with IDs), and how each feature was implemented |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Key decisions, logged once committed to a PR or merged |
+| [docs/world-format.md](docs/world-format.md) | Specification of the `.nworld` save file. Update it with any format change |
 
 ---
 

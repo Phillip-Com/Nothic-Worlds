@@ -7,6 +7,11 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-09-30 | Worlds save as **one `.nworld` file** (zip: `world.json` + assets) | In PR | [#7](https://github.com/Phillip-Com/Nothic-Worlds/pull/7) | Spec: docs/world-format.md. VISION.md `SAV-01` |
+| 2026-09-30 | The **original map image** is copied into the world file, unchanged | In PR | [#7](https://github.com/Phillip-Com/Nothic-Worlds/pull/7) | Can always be re-prepared at full quality |
+| 2026-09-30 | The **camera view** is saved with the world | In PR | [#7](https://github.com/Phillip-Com/Nothic-Worlds/pull/7) | Reopen where you left off |
+| 2026-09-30 | Saving: **manual (Ctrl+S) + safety net** (unsaved-changes warning, recovery copy every 5 min) | In PR | [#7](https://github.com/Phillip-Com/Nothic-Worlds/pull/7) | Recorded here; built in the next PR. VISION.md `SAV-02` |
+| 2026-09-30 | Next after saving: map fitting tools (`MAP-05`, `MAP-02`) | In PR | [#7](https://github.com/Phillip-Com/Nothic-Worlds/pull/7) | Saving first so fitting work is never lost |
 | 2026-09-30 | Pre-PR checklist adds a **repo-wide line-length check** (100 characters) | Merged | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) · `8ca09ee` | `dotnet format` doesn't enforce it; 9 old violations slipped through. CLAUDE.md §9 |
 | 2026-09-30 | Polar map: centered on the **north** pole, **equator** at the edge; the southern hemisphere uses the fill color | Merged | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) · `8ca09ee` | VISION.md `MAP-04` |
 | 2026-09-30 | Two hemispheres: **west left, east right**, split at 0°/180° | Merged | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) · `8ca09ee` | VISION.md `MAP-04` |
