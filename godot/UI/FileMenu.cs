@@ -160,6 +160,13 @@ public partial class FileMenu : Node
             return;
         }
 
+        // Replacing the world mid-calibration would pull it out from under the workspace.
+        if (Session.IsCalibrating && item is MenuItem.New or MenuItem.Open)
+        {
+            Toolbar?.ShowInfo("Finish calibrating first (Done or Cancel).");
+            return;
+        }
+
         switch (item)
         {
             case MenuItem.New:
