@@ -1,3 +1,4 @@
+using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Maps;
 using NothicWorlds.Core.Model;
 
@@ -49,6 +50,32 @@ public class WorldTests
         Assert.Equal(MapProjection.Robinson, copy.Bodies[0].Surface.Map!.Projection);
         Assert.Equal(new RgbColor(9, 8, 7), copy.Bodies[0].Surface.FillColor);
         Assert.Single(copy.Bodies);
+    }
+
+    [Fact]
+    public void Clone_CopiesPiecesIndependently()
+    {
+        World original = MappedWorld();
+        original.Bodies[0].Surface.Pieces.Add(new MapPiece
+        {
+            AssetName = "assets/piece.png",
+            Outline = PieceOutline.Rectangle(new(0.1, 0.1), new(0.4, 0.3), 2.0),
+            Center = new GeoCoordinate(10, 20),
+            WidthDegrees = 15,
+        });
+
+        World copy = original.Clone();
+        MapPiece originalPiece = original.Bodies[0].Surface.Pieces[0];
+        originalPiece.Center = new GeoCoordinate(-40, -40);
+        originalPiece.WidthDegrees = 60;
+        originalPiece.Name = "Moved";
+
+        MapPiece copied = Assert.Single(copy.Bodies[0].Surface.Pieces);
+        Assert.Equal(originalPiece.Id, copied.Id);
+        Assert.Equal(new GeoCoordinate(10, 20), copied.Center);
+        Assert.Equal(15, copied.WidthDegrees);
+        Assert.Equal("Piece", copied.Name);
+        Assert.Same(originalPiece.Outline, copied.Outline);  // Immutable, safely shared
     }
 
     private static World MappedWorld()

@@ -20,6 +20,7 @@ public sealed class Body
     {
         var copy = new Body { Id = Id, Name = Name, Kind = Kind };
         copy.Surface.FillColor = Surface.FillColor;
+        copy.Surface.Pieces.AddRange(Surface.Pieces.Select(piece => piece.Clone()));
         copy.Surface.Map = Surface.Map is SurfaceMap map
             ? new SurfaceMap
             {

@@ -217,8 +217,11 @@ public static class WorldPackage
 
     private static List<string> ReferencedAssets(World world)
     {
+        // The main map and every piece's source image.
         return world.Bodies
-            .Select(body => body.Surface.Map?.AssetName)
+            .SelectMany(body => body.Surface.Pieces
+                .Select(piece => (string?)piece.AssetName)
+                .Prepend(body.Surface.Map?.AssetName))
             .OfType<string>()
             .Distinct()
             .ToList();
