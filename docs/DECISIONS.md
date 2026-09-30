@@ -7,6 +7,10 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-09-30 | Hand-drawn maps: add a **Flat map** mode (Mercator, shapes kept as drawn) alongside **Globe map** (equirectangular) | In PR | [#5](https://github.com/Phillip-Com/Nothic-Worlds/pull/5) | Chosen over latitude coverage, which only reduces pinching. VISION.md `MAP-03` |
+| 2026-09-30 | Map type is chosen with a toolbar dropdown, changeable any time; new imports default to **Flat map** | In PR | [#5](https://github.com/Phillip-Com/Nothic-Worlds/pull/5) | VISION.md `MAP-03` |
+| 2026-09-30 | Flat map polar caps: **stretch the map's top/bottom edge** to the poles | In PR | [#5](https://github.com/Phillip-Com/Nothic-Worlds/pull/5) | Seamless for ocean/ice edges, streaky if land touches the edge. VISION.md `MAP-03` |
+| 2026-09-30 | Milestone 2: map fixes (`MAP-03`) first, then the world save format | In PR | [#5](https://github.com/Phillip-Com/Nothic-Worlds/pull/5) | VISION.md §3 |
 | 2026-09-29 | Imported maps are compressed with **S3TC** on the GPU | Merged | [#4](https://github.com/Phillip-Com/Nothic-Worlds/pull/4) · `0f7af7c` | 8k map: ~137 MB video memory instead of ~497 MB, +~2 s load, slight blockiness. An uncompressed "high quality" option is in the Idea Inbox (Advanced tier). VISION.md `MAP-01` |
 | 2026-09-29 | Map size limit **8192 × 4096**; larger images are shrunk, keeping their proportions | Merged | [#4](https://github.com/Phillip-Com/Nothic-Worlds/pull/4) · `0f7af7c` | VISION.md `MAP-01` |
 | 2026-09-29 | Maps that aren't 2:1 are **applied with a warning**, not rejected | Merged | [#4](https://github.com/Phillip-Com/Nothic-Worlds/pull/4) · `0f7af7c` | VISION.md `MAP-01` |

@@ -35,7 +35,9 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 | Toggle lat/long grid | — | G |
 | Performance overlay | — | F3 |
 
-Use **Import Map…** (top-left) to wrap a 2:1 equirectangular map image onto the planet.
+Use **Import Map…** (top-left) to wrap a map image onto the planet. Set **Map type** to match it:
+**Flat map** (the default) for hand-drawn and fantasy-tool maps, or **Globe map** for 2:1
+equirectangular maps made for globes.
 
 ## Repository layout
 
