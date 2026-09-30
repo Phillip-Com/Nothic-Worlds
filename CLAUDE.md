@@ -263,7 +263,9 @@ would hide Godot's `Input` class.)
 Before opening a PR, the first four must succeed: the build has no errors, the tests pass, the
 formatting check makes no changes, and the headless run starts without errors. For PRs that
 affect rendering, also run the benchmark and report its numbers in the PR. Compare them with the
-baseline recorded under `REN-03` in VISION.md, and flag any drop. On this machine
+baseline recorded under `REN-03` in VISION.md, and flag any drop. Other apps using the GPU
+(especially an open Godot editor) skew the results. If a drop shows up, benchmark the previous
+commit under the same conditions before blaming the change. On this machine
 Godot is installed via winget. If the `godot` command isn't on PATH, use the full path to
 `Godot_v4.7.2-stable_mono_win64_console.exe` under
 `%LOCALAPPDATA%\Microsoft\WinGet\Packages\GodotEngine.GodotEngine.Mono_*`.

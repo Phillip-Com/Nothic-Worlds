@@ -99,13 +99,26 @@ Each entry uses this format:
 M1 covers these camera controls for a single planet:
 - **Orbit:** drag to spin the globe / circle the camera around it
 - **Zoom:** scroll wheel to move closer or farther
-- **Pan:** when zoomed in close, slide the view sideways across the surface
-**Implementation (M1, PR #3):** `godot/Controls/PlanetCamera.cs`
-- Orbit and pan are separate controls (owner's choice): **left-drag orbits** at a steady
-  0.25°/pixel, and **right-drag pans** at a speed matched to altitude so the ground follows the
-  mouse. Scroll / E / Q / + / - zoom by a percentage per step. WASD/arrows pan. Home resets.
-- The camera always looks at the planet's center, north stays up, and latitude is limited to
-  ±89° so the view can't flip at the poles. Altitude ranges from 0.05 to 8 planet radii.
+- **Pan:** switches automatically with zoom (owner's decision after trying the first version):
+  - **Zoomed out:** slide the *whole view* sideways and up/down, moving the planet across the
+    screen. At star-system scale, this is how the user moves around the whole area.
+  - **Zoomed in close:** slide across the planet's surface.
+- **Indicator:** on-screen text shows whether the camera is orbiting or panning, and which pan
+  mode is active.
+**Implementation (M1, PR #3):** `godot/Controls/PlanetCamera.cs`, `godot/UI/CameraModeIndicator.cs`
+- Orbit and pan are separate controls: **left-drag orbits** around the focus point at a steady
+  0.25°/pixel, and **right-drag / WASD pan**. Scroll / E / Q / + / - zoom by a percentage per
+  step. Home resets.
+- **Pan mode** (`PanMode`) is chosen by altitude. Below `SurfacePanMaxAltitude` (1.0 radius, where
+  the planet roughly fills the screen) it's **Surface**: lat/long moves at ground speed, and the
+  focus point eases back to the planet's center. Above that it's **View**: the focus point moves in
+  the screen plane, keeping the grabbed point under the mouse.
+- The camera looks at a focus point (planet center + view-pan offset), north stays up, and
+  latitude is limited to ±89° so the view can't flip at the poles. Altitude ranges from 0.05 to
+  8 radii. If orbiting around an off-planet focus point would put the camera inside the planet,
+  it gets pushed back out.
+- The indicator reads `PlanetCamera.CurrentAction` and `PlanetCamera.PanMode`. It updates its text
+  only when something changes.
 - All movement eases toward a target (frame-rate independent). Longitude is kept unwrapped so
   easing never takes the long way around.
 - Public `Orbit` / `Pan` / `Zoom` / `ResetView` methods can be reused by other code (the benchmark
@@ -124,6 +137,9 @@ visible. Heavier features go in an opt-in **Advanced** section.
   with VSync off, then prints the results. Use it to catch performance regressions.
 - **Baseline (2026-09-29, Vega 10 laptop, 1920×1080 fullscreen, grid planet):** average
   **207 fps**, slowest frame 10.1 ms (99 fps), 35 MB video memory, 42 MB app memory.
+  Measured with no other apps using the graphics chip. With the Godot editor open in the
+  background, the same build scores ~125–130 fps, so close the editor before benchmarking. The
+  camera indicator added ~12 MB of video memory (font/UI).
 
 **REN-04 — Top-down local region view** · Idea · Base
 **Intent:** Zoom down to a local region and see it as a top-down terrain view.
