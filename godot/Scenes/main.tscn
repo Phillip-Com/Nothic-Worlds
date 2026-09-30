@@ -1,12 +1,43 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://Scenes/Main.cs" id="1_main"]
+[ext_resource type="Shader" path="res://Rendering/planet.gdshader" id="2_planet"]
+[ext_resource type="Script" path="res://Controls/PlanetCamera.cs" id="3_camera"]
+[ext_resource type="Script" path="res://Diagnostics/PerformanceOverlay.cs" id="4_overlay"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_planet"]
+shader = ExtResource("2_planet")
+
+[sub_resource type="SphereMesh" id="SphereMesh_planet"]
+material = SubResource("ShaderMaterial_planet")
+radius = 1.0
+height = 2.0
+radial_segments = 128
+rings = 64
+
+[sub_resource type="Environment" id="Environment_space"]
+background_mode = 1
+background_color = Color(0.02, 0.02, 0.04, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.55, 0.6, 0.75, 1)
+ambient_light_energy = 0.35
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
 
-[node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5)
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_space")
+
+[node name="Planet" type="MeshInstance3D" parent="."]
+mesh = SubResource("SphereMesh_planet")
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.866025, -0.25, 0.433013, 0, 0.866025, 0.5, -0.5, -0.433013, 0.75, 0, 0, 0)
+rotation = Vector3(-0.61, -0.52, 0)
+
+[node name="PlanetCamera" type="Camera3D" parent="."]
+near = 0.001
+far = 100.0
+script = ExtResource("3_camera")
+
+[node name="PerformanceOverlay" type="CanvasLayer" parent="."]
+script = ExtResource("4_overlay")
