@@ -32,6 +32,24 @@ public sealed class World
     /// </summary>
     public CameraView? View { get; set; }
 
+    /// <summary>
+    /// Returns an independent copy of this world. Saving works on a copy, so it can run in the
+    /// background while the user keeps editing.
+    /// </summary>
+    public World Clone()
+    {
+        var copy = new World
+        {
+            Id = Id,
+            Name = Name,
+            CreatedUtc = CreatedUtc,
+            ModifiedUtc = ModifiedUtc,
+            View = View,  // Immutable record, safe to share.
+        };
+        copy.Bodies.AddRange(Bodies.Select(body => body.Clone()));
+        return copy;
+    }
+
     /// <summary>Creates a new world with a single, unmapped planet.</summary>
     public static World CreateNew(string name = "Untitled World")
     {

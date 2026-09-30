@@ -78,8 +78,25 @@ public static class WorldPackage
                 throw;
             }
 
-            throw new WorldFileException($"Couldn't save the world: {error.Message}", error);
+            throw new WorldFileException($"Couldn't save the world: {Describe(error)}", error);
         }
+    }
+
+    // Plain-language reasons for common save failures. The raw messages mention the
+    // in-progress ".saving" file, which would only confuse the user.
+    private static string Describe(Exception error)
+    {
+        const int diskFull = 0x70;       // Windows ERROR_DISK_FULL
+        const int handleDiskFull = 0x27; // Windows ERROR_HANDLE_DISK_FULL
+        return error switch
+        {
+            DirectoryNotFoundException => "the folder doesn't exist.",
+            UnauthorizedAccessException =>
+                "permission was denied for that location. Try saving somewhere else.",
+            IOException io when (io.HResult & 0xFFFF) is diskFull or handleDiskFull =>
+                "the disk is full.",
+            _ => error.Message,
+        };
     }
 
     /// <summary>Loads a world file, upgrading older format versions.</summary>
