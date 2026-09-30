@@ -12,10 +12,19 @@ namespace NothicWorlds.Rendering;
 /// </summary>
 public partial class PlanetSurface : MeshInstance3D
 {
+    // Samples per calibration lookup table: about 0.09° of latitude and 0.18° of longitude
+    // apart, blended smoothly by the GPU in between.
+    private const int TableSamples = 2048;
+
     private ShaderMaterial _material = null!;
+    private ImageTexture? _latitudeTable;
+    private ImageTexture? _longitudeTable;
 
     /// <summary>True if a map image is currently applied.</summary>
     public bool HasMap { get; private set; }
+
+    /// <summary>The map image currently wrapped onto the planet, or null.</summary>
+    public Texture2D? MapTexture { get; private set; }
 
     /// <summary>Whether the latitude/longitude grid is drawn.</summary>
     public bool ShowGrid
@@ -66,12 +75,33 @@ public partial class PlanetSurface : MeshInstance3D
         }
     }
 
+    /// <summary>
+    /// Applies a grid calibration (VISION.md MAP-05), or removes it with null. Cheap enough to
+    /// call on every mouse movement while dragging a guide line.
+    /// </summary>
+    public void SetCalibration(MapCalibration? calibration)
+    {
+        if (calibration is null)
+        {
+            _material.SetShaderParameter("has_calibration", false);
+            return;
+        }
+
+        _latitudeTable = UpdateTable(_latitudeTable, calibration.BakeLatitudeTable(TableSamples));
+        _longitudeTable =
+            UpdateTable(_longitudeTable, calibration.BakeLongitudeTable(TableSamples));
+        _material.SetShaderParameter("calibration_latitudes", _latitudeTable);
+        _material.SetShaderParameter("calibration_longitudes", _longitudeTable);
+        _material.SetShaderParameter("has_calibration", true);
+    }
+
     /// <summary>Wraps a map texture onto the planet and hides the grid.</summary>
     public void SetMap(Texture2D texture)
     {
         _material.SetShaderParameter("surface_map", texture);
         _material.SetShaderParameter("map_aspect", (float)texture.GetWidth() / texture.GetHeight());
         _material.SetShaderParameter("has_map", true);
+        MapTexture = texture;
         HasMap = true;
         ShowGrid = false;
     }
@@ -81,8 +111,26 @@ public partial class PlanetSurface : MeshInstance3D
     {
         _material.SetShaderParameter("surface_map", default);
         _material.SetShaderParameter("has_map", false);
+        SetCalibration(null);
+        MapTexture = null;
         HasMap = false;
         ShowGrid = true;
+    }
+
+    // Writes a table of 32-bit floats into a one-pixel-tall texture, reusing the existing
+    // texture when there is one (much cheaper while dragging).
+    private static ImageTexture UpdateTable(ImageTexture? texture, float[] values)
+    {
+        byte[] bytes = new byte[values.Length * sizeof(float)];
+        Buffer.BlockCopy(values, 0, bytes, 0, bytes.Length);
+        Image image = Image.CreateFromData(values.Length, 1, false, Image.Format.Rf, bytes);
+        if (texture is null)
+        {
+            return ImageTexture.CreateFromImage(image);
+        }
+
+        texture.Update(image);
+        return texture;
     }
 
     // A material only stores parameters that have been set. Until then, the shader uses the
