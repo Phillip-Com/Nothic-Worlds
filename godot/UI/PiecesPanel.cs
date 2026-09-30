@@ -40,6 +40,10 @@ public partial class PiecesPanel : CanvasLayer
     private List<MapPiece> _listed = [];
     private Guid? _selectedId;
 
+    // What the list shows (id and name of each row), to skip rebuilding it when only a piece's
+    // position changed, e.g. on every step of a drag.
+    private List<(Guid, string)> _shownRows = [];
+
     /// <summary>The open world whose pieces are shown.</summary>
     [Export] public WorldSession? Session { get; set; }
 
@@ -48,6 +52,12 @@ public partial class PiecesPanel : CanvasLayer
 
     /// <summary>Where messages go. The panel hides whenever the toolbar does.</summary>
     [Export] public MapToolbar? Toolbar { get; set; }
+
+    /// <summary>Raised when a different piece (or none) is selected.</summary>
+    public event Action? SelectionChanged;
+
+    /// <summary>The selected piece's id, or null.</summary>
+    public Guid? SelectedPieceId => _selectedId;
 
     /// <summary>Whether the panel is open (it's still hidden while the toolbar is).</summary>
     public bool IsPanelOpen
@@ -226,16 +236,30 @@ public partial class PiecesPanel : CanvasLayer
         if (_selectedId is Guid id && _listed.All(p => p.Id != id))
         {
             _selectedId = null;
+            SelectionChanged?.Invoke();
         }
 
-        _list.Clear();
-        foreach (MapPiece piece in _listed)
+        List<(Guid, string)> rows = [.. _listed.Select(p => (p.Id, p.Name))];
+        if (!rows.SequenceEqual(_shownRows))
         {
-            int index = _list.AddItem(piece.Name);
-            if (piece.Id == _selectedId)
+            _list.Clear();
+            foreach (MapPiece piece in _listed)
             {
-                _list.Select(index);
+                _list.AddItem(piece.Name);
             }
+
+            _shownRows = rows;
+        }
+
+        int selectedRow = _listed.FindIndex(p => p.Id == _selectedId);
+        if (selectedRow >= 0)
+        {
+            _list.Select(selectedRow);
+            _list.EnsureCurrentIsVisible();
+        }
+        else
+        {
+            _list.DeselectAll();
         }
 
         _heading.Text = $"Map Pieces ({_listed.Count} of {SurfaceSettings.MaxPieces})";
@@ -245,10 +269,17 @@ public partial class PiecesPanel : CanvasLayer
         ShowSelected();
     }
 
-    private void Select(Guid id)
+    /// <summary>Selects a piece (null for none), in the list and on the globe.</summary>
+    public void Select(Guid? id)
     {
+        if (id == _selectedId)
+        {
+            return;
+        }
+
         _selectedId = id;
         SyncWithWorld();
+        SelectionChanged?.Invoke();
     }
 
     // Fills the fields from the selected piece, without triggering edits.

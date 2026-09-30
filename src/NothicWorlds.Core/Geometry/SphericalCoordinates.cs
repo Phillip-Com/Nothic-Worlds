@@ -73,6 +73,42 @@ public static class SphericalCoordinates
     }
 
     /// <summary>
+    /// The angle between two points as seen from the sphere's center (the great-circle distance
+    /// on a unit sphere), in degrees: 0 to 180.
+    /// </summary>
+    public static double ArcDegrees(GeoCoordinate from, GeoCoordinate to)
+    {
+        double lat1 = double.DegreesToRadians(from.LatitudeDegrees);
+        double lat2 = double.DegreesToRadians(to.LatitudeDegrees);
+        double deltaLon = double.DegreesToRadians(
+            LongitudeDelta(from.LongitudeDegrees, to.LongitudeDegrees));
+
+        // Haversine formula: accurate for short and long distances alike.
+        double h = Math.Pow(Math.Sin((lat2 - lat1) / 2), 2)
+            + Math.Cos(lat1) * Math.Cos(lat2) * Math.Pow(Math.Sin(deltaLon / 2), 2);
+        return double.RadiansToDegrees(2 * Math.Asin(Math.Min(1.0, Math.Sqrt(h))));
+    }
+
+    /// <summary>
+    /// The compass direction to set off in from <paramref name="from"/> to reach
+    /// <paramref name="to"/> along a great circle, in degrees clockwise from north: 0 to 360.
+    /// Returns 0 when the points coincide.
+    /// </summary>
+    public static double BearingDegrees(GeoCoordinate from, GeoCoordinate to)
+    {
+        double lat1 = double.DegreesToRadians(from.LatitudeDegrees);
+        double lat2 = double.DegreesToRadians(to.LatitudeDegrees);
+        double deltaLon = double.DegreesToRadians(
+            LongitudeDelta(from.LongitudeDegrees, to.LongitudeDegrees));
+
+        double east = Math.Sin(deltaLon) * Math.Cos(lat2);
+        double north = Math.Cos(lat1) * Math.Sin(lat2)
+            - Math.Sin(lat1) * Math.Cos(lat2) * Math.Cos(deltaLon);
+        double bearing = double.RadiansToDegrees(Math.Atan2(east, north));
+        return bearing < 0 ? bearing + 360.0 : bearing;
+    }
+
+    /// <summary>
     /// Returns the shortest signed change in longitude from <paramref name="fromDegrees"/> to
     /// <paramref name="toDegrees"/>, in [-180, 180). For example, 170 → -170 is +20 (east
     /// across the date line), not -340.

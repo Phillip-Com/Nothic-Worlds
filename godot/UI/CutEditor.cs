@@ -196,7 +196,7 @@ public partial class CutEditor : CanvasLayer
         return (PointFacingCamera(), DefaultWidthDegrees);
     }
 
-    // The point on the planet at the middle of the screen, or the point nearest the camera if
+    // The point on the planet at the middle of the screen, or the nearest point on its edge if
     // the middle of the screen misses the planet.
     private GeoCoordinate PointFacingCamera()
     {
@@ -205,19 +205,9 @@ public partial class CutEditor : CanvasLayer
             return new GeoCoordinate(0, 0);
         }
 
-        Transform3D toPlanet = planet.GlobalTransform.AffineInverse();
         Vector2 middle = GetViewport().GetVisibleRect().Size / 2;
-        Vector3 origin = toPlanet * camera.ProjectRayOrigin(middle);
-        Vector3 direction = (toPlanet.Basis * camera.ProjectRayNormal(middle)).Normalized();
-
-        // Ray–sphere intersection with the planet's surface (nearest hit).
-        float along = -origin.Dot(direction);
-        float missSquared = origin.LengthSquared() - along * along;
-        float radiusSquared = camera.PlanetRadius * camera.PlanetRadius;
-        Vector3 point = missSquared <= radiusSquared
-            ? origin + direction * (along - Mathf.Sqrt(radiusSquared - missSquared))
-            : origin;
-        return SphericalCoordinates.FromDirection(point.Normalized().ToNumerics());
+        return GlobePicker.CoordinateAt(camera, planet, middle, nearestWhenMissed: true)
+            ?? new GeoCoordinate(0, 0);
     }
 
     private void SetTool(CutCanvas.CutTool tool)

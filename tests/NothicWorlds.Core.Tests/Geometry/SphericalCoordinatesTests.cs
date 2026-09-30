@@ -115,4 +115,32 @@ public class SphericalCoordinatesTests
     {
         Assert.Equal(expected, SphericalCoordinates.LongitudeDelta(from, to), 1e-9);
     }
+
+    [Theory]
+    [InlineData(0, 0, 0, 90, 90)]
+    [InlineData(0, 0, 90, 0, 90)]
+    [InlineData(10, 170, 10, -170, 19.693)]  // Across the date line, not the long way round
+    [InlineData(-30, 45, -30, 45, 0)]
+    [InlineData(0, 0, 0, 180, 180)]
+    public void ArcDegrees_IsTheGreatCircleAngle(
+        double lat1, double lon1, double lat2, double lon2, double expected)
+    {
+        double arc = SphericalCoordinates.ArcDegrees(
+            new GeoCoordinate(lat1, lon1), new GeoCoordinate(lat2, lon2));
+
+        Assert.Equal(expected, arc, 1e-3);
+    }
+
+    [Theory]
+    [InlineData(10, 0, 0)]     // Due north
+    [InlineData(0, 10, 90)]    // Due east
+    [InlineData(-10, 0, 180)]  // Due south
+    [InlineData(0, -10, 270)]  // Due west
+    public void BearingDegrees_IsClockwiseFromNorth(double lat, double lon, double expected)
+    {
+        double bearing = SphericalCoordinates.BearingDegrees(
+            new GeoCoordinate(0, 0), new GeoCoordinate(lat, lon));
+
+        Assert.Equal(expected, bearing, 1e-9);
+    }
 }

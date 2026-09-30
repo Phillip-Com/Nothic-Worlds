@@ -85,4 +85,18 @@ public class PieceOutlineTests
         double coverage = mask.Sum(v => v / 255.0) / mask.Length;
         Assert.InRange(coverage, 0.73, 0.77);   // Three quarters
     }
+
+    [Theory]
+    [InlineData(0.15, 0.85, true)]
+    [InlineData(0.05, 0.5, false)]  // Left of the box
+    [InlineData(0.8, 0.2, false)]   // In the box, but outside the triangle
+    [InlineData(0.3, 0.7, true)]
+    public void Contains_FollowsTheCutShape(double u, double v, bool expected)
+    {
+        // A triangle: top-left, bottom-left, bottom-right of the box (0.1–0.9).
+        PieceOutline triangle = PieceOutline.Create(
+            [new(0.1, 0.1), new(0.1, 0.9), new(0.9, 0.9)], 1.0);
+
+        Assert.Equal(expected, triangle.Contains(new ImagePoint(u, v)));
+    }
 }

@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://UI/CalibrationWorkspace.cs" id="11_calibration"]
 [ext_resource type="Script" path="res://UI/PiecesPanel.cs" id="12_pieces"]
 [ext_resource type="Script" path="res://UI/CutEditor.cs" id="13_cut"]
+[ext_resource type="Script" path="res://Controls/PieceHandles.cs" id="14_handles"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -100,3 +101,9 @@ Toolbar = NodePath("../MapToolbar")
 script = ExtResource("13_cut")
 Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
+
+[node name="PieceHandles" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Camera", "Panel")]
+script = ExtResource("14_handles")
+Session = NodePath("../WorldSession")
+Camera = NodePath("../PlanetCamera")
+Panel = NodePath("../PiecesPanel")
