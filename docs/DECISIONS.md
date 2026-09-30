@@ -7,10 +7,10 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-09-30 | Pre-PR checklist adds a **repo-wide line-length check** (100 characters) | In PR | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) | `dotnet format` doesn't enforce it; 9 old violations slipped through. CLAUDE.md §9 |
-| 2026-09-30 | Polar map: centered on the **north** pole, **equator** at the edge; the southern hemisphere uses the fill color | In PR | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) | VISION.md `MAP-04` |
-| 2026-09-30 | Two hemispheres: **west left, east right**, split at 0°/180° | In PR | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) | VISION.md `MAP-04` |
-| 2026-09-30 | Circular map types spread the map with **even spacing** (azimuthal equidistant) | In PR | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) | Rim isn't squished. VISION.md `MAP-04` |
+| 2026-09-30 | Pre-PR checklist adds a **repo-wide line-length check** (100 characters) | Merged | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) · `8ca09ee` | `dotnet format` doesn't enforce it; 9 old violations slipped through. CLAUDE.md §9 |
+| 2026-09-30 | Polar map: centered on the **north** pole, **equator** at the edge; the southern hemisphere uses the fill color | Merged | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) · `8ca09ee` | VISION.md `MAP-04` |
+| 2026-09-30 | Two hemispheres: **west left, east right**, split at 0°/180° | Merged | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) · `8ca09ee` | VISION.md `MAP-04` |
+| 2026-09-30 | Circular map types spread the map with **even spacing** (azimuthal equidistant) | Merged | [#6](https://github.com/Phillip-Com/Nothic-Worlds/pull/6) · `8ca09ee` | Rim isn't squished. VISION.md `MAP-04` |
 | 2026-09-30 | Hand-drawn maps: add a **Flat map** mode (Mercator, shapes kept as drawn) alongside **Globe map** (equirectangular) | Merged | [#5](https://github.com/Phillip-Com/Nothic-Worlds/pull/5) · `fe8db9a` | Chosen over latitude coverage, which only reduces pinching. VISION.md `MAP-03` |
 | 2026-09-30 | Map type is chosen with a toolbar dropdown, changeable any time; new imports default to **Flat map** | Merged | [#5](https://github.com/Phillip-Com/Nothic-Worlds/pull/5) · `fe8db9a` | VISION.md `MAP-03` |
 | 2026-09-30 | Flat map polar caps: filled with a **user-picked Pole color**, softly blended at the map edge | Merged | [#5](https://github.com/Phillip-Com/Nothic-Worlds/pull/5) · `fe8db9a` | Replaced the first choice (stretch the map's edges) after the owner saw the streaks on their map. VISION.md `MAP-03` |
