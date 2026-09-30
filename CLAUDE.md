@@ -268,4 +268,7 @@ Key decisions are recorded in [docs/DECISIONS.md](docs/DECISIONS.md), not in thi
 - Add an entry **only** after the change behind it has been committed to a PR or merged into
   `main`. Decisions that are only discussed or approved are not logged yet.
 - Each entry links the PR (and the commit, if merged) that carries the decision.
+- New entries start with status **In PR**. Don't open a separate PR just to mark entries as
+  merged. Instead, the **first commit of the next branch** changes the previous PR's entries to
+  **Merged** and adds the merge commit.
 - Read the log before starting any task that touches an area with past decisions.
