@@ -139,6 +139,27 @@ public sealed class PieceOutline
         return mask;
     }
 
+    /// <summary>
+    /// True if a point on the source image is inside the cut (even-odd rule, the same one the
+    /// mask uses).
+    /// </summary>
+    public bool Contains(ImagePoint point)
+    {
+        bool inside = false;
+        for (int i = 0, j = Points.Count - 1; i < Points.Count; j = i++)
+        {
+            ImagePoint a = Points[i];
+            ImagePoint b = Points[j];
+            if ((a.V > point.V) != (b.V > point.V)
+                && point.U < a.U + (point.V - a.V) / (b.V - a.V) * (b.U - a.U))
+            {
+                inside = !inside;
+            }
+        }
+
+        return inside;
+    }
+
     private static double SignedArea(List<ImagePoint> points)
     {
         double sum = 0;

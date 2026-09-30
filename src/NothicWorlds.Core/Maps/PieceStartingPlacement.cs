@@ -66,19 +66,6 @@ public static class PieceStartingPlacement
 
     private static double? ArcDegrees(GeoCoordinate from, GeoCoordinate? to)
     {
-        if (to is not GeoCoordinate end)
-        {
-            return null;
-        }
-
-        double lat1 = double.DegreesToRadians(from.LatitudeDegrees);
-        double lat2 = double.DegreesToRadians(end.LatitudeDegrees);
-        double deltaLon = double.DegreesToRadians(
-            SphericalCoordinates.LongitudeDelta(from.LongitudeDegrees, end.LongitudeDegrees));
-
-        // Haversine formula: accurate for short and long distances alike.
-        double h = Math.Pow(Math.Sin((lat2 - lat1) / 2), 2)
-            + Math.Cos(lat1) * Math.Cos(lat2) * Math.Pow(Math.Sin(deltaLon / 2), 2);
-        return double.RadiansToDegrees(2 * Math.Asin(Math.Min(1.0, Math.Sqrt(h))));
+        return to is GeoCoordinate end ? SphericalCoordinates.ArcDegrees(from, end) : null;
     }
 }
