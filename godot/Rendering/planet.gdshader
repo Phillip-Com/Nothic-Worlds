@@ -47,6 +47,19 @@ uniform bool has_calibration = false;
 uniform sampler2D calibration_latitudes : filter_linear, repeat_disable;
 uniform sampler2D calibration_longitudes : filter_linear, repeat_disable;
 
+// Map pieces (VISION.md MAP-02): up to 32 flat images laid on the globe like stickers, drawn
+// over the map in order. The math must match NothicWorlds.Core.Maps.PieceProjection (which has
+// the tests); the per-piece values come from it via PlanetSurface.SetPieces.
+uniform int piece_count = 0;
+uniform sampler2D piece_textures[32] : source_color, filter_linear_mipmap, repeat_disable;
+uniform vec3 piece_centers[32];
+uniform vec3 piece_easts[32];
+uniform vec3 piece_norths[32];
+// x, y: cosine and sine of the clockwise rotation; z, w: 1 / width and 1 / height (radians).
+uniform vec4 piece_frames[32];
+// x: cosine of the piece's reach (quick skip for far-away pixels); y: radians per texel.
+uniform vec2 piece_limits[32];
+
 uniform vec3 base_color : source_color = vec3(0.13, 0.27, 0.45);
 uniform vec3 grid_color : source_color = vec3(0.75, 0.8, 0.9);
 uniform vec3 highlight_color : source_color = vec3(1.0, 0.8, 0.35);
@@ -255,12 +268,47 @@ vec3 sample_map(float true_lat, float true_lon) {
 	return mix(map_color, fill_color, fill);
 }
 
+// Draws each piece covering this point, in order. `pixel_angle` is how much of the globe (in
+// radians) one screen pixel covers here; it picks the texture's detail level, since the usual
+// automatic choice doesn't work inside a loop that skips pixels.
+vec3 draw_pieces(vec3 color, vec3 direction, float pixel_angle) {
+	for (int i = 0; i < piece_count; i++) {
+		float cos_distance = dot(direction, piece_centers[i]);
+		if (cos_distance < piece_limits[i].x) {
+			continue;  // Too far from this piece's center to be part of it.
+		}
+
+		float east = dot(direction, piece_easts[i]);
+		float north = dot(direction, piece_norths[i]);
+		float sideways = sqrt(east * east + north * north);
+		// atan of sine and cosine stays accurate near the center; acos alone doesn't.
+		float distance = atan(sideways, cos_distance);
+		float scale = sideways > 1e-9 ? distance / sideways : 1.0;
+		float x = east * scale;
+		float y = north * scale;
+
+		vec4 frame = piece_frames[i];
+		float right = x * frame.x - y * frame.y;
+		float up = x * frame.y + y * frame.x;
+		vec2 uv = vec2(0.5 + right * frame.z, 0.5 - up * frame.w);
+		if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+			continue;
+		}
+
+		float lod = max(log2(max(pixel_angle / piece_limits[i].y, 1e-6)), 0.0);
+		vec4 texel = textureLod(piece_textures[i], uv, lod);
+		color = mix(color, texel.rgb, texel.a);
+	}
+	return color;
+}
+
 void fragment() {
 	vec3 direction = normalize(local_direction);
 	float latitude = degrees(asin(clamp(direction.y, -1.0, 1.0)));
 	float longitude = degrees(atan(direction.x, direction.z));
 
 	vec3 color = has_map ? sample_map(radians(latitude), radians(longitude)) : base_color;
+	color = draw_pieces(color, direction, length(fwidth(direction)));
 
 	if (show_grid) {
 		float grid = max(
