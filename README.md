@@ -55,7 +55,8 @@ along with everything orbiting it (Ctrl+Z brings it back). **Make Center** puts 
 body at the center of its system, with the bodies it orbited now circling it on the same paths
 (for example, a planet-centered system with the sun going around it). It also edits the selected body's
 name, kind, radius, day length, axial tilt, and orbit: what it orbits, distance (km or AU),
-period, and starting position. Switch on "Elongated or tilted orbit" for more.
+period, and starting position. Switch on "Elongated or tilted orbit" for more. While the panel is
+open, the selected body's path is drawn in yellow, and every change shows live as you type.
 
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers

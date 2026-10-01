@@ -254,6 +254,13 @@ on the left (owner's choice).
   distance in km or AU, the period, and the start angle. A switch shows the extras: elongation,
   closest point, tilt, and tilt direction. Values that aren't allowed are refused with the
   reason, and the fields go back to the real values.
+- **Path and live updates while editing (owner's request):** while the panel is open, the
+  selected body's path is always drawn, even close up, in the selection yellow
+  (`SystemView.HighlightedOrbit`). Number fields apply as you type (`SpinBox.UpdateOnTextChanged`,
+  via `NumberFields.WithLiveTyping`), so the path, position, and size update on every keystroke.
+  Updates from the world never overwrite a field being typed in (`ShowValue`), and half-typed
+  numbers don't flash error messages. Rapid typing merges into one undo step. Same for the
+  Pieces panel's fields.
 - **Make Center (owner's request and decision, 2026-09-30: "swap places, keep motion"):** the
   selected body becomes the center of its system. `SystemHierarchy.MakeCenter` flips the chain
   between it and the old center: each body it orbited now circles the one below it on the same
