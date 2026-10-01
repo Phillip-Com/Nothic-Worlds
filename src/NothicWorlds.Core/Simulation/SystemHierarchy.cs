@@ -46,6 +46,30 @@ public static class SystemHierarchy
         return null;
     }
 
+    /// <summary>
+    /// Everything that orbits <paramref name="ancestor"/>, directly or through others (its
+    /// moons, their moons, ...), in list order. Not the body itself.
+    /// </summary>
+    public static List<Body> DescendantsOf(IReadOnlyList<Body> bodies, Guid ancestor)
+    {
+        var found = new HashSet<Guid> { ancestor };
+        bool grew = true;
+        while (grew)
+        {
+            grew = false;
+            foreach (Body body in bodies)
+            {
+                if (body.Orbit is Orbit orbit && found.Contains(orbit.ParentId)
+                    && found.Add(body.Id))
+                {
+                    grew = true;
+                }
+            }
+        }
+
+        return [.. bodies.Where(body => body.Id != ancestor && found.Contains(body.Id))];
+    }
+
     /// <summary>The bodies that orbit <paramref name="parent"/> directly, in list order.</summary>
     public static IEnumerable<Body> ChildrenOf(IReadOnlyList<Body> bodies, Guid parent)
     {
