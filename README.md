@@ -42,9 +42,10 @@ A new world is a small star system: a sun with one planet orbiting it. Zoom out 
 system, and click any body to fly to it. The map tools work on the selected body; stars have no
 map. The time bar (bottom right) plays the world clock at the chosen speed, steps it back or forward
 with **−** / **+** (by an hour, day, week, 30 days, or year of the selected body), shows the date
-on the selected body in its own days, jumps to a day with **Go to…**, and switches between a
-readable view and **True scale**. Steps and jumps glide smoothly, so you can watch the bodies
-move into place.
+on the selected body (in its calendar, or in its own days without one), jumps to a date with
+**Go to…**, and switches between a readable view and **True scale**. Steps and jumps glide
+smoothly, so you can watch the bodies move into place. Above the buttons, a second line shows the
+body's seasons in each hemisphere and when the next solstice or equinox comes.
 
 In number fields, Up/Down change the value (Shift for bigger steps). Click the view to give the
 arrow keys back to the camera.
@@ -57,6 +58,13 @@ body at the center of its system, with the bodies it orbited now circling it on 
 name, kind, radius, day length, axial tilt, and orbit: what it orbits, distance (km or AU),
 period, and starting position. Switch on "Elongated or tilted orbit" for more. While the panel is
 open, the selected body's path is drawn in yellow, and every change shows live as you type.
+**Axis direction** sets which way the tilted axis leans, which decides when in the year the
+solstices fall.
+
+Planets and moons can have their own calendar: **Calendar · Edit…** in the panel sets its months,
+weekdays, year numbering (with an optional era), and the date the clock starts on. Below it, the
+panel lists the year's solstices and equinoxes with **Go to** buttons, and they are marked on the
+orbit too (equinoxes as dots, solstices as diamonds).
 
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers
