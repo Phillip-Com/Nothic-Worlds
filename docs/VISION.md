@@ -74,7 +74,7 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
   format (PR #7), then the app side (File menu, unsaved changes, recovery copies) (PR #8).
 - **Complete** (PR #8 merged 2026-09-30).
 
-**Milestone 3: Map Fitting** · In Progress
+**Milestone 3: Map Fitting** · Complete (PR #15 merged 2026-09-30)
 - **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace (PR #10).
 - **Part 2:** `MAP-02` cut and place. Core first (PR #11), then the Cut editor, Pieces panel,
   and live drawing (PR #12), then drag handles on the globe (PR #13), then undo/redo (`UI-03`,

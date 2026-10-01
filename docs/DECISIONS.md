@@ -7,8 +7,8 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-09-30 | **Edit Points** is entered with the panel's toggle or by **double-clicking** a piece; Esc leaves it | In PR | [#15](https://github.com/Phillip-Com/Nothic-Worlds/pull/15) | VISION.md `MAP-02` |
-| 2026-09-30 | World file **format version 4** adds optional piece warps; version 3 files upgrade automatically | In PR | [#15](https://github.com/Phillip-Com/Nothic-Worlds/pull/15) | docs/world-format.md version history |
+| 2026-09-30 | **Edit Points** is entered with the panel's toggle or by **double-clicking** a piece; Esc leaves it | Merged | [#15](https://github.com/Phillip-Com/Nothic-Worlds/pull/15) · `b28f4ac` | VISION.md `MAP-02` |
+| 2026-09-30 | World file **format version 4** adds optional piece warps; version 3 files upgrade automatically | Merged | [#15](https://github.com/Phillip-Com/Nothic-Worlds/pull/15) · `b28f4ac` | docs/world-format.md version history |
 | 2026-09-30 | A world that **matches its saved file** counts as saved (e.g. after undoing back to it) | Merged | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) · `1d80a42` | VISION.md `UI-03` |
 | 2026-09-30 | **Undo/redo** brought forward, before map warping; covers **all world edits** (pieces, map type, fill color, calibration, Import/Clear Map) | Merged | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) · `1d80a42` | VISION.md `UI-03` |
 | 2026-09-30 | Undo/redo through an **Edit menu** (names what will be undone) plus Ctrl+Z and Ctrl+Y / Ctrl+Shift+Z | Merged | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) · `1d80a42` | |
