@@ -86,7 +86,8 @@ public partial class CalibrationWorkspace : CanvasLayer
 
         // The dialog's own text would sit under a custom child, so use a label of our own.
         _addPrompt = new Label();
-        _addValue = new SpinBox { Step = 0.5, CustomMinimumSize = new Vector2(120, 0) };
+        _addValue = new SpinBox { Step = 0.5, CustomMinimumSize = new Vector2(120, 0) }
+            .WithArrowKeys();
         var addLayout = new VBoxContainer();
         addLayout.AddChild(_addPrompt);
         addLayout.AddChild(_addValue);

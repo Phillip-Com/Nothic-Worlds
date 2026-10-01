@@ -520,7 +520,7 @@ public partial class SystemPanel : CanvasLayer
             Suffix = suffix,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
         };
-        field.ValueChanged += _ => changed();
+        field.WithArrowKeys().ValueChanged += _ => changed();
         return field;
     }
 

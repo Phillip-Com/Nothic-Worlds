@@ -234,7 +234,7 @@ public partial class PiecesPanel : CanvasLayer
             Suffix = suffix,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
         };
-        field.ValueChanged += _ => CommitPlacement();
+        field.WithArrowKeys().ValueChanged += _ => CommitPlacement();
         grid.AddChild(field);
         return field;
     }
