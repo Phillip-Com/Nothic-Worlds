@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 5** (see **Version history** at the end)
+**Current format version: 6** (see **Version history** at the end)
 
 ## Container
 
@@ -20,11 +20,11 @@ A `.nworld` file is a standard **zip archive** containing:
   which also blocks names that try to escape the archive (`../`).
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB.
 
-## `world.json` (version 5)
+## `world.json` (version 6)
 
 ```json
 {
-  "formatVersion": 5,
+  "formatVersion": 6,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -38,6 +38,7 @@ A `.nworld` file is a standard **zip archive** containing:
       "radiusKm": 696000,
       "dayLengthHours": 609.5,
       "axialTilt": 0,
+      "axialTiltDirection": 0,
       "surface": { "fillColor": "#E6EDF5" }
     },
     {
@@ -47,6 +48,7 @@ A `.nworld` file is a standard **zip archive** containing:
       "radiusKm": 1737.5,
       "dayLengthHours": 660,
       "axialTilt": 1.5,
+      "axialTiltDirection": 0,
       "orbit": {
         "parent": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         "distanceKm": 384400,
@@ -63,6 +65,19 @@ A `.nworld` file is a standard **zip archive** containing:
       "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       "name": "Aerth",
       "kind": "planet",
+      "radiusKm": 6000,
+      "dayLengthHours": 26.5,
+      "axialTilt": 23.5,
+      "axialTiltDirection": 45,
+      "orbit": { "parent": "51515151-5151-5151-5151-515151515151", "distanceKm": 149600000,
+        "periodDays": 365.25, "startAngle": 90 },
+      "calendar": {
+        "months": [ { "name": "Frost", "days": 30 }, { "name": "Highsun", "days": 31 } ],
+        "weekdays": [ "Moonday", "Starday" ],
+        "firstYear": 1203,
+        "era": "of the Third Age",
+        "start": { "month": 1, "day": 5, "weekday": 1 }
+      },
       "surface": {
         "map": {
           "asset": "assets/0123456789abcdef0123456789abcdef.png",
@@ -118,6 +133,13 @@ A `.nworld` file is a standard **zip archive** containing:
 | `bodies[].radiusKm` | yes | Above 0, at most 10¹⁰ |
 | `bodies[].dayLengthHours` | yes | Time for one spin, in standard hours. Above 0, at most 10⁷. |
 | `bodies[].axialTilt` | yes | Degrees the spin axis leans, 0 to 180 |
+| `bodies[].axialTiltDirection` | yes | Degrees: which way the north pole leans (see the axis rule below) |
+| `bodies[].calendar` | no | The body's own calendar (`CAL-01`). Omitted to count plain days. |
+| `…calendar.months` | yes | 1 to 100 `{ "name", "days" }`, in order; each name not empty, days 1 to 100,000 |
+| `…calendar.weekdays` | no | Weekday names, in order (at most 100, none empty). Omitted for a calendar without weeks. |
+| `…calendar.firstYear` | yes | The year number at time 0 |
+| `…calendar.era` | no | Words shown after the year number, e.g. "of the Third Age" |
+| `…calendar.start` | yes | The date at time 0: `month` (0 is the first), `day` (1 is the first, within that month), `weekday` (0 is the first; 0 when there are no weekdays) |
 | `bodies[].orbit` | no | The body's designed orbit around another body. Omitted for a body at the system's center. Every chain of parents must end at a body without an orbit (no missing parents, no loops). |
 | `…orbit.parent` | yes | The `id` of the body it circles |
 | `…orbit.distanceKm` | yes | The orbit's size (semi-major axis), center to center. Above 0, at most 10¹³. |
@@ -194,6 +216,20 @@ approach *ϖ*, tilt *i*, and tilt direction *Ω*, the position relative to the p
 A body's position is its parent's position plus this offset. Bodies without an orbit sit at
 (0, 0, 0). A body turns once on its axis every `dayLengthHours`, eastward.
 
+**Spin axis** (`BodyOrientation` in Core). With tilt *i* and tilt direction *θ*, the north pole
+points along (0, cos *i*, 0) + sin *i* × (cos *θ*, 0, −sin *θ*): it starts straight up (+y)
+and leans by *i* toward direction *θ*, measured like orbit angles.
+
+**Calendars** count the body's own days (`CalendarMath` in Core). Day 0 is the day at time 0
+(each day lasts `dayLengthHours`), which is the calendar's `start` date. Day *n* is *n* days on
+through the months in order, wrapping into the next year after the last month, and back into
+earlier years for negative *n*. Weekdays cycle the same way from `start.weekday`.
+
+**Seasons** aren't stored; they're worked out (`Seasons` in Core). The body's star is the
+nearest star up its chain of parents, or a star orbiting it or its planet. The star's
+declination is the angle between the direction to the star and the body's equatorial plane.
+Northern solstices are where it peaks and bottoms out; equinoxes are where it crosses zero.
+
 ## Safe saving
 
 1. Write the complete new file next to the target as `<name>.nworld.saving`, and flush it to disk.
@@ -211,3 +247,4 @@ If anything fails, the existing world file is left untouched.
 | 3 | Added optional `surface.pieces` (cut and place, `MAP-02`) | Nothing to change: version 2 surfaces have no pieces |
 | 4 | Added optional `pieces[].warp` (Edit Points, `MAP-02`) | Nothing to change: version 3 pieces aren't warped |
 | 5 | Star systems (M4): `timeDays`; bodies gain `radiusKm`, `dayLengthHours`, `axialTilt`, optional `orbit`; kinds `star` and `moon` | Each body gets `radiusKm` 6371, `dayLengthHours` 24, `axialTilt` 0, and no orbit |
+| 6 | Calendars and seasons (M5): bodies gain `axialTiltDirection` and an optional `calendar` | Each body gets `axialTiltDirection` 0 and no calendar |

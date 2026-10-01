@@ -443,6 +443,179 @@ public sealed class WorldPackageTests : IDisposable
         }
         """;
 
+    // A version 6 world file (adds axial tilt directions and calendars), exactly as this
+    // version writes it. If this test fails, the file format changed: that must be deliberate,
+    // with a new format version, a migration, and a new golden file. Never edit this.
+    private const string GoldenV6Json = """
+        {
+          "formatVersion": 6,
+          "id": "11111111-2222-3333-4444-555555555555",
+          "name": "Aerth",
+          "createdUtc": "2026-09-30T12:00:00+00:00",
+          "modifiedUtc": "2026-09-30T13:30:00+00:00",
+          "timeDays": 400.5,
+          "bodies": [
+            {
+              "id": "51515151-5151-5151-5151-515151515151",
+              "name": "Sol",
+              "kind": "star",
+              "radiusKm": 696000,
+              "dayLengthHours": 609.5,
+              "axialTilt": 0,
+              "axialTiltDirection": 0,
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aerth",
+              "kind": "planet",
+              "radiusKm": 6000,
+              "dayLengthHours": 26.5,
+              "axialTilt": 23.5,
+              "axialTiltDirection": 45,
+              "orbit": {
+                "parent": "51515151-5151-5151-5151-515151515151",
+                "distanceKm": 149600000,
+                "periodDays": 365.25,
+                "startAngle": 90
+              },
+              "calendar": {
+                "months": [
+                  {
+                    "name": "Frost",
+                    "days": 30
+                  },
+                  {
+                    "name": "Highsun",
+                    "days": 31
+                  }
+                ],
+                "weekdays": [
+                  "Moonday",
+                  "Starday"
+                ],
+                "firstYear": 1203,
+                "era": "of the Third Age",
+                "start": {
+                  "month": 1,
+                  "day": 5,
+                  "weekday": 1
+                }
+              },
+              "surface": {
+                "map": {
+                  "asset": "assets/0123456789abcdef0123456789abcdef.png",
+                  "projection": "winkel-tripel",
+                  "calibration": {
+                    "latitudes": [
+                      {
+                        "latitude": 30,
+                        "drawnAs": 33.5
+                      }
+                    ],
+                    "longitudes": [
+                      {
+                        "longitude": -180,
+                        "drawnAs": -185
+                      },
+                      {
+                        "longitude": 0,
+                        "drawnAs": 2
+                      }
+                    ]
+                  }
+                },
+                "pieces": [
+                  {
+                    "id": "99999999-8888-7777-6666-555555555555",
+                    "name": "Northern Isles",
+                    "asset": "assets/fedcba9876543210fedcba9876543210.png",
+                    "outline": {
+                      "sourceAspectRatio": 1.5,
+                      "points": [
+                        [
+                          0.25,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.5
+                        ],
+                        [
+                          0.25,
+                          0.5
+                        ]
+                      ]
+                    },
+                    "latitude": 55,
+                    "longitude": -20.5,
+                    "rotation": 15,
+                    "width": 12.5,
+                    "warp": [
+                      [
+                        0,
+                        0
+                      ],
+                      [
+                        1.25,
+                        -0.125
+                      ],
+                      [
+                        1,
+                        1
+                      ],
+                      [
+                        0,
+                        1
+                      ]
+                    ]
+                  }
+                ],
+                "fillColor": "#112233"
+              }
+            },
+            {
+              "id": "70707070-7070-7070-7070-707070707070",
+              "name": "Luna",
+              "kind": "moon",
+              "radiusKm": 1737.5,
+              "dayLengthHours": 660,
+              "axialTilt": 1.5,
+              "axialTiltDirection": 0,
+              "orbit": {
+                "parent": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "distanceKm": 384400,
+                "periodDays": 27.5,
+                "startAngle": 0,
+                "eccentricity": 0.25,
+                "closestApproach": 45,
+                "tilt": 5.25,
+                "tiltDirection": 120
+              },
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            }
+          ],
+          "view": {
+            "latitude": 20,
+            "longitude": -45.5,
+            "altitude": 1.25,
+            "focusOffset": [
+              0.5,
+              0,
+              -0.25
+            ]
+          }
+        }
+        """;
+
     private static readonly byte[] _imageBytes = Encoding.ASCII.GetBytes("pretend PNG bytes");
     private static readonly byte[] _pieceBytes = Encoding.ASCII.GetBytes("pretend piece PNG");
 
@@ -526,13 +699,37 @@ public sealed class WorldPackageTests : IDisposable
     // ----- The file format itself -----
 
     [Fact]
-    public void WrittenJson_MatchesTheGoldenVersion5File()
+    public void WrittenJson_MatchesTheGoldenVersion6File()
     {
         string path = PathFor("golden.nworld");
 
-        WorldPackage.Save(path, SystemGoldenWorld(), AssetsWithPiece());
+        WorldPackage.Save(path, CalendarGoldenWorld(), AssetsWithPiece());
 
-        Assert.Equal(Normalize(GoldenV5Json), Normalize(ReadEntry(path, "world.json")));
+        Assert.Equal(Normalize(GoldenV6Json), Normalize(ReadEntry(path, "world.json")));
+    }
+
+    [Fact]
+    public void GoldenVersion6File_LoadsAsExpected()
+    {
+        string path = WriteRawPackage("golden-v6.nworld", GoldenV6Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        AssertSameWorld(CalendarGoldenWorld(), WorldPackage.Load(path).World);
+    }
+
+    [Fact]
+    public void Version5Files_LeanTowardZeroAndHaveNoCalendar()
+    {
+        string path = WriteRawPackage("golden-v5-upgrade.nworld", GoldenV5Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        World world = WorldPackage.Load(path).World;
+
+        Assert.All(world.Bodies, body =>
+        {
+            Assert.Equal(0, body.AxialTiltDirectionDegrees);
+            Assert.Null(body.Calendar);
+        });
     }
 
     [Fact]
@@ -656,7 +853,7 @@ public sealed class WorldPackageTests : IDisposable
 
         WorldPackage.Save(newPath, loaded.World, loaded.Assets);
 
-        Assert.Contains("\"formatVersion\": 5", ReadEntry(newPath, "world.json"));
+        Assert.Contains("\"formatVersion\": 6", ReadEntry(newPath, "world.json"));
         AssertSameWorld(GoldenWorld(), WorldPackage.Load(newPath).World);
     }
 
@@ -761,7 +958,7 @@ public sealed class WorldPackageTests : IDisposable
     public void Load_NewerFormatVersion_IsRefusedWithAClearMessage()
     {
         string path = WriteRawPackage(
-            "future.nworld", GoldenV5Json.Replace("\"formatVersion\": 5", "\"formatVersion\": 6"),
+            "future.nworld", GoldenV6Json.Replace("\"formatVersion\": 6", "\"formatVersion\": 7"),
             (AssetName, _imageBytes));
 
         WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
@@ -835,6 +1032,23 @@ public sealed class WorldPackageTests : IDisposable
         string json = Normalize(GoldenV5Json).Replace(find, replace);
         Assert.NotEqual(Normalize(GoldenV5Json), json);  // The edit really applied.
         string path = WriteRawPackage("damaged-v5.nworld", json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
+    }
+
+    [Theory]
+    [InlineData("\"days\": 30", "\"days\": 0")]                      // An empty month
+    [InlineData("\"name\": \"Frost\"", "\"name\": \"\"")]             // An unnamed month
+    [InlineData("\"day\": 5", "\"day\": 40")]                        // Start past the month
+    [InlineData("\"weekday\": 1", "\"weekday\": 2")]                 // Start past the week
+    [InlineData("\"month\": 1,", "\"month\": 7,")]                   // No such month
+    [InlineData("\"axialTiltDirection\": 45", "\"axialTiltDirection\": \"east\"")]
+    public void Load_DamagedCalendar_IsRejected(string find, string replace)
+    {
+        string json = Normalize(GoldenV6Json).Replace(find, replace);
+        Assert.NotEqual(Normalize(GoldenV6Json), json);  // The edit really applied.
+        string path = WriteRawPackage("damaged-v6.nworld", json,
             (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
 
         Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
@@ -1001,6 +1215,26 @@ public sealed class WorldPackageTests : IDisposable
         };
     }
 
+    // A version 6 world: the version 5 system, with the planet's axis leaning toward 45° and
+    // the planet keeping its own calendar.
+    private static World CalendarGoldenWorld()
+    {
+        World world = SystemGoldenWorld();
+        Body planet = world.Bodies[1];
+        planet.AxialTiltDirectionDegrees = 45;
+        planet.Calendar = new Calendar
+        {
+            Months = [new("Frost", 30), new("Highsun", 31)],
+            Weekdays = ["Moonday", "Starday"],
+            FirstYear = 1203,
+            Era = "of the Third Age",
+            StartMonth = 1,
+            StartDay = 5,
+            StartWeekday = 1,
+        };
+        return world;
+    }
+
     // A version 5 star system: a sun at the center, the mapped planet around it, and a moon on
     // an elongated, tilted orbit around the planet.
     private static World SystemGoldenWorld()
@@ -1077,6 +1311,8 @@ public sealed class WorldPackageTests : IDisposable
             Assert.Equal(e.RadiusKm, a.RadiusKm);
             Assert.Equal(e.DayLengthHours, a.DayLengthHours);
             Assert.Equal(e.AxialTiltDegrees, a.AxialTiltDegrees);
+            Assert.Equal(e.AxialTiltDirectionDegrees, a.AxialTiltDirectionDegrees);
+            Assert.Equal(e.Calendar, a.Calendar);
             Assert.Equal(e.Orbit, a.Orbit);
             Assert.Equal(e.Surface.FillColor, a.Surface.FillColor);
             Assert.Equal(e.Surface.Map?.AssetName, a.Surface.Map?.AssetName);

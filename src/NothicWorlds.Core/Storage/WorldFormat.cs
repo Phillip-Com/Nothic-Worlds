@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 6;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -67,9 +67,26 @@ internal static partial class WorldFormat
         // the world a clock (star systems, M4). Older worlds hold one planet, which gets Earth's
         // size, a 24-hour day, and no tilt, and stays at the center with no orbit.
         AddBodyDefaults,
+
+        // 5 → 6: bodies gained an axial tilt direction and an optional calendar (calendars and
+        // seasons, M5). Older bodies lean toward direction 0 and count plain days.
+        document => SetOnEveryBody(document, "axialTiltDirection", 0.0),
     ];
 
     public static string ProjectionName(MapProjection projection) => _projectionNames[projection];
+
+    private static JsonObject SetOnEveryBody(JsonObject document, string name, double value)
+    {
+        if (document["bodies"] is JsonArray bodies)
+        {
+            foreach (JsonObject body in bodies.OfType<JsonObject>())
+            {
+                body[name] ??= value;
+            }
+        }
+
+        return document;
+    }
 
     private static JsonObject AddBodyDefaults(JsonObject document)
     {
