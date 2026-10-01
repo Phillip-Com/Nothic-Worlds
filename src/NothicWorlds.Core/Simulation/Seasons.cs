@@ -206,7 +206,8 @@ public static class Seasons
         Vector3D pole = BodyOrientation.NorthPole(body);
         return timeDays =>
         {
-            Vector3D toStar = PositionAlong(starChain, timeDays) - PositionAlong(bodyChain, timeDays);
+            Vector3D toStar =
+                PositionAlong(starChain, timeDays) - PositionAlong(bodyChain, timeDays);
             double sine = toStar.Dot(pole) / toStar.Length;
             return double.RadiansToDegrees(Math.Asin(Math.Clamp(sine, -1, 1)));
         };
