@@ -133,6 +133,10 @@ Each entry uses this format:
   when you're close to it, so it doesn't cut through the globe.
 - **Floating origin:** positions are worked out in full precision. The scene is drawn around
   the focused body, so true-scale systems millions of units across stay precise near the camera.
+- **Near clipping follows the nearest surface (bug fix, PR #18):** the camera's near plane is 2%
+  of the distance to the closest body's surface (never under 0.001 of the focused body's radius).
+  It used to be fixed at that tiny minimum. Zoomed far out at true scale (about 59,000 units),
+  the depth buffer then lacked the precision to draw distant things, and orbit lines vanished.
 - Benchmark (8k map, fullscreen, back to back with `main`): ~154 → ~147 fps, video memory
   144 → 151 MB, for the added sun, its light, and orbit lines.
 
