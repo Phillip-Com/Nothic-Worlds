@@ -30,6 +30,10 @@ public partial class BodyMarkers : CanvasLayer
     private const float GrabPixels = 10.0f;
     private const float SeasonMarkerRadius = 5.0f;
 
+    // How far past the screen edge a season marker may sit and still be drawn (its label can
+    // reach in).
+    private const float OffScreenMarginPixels = 200.0f;
+
     private static readonly Color _starColor = new(1.0f, 0.85f, 0.45f);
     private static readonly Color _planetColor = new(0.55f, 0.75f, 1.0f);
     private static readonly Color _moonColor = new(0.8f, 0.8f, 0.85f);
@@ -45,8 +49,28 @@ public partial class BodyMarkers : CanvasLayer
     private Vector2? _pressedAt;
     private Guid? _pressedBody;
 
+    // The season markers being shown, kept until the timeline or the current season changes,
+    // so drawing every frame allocates nothing (allocations add up to garbage-collection
+    // stutters).
+    private SeasonMarkerPlan? _seasonPlan;
+
+    // Reused corner lists for drawing diamonds.
+    private readonly Vector2[] _diamond = new Vector2[4];
+    private readonly Vector2[] _diamondOutline = new Vector2[5];
+
     /// <summary>The open world.</summary>
     [Export] public WorldSession? Session { get; set; }
+
+    // The markers for one year of seasons: which orbit they sit on and what each one shows.
+    private sealed record SeasonMarkerPlan(
+        SeasonTimeline Timeline,
+        SeasonEvent? Latest,
+        Body? Traveller,
+        Body? Parent,
+        IReadOnlyList<SeasonMarker> Markers);
+
+    private readonly record struct SeasonMarker(
+        double TimeDays, bool IsSolstice, Color Color, string Label);
 
     /// <summary>The system view, for where each body is drawn.</summary>
     [Export] public SystemView? System { get; set; }
@@ -167,41 +191,70 @@ public partial class BodyMarkers : CanvasLayer
     // Equinoxes are round, solstices are diamonds.
     private void DrawSeasonMarkers(Font font)
     {
-        IReadOnlyList<Body> bodies = Session!.World.Bodies;
-        IReadOnlyList<SeasonEvent> year = Session.SelectedSeasons.YearAround(Session.TimeDays);
-        if (year.Count == 0
-            || Seasons.OrbitShowingYear(bodies, Session.SelectedBody) is not Body traveller
-            || traveller.Orbit is not Orbit orbit
-            || bodies.FirstOrDefault(b => b.Id == orbit.ParentId) is not Body parent
+        SeasonMarkerPlan plan = CurrentSeasonPlan();
+        if (plan.Traveller is not Body traveller || plan.Parent is not Body parent
             || !System!.Layout.TryGetValue(parent.Id, out DisplayBody parentPlace))
         {
             return;
         }
 
-        foreach (SeasonEvent seasonEvent in year)
+        foreach (SeasonMarker marker in plan.Markers)
         {
             Vector3D onOrbit = parentPlace.Position + SystemLayout.OrbitPoint(
-                traveller, parent, seasonEvent.TimeDays, System.DisplayScale);
+                traveller, parent, marker.TimeDays, System.DisplayScale);
             Vector3 scenePosition = System.ToScene(onOrbit);
             if (Camera!.IsPositionBehind(scenePosition))
             {
                 continue;
             }
 
+            // Skip markers off the screen: a point nearly beside the camera projects millions
+            // of pixels away, and the engine stalls drawing shapes there.
             Vector2 center = Camera.UnprojectPosition(scenePosition);
-            Color color = Seasons.SeasonsAfter(seasonEvent.Kind).Northern switch
+            if (!_overlay.GetRect().Grow(OffScreenMarginPixels).HasPoint(center))
             {
-                Season.Spring => _springColor,
-                Season.Summer => _summerColor,
-                Season.Autumn => _autumnColor,
-                _ => _winterColor,
-            };
-            DrawSeasonMarker(center, IsSolstice(seasonEvent.Kind), color);
+                continue;
+            }
+
+            DrawSeasonMarker(center, marker.IsSolstice, marker.Color);
             Vector2 at = center + new Vector2(SeasonMarkerRadius + 4, -SeasonMarkerRadius);
-            string label = SeasonText.ShortName(seasonEvent.Kind);
-            _overlay.DrawString(font, at + Vector2.One, label, modulate: Colors.Black);
-            _overlay.DrawString(font, at, label, modulate: color);
+            _overlay.DrawString(font, at + Vector2.One, marker.Label, modulate: Colors.Black);
+            _overlay.DrawString(font, at, marker.Label, modulate: marker.Color);
         }
+    }
+
+    // The markers to show now: the cached ones, unless the world, selection, or season changed.
+    private SeasonMarkerPlan CurrentSeasonPlan()
+    {
+        SeasonTimeline timeline = Session!.SelectedSeasons;
+        SeasonEvent? latest = timeline.LatestEvent(Session.TimeDays);
+        if (_seasonPlan is { } cached && cached.Timeline == timeline && cached.Latest == latest)
+        {
+            return cached;
+        }
+
+        IReadOnlyList<Body> bodies = Session.World.Bodies;
+        Body? traveller = Seasons.OrbitShowingYear(bodies, Session.SelectedBody);
+        Body? parent = traveller?.Orbit is Orbit orbit
+            ? bodies.FirstOrDefault(b => b.Id == orbit.ParentId)
+            : null;
+        SeasonMarker[] markers = [.. timeline.YearAround(Session.TimeDays).Select(e =>
+            new SeasonMarker(e.TimeDays, IsSolstice(e.Kind), SeasonColor(e.Kind),
+                SeasonText.ShortName(e.Kind)))];
+        _seasonPlan = new SeasonMarkerPlan(timeline, latest, traveller, parent, markers);
+        return _seasonPlan;
+    }
+
+    // The color of the northern season an event begins.
+    private static Color SeasonColor(SeasonEventKind kind)
+    {
+        return Seasons.SeasonsAfter(kind).Northern switch
+        {
+            Season.Spring => _springColor,
+            Season.Summer => _summerColor,
+            Season.Autumn => _autumnColor,
+            _ => _winterColor,
+        };
     }
 
     private void DrawSeasonMarker(Vector2 center, bool diamond, Color color)
@@ -214,13 +267,14 @@ public partial class BodyMarkers : CanvasLayer
         }
 
         float r = SeasonMarkerRadius + 1;
-        Vector2[] corners =
-        [
-            center + new Vector2(0, -r), center + new Vector2(r, 0),
-            center + new Vector2(0, r), center + new Vector2(-r, 0),
-        ];
-        _overlay.DrawColoredPolygon(corners, color);
-        _overlay.DrawPolyline([.. corners, corners[0]], Colors.Black, 1.5f);
+        _diamond[0] = center + new Vector2(0, -r);
+        _diamond[1] = center + new Vector2(r, 0);
+        _diamond[2] = center + new Vector2(0, r);
+        _diamond[3] = center + new Vector2(-r, 0);
+        _diamond.CopyTo(_diamondOutline, 0);
+        _diamondOutline[4] = _diamond[0];
+        _overlay.DrawColoredPolygon(_diamond, color);
+        _overlay.DrawPolyline(_diamondOutline, Colors.Black, 1.5f);
     }
 
     private static bool IsSolstice(SeasonEventKind kind) =>
