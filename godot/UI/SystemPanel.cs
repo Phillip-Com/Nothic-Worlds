@@ -49,6 +49,7 @@ public partial class SystemPanel : CanvasLayer
     private SpinBox _closestApproach = null!;
     private SpinBox _orbitTilt = null!;
     private SpinBox _tiltDirection = null!;
+    private CalendarSection? _calendar;
     private bool _open;
     private bool _syncing;
 
@@ -66,6 +67,9 @@ public partial class SystemPanel : CanvasLayer
     /// highlighted (owner's request).
     /// </summary>
     [Export] public Rendering.SystemView? System { get; set; }
+
+    /// <summary>The time bar, for the seasons' Go to buttons.</summary>
+    [Export] public TimeControls? Time { get; set; }
 
     private enum DistanceUnit
     {
@@ -126,6 +130,10 @@ public partial class SystemPanel : CanvasLayer
             GD.PushError("SystemPanel needs a world session.");
             return;
         }
+
+        layout.AddChild(new HSeparator());
+        _calendar = new CalendarSection { Session = Session, Time = Time };
+        layout.AddChild(_calendar);
 
         Session.Changed += SyncWithWorld;
         Session.SelectionChanged += SyncWithWorld;
@@ -386,6 +394,7 @@ public partial class SystemPanel : CanvasLayer
             ShowOrbit(body, orbit);
         }
 
+        _calendar?.Refresh();
         _syncing = false;
     }
 

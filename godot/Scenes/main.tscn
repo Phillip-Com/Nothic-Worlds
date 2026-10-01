@@ -127,8 +127,9 @@ System = NodePath("../SystemView")
 Camera = NodePath("../PlanetCamera")
 Toolbar = NodePath("../MapToolbar")
 
-[node name="SystemPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "System")]
+[node name="SystemPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "System", "Time")]
 script = ExtResource("18_system_panel")
 Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 System = NodePath("../SystemView")
+Time = NodePath("../TimeControls")
