@@ -1,5 +1,4 @@
 using Godot;
-using NothicWorlds.Controls;
 using NothicWorlds.Core.Maps;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Interop;
@@ -7,10 +6,10 @@ using NothicWorlds.Interop;
 namespace NothicWorlds.Rendering;
 
 /// <summary>
-/// Controls what's drawn on the planet's surface through <c>planet.gdshader</c>: an imported
-/// map (VISION.md MAP-01), how it wraps onto the globe (MAP-03, MAP-04), and the
-/// latitude/longitude grid.
-/// The grid shows by default, hides when a map is applied, and G toggles it.
+/// Controls what's drawn on one planet's or moon's surface through <c>planet.gdshader</c>: an
+/// imported map (VISION.md MAP-01), how it wraps onto the globe (MAP-03, MAP-04), map pieces
+/// (MAP-02), and the latitude/longitude grid. The grid shows by default and hides when a map is
+/// applied; G toggles it (handled by <see cref="SystemView"/> for every globe at once).
 /// </summary>
 public partial class PlanetSurface : MeshInstance3D
 {
@@ -22,7 +21,7 @@ public partial class PlanetSurface : MeshInstance3D
     private const int WarpTilesAcross = 8;
     private const int WarpTilesDown = SurfaceSettings.MaxPieces / WarpTilesAcross;
 
-    private ShaderMaterial _material = null!;
+    private ShaderMaterial? _surfaceMaterial;
     private ImageTexture? _latitudeTable;
     private ImageTexture? _longitudeTable;
 
@@ -43,7 +42,7 @@ public partial class PlanetSurface : MeshInstance3D
     public bool ShowGrid
     {
         get => (bool)GetParameter("show_grid");
-        set => _material.SetShaderParameter("show_grid", value);
+        set => SurfaceMaterial.SetShaderParameter("show_grid", value);
     }
 
     /// <summary>
@@ -53,7 +52,7 @@ public partial class PlanetSurface : MeshInstance3D
     public MapProjection Projection
     {
         get => (MapProjection)(int)GetParameter("projection");
-        set => _material.SetShaderParameter("projection", (int)value);
+        set => SurfaceMaterial.SetShaderParameter("projection", (int)value);
     }
 
     /// <summary>
@@ -64,29 +63,14 @@ public partial class PlanetSurface : MeshInstance3D
     public Color FillColor
     {
         get => (Color)GetParameter("fill_color");
-        set => _material.SetShaderParameter("fill_color", value);
+        set => SurfaceMaterial.SetShaderParameter("fill_color", value);
     }
 
-    public override void _Ready()
-    {
-        if (GetActiveMaterial(0) is not ShaderMaterial material)
-        {
-            GD.PushError("PlanetSurface needs a ShaderMaterial using planet.gdshader.");
-            SetProcessUnhandledInput(false);
-            return;
-        }
-
-        _material = material;
-    }
-
-    public override void _UnhandledInput(InputEvent @event)
-    {
-        if (@event.IsActionPressed(InputActions.ToggleGrid))
-        {
-            ShowGrid = !ShowGrid;
-            GetViewport().SetInputAsHandled();
-        }
-    }
+    // Looked up on first use rather than in _Ready, so a surface can be set up right after
+    // it's created.
+    private ShaderMaterial SurfaceMaterial => _surfaceMaterial ??=
+        GetActiveMaterial(0) as ShaderMaterial ?? throw new InvalidOperationException(
+            "PlanetSurface needs a ShaderMaterial using planet.gdshader.");
 
     /// <summary>
     /// Applies a grid calibration (VISION.md MAP-05), or removes it with null. Cheap enough to
@@ -96,16 +80,16 @@ public partial class PlanetSurface : MeshInstance3D
     {
         if (calibration is null)
         {
-            _material.SetShaderParameter("has_calibration", false);
+            SurfaceMaterial.SetShaderParameter("has_calibration", false);
             return;
         }
 
         _latitudeTable = UpdateTable(_latitudeTable, calibration.BakeLatitudeTable(TableSamples));
         _longitudeTable =
             UpdateTable(_longitudeTable, calibration.BakeLongitudeTable(TableSamples));
-        _material.SetShaderParameter("calibration_latitudes", _latitudeTable);
-        _material.SetShaderParameter("calibration_longitudes", _longitudeTable);
-        _material.SetShaderParameter("has_calibration", true);
+        SurfaceMaterial.SetShaderParameter("calibration_latitudes", _latitudeTable);
+        SurfaceMaterial.SetShaderParameter("calibration_longitudes", _longitudeTable);
+        SurfaceMaterial.SetShaderParameter("has_calibration", true);
     }
 
     /// <summary>
@@ -167,24 +151,25 @@ public partial class PlanetSurface : MeshInstance3D
             UploadWarpAtlas();
         }
 
-        _material.SetShaderParameter("piece_warp_tiles", warpTiles);
-        _material.SetShaderParameter("piece_warp_rects", warpRects);
+        SurfaceMaterial.SetShaderParameter("piece_warp_tiles", warpTiles);
+        SurfaceMaterial.SetShaderParameter("piece_warp_rects", warpRects);
 
-        _material.SetShaderParameter("piece_textures", textures);
-        _material.SetShaderParameter("piece_centers", centers);
-        _material.SetShaderParameter("piece_easts", easts);
-        _material.SetShaderParameter("piece_norths", norths);
-        _material.SetShaderParameter("piece_frames", frames);
-        _material.SetShaderParameter("piece_limits", limits);
-        _material.SetShaderParameter("piece_count", count);
+        SurfaceMaterial.SetShaderParameter("piece_textures", textures);
+        SurfaceMaterial.SetShaderParameter("piece_centers", centers);
+        SurfaceMaterial.SetShaderParameter("piece_easts", easts);
+        SurfaceMaterial.SetShaderParameter("piece_norths", norths);
+        SurfaceMaterial.SetShaderParameter("piece_frames", frames);
+        SurfaceMaterial.SetShaderParameter("piece_limits", limits);
+        SurfaceMaterial.SetShaderParameter("piece_count", count);
     }
 
     /// <summary>Wraps a map texture onto the planet and hides the grid.</summary>
     public void SetMap(Texture2D texture)
     {
-        _material.SetShaderParameter("surface_map", texture);
-        _material.SetShaderParameter("map_aspect", (float)texture.GetWidth() / texture.GetHeight());
-        _material.SetShaderParameter("has_map", true);
+        SurfaceMaterial.SetShaderParameter("surface_map", texture);
+        SurfaceMaterial.SetShaderParameter(
+            "map_aspect", (float)texture.GetWidth() / texture.GetHeight());
+        SurfaceMaterial.SetShaderParameter("has_map", true);
         MapTexture = texture;
         HasMap = true;
         ShowGrid = false;
@@ -193,8 +178,8 @@ public partial class PlanetSurface : MeshInstance3D
     /// <summary>Removes the map, freeing its memory, and shows the grid again.</summary>
     public void ClearMap()
     {
-        _material.SetShaderParameter("surface_map", default);
-        _material.SetShaderParameter("has_map", false);
+        SurfaceMaterial.SetShaderParameter("surface_map", default);
+        SurfaceMaterial.SetShaderParameter("has_map", false);
         SetCalibration(null);
         MapTexture = null;
         HasMap = false;
@@ -233,7 +218,7 @@ public partial class PlanetSurface : MeshInstance3D
         if (_warpTexture is null)
         {
             _warpTexture = ImageTexture.CreateFromImage(image);
-            _material.SetShaderParameter("piece_warp_atlas", _warpTexture);
+            SurfaceMaterial.SetShaderParameter("piece_warp_atlas", _warpTexture);
         }
         else
         {
@@ -262,9 +247,9 @@ public partial class PlanetSurface : MeshInstance3D
     // as false, 0, or black). Fall back to the shader's default so reads match what's drawn.
     private Variant GetParameter(string name)
     {
-        Variant value = _material.GetShaderParameter(name);
+        Variant value = SurfaceMaterial.GetShaderParameter(name);
         return value.VariantType != Variant.Type.Nil
             ? value
-            : RenderingServer.ShaderGetParameterDefault(_material.Shader.GetRid(), name);
+            : RenderingServer.ShaderGetParameterDefault(SurfaceMaterial.Shader.GetRid(), name);
     }
 }

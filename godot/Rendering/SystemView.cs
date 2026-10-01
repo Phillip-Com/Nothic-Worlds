@@ -1,0 +1,416 @@
+using Godot;
+using NothicWorlds.Controls;
+using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Model;
+using NothicWorlds.Core.Simulation;
+using NothicWorlds.Session;
+
+namespace NothicWorlds.Rendering;
+
+/// <summary>
+/// Draws the whole star system (VISION.md REN-01, REN-02, BOD-01): every body at its place for
+/// the world clock, spinning and tilted, stars glowing and lighting the others, and faint orbit
+/// lines. It reads the world from the session and never changes it.
+/// </summary>
+/// <remarks>
+/// <para>Positions come from Core's <see cref="SystemLayout"/> (readable or true scale) in full
+/// precision. The scene is drawn around a <b>floating origin</b>: the focused body sits at the
+/// scene's center and everything else is placed relative to it, so even true-scale systems
+/// millions of units across stay precise where the camera is.</para>
+/// <para>Focusing another body flies there: the origin glides from one body to the other and the
+/// camera's scale follows the new body's size.</para>
+/// </remarks>
+public partial class SystemView : Node3D
+{
+    private const double FlightSeconds = 1.2;
+
+    // Close to a body, its own orbit line would run straight through it; it appears once the
+    // camera is this many of the body's radii away.
+    private const float OwnOrbitLineAltitude = 30.0f;
+
+    // Flying from closer than this many radii keeps the framing (the new body fills the screen
+    // as the old one did); from farther out, it keeps the camera's real distance, so flying to
+    // a big star from the system view doesn't zoom far out.
+    private const float CloseUpAltitude = 10.0f;
+    private const int OrbitLineSamples = 256;
+
+    private static readonly Color _starColor = new(1.0f, 0.86f, 0.55f);
+    private static readonly Color _orbitColor = new(0.6f, 0.7f, 0.9f, 0.35f);
+
+    private readonly Dictionary<Guid, BodyVisual> _visuals = [];
+    private readonly SphereMesh _sphere = new()
+    {
+        Radius = 1.0f,
+        Height = 2.0f,
+        RadialSegments = 128,
+        Rings = 64,
+    };
+    private readonly StandardMaterial3D _orbitMaterial = new()
+    {
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        AlbedoColor = _orbitColor,
+    };
+
+    private SystemScale _scale = SystemScale.Readable;
+    private Dictionary<Guid, DisplayBody> _layout = [];
+    private Guid _focusId;
+    private double _flightProgress = 1.0;
+    private Vector3D _flightFrom;
+    private double _flightFromRadius = 1.0;
+    private double _flightFromAltitude;
+    private double _flightToAltitude;
+
+    /// <summary>The open world to draw.</summary>
+    [Export] public WorldSession? Session { get; set; }
+
+    /// <summary>The camera, scaled to the focused body and given the system's reach.</summary>
+    [Export] public PlanetCamera? Camera { get; set; }
+
+    /// <summary>Lights the planets when the system has no stars (e.g. older worlds).</summary>
+    [Export] public DirectionalLight3D? FallbackLight { get; set; }
+
+    /// <summary>The planet surface material; each planet and moon gets its own copy.</summary>
+    [Export] public ShaderMaterial? PlanetMaterial { get; set; }
+
+    /// <summary>Raised after every body has been placed for this frame.</summary>
+    public event Action? Placed;
+
+    /// <summary>
+    /// How sizes and distances are drawn (owner's choice: readable by default, true scale as a
+    /// toggle). The simulation is the same either way.
+    /// </summary>
+    public SystemScale DisplayScale
+    {
+        get => _scale;
+        set
+        {
+            if (_scale != value)
+            {
+                _scale = value;
+                RebuildOrbitLines();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Where the scene's center is, in display units from the system's center: the focused
+    /// body (or a point on the way to it during a flight).
+    /// </summary>
+    public Vector3D Origin { get; private set; }
+
+    /// <summary>Each body's display position and size, as last placed.</summary>
+    public IReadOnlyDictionary<Guid, DisplayBody> Layout => _layout;
+
+    public override void _Ready()
+    {
+        if (Session is null || Camera is null || PlanetMaterial is null)
+        {
+            GD.PushError("SystemView needs a world session, a camera, and a planet material.");
+            SetProcess(false);
+        }
+    }
+
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (@event.IsActionPressed(InputActions.ToggleGrid))
+        {
+            // One switch for every globe, following the selected one.
+            bool show = !(Session?.Surface?.ShowGrid ?? false);
+            foreach (BodyVisual visual in _visuals.Values)
+            {
+                if (visual.Surface is PlanetSurface surface)
+                {
+                    surface.ShowGrid = show;
+                }
+            }
+
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    /// <summary>
+    /// Builds the visuals for a world's bodies, replacing any from before, and focuses
+    /// <paramref name="focusId"/> straight away (no flight).
+    /// </summary>
+    public void Show(World world, Guid focusId)
+    {
+        foreach (BodyVisual visual in _visuals.Values)
+        {
+            visual.Free();
+        }
+
+        _visuals.Clear();
+        foreach (Body body in world.Bodies)
+        {
+            _visuals[body.Id] = CreateVisual(body);
+        }
+
+        RebuildOrbitLines();
+        _focusId = focusId;
+        _flightProgress = 1.0;
+        Place();
+    }
+
+    /// <summary>The surface of a planet or moon, or null for a star (or an unknown body).</summary>
+    public PlanetSurface? SurfaceFor(Guid bodyId)
+    {
+        return _visuals.GetValueOrDefault(bodyId)?.Surface;
+    }
+
+    /// <summary>Flies the view to a body, which then stays at the scene's center.</summary>
+    public void FlyTo(Guid bodyId)
+    {
+        if (bodyId == _focusId || !_layout.ContainsKey(bodyId))
+        {
+            return;
+        }
+
+        _flightFrom = Origin;
+        _flightFromRadius = _layout.TryGetValue(_focusId, out DisplayBody from) ? from.Radius : 1;
+        double toRadius = _layout[bodyId].Radius;
+        _flightFromAltitude = Camera?.CurrentAltitude ?? 2.0;
+        _flightToAltitude = _flightFromAltitude <= CloseUpAltitude
+            ? _flightFromAltitude
+            : (1 + _flightFromAltitude) * _flightFromRadius / toRadius - 1;
+        _focusId = bodyId;
+        _flightProgress = 0.0;
+        Camera?.ClearFocusOffset();
+    }
+
+    /// <summary>
+    /// Converts a display position to the scene (relative to the floating origin).
+    /// </summary>
+    public Vector3 ToScene(Vector3D display)
+    {
+        Vector3D relative = display - Origin;
+        return new Vector3((float)relative.X, (float)relative.Y, (float)relative.Z);
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_flightProgress < 1.0)
+        {
+            _flightProgress = Math.Min(1.0, _flightProgress + delta / FlightSeconds);
+        }
+
+        Place();
+    }
+
+    // Puts every body where the world clock says, and moves the origin and camera to follow
+    // the focused body.
+    private void Place()
+    {
+        if (Session is null || _visuals.Count == 0)
+        {
+            return;
+        }
+
+        World world = Session.World;
+        try
+        {
+            _layout = SystemLayout.At(world.Bodies, world.TimeDays, _scale);
+        }
+        catch (ArgumentException error)
+        {
+            // Can't happen for a world that loaded; skip the frame rather than crash.
+            GD.PushError($"Couldn't place the bodies: {error.Message}");
+            return;
+        }
+
+        if (!_layout.TryGetValue(_focusId, out DisplayBody focus))
+        {
+            return;
+        }
+
+        double eased = Ease(_flightProgress);
+        Origin = _flightFrom + (focus.Position - _flightFrom) * eased;
+        double radius = Math.Exp(Lerp(Math.Log(_flightFromRadius), Math.Log(focus.Radius), eased));
+        if (_flightProgress >= 1.0)
+        {
+            Origin = focus.Position;
+            radius = focus.Radius;
+        }
+
+        bool anyStar = false;
+        foreach (Body body in world.Bodies)
+        {
+            if (_visuals.TryGetValue(body.Id, out BodyVisual? visual)
+                && _layout.TryGetValue(body.Id, out DisplayBody place))
+            {
+                PlaceBody(visual, body, place, world.TimeDays);
+                anyStar |= body.Kind == BodyKind.Star;
+            }
+        }
+
+        if (FallbackLight is not null)
+        {
+            FallbackLight.Visible = !anyStar;
+        }
+
+        FitCamera(radius);
+        if (_flightProgress < 1.0 && Camera is not null)
+        {
+            // Ease the real distance (radius × (1 + altitude)) smoothly from start to end.
+            double altitude = Math.Exp(Lerp(Math.Log(1 + _flightFromAltitude),
+                Math.Log(1 + _flightToAltitude), eased)) - 1;
+            Camera.SetAltitudeImmediately((float)altitude);
+        }
+
+        Placed?.Invoke();
+    }
+
+    private void PlaceBody(BodyVisual visual, Body body, DisplayBody place, double timeDays)
+    {
+        // Spin about the body's own axis, then lean the axis by the tilt.
+        double spin = double.DegreesToRadians(BodyClock.SpinDegrees(body, timeDays));
+        double tilt = double.DegreesToRadians(body.AxialTiltDegrees);
+        Basis basis = new Basis(Vector3.Right, (float)tilt) * new Basis(Vector3.Up, (float)spin);
+        visual.Root.Transform = new Transform3D(
+            basis.Scaled(Vector3.One * (float)place.Radius), ToScene(place.Position));
+        if (visual.Light is OmniLight3D light)
+        {
+            light.Position = ToScene(place.Position);
+        }
+
+        if (visual.OrbitLine is MeshInstance3D line && body.Orbit is Orbit orbit
+            && _layout.TryGetValue(orbit.ParentId, out DisplayBody parent))
+        {
+            line.Position = ToScene(parent.Position);
+            line.Visible = body.Id != _focusId
+                || (Camera?.CurrentAltitude ?? float.MaxValue) > OwnOrbitLineAltitude;
+        }
+    }
+
+    // Scales the camera to the focused body and lets it zoom out far enough to see the whole
+    // system, with a far clipping distance to match.
+    private void FitCamera(double focusRadius)
+    {
+        if (Camera is null)
+        {
+            return;
+        }
+
+        double extent = 0;
+        foreach (DisplayBody place in _layout.Values)
+        {
+            extent = Math.Max(extent, (place.Position - Origin).Length + place.Radius);
+        }
+
+        Camera.PlanetRadius = (float)focusRadius;
+        Camera.MaxAltitude = (float)Math.Max(8.0, 2.5 * extent / focusRadius);
+        Camera.Near = (float)(focusRadius * 0.001);
+        Camera.Far = (float)Math.Max(100.0 * focusRadius, 6.0 * extent);
+    }
+
+    private BodyVisual CreateVisual(Body body)
+    {
+        var root = new Node3D { Name = $"Body {body.Name}" };
+        AddChild(root);
+        PlanetSurface? surface = null;
+        OmniLight3D? light = null;
+        if (body.Kind == BodyKind.Star)
+        {
+            root.AddChild(new MeshInstance3D
+            {
+                Mesh = _sphere,
+                MaterialOverride = new StandardMaterial3D
+                {
+                    ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                    AlbedoColor = _starColor,
+                },
+            });
+
+            // Lights everything around it, with no fall-off, like sunlight across a system. It's
+            // kept apart from the scaled star, so the star's size doesn't change its reach.
+            light = new OmniLight3D
+            {
+                Name = $"Light {body.Name}",
+                OmniRange = 1e7f,
+                OmniAttenuation = 0.0f,
+                LightColor = _starColor.Lightened(0.6f),
+            };
+            AddChild(light);
+        }
+        else
+        {
+            surface = new PlanetSurface
+            {
+                Mesh = _sphere,
+                MaterialOverride = (ShaderMaterial)PlanetMaterial!.Duplicate(),
+            };
+            root.AddChild(surface);
+        }
+
+        return new BodyVisual(body.Id, root, surface) { Light = light };
+    }
+
+    private void RebuildOrbitLines()
+    {
+        if (Session is null)
+        {
+            return;
+        }
+
+        World world = Session.World;
+        var byId = world.Bodies.ToDictionary(body => body.Id);
+        foreach (BodyVisual visual in _visuals.Values)
+        {
+            visual.OrbitLine?.QueueFree();
+            visual.OrbitLine = null;
+            if (byId.GetValueOrDefault(visual.BodyId) is { Orbit: Orbit orbit } body
+                && byId.GetValueOrDefault(orbit.ParentId) is Body parent)
+            {
+                visual.OrbitLine = CreateOrbitLine(body, parent);
+            }
+        }
+    }
+
+    private MeshInstance3D CreateOrbitLine(Body body, Body parent)
+    {
+        IReadOnlyList<Vector3D> path =
+            SystemLayout.OrbitPath(body, parent, _scale, OrbitLineSamples);
+        var mesh = new ImmediateMesh();
+        mesh.SurfaceBegin(Mesh.PrimitiveType.LineStrip, _orbitMaterial);
+        foreach (Vector3D point in path.Append(path[0]))
+        {
+            mesh.SurfaceAddVertex(new Vector3((float)point.X, (float)point.Y, (float)point.Z));
+        }
+
+        mesh.SurfaceEnd();
+        var line = new MeshInstance3D
+        {
+            Name = $"Orbit {body.Name}",
+            Mesh = mesh,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(line);
+        return line;
+    }
+
+    // Smooth start and finish (smoothstep).
+    private static double Ease(double t) => t * t * (3 - 2 * t);
+
+    private static double Lerp(double a, double b, double t) => a + (b - a) * t;
+
+    // A body's nodes in the scene.
+    private sealed class BodyVisual(Guid bodyId, Node3D root, PlanetSurface? surface)
+    {
+        public Guid BodyId { get; } = bodyId;
+
+        public Node3D Root { get; } = root;
+
+        public PlanetSurface? Surface { get; } = surface;
+
+        public MeshInstance3D? OrbitLine { get; set; }
+
+        public OmniLight3D? Light { get; init; }
+
+        public void Free()
+        {
+            Root.QueueFree();
+            OrbitLine?.QueueFree();
+            Light?.QueueFree();
+        }
+    }
+}

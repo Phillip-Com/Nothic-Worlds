@@ -92,7 +92,18 @@ public sealed class UndoHistory<TState>
     /// <exception cref="InvalidOperationException">There's nothing to undo.</exception>
     public TState Undo(TState current)
     {
-        return Move(_undo, _redo, current, "undo");
+        return Move(_undo, _redo, _ => current, "undo");
+    }
+
+    /// <summary>
+    /// Takes back the last step, where what to keep for redo depends on the step (e.g. the
+    /// current state of the same planet the step changed).
+    /// </summary>
+    /// <param name="currentFor">Given the state to restore, returns the state it replaces.</param>
+    /// <exception cref="InvalidOperationException">There's nothing to undo.</exception>
+    public TState Undo(Func<TState, TState> currentFor)
+    {
+        return Move(_undo, _redo, currentFor, "undo");
     }
 
     /// <summary>
@@ -102,7 +113,16 @@ public sealed class UndoHistory<TState>
     /// <exception cref="InvalidOperationException">There's nothing to redo.</exception>
     public TState Redo(TState current)
     {
-        return Move(_redo, _undo, current, "redo");
+        return Move(_redo, _undo, _ => current, "redo");
+    }
+
+    /// <summary>
+    /// Re-applies the last undone step (see <see cref="Undo(Func{TState, TState})"/>).
+    /// </summary>
+    /// <exception cref="InvalidOperationException">There's nothing to redo.</exception>
+    public TState Redo(Func<TState, TState> currentFor)
+    {
+        return Move(_redo, _undo, currentFor, "redo");
     }
 
     /// <summary>Forgets every step (e.g. when another world is opened).</summary>
@@ -113,7 +133,8 @@ public sealed class UndoHistory<TState>
         _mergeable = null;
     }
 
-    private TState Move(List<Step> from, List<Step> to, TState current, string action)
+    private TState Move(
+        List<Step> from, List<Step> to, Func<TState, TState> currentFor, string action)
     {
         if (from.Count == 0)
         {
@@ -122,7 +143,7 @@ public sealed class UndoHistory<TState>
 
         Step step = from[^1];
         from.RemoveAt(from.Count - 1);
-        to.Add(step with { State = current, MergeKey = null });
+        to.Add(step with { State = currentFor(step.State), MergeKey = null });
         _mergeable = null;  // An edit after undo/redo always starts a new step.
         return step.State;
     }

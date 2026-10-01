@@ -306,7 +306,7 @@ public partial class PiecesPanel : CanvasLayer
         _heading.Text = $"Map Pieces ({_listed.Count} of {SurfaceSettings.MaxPieces})";
         bool full = _listed.Count >= SurfaceSettings.MaxPieces;
         _cutMapButton.Disabled = Session.IsBusy || full || Session.MainMapAssetName is null;
-        _cutImageButton.Disabled = Session.IsBusy || full;
+        _cutImageButton.Disabled = Session.IsBusy || full || !Session.SelectedBodyHasSurface;
         ShowSelected();
     }
 

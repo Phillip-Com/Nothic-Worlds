@@ -13,15 +13,19 @@ namespace NothicWorlds.Session;
 
 /// <summary>
 /// The open world (VISION.md SAV-01). It holds the Core <see cref="World"/> and where its assets
-/// come from, shows it on the planet and camera, tracks unsaved changes, and saves and opens
-/// <c>.nworld</c> files. <b>Every edit to the world goes through here</b>, so the saved data
-/// always matches what's on screen and unsaved changes are always tracked.
+/// come from, shows it in the system view and camera, tracks unsaved changes, and saves and
+/// opens <c>.nworld</c> files. <b>Every edit to the world goes through here</b>, so the saved
+/// data always matches what's on screen and unsaved changes are always tracked.
 /// </summary>
 /// <remarks>
-/// Moving the camera doesn't count as an unsaved change (it would make the warning appear
-/// constantly), but the current view is included whenever the world is saved.
-/// Every edit can be undone: each one records a copy of the planet's surface first (see
-/// <see cref="UndoAsync"/>).
+/// <para>One body is <b>selected</b> at a time (VISION.md BOD-01): the map tools (import,
+/// calibrate, pieces) work on it, and the view flies to it. Only the selected body's map is
+/// kept at full size; the others show a small preview, so a system of mapped planets fits the
+/// baseline laptop's graphics memory.</para>
+/// <para>Moving the camera, or the world clock, doesn't count as an unsaved change (it would
+/// make the warning appear constantly), but both are saved with the world.</para>
+/// <para>Every edit can be undone: each one records a copy of the changed body's surface first
+/// (see <see cref="UndoAsync"/>).</para>
 /// </remarks>
 public partial class WorldSession : Node
 {
@@ -29,34 +33,46 @@ public partial class WorldSession : Node
 
     // Each piece's baked texture, and the most recently decoded source image (for cutting).
     private Dictionary<Guid, Texture2D> _pieceTextures = [];
+    private (string Name, Image Image)? _decodedSource;
 
     // Each warped piece's baked lookup, with the warp it was baked from (rebaked when it changes).
     private readonly Dictionary<Guid, (IReadOnlyList<ImagePoint> Points, WarpLookup Lookup)>
         _warpLookups = [];
-    private (string Name, Image Image)? _decodedSource;
 
-    // The map type picked while no map is loaded; the next import uses it.
+    // Maps on screen: the full-size map's body and image, each body's full-size check, and
+    // each body's small preview (with the image it was made from).
+    private (Guid Body, string Asset)? _fullMap;
+    private readonly Dictionary<Guid, MapImageCheck> _mapChecks = [];
+    private readonly Dictionary<Guid, (string Asset, Texture2D Texture)> _previews = [];
+
+    // The map type picked while the selected body has no map; its next import uses it.
     private MapProjection _projectionWithoutMap = MapProjection.Mercator;
 
     // Increases with every edit, so a gesture can tell whether it changed anything.
     private int _editVersion;
 
-    // Undo/redo: snapshots of the planet's surface. While a gesture (a drag, or a calibration
+    // Undo/redo: snapshots of one body's surface. While a gesture (a drag, or a calibration
     // session) is under way, its edits add up to one step, recorded when it ends.
-    private readonly UndoHistory<SurfaceSettings> _history = new();
-    private (string Description, SurfaceSettings Before, int Version)? _gesture;
+    private readonly UndoHistory<SurfaceSnapshot> _history = new();
+    private (string Description, SurfaceSnapshot Before, int Version)? _gesture;
 
     // Copies of images only the undo history still needs (see AssetStash).
     private AssetStash? _stash;
 
-    // The surface as it is in the saved file (or as a new world started), so the world counts
-    // as saved whenever it matches again, e.g. after undoing back to it. Null when there's
-    // nothing to match (a recovered world is unsaved until it's saved).
-    private SurfaceSettings? _savedSurface;
+    // Every body's surface as it is in the saved file (or as a new world started), so the
+    // world counts as saved whenever it matches again, e.g. after undoing back to it. Null when
+    // there's nothing to match (a recovered world is unsaved until it's saved).
+    private Dictionary<Guid, SurfaceSettings>? _savedSurfaces;
 
     /// <summary>Raised when anything shown about the world changes (name, file, unsaved state,
-    /// busy state, or contents).</summary>
+    /// busy state, selection, or contents).</summary>
     public event Action? Changed;
+
+    /// <summary>Raised when a different body is selected (or a world opens).</summary>
+    public event Action? SelectionChanged;
+
+    /// <summary>Raised when the world clock changes (often: every frame while it runs).</summary>
+    public event Action? TimeChanged;
 
     /// <summary>Raised when a world is closed (replaced or the app quits), with its ID.</summary>
     public event Action<Guid>? WorldClosed;
@@ -64,8 +80,8 @@ public partial class WorldSession : Node
     /// <summary>Raised after a successful save, with the world's ID.</summary>
     public event Action<Guid>? Saved;
 
-    /// <summary>Draws the planet's surface.</summary>
-    [Export] public PlanetSurface? Surface { get; set; }
+    /// <summary>Draws the star system.</summary>
+    [Export] public SystemView? System { get; set; }
 
     /// <summary>The camera, whose view is saved with the world.</summary>
     [Export] public PlanetCamera? Camera { get; set; }
@@ -82,31 +98,50 @@ public partial class WorldSession : Node
     /// </summary>
     public bool HasUnsavedChanges { get; private set; }
 
-    /// <summary>True while a save or open is in progress.</summary>
+    /// <summary>True while a save, an open, or a map load is in progress.</summary>
     public bool IsBusy { get; private set; }
 
-    /// <summary>The size check of the map currently shown, or null if there's no map.</summary>
-    public MapImageCheck? MapCheck { get; private set; }
+    /// <summary>The selected body's ID (see <see cref="SelectBodyAsync"/>).</summary>
+    public Guid SelectedBodyId { get; private set; }
+
+    /// <summary>The selected body: the one the map tools work on and the view centers on.</summary>
+    public Body SelectedBody => FindBody(SelectedBodyId) ?? World.Bodies[0];
+
+    /// <summary>True if the selected body can have a map (planets and moons; not stars).</summary>
+    public bool SelectedBodyHasSurface => SelectedBody.Kind != BodyKind.Star;
+
+    /// <summary>The selected body's surface, or null for a star.</summary>
+    public PlanetSurface? Surface => System?.SurfaceFor(SelectedBodyId);
+
+    /// <summary>
+    /// The size check of the selected body's map, or null if it has none (or it's still
+    /// loading).
+    /// </summary>
+    public MapImageCheck? MapCheck => _mapChecks.GetValueOrDefault(SelectedBodyId);
 
     /// <summary>
     /// Where each of the world's assets can be read from (e.g. for recovery copies).
     /// </summary>
     public IReadOnlyDictionary<string, IAssetSource> Assets => _assets;
 
-    /// <summary>The planet's current map type.</summary>
-    public MapProjection Projection => MainBody.Surface.Map?.Projection ?? _projectionWithoutMap;
+    /// <summary>The selected body's map type.</summary>
+    public MapProjection Projection =>
+        SelectedBody.Surface.Map?.Projection ?? _projectionWithoutMap;
 
-    /// <summary>The planet's fill color.</summary>
-    public RgbColor FillColor => MainBody.Surface.FillColor;
+    /// <summary>The selected body's fill color.</summary>
+    public RgbColor FillColor => SelectedBody.Surface.FillColor;
 
-    /// <summary>The current map's grid calibration (VISION.md MAP-05), or null.</summary>
-    public MapCalibration? Calibration => MainBody.Surface.Map?.Calibration;
+    /// <summary>The selected body's map calibration (VISION.md MAP-05), or null.</summary>
+    public MapCalibration? Calibration => SelectedBody.Surface.Map?.Calibration;
 
-    private Body MainBody => World.Bodies[0];
+    /// <summary>The world clock, in standard days (VISION.md SIM-02).</summary>
+    public double TimeDays => World.TimeDays;
 
     public override void _Ready()
     {
-        ShowSurfaceSettings();
+        SelectedBodyId = DefaultSelection(World);
+        _savedSurfaces = SnapshotSurfaces(World);
+        ShowWorld();
     }
 
     public override void _ExitTree()
@@ -116,25 +151,26 @@ public partial class WorldSession : Node
         _stash = null;
     }
 
-    /// <summary>Replaces the open world with a new, empty one. Unsaved changes are discarded,
-    /// so ask the user first.</summary>
+    /// <summary>Replaces the open world with a new one: a sun and one unmapped planet.
+    /// Unsaved changes are discarded, so ask the user first.</summary>
     public void NewWorld()
     {
         CloseCurrentWorld();
         World = World.CreateNew();
         _assets = [];
         FilePath = null;
-        MapCheck = null;
+        ForgetMaps();
+        SelectedBodyId = DefaultSelection(World);
         HasUnsavedChanges = false;
-        _savedSurface = MainBody.Surface.Clone();
+        _savedSurfaces = SnapshotSurfaces(World);
         _projectionWithoutMap = MapProjection.Mercator;
         _pieceTextures = [];
         ResetHistory();
         ReleaseDecodedSource();
-        Surface?.ClearMap();
-        ShowSurfaceSettings();
-        ShowPieces();
+        ShowWorld();
         Camera?.SetView(null);
+        SelectionChanged?.Invoke();
+        TimeChanged?.Invoke();
         Changed?.Invoke();
     }
 
@@ -143,7 +179,7 @@ public partial class WorldSession : Node
     /// user first). If the file can't be read, the current world stays open.
     /// </summary>
     /// <returns>
-    /// A warning if the world opened but its map couldn't be shown; otherwise null.
+    /// A warning if the world opened but some images couldn't be shown; otherwise null.
     /// </returns>
     /// <exception cref="WorldFileException">The file couldn't be opened.</exception>
     public async Task<string?> OpenAsync(string path)
@@ -207,7 +243,7 @@ public partial class WorldSession : Node
         }
 
         FilePath = fullPath;
-        _savedSurface = snapshot.Bodies[0].Surface;  // A private copy, made before saving.
+        _savedSurfaces = SnapshotSurfaces(snapshot);
         UpdateUnsavedState();
 
         // The saved assets now live in the world file, so later saves no longer depend on the
@@ -224,12 +260,50 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
-    /// Imports a map image and wraps it onto the planet with the current map type.
+    /// Selects a body: the view flies to it, and the map tools work on it from now on. Its
+    /// map is loaded at full size (the previously selected body goes back to a preview).
+    /// Does nothing while something else is in progress.
+    /// </summary>
+    /// <returns>A warning if the body's map couldn't be shown; otherwise null.</returns>
+    public async Task<string?> SelectBodyAsync(Guid bodyId)
+    {
+        if (bodyId == SelectedBodyId || FindBody(bodyId) is not Body body || !IsIdleForHistory)
+        {
+            return null;
+        }
+
+        Body previous = SelectedBody;
+        SelectedBodyId = bodyId;
+        System?.FlyTo(bodyId);
+        ShowPreviewInsteadOfFullMap(previous);
+        SelectionChanged?.Invoke();
+        Changed?.Invoke();
+        return await ShowFullMapAsync(body);
+    }
+
+    /// <summary>
+    /// Sets the world clock (VISION.md SIM-02). Every body moves and spins to match. Not an
+    /// unsaved change (see the class remarks).
+    /// </summary>
+    public void SetTime(double timeDays)
+    {
+        if (double.IsFinite(timeDays) && timeDays != World.TimeDays)
+        {
+            World.TimeDays = timeDays;
+            TimeChanged?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Imports a map image and wraps it onto the selected body with the current map type.
     /// </summary>
     /// <exception cref="MapLoadException">The image couldn't be used.</exception>
+    /// <exception cref="InvalidOperationException">The selected body is a star.</exception>
     public async Task<LoadedMap> ImportMapAsync(string imagePath)
     {
         RequireIdle();
+        RequireSurface();
+        Body body = SelectedBody;
         SetBusy(true);
         LoadedMap map;
         try
@@ -244,26 +318,28 @@ public partial class WorldSession : Node
         string assetName = WorldPackage.CreateAssetName(Path.GetExtension(imagePath));
         _assets[assetName] = new FileAssetSource(Path.GetFullPath(imagePath));
         RecordUndo("Import Map");
-        MainBody.Surface.Map = new SurfaceMap { AssetName = assetName, Projection = Projection };
-        MapCheck = map.Check;
+        body.Surface.Map = new SurfaceMap { AssetName = assetName, Projection = Projection };
+        _mapChecks[body.Id] = map.Check;
+        _fullMap = (body.Id, assetName);
         Surface?.SetMap(map.Texture);
         Surface?.SetCalibration(null);  // A new map starts uncalibrated.
         MarkChanged();
         return map;
     }
 
-    /// <summary>Removes the planet's map.</summary>
+    /// <summary>Removes the selected body's map.</summary>
     public void ClearMap()
     {
-        if (MainBody.Surface.Map is null)
+        if (SelectedBody.Surface.Map is null)
         {
             return;
         }
 
         RecordUndo("Clear Map");
         _projectionWithoutMap = Projection;
-        MainBody.Surface.Map = null;
-        MapCheck = null;
+        SelectedBody.Surface.Map = null;
+        _mapChecks.Remove(SelectedBodyId);
+        _fullMap = null;
         Surface?.ClearMap();
         MarkChanged();
     }
@@ -276,7 +352,7 @@ public partial class WorldSession : Node
             return;
         }
 
-        if (MainBody.Surface.Map is SurfaceMap map)
+        if (SelectedBody.Surface.Map is SurfaceMap map)
         {
             RecordUndo("Change Map Type");
             map.Projection = projection;
@@ -289,7 +365,7 @@ public partial class WorldSession : Node
             Changed?.Invoke();
         }
 
-        ShowSurfaceSettings();
+        ShowSurfaceSettings(SelectedBody);
     }
 
     /// <summary>
@@ -298,7 +374,7 @@ public partial class WorldSession : Node
     /// </summary>
     public void SetCalibration(MapCalibration? calibration)
     {
-        if (MainBody.Surface.Map is not SurfaceMap map
+        if (SelectedBody.Surface.Map is not SurfaceMap map
             || ReferenceEquals(map.Calibration, calibration))
         {
             return;
@@ -333,12 +409,12 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
-    /// Puts back the calibration from <paramref name="snapshot"/>, and the unsaved state from
-    /// before editing (the workspace blocks other edits meanwhile, so nothing else changed).
+    /// Puts back the calibration from <paramref name="snapshot"/> (the workspace blocks other
+    /// edits meanwhile, so nothing else changed).
     /// </summary>
     public void CancelCalibration(CalibrationSnapshot snapshot)
     {
-        if (MainBody.Surface.Map is not SurfaceMap map)
+        if (SelectedBody.Surface.Map is not SurfaceMap map)
         {
             return;
         }
@@ -356,11 +432,13 @@ public partial class WorldSession : Node
     /// </summary>
     public bool IsCutting { get; set; }
 
-    /// <summary>The planet's map pieces, bottom to top (VISION.md MAP-02). Read only.</summary>
-    public IReadOnlyList<MapPiece> Pieces => MainBody.Surface.Pieces;
+    /// <summary>
+    /// The selected body's map pieces, bottom to top (VISION.md MAP-02). Read only.
+    /// </summary>
+    public IReadOnlyList<MapPiece> Pieces => SelectedBody.Surface.Pieces;
 
-    /// <summary>The main map's asset name, for cutting pieces from it, or null.</summary>
-    public string? MainMapAssetName => MainBody.Surface.Map?.AssetName;
+    /// <summary>The selected body's map asset name, for cutting pieces from it, or null.</summary>
+    public string? MainMapAssetName => SelectedBody.Surface.Map?.AssetName;
 
     /// <summary>
     /// Registers an image file as a source for cutting pieces and returns its asset name. It's
@@ -401,15 +479,20 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
-    /// Cuts a new piece from a source image and lays it on the globe, on top of the others.
+    /// Cuts a new piece from a source image and lays it on the selected body, on top of the
+    /// others.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The planet has the most pieces.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The body already has the most pieces, or it's a star.
+    /// </exception>
     /// <exception cref="MapLoadException">The source image can't be read.</exception>
     public async Task<MapPiece> AddPieceAsync(
         string assetName, PieceOutline outline, GeoCoordinate center, double widthDegrees)
     {
         RequireIdle();
-        if (Pieces.Count >= SurfaceSettings.MaxPieces)
+        RequireSurface();
+        Body body = SelectedBody;
+        if (body.Surface.Pieces.Count >= SurfaceSettings.MaxPieces)
         {
             throw new InvalidOperationException(
                 $"A planet can have up to {SurfaceSettings.MaxPieces} pieces.");
@@ -430,7 +513,7 @@ public partial class WorldSession : Node
 
         var piece = new MapPiece
         {
-            Name = NextPieceName(),
+            Name = NextPieceName(body),
             AssetName = assetName,
             Outline = outline,
             Center = center,
@@ -438,9 +521,9 @@ public partial class WorldSession : Node
                 PieceProjection.MinimumWidthDegrees, PieceProjection.MaximumWidthDegrees),
         };
         RecordUndo($"Add {piece.Name}");
-        MainBody.Surface.Pieces.Add(piece);
+        body.Surface.Pieces.Add(piece);
         _pieceTextures[piece.Id] = texture;
-        ShowPieces();
+        ShowPieces(body);
         MarkChanged();
         return piece;
     }
@@ -459,7 +542,7 @@ public partial class WorldSession : Node
         piece.RotationDegrees = ((rotationDegrees % 360) + 360) % 360;
         piece.WidthDegrees = Math.Clamp(widthDegrees,
             PieceProjection.MinimumWidthDegrees, PieceProjection.MaximumWidthDegrees);
-        ShowPieces();
+        ShowPieces(SelectedBody);
         MarkChanged();
     }
 
@@ -475,7 +558,7 @@ public partial class WorldSession : Node
         }
     }
 
-    /// <summary>Removes a piece from the planet.</summary>
+    /// <summary>Removes a piece from the selected body.</summary>
     public void RemovePiece(Guid id)
     {
         if (FindPiece(id) is not MapPiece piece)
@@ -484,8 +567,8 @@ public partial class WorldSession : Node
         }
 
         RecordUndo($"Delete {piece.Name}");
-        MainBody.Surface.Pieces.Remove(piece);
-        ShowPieces();
+        SelectedBody.Surface.Pieces.Remove(piece);
+        ShowPieces(SelectedBody);
         MarkChanged();
     }
 
@@ -495,7 +578,7 @@ public partial class WorldSession : Node
     /// </summary>
     public void MovePieceInOrder(Guid id, int steps)
     {
-        List<MapPiece> pieces = MainBody.Surface.Pieces;
+        List<MapPiece> pieces = SelectedBody.Surface.Pieces;
         int index = pieces.FindIndex(p => p.Id == id);
         int target = Math.Clamp(index + steps, 0, pieces.Count - 1);
         if (index < 0 || target == index)
@@ -507,7 +590,7 @@ public partial class WorldSession : Node
         RecordUndo($"Reorder {piece.Name}");
         pieces.RemoveAt(index);
         pieces.Insert(target, piece);
-        ShowPieces();
+        ShowPieces(SelectedBody);
         MarkChanged();
     }
 
@@ -532,7 +615,7 @@ public partial class WorldSession : Node
             [.. piece.WarpedPoints ?? PieceWarp.UnwarpedPoints(piece.Outline)];
         points[pointIndex] = position;
         piece.WarpedPoints = points;  // A new list: never edited in place.
-        ShowPieces();
+        ShowPieces(SelectedBody);
         MarkChanged();
     }
 
@@ -546,7 +629,7 @@ public partial class WorldSession : Node
 
         RecordUndo($"Reset Points of {piece.Name}");
         piece.WarpedPoints = null;
-        ShowPieces();
+        ShowPieces(SelectedBody);
         MarkChanged();
     }
 
@@ -572,33 +655,7 @@ public partial class WorldSession : Node
         return lookup;
     }
 
-    private MapPiece? FindPiece(Guid id) => MainBody.Surface.Pieces.Find(p => p.Id == id);
-
-    private string NextPieceName()
-    {
-        int number = 1;
-        while (Pieces.Any(p => p.Name == $"Piece {number}"))
-        {
-            number++;
-        }
-
-        return $"Piece {number}";
-    }
-
-    // Sends every piece that has a texture to the planet, bottom to top.
-    private void ShowPieces()
-    {
-        foreach (Guid id in _warpLookups.Keys.Where(id => FindPiece(id) is null).ToList())
-        {
-            _warpLookups.Remove(id);
-        }
-
-        Surface?.SetPieces([.. Pieces
-            .Where(p => _pieceTextures.ContainsKey(p.Id))
-            .Select(p => (_pieceTextures[p.Id], PieceProjection.For(p), WarpLookupFor(p)))]);
-    }
-
-    /// <summary>Changes the color used where the map doesn't cover the globe.</summary>
+    /// <summary>Changes the color used where the selected body's map doesn't cover it.</summary>
     public void SetFillColor(RgbColor color)
     {
         if (color == FillColor)
@@ -606,9 +663,9 @@ public partial class WorldSession : Node
             return;
         }
 
-        RecordUndo("Change Fill Color", mergeKey: "fill color");
-        MainBody.Surface.FillColor = color;
-        ShowSurfaceSettings();
+        RecordUndo("Change Fill Color", mergeKey: ("fill color", SelectedBodyId));
+        SelectedBody.Surface.FillColor = color;
+        ShowSurfaceSettings(SelectedBody);
         MarkChanged();
     }
 
@@ -628,10 +685,11 @@ public partial class WorldSession : Node
     public string? RedoDescription => _history.RedoDescription;
 
     /// <summary>
-    /// Takes back the last edit. If that brings back a different map image, the image is
-    /// reloaded (a few seconds for a large map).
+    /// Takes back the last edit, selecting the body it changed so the change is visible. If
+    /// that brings back a different map image, the image is reloaded (a few seconds for a
+    /// large map).
     /// </summary>
-    /// <returns>What was undone and, if the map image couldn't be shown, a warning.</returns>
+    /// <returns>What was undone and, if an image couldn't be shown, a warning.</returns>
     /// <exception cref="InvalidOperationException">Undo isn't possible now.</exception>
     public Task<(string Description, string? Warning)> UndoAsync()
     {
@@ -641,7 +699,7 @@ public partial class WorldSession : Node
         }
 
         string description = _history.UndoDescription!;
-        return RestoreAsync(_history.Undo(MainBody.Surface.Clone()), description);
+        return RestoreAsync(_history.Undo(CurrentSurfaceOfSameBody), description);
     }
 
     /// <summary>Re-applies the last undone edit (see <see cref="UndoAsync"/>).</summary>
@@ -654,7 +712,7 @@ public partial class WorldSession : Node
         }
 
         string description = _history.RedoDescription!;
-        return RestoreAsync(_history.Redo(MainBody.Surface.Clone()), description);
+        return RestoreAsync(_history.Redo(CurrentSurfaceOfSameBody), description);
     }
 
     /// <summary>
@@ -665,14 +723,14 @@ public partial class WorldSession : Node
     public void BeginGesture(string description)
     {
         EndGesture();
-        _gesture = (description, MainBody.Surface.Clone(), _editVersion);
+        _gesture = (description, SnapshotSelected(), _editVersion);
         Changed?.Invoke();  // Undo isn't available mid-gesture.
     }
 
     /// <summary>Ends the gesture started by <see cref="BeginGesture"/>.</summary>
     public void EndGesture()
     {
-        if (_gesture is not (string description, SurfaceSettings before, int version))
+        if (_gesture is not (string description, SurfaceSnapshot before, int version))
         {
             return;
         }
@@ -702,15 +760,18 @@ public partial class WorldSession : Node
         SetBusy(true);
         LoadedWorld loaded;
         LoadedMap? map = null;
+        Guid selected;
         string? warning = null;
         Dictionary<Guid, Texture2D> pieceTextures;
         try
         {
             loaded = await Task.Run(() => WorldPackage.Load(readPath));
+            selected = DefaultSelection(loaded.World);
 
             // If the map image can't be shown, still open the world and keep the image data,
             // so saving never loses it.
-            if (loaded.World.Bodies[0].Surface.Map is SurfaceMap surfaceMap)
+            Body selectedBody = loaded.World.Bodies.First(body => body.Id == selected);
+            if (selectedBody.Surface.Map is SurfaceMap surfaceMap)
             {
                 try
                 {
@@ -724,7 +785,8 @@ public partial class WorldSession : Node
             }
 
             (pieceTextures, int failed) = await BakePiecesAsync(
-                loaded.World.Bodies[0].Surface.Pieces, loaded.Assets);
+                [.. loaded.World.Bodies.SelectMany(body => body.Surface.Pieces)],
+                loaded.Assets);
             if (failed > 0)
             {
                 warning = $"{warning} {failed} map piece(s) couldn't be shown (they're kept, " +
@@ -738,28 +800,29 @@ public partial class WorldSession : Node
 
         CloseCurrentWorld();
         ResetHistory();
+        ForgetMaps();
         _pieceTextures = pieceTextures;
         World = loaded.World;
         _assets = new Dictionary<string, IAssetSource>(loaded.Assets);
         FilePath = savedPath;
         HasUnsavedChanges = unsaved;
-        _savedSurface = unsaved ? null : World.Bodies[0].Surface.Clone();
-        MapCheck = map?.Check;
+        SelectedBodyId = selected;
+        _savedSurfaces = unsaved ? null : SnapshotSurfaces(World);
         _projectionWithoutMap = MapProjection.Mercator;
-        if (map is not null)
+        ShowWorld();
+        if (map is not null && SelectedBody.Surface.Map is SurfaceMap shown)
         {
             Surface?.SetMap(map.Texture);
-        }
-        else
-        {
-            Surface?.ClearMap();
+            _mapChecks[selected] = map.Check;
+            _fullMap = (selected, shown.AssetName);
         }
 
-        ShowSurfaceSettings();
-        ShowPieces();
         Camera?.SetView(World.View);
         _editVersion++;
+        SelectionChanged?.Invoke();
+        TimeChanged?.Invoke();
         Changed?.Invoke();
+        _ = LoadPreviewsAsync(World.Id);
         return warning;
     }
 
@@ -791,67 +854,236 @@ public partial class WorldSession : Node
         return (textures, failed);
     }
 
-    private void ShowSurfaceSettings()
+    // Shows a body's map at full size (or clears it if it has none), unless it already is.
+    private async Task<string?> ShowFullMapAsync(Body body)
     {
-        if (Surface is null)
+        PlanetSurface? surface = System?.SurfaceFor(body.Id);
+        if (body.Surface.Map is not SurfaceMap map)
+        {
+            surface?.ClearMap();
+            _mapChecks.Remove(body.Id);
+            return null;
+        }
+
+        if (_fullMap == (body.Id, map.AssetName))
+        {
+            return null;
+        }
+
+        SetBusy(true);
+        try
+        {
+            LoadedMap loaded =
+                await MapImageLoader.LoadAsync(_assets[map.AssetName], map.AssetName);
+            surface?.SetMap(loaded.Texture);
+            _mapChecks[body.Id] = loaded.Check;
+            _fullMap = (body.Id, map.AssetName);
+            return null;
+        }
+        catch (MapLoadException error)
+        {
+            // The map stays in the world data, so saving keeps it.
+            surface?.ClearMap();
+            _mapChecks.Remove(body.Id);
+            return $"The map image couldn't be shown: {error.Message}";
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    // A body that's no longer selected swaps its full-size map for the small preview, freeing
+    // graphics memory. If the preview isn't ready yet, it's loaded first.
+    private void ShowPreviewInsteadOfFullMap(Body body)
+    {
+        if (_fullMap?.Body != body.Id || body.Surface.Map is not SurfaceMap map)
         {
             return;
         }
 
-        Surface.Projection = Projection;
-        Surface.FillColor = FillColor.ToGodot();
-        Surface.SetCalibration(Calibration);
+        if (_previews.TryGetValue(body.Id, out var preview) && preview.Asset == map.AssetName)
+        {
+            System?.SurfaceFor(body.Id)?.SetMap(preview.Texture);
+            _fullMap = null;
+        }
+        else
+        {
+            _ = LoadPreviewAsync(body, World.Id);
+        }
+    }
+
+    // Loads previews for every mapped body in the background after a world opens, one at a
+    // time so the app stays responsive.
+    private async Task LoadPreviewsAsync(Guid worldId)
+    {
+        foreach (Body body in World.Bodies.ToList())
+        {
+            if (World.Id != worldId)
+            {
+                return;  // Another world was opened meanwhile.
+            }
+
+            await LoadPreviewAsync(body, worldId);
+        }
+    }
+
+    // Loads one body's map preview, and shows it if the body isn't the selected one.
+    private async Task LoadPreviewAsync(Body body, Guid worldId)
+    {
+        if (body.Surface.Map is not SurfaceMap map
+            || _assets.GetValueOrDefault(map.AssetName) is not IAssetSource source)
+        {
+            return;
+        }
+
+        if (!_previews.TryGetValue(body.Id, out var preview) || preview.Asset != map.AssetName)
+        {
+            try
+            {
+                Texture2D texture = await MapImageLoader.LoadPreviewAsync(source, map.AssetName);
+                preview = (map.AssetName, texture);
+            }
+            catch (MapLoadException error)
+            {
+                GD.PushWarning($"Couldn't load a preview of {body.Name}'s map: {error.Message}");
+                return;
+            }
+
+            if (World.Id != worldId)
+            {
+                return;
+            }
+
+            _previews[body.Id] = preview;
+        }
+
+        if (body.Id != SelectedBodyId && body.Surface.Map?.AssetName == preview.Asset)
+        {
+            System?.SurfaceFor(body.Id)?.SetMap(preview.Texture);
+            if (_fullMap?.Body == body.Id)
+            {
+                _fullMap = null;
+            }
+        }
+    }
+
+    private void ForgetMaps()
+    {
+        _mapChecks.Clear();
+        _previews.Clear();
+        _fullMap = null;
+    }
+
+    // Builds the system view for the open world, and shows every body's surface settings and
+    // pieces (maps are loaded separately).
+    private void ShowWorld()
+    {
+        System?.Show(World, SelectedBodyId);
+        foreach (Body body in World.Bodies)
+        {
+            ShowSurfaceSettings(body);
+            ShowPieces(body);
+        }
+    }
+
+    private void ShowSurfaceSettings(Body body)
+    {
+        if (System?.SurfaceFor(body.Id) is not PlanetSurface surface)
+        {
+            return;
+        }
+
+        surface.Projection = body.Surface.Map?.Projection
+            ?? (body.Id == SelectedBodyId ? _projectionWithoutMap : MapProjection.Mercator);
+        surface.FillColor = body.Surface.FillColor.ToGodot();
+        surface.SetCalibration(body.Surface.Map?.Calibration);
+    }
+
+    // Sends every piece of a body that has a texture to its surface, bottom to top.
+    private void ShowPieces(Body body)
+    {
+        var allPieces = new HashSet<Guid>(World.Bodies
+            .SelectMany(b => b.Surface.Pieces.Select(piece => piece.Id)));
+        foreach (Guid id in _warpLookups.Keys.Where(id => !allPieces.Contains(id)).ToList())
+        {
+            _warpLookups.Remove(id);
+        }
+
+        System?.SurfaceFor(body.Id)?.SetPieces([.. body.Surface.Pieces
+            .Where(p => _pieceTextures.ContainsKey(p.Id))
+            .Select(p => (_pieceTextures[p.Id], PieceProjection.For(p), WarpLookupFor(p)))]);
+    }
+
+    private Body? FindBody(Guid id) => World.Bodies.Find(body => body.Id == id);
+
+    private MapPiece? FindPiece(Guid id) => SelectedBody.Surface.Pieces.Find(p => p.Id == id);
+
+    private static string NextPieceName(Body body)
+    {
+        int number = 1;
+        while (body.Surface.Pieces.Any(p => p.Name == $"Piece {number}"))
+        {
+            number++;
+        }
+
+        return $"Piece {number}";
+    }
+
+    // The body selected when a world opens: the first planet or moon, so the map tools are
+    // ready to use; a star only if there's nothing else.
+    private static Guid DefaultSelection(World world)
+    {
+        return (world.Bodies.FirstOrDefault(body => body.Kind != BodyKind.Star)
+            ?? world.Bodies[0]).Id;
+    }
+
+    private static Dictionary<Guid, SurfaceSettings> SnapshotSurfaces(World world)
+    {
+        return world.Bodies.ToDictionary(body => body.Id, body => body.Surface.Clone());
     }
 
     private bool IsIdleForHistory =>
         !IsBusy && _gesture is null && !IsCalibrating && !IsCutting;
+
+    private SurfaceSnapshot SnapshotSelected()
+    {
+        return new SurfaceSnapshot(SelectedBodyId, SelectedBody.Surface.Clone());
+    }
+
+    // For undo and redo: the current surface of the body a step belongs to.
+    private SurfaceSnapshot CurrentSurfaceOfSameBody(SurfaceSnapshot step)
+    {
+        return new SurfaceSnapshot(
+            step.BodyId, (FindBody(step.BodyId)?.Surface ?? step.Surface).Clone());
+    }
 
     // Call just before changing the surface. Inside a gesture, the gesture records it instead.
     private void RecordUndo(string description, object? mergeKey = null)
     {
         if (_gesture is null)
         {
-            _history.Record(description, MainBody.Surface.Clone(), mergeKey);
+            _history.Record(description, SnapshotSelected(), mergeKey);
             ForgetUnusedTextures();
         }
     }
 
-    // Puts back a snapshot from the history, reloading the map image if it's a different one.
+    // Puts back a snapshot from the history and selects its body, reloading the map image if
+    // it's a different one.
     private async Task<(string Description, string? Warning)> RestoreAsync(
-        SurfaceSettings state, string description)
+        SurfaceSnapshot snapshot, string description)
     {
-        string? previousMap = MainBody.Surface.Map?.AssetName;
-        MainBody.Surface.RestoreFrom(state);
-        string? warning = null;
-        if (MainBody.Surface.Map?.AssetName is not string mapAsset)
+        if (FindBody(snapshot.BodyId) is not Body body)
         {
-            MapCheck = null;
-            Surface?.ClearMap();
-        }
-        else if (mapAsset != previousMap)
-        {
-            SetBusy(true);
-            try
-            {
-                LoadedMap map = await MapImageLoader.LoadAsync(_assets[mapAsset], mapAsset);
-                MapCheck = map.Check;
-                Surface?.SetMap(map.Texture);
-            }
-            catch (MapLoadException error)
-            {
-                // The map stays in the world data, so saving keeps it.
-                MapCheck = null;
-                Surface?.ClearMap();
-                warning = $"The map image couldn't be shown: {error.Message}";
-            }
-            finally
-            {
-                SetBusy(false);
-            }
+            return (description, "The body that edit belonged to no longer exists.");
         }
 
-        ShowSurfaceSettings();
-        ShowPieces();
+        body.Surface.RestoreFrom(snapshot.Surface);
+        ShowSurfaceSettings(body);
+        ShowPieces(body);
+        string? warning = body.Id == SelectedBodyId
+            ? await ShowFullMapAsync(body)
+            : await SelectBodyAsync(body.Id);
         ForgetUnusedTextures();
         MarkChanged();
         return (description, warning);
@@ -861,8 +1093,9 @@ public partial class WorldSession : Node
     // undoing a delete is instant. The rest are freed.
     private void ForgetUnusedTextures()
     {
-        var used = new HashSet<Guid>(_history.States.Append(MainBody.Surface)
-            .SelectMany(state => state.Pieces.Select(piece => piece.Id)));
+        var used = new HashSet<Guid>(_history.States.Select(state => state.Surface)
+            .Concat(World.Bodies.Select(body => body.Surface))
+            .SelectMany(surface => surface.Pieces.Select(piece => piece.Id)));
         foreach (Guid id in _pieceTextures.Keys.Where(id => !used.Contains(id)).ToList())
         {
             _pieceTextures.Remove(id);
@@ -875,8 +1108,9 @@ public partial class WorldSession : Node
     {
         var saved = new HashSet<string>(WorldPackage.ReferencedAssetNames(saving));
         return [.. _history.States
-            .SelectMany(state => state.Pieces.Select(piece => piece.AssetName)
-                .Append(state.Map?.AssetName))
+            .Select(state => state.Surface)
+            .SelectMany(surface => surface.Pieces.Select(piece => piece.AssetName)
+                .Append(surface.Map?.AssetName))
             .OfType<string>()
             .Distinct()
             .Where(name => !saved.Contains(name)
@@ -908,8 +1142,11 @@ public partial class WorldSession : Node
 
     private void UpdateUnsavedState()
     {
-        HasUnsavedChanges =
-            _savedSurface is null || !MainBody.Surface.HasSameContent(_savedSurface);
+        HasUnsavedChanges = _savedSurfaces is null
+            || _savedSurfaces.Count != World.Bodies.Count
+            || World.Bodies.Any(body =>
+                !_savedSurfaces.TryGetValue(body.Id, out SurfaceSettings? saved)
+                || !body.Surface.HasSameContent(saved));
     }
 
     private void CloseCurrentWorld()
@@ -930,4 +1167,16 @@ public partial class WorldSession : Node
             throw new InvalidOperationException("Wait for the current save or open to finish.");
         }
     }
+
+    private void RequireSurface()
+    {
+        if (!SelectedBodyHasSurface)
+        {
+            throw new InvalidOperationException(
+                "Stars don't have maps. Select a planet or moon first.");
+        }
+    }
+
+    // One body's surface at one moment, for undo.
+    private sealed record SurfaceSnapshot(Guid BodyId, SurfaceSettings Surface);
 }

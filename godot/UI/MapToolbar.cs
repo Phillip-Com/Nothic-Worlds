@@ -199,8 +199,11 @@ public partial class MapToolbar : CanvasLayer
 
         _mapType.Select(_mapType.GetItemIndex((int)Session.Projection));
         _fillColor.Color = Session.FillColor.ToGodot();
-        _fillColorControls.Visible = !MapProjections.CoversWholeGlobe(Session.Projection);
-        _importButton.Disabled = Session.IsBusy;
+        bool hasSurface = Session.SelectedBodyHasSurface;  // Stars have no map.
+        _fillColorControls.Visible =
+            hasSurface && !MapProjections.CoversWholeGlobe(Session.Projection);
+        _importButton.Disabled = Session.IsBusy || !hasSurface;
+        _mapType.Disabled = !hasSurface;
         _clearButton.Disabled = Session.IsBusy || Session.MapCheck is null;
         _calibrateButton.Disabled = Session.IsBusy || Session.MapCheck is null;
     }
