@@ -95,6 +95,11 @@ public sealed class SurfaceSettings
             && a.Longitudes.SequenceEqual(b.Longitudes);
     }
 
+    private static bool SameWarp(IReadOnlyList<ImagePoint>? a, IReadOnlyList<ImagePoint>? b)
+    {
+        return ReferenceEquals(a, b) || (a is not null && b is not null && a.SequenceEqual(b));
+    }
+
     private static bool SamePiece(MapPiece a, MapPiece b)
     {
         return a.Id == b.Id
@@ -103,6 +108,7 @@ public sealed class SurfaceSettings
             && a.Center == b.Center
             && a.RotationDegrees == b.RotationDegrees
             && a.WidthDegrees == b.WidthDegrees
+            && SameWarp(a.WarpedPoints, b.WarpedPoints)
             && (ReferenceEquals(a.Outline, b.Outline)
                 || (a.Outline.SourceAspectRatio == b.Outline.SourceAspectRatio
                     && a.Outline.Points.SequenceEqual(b.Outline.Points)));
