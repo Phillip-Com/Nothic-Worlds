@@ -46,6 +46,44 @@ public static class Seasons
     }
 
     /// <summary>
+    /// The body whose orbit line shows a body's year, to mark its solstices and equinoxes on:
+    /// the body itself if it circles its star; its planet, for a moon; or, in a planet-centered
+    /// system, the star circling it. Null if there's no such orbit (no star, or the star isn't
+    /// directly linked to the body's chain, e.g. a far companion star).
+    /// </summary>
+    public static Body? OrbitShowingYear(IReadOnlyList<Body> bodies, Body body)
+    {
+        if (StarFor(bodies, body) is not Body star)
+        {
+            return null;
+        }
+
+        var byId = bodies.ToDictionary(b => b.Id);
+        var seen = new HashSet<Guid>();
+        for (Body? current = body; current is not null && seen.Add(current.Id);)
+        {
+            if (star.Orbit?.ParentId == current.Id)
+            {
+                return star;
+            }
+
+            if (current.Orbit is not Orbit orbit)
+            {
+                return null;
+            }
+
+            if (orbit.ParentId == star.Id)
+            {
+                return current;
+            }
+
+            current = byId.GetValueOrDefault(orbit.ParentId);
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// How high the star stands over the body's equator at a time, in degrees: positive when
     /// it's over the northern hemisphere. Its extremes are the solstices; zero is an equinox.
     /// </summary>

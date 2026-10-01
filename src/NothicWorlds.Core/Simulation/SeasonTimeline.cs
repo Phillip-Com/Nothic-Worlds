@@ -90,10 +90,12 @@ public sealed class SeasonTimeline
     }
 
     /// <summary>
-    /// The next <paramref name="count"/> events after a time (four of them cover a year).
+    /// The year of events around a time: the one that began the current season, then the next
+    /// three. Empty if there are no seasons.
     /// </summary>
-    public IReadOnlyList<SeasonEvent> Upcoming(double timeDays, int count)
+    public IReadOnlyList<SeasonEvent> YearAround(double timeDays)
     {
-        return [.. _events.Where(e => e.TimeDays > timeDays).Take(count)];
+        int first = _events.FindLastIndex(e => e.TimeDays <= timeDays);
+        return [.. _events.Skip(Math.Max(first, 0)).Take(4)];
     }
 }

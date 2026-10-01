@@ -33,18 +33,29 @@ public class SeasonTimelineTests
     }
 
     [Fact]
-    public void Upcoming_GivesTheNextYearOfEvents()
+    public void YearAround_StartsWithTheCurrentSeason()
     {
         (List<Body> bodies, Body planet) = EarthLike();
         SeasonTimeline timeline = SeasonTimeline.Around(bodies, planet, 0);
 
-        IReadOnlyList<SeasonEvent> year = timeline.Upcoming(10, 4);
+        IReadOnlyList<SeasonEvent> year = timeline.YearAround(100);
 
         Assert.Equal(
             [SeasonEventKind.NorthernSpringEquinox, SeasonEventKind.NorthernSummerSolstice,
                 SeasonEventKind.NorthernAutumnEquinox, SeasonEventKind.NorthernWinterSolstice],
             year.Select(e => e.Kind));
+        Assert.Equal(365.25 / 4, year[0].TimeDays, 0.05);
         Assert.Equal(365.25, year[^1].TimeDays, 0.05);
+    }
+
+    [Fact]
+    public void YearAround_KeepsAnEventAfterGoingToIt()
+    {
+        (List<Body> bodies, Body planet) = EarthLike();
+        SeasonTimeline timeline = SeasonTimeline.Around(bodies, planet, 0);
+        SeasonEvent summer = timeline.YearAround(100)[1];
+
+        Assert.Equal(summer, timeline.YearAround(summer.TimeDays)[0]);
     }
 
     [Fact]
