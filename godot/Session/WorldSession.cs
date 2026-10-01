@@ -405,11 +405,12 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
-    /// Changes a body's size, day length, and axial tilt. Rapid changes (holding a field's
-    /// arrow) are one undo step.
+    /// Changes a body's size, day length, and axial tilt (how far its axis leans, and which
+    /// way). Rapid changes (holding a field's arrow) are one undo step.
     /// </summary>
     /// <returns>What's wrong with the values (nothing is changed then), or null.</returns>
-    public string? SetBodyPhysical(Guid bodyId, double radiusKm, double dayHours, double tilt)
+    public string? SetBodyPhysical(
+        Guid bodyId, double radiusKm, double dayHours, double tilt, double tiltDirection)
     {
         if (FindBody(bodyId) is not Body body)
         {
@@ -421,6 +422,7 @@ public partial class WorldSession : Node
             RadiusKm = radiusKm,
             DayLengthHours = dayHours,
             AxialTiltDegrees = tilt,
+            AxialTiltDirectionDegrees = tiltDirection,
         };
         if (check.Problem() is string problem)
         {
@@ -428,7 +430,7 @@ public partial class WorldSession : Node
         }
 
         if (body.RadiusKm == radiusKm && body.DayLengthHours == dayHours
-            && body.AxialTiltDegrees == tilt)
+            && body.AxialTiltDegrees == tilt && body.AxialTiltDirectionDegrees == tiltDirection)
         {
             return null;
         }
@@ -437,6 +439,7 @@ public partial class WorldSession : Node
         body.RadiusKm = radiusKm;
         body.DayLengthHours = dayHours;
         body.AxialTiltDegrees = tilt;
+        body.AxialTiltDirectionDegrees = tiltDirection;
         SyncView();
         MarkChanged();
         TimeChanged?.Invoke();  // The date shown depends on the day length.

@@ -35,6 +35,7 @@ public partial class SystemPanel : CanvasLayer
     private SpinBox _radius = null!;
     private SpinBox _dayLength = null!;
     private SpinBox _axialTilt = null!;
+    private SpinBox _axisDirection = null!;
     private Control _orbitFields = null!;
     private Label _noOrbit = null!;
     private OptionButton _parent = null!;
@@ -178,7 +179,11 @@ public partial class SystemPanel : CanvasLayer
         _axialTilt = AddField(grid, "Axial tilt", 0, 180, 0.1, "°", CommitPhysical);
         _radius.TooltipText = "The body's radius (Earth: 6,371 km)";
         _dayLength.TooltipText = "How long one spin takes, in standard hours (Earth: 24)";
+        _axisDirection = AddField(grid, "Axis direction", 0, 360, 1, "°", CommitPhysical)
+            .WithWrapAround();
         _axialTilt.TooltipText = "How far the spin axis leans (Earth: 23.4°)";
+        _axisDirection.TooltipText = "Which way the north pole leans, measured like the " +
+            "orbit angles. It sets when in the year the solstices fall";
         layout.AddChild(grid);
 
         layout.AddChild(new Label { Text = "Orbit" });
@@ -372,6 +377,7 @@ public partial class SystemPanel : CanvasLayer
         _radius.ShowValue(body.RadiusKm);
         _dayLength.ShowValue(body.DayLengthHours);
         _axialTilt.ShowValue(body.AxialTiltDegrees);
+        _axisDirection.ShowValue(body.AxialTiltDirectionDegrees);
 
         _orbitFields.Visible = body.Orbit is not null;
         _noOrbit.Visible = body.Orbit is null;
@@ -441,7 +447,7 @@ public partial class SystemPanel : CanvasLayer
         }
 
         string? problem = Session.SetBodyPhysical(Session.SelectedBodyId,
-            _radius.Value, _dayLength.Value, _axialTilt.Value);
+            _radius.Value, _dayLength.Value, _axialTilt.Value, _axisDirection.Value);
         ReportProblem(problem);
     }
 
