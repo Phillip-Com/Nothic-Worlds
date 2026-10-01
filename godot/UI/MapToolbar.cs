@@ -7,11 +7,11 @@ using NothicWorlds.Session;
 namespace NothicWorlds.UI;
 
 /// <summary>
-/// Top-left toolbar (VISION.md MAP-01, MAP-02, MAP-03, MAP-04) with a slot for the File menu,
-/// "Import Map…", "Clear Map", "Calibrate…", "Pieces…", a "Map type" dropdown, and a "Fill
-/// color" picker (for map types that don't cover the whole globe), plus a message line underneath
-/// that other parts of the app can use too. Success messages fade after a few seconds. Warnings
-/// and errors stay until the next message.
+/// Top-left toolbar (VISION.md MAP-01 to MAP-05, UI-02) with a slot for the File and Edit
+/// menus, "System…", "Import Map…", "Clear Map", "Calibrate…", "Pieces…", a "Map type"
+/// dropdown, and a "Fill color" picker (for map types that don't cover the whole globe), plus a
+/// message line underneath that other parts of the app can use too. Success messages fade after
+/// a few seconds. Warnings and errors stay until the next message.
 /// </summary>
 /// <remarks>
 /// All edits go through <see cref="WorldSession"/>, so unsaved changes are tracked.
@@ -47,6 +47,9 @@ public partial class MapToolbar : CanvasLayer
     /// <summary>The Calibrate workspace, opened by the Calibrate… button.</summary>
     [Export] public CalibrationWorkspace? Calibration { get; set; }
 
+    /// <summary>The System panel, shown and hidden by the System… button.</summary>
+    [Export] public SystemPanel? SystemPanel { get; set; }
+
     /// <summary>The Pieces panel, shown and hidden by the Pieces… button.</summary>
     [Export] public PiecesPanel? Pieces { get; set; }
 
@@ -68,6 +71,18 @@ public partial class MapToolbar : CanvasLayer
         var controls = new HBoxContainer();
         layout.AddChild(controls);
         controls.AddChild(MenuArea);
+
+        var systemButton = CreateButton(
+            "System…", "The star system: add, delete, and edit suns, planets, and moons");
+        systemButton.ToggleMode = true;
+        systemButton.Toggled += open =>
+        {
+            if (SystemPanel is not null)
+            {
+                SystemPanel.IsPanelOpen = open;
+            }
+        };
+        controls.AddChild(systemButton);
 
         _importButton = CreateButton(
             "Import Map…", "Wrap a map image (PNG, JPG, WebP) onto the planet");

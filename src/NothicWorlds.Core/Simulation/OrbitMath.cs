@@ -39,6 +39,32 @@ public static class OrbitMath
             .RotatedAroundY(orbit.TiltDirectionDegrees);
     }
 
+    /// <summary>
+    /// Times (in days, from 0 up to one period) to sample one full trip around an orbit so the
+    /// points are spread evenly along the curve, not evenly in time. On an elongated orbit the
+    /// body rushes through its closest approach; even time steps would leave only a few points
+    /// there, joined by straight lines the body doesn't follow.
+    /// </summary>
+    public static IReadOnlyList<double> EvenlySpacedTimes(Orbit orbit, int samples)
+    {
+        // Step evenly in eccentric anomaly (the angle around the orbit's ellipse), starting at
+        // where the body is at time 0, and convert each step back to a time.
+        double e = orbit.Eccentricity;
+        double startMean = double.DegreesToRadians(
+            orbit.StartAngleDegrees - orbit.ClosestApproachDegrees);
+        double startEccentric = SolveKepler(startMean, e);
+        double startMeanWrapped = startEccentric - e * Math.Sin(startEccentric);
+        var times = new double[samples];
+        for (int i = 0; i < samples; i++)
+        {
+            double eccentric = startEccentric + 2 * Math.PI * i / samples;
+            double mean = eccentric - e * Math.Sin(eccentric);
+            times[i] = (mean - startMeanWrapped) / (2 * Math.PI) * orbit.PeriodDays;
+        }
+
+        return times;
+    }
+
     // Solves Kepler's equation, M = E - e·sin(E), for E (Newton's method). Converges in a few
     // steps for every eccentricity allowed (up to 0.95).
     private static double SolveKepler(double meanAnomaly, double eccentricity)

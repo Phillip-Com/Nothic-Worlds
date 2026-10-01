@@ -181,10 +181,8 @@ public partial class PiecesPanel : CanvasLayer
         _rotation = AddNumberField(grid, "Rotation", 0, 360, 0.1, "°");
         _width = AddNumberField(grid, "Width", PieceProjection.MinimumWidthDegrees,
             PieceProjection.MaximumWidthDegrees, 0.1, "°");
-        _longitude.AllowGreater = true;  // Wrapped round, e.g. 190° becomes -170°.
-        _longitude.AllowLesser = true;
-        _rotation.AllowGreater = true;
-        _rotation.AllowLesser = true;
+        _longitude.WithWrapAround();  // E.g. 190° becomes -170°.
+        _rotation.WithWrapAround();   // E.g. 370° becomes 10°.
         _latitude.TooltipText = "Where the piece's center is: north positive, south negative";
         _longitude.TooltipText = "Where the piece's center is: east positive, west negative";
         _rotation.TooltipText = "Clockwise turn; 0° keeps the top of the piece facing north";
@@ -234,7 +232,7 @@ public partial class PiecesPanel : CanvasLayer
             Suffix = suffix,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
         };
-        field.ValueChanged += _ => CommitPlacement();
+        field.WithLiveTyping(ShowSelected).ValueChanged += _ => CommitPlacement();
         grid.AddChild(field);
         return field;
     }
@@ -346,10 +344,10 @@ public partial class PiecesPanel : CanvasLayer
             _name.Text = piece.Name;
         }
 
-        _latitude.SetValueNoSignal(piece.Center.LatitudeDegrees);
-        _longitude.SetValueNoSignal(piece.Center.LongitudeDegrees);
-        _rotation.SetValueNoSignal(piece.RotationDegrees);
-        _width.SetValueNoSignal(piece.WidthDegrees);
+        _latitude.ShowValue(piece.Center.LatitudeDegrees);
+        _longitude.ShowValue(piece.Center.LongitudeDegrees);
+        _rotation.ShowValue(piece.RotationDegrees);
+        _width.ShowValue(piece.WidthDegrees);
         _editPointsButton.SetPressedNoSignal(IsEditingPoints);
         _resetPointsButton.Disabled = piece.WarpedPoints is null;
         int position = _listed.IndexOf(piece);

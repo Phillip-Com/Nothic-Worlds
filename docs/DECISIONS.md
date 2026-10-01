@@ -7,12 +7,15 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-09-30 | Milestone 4: **star system basics** (suns, planets, moons, designed orbits, world clock, system view) | In PR | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) | VISION.md §3 |
-| 2026-09-30 | System view: **readable scale by default, with a true-scale toggle**; data always in real units | In PR | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) | Built in the next PR |
-| 2026-09-30 | Orbits: **simple** (distance, period, start), circles by default, with optional elongation and tilt; periods set freely | In PR | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) | VISION.md `SIM-01` |
-| 2026-09-30 | Until calendars exist, time shows as **Day N, hh:mm in the selected planet's days** | In PR | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) | VISION.md `SIM-02` |
-| 2026-09-30 | Milestone 4 in **three PRs**: Core, then system view + time controls, then editing | In PR | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) | |
-| 2026-09-30 | World file **format version 5** adds star systems; older bodies get Earth-like defaults | In PR | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) | docs/world-format.md version history |
+| 2026-09-30 | **Make Center**: any body can become the center of its system; the bodies it orbited flip to circle it on the same paths, keeping every relative position | In PR | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) | VISION.md `UI-02` |
+| 2026-09-30 | Deleting a body **also deletes everything orbiting it**; Ctrl+Z brings it all back | In PR | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) | VISION.md `UI-02` |
+| 2026-09-30 | System tree and body properties in a **left panel, opened by a System… button** | In PR | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) | VISION.md `UI-02` |
+| 2026-09-30 | Milestone 4: **star system basics** (suns, planets, moons, designed orbits, world clock, system view) | Merged | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) · `56cb993` | VISION.md §3 |
+| 2026-09-30 | System view: **readable scale by default, with a true-scale toggle**; data always in real units | Merged | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) · `56cb993` | Built in the next PR |
+| 2026-09-30 | Orbits: **simple** (distance, period, start), circles by default, with optional elongation and tilt; periods set freely | Merged | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) · `56cb993` | VISION.md `SIM-01` |
+| 2026-09-30 | Until calendars exist, time shows as **Day N, hh:mm in the selected planet's days** | Merged | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) · `56cb993` | VISION.md `SIM-02` |
+| 2026-09-30 | Milestone 4 in **three PRs**: Core, then system view + time controls, then editing | Merged | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) · `56cb993` | |
+| 2026-09-30 | World file **format version 5** adds star systems; older bodies get Earth-like defaults | Merged | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) · `56cb993` | docs/world-format.md version history |
 | 2026-09-30 | **Edit Points** is entered with the panel's toggle or by **double-clicking** a piece; Esc leaves it | Merged | [#15](https://github.com/Phillip-Com/Nothic-Worlds/pull/15) · `b28f4ac` | VISION.md `MAP-02` |
 | 2026-09-30 | World file **format version 4** adds optional piece warps; version 3 files upgrade automatically | Merged | [#15](https://github.com/Phillip-Com/Nothic-Worlds/pull/15) · `b28f4ac` | docs/world-format.md version history |
 | 2026-09-30 | A world that **matches its saved file** counts as saved (e.g. after undoing back to it) | Merged | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) · `1d80a42` | VISION.md `UI-03` |

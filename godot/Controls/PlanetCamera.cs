@@ -111,6 +111,17 @@ public partial class PlanetCamera : Camera3D
         SnapToTarget();
     }
 
+    public override void _Input(InputEvent @event)
+    {
+        // Clicking the view (not a panel) finishes editing any field, so the keyboard moves
+        // the camera again. The click itself carries on as usual.
+        if (@event is InputEventMouseButton { Pressed: true }
+            && GetViewport().GuiGetHoveredControl() is null)
+        {
+            GetViewport().GuiReleaseFocus();
+        }
+    }
+
     public override void _UnhandledInput(InputEvent @event)
     {
         switch (@event)
@@ -299,8 +310,11 @@ public partial class PlanetCamera : Camera3D
 
     private void HandleKeyboard(float delta)
     {
-        // Ctrl+key combinations are app shortcuts (e.g. Ctrl+S saves), not camera movement.
-        if (Input.IsKeyPressed(Key.Ctrl))
+        // Ctrl+key combinations are app shortcuts (e.g. Ctrl+S saves), not camera movement. And
+        // while a text or number field is being edited, the keys are for it (e.g. Up/Down
+        // change a number).
+        if (Input.IsKeyPressed(Key.Ctrl)
+            || GetViewport().GuiGetFocusOwner() is LineEdit or TextEdit)
         {
             _keyboardPanning = false;
             return;

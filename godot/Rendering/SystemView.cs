@@ -52,6 +52,13 @@ public partial class SystemView : Node3D
         AlbedoColor = _orbitColor,
     };
 
+    // The path of the body being edited: the selection color, fully visible.
+    private readonly StandardMaterial3D _highlightMaterial = new()
+    {
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        AlbedoColor = new Color(1.0f, 0.85f, 0.2f),
+    };
+
     private SystemScale _scale = SystemScale.Readable;
     private Dictionary<Guid, DisplayBody> _layout = [];
     private Guid _focusId;
@@ -72,6 +79,12 @@ public partial class SystemView : Node3D
 
     /// <summary>The planet surface material; each planet and moon gets its own copy.</summary>
     [Export] public ShaderMaterial? PlanetMaterial { get; set; }
+
+    /// <summary>
+    /// The body whose path is highlighted and always shown, even close up (while the System
+    /// panel edits it), or null for none.
+    /// </summary>
+    public Guid? HighlightedOrbit { get; set; }
 
     /// <summary>Raised after every body has been placed for this frame.</summary>
     public event Action? Placed;
@@ -141,14 +154,49 @@ public partial class SystemView : Node3D
         }
 
         _visuals.Clear();
+        Sync(world);
+        FocusImmediately(focusId);
+    }
+
+    /// <summary>
+    /// Brings the visuals up to date after bodies were added, removed, or changed, keeping the
+    /// rest (and their loaded maps) as they are.
+    /// </summary>
+    /// <returns>The bodies whose visuals were created anew, so their surfaces are blank.</returns>
+    public HashSet<Guid> Sync(World world)
+    {
+        var present = new HashSet<Guid>(world.Bodies.Select(body => body.Id));
+        foreach (Guid gone in _visuals.Keys.Where(id => !present.Contains(id)).ToList())
+        {
+            _visuals[gone].Free();
+            _visuals.Remove(gone);
+        }
+
+        // A star and a planet are drawn differently, so a body that changed between them is
+        // rebuilt.
+        var created = new HashSet<Guid>();
         foreach (Body body in world.Bodies)
         {
-            _visuals[body.Id] = CreateVisual(body);
+            bool isStar = body.Kind == BodyKind.Star;
+            if (!_visuals.TryGetValue(body.Id, out BodyVisual? visual)
+                || (visual.Surface is null) != isStar)
+            {
+                visual?.Free();
+                _visuals[body.Id] = CreateVisual(body);
+                created.Add(body.Id);
+            }
         }
 
         RebuildOrbitLines();
-        _focusId = focusId;
+        return created;
+    }
+
+    /// <summary>Centers the view on a body straight away, with no flight.</summary>
+    public void FocusImmediately(Guid bodyId)
+    {
+        _focusId = bodyId;
         _flightProgress = 1.0;
+        Camera?.ClearFocusOffset();
         Place();
     }
 
@@ -161,9 +209,18 @@ public partial class SystemView : Node3D
     /// <summary>Flies the view to a body, which then stays at the scene's center.</summary>
     public void FlyTo(Guid bodyId)
     {
-        if (bodyId == _focusId || !_layout.ContainsKey(bodyId))
+        if (bodyId == _focusId)
         {
             return;
+        }
+
+        if (!_layout.ContainsKey(bodyId))
+        {
+            Place();  // A body added a moment ago isn't placed until the next frame.
+            if (!_layout.ContainsKey(bodyId))
+            {
+                return;
+            }
         }
 
         _flightFrom = Origin;
@@ -277,7 +334,9 @@ public partial class SystemView : Node3D
             && _layout.TryGetValue(orbit.ParentId, out DisplayBody parent))
         {
             line.Position = ToScene(parent.Position);
-            line.Visible = body.Id != _focusId
+            bool highlighted = body.Id == HighlightedOrbit;
+            line.MaterialOverride = highlighted ? _highlightMaterial : null;
+            line.Visible = highlighted || body.Id != _focusId
                 || (Camera?.CurrentAltitude ?? float.MaxValue) > OwnOrbitLineAltitude;
         }
     }
@@ -299,8 +358,26 @@ public partial class SystemView : Node3D
 
         Camera.PlanetRadius = (float)focusRadius;
         Camera.MaxAltitude = (float)Math.Max(8.0, 2.5 * extent / focusRadius);
-        Camera.Near = (float)(focusRadius * 0.001);
+        Camera.Near = (float)Math.Max(focusRadius * 0.001, NearestSurfaceDistance() * 0.02);
         Camera.Far = (float)Math.Max(100.0 * focusRadius, 6.0 * extent);
+    }
+
+    // How far the camera is from the closest body's surface. The near clipping distance follows
+    // it: tiny up close, so the camera can get right down to the ground, and larger when zoomed
+    // out. A near distance fixed at a tiny value made the depth buffer run out of precision far
+    // away (at true scale the camera can be ~59,000 units out), so distant orbit lines and
+    // bodies failed the depth test and weren't drawn.
+    private double NearestSurfaceDistance()
+    {
+        Vector3 at = Camera!.GlobalPosition;
+        var camera = new Vector3D(at.X, at.Y, at.Z) + Origin;
+        double nearest = double.MaxValue;
+        foreach (DisplayBody place in _layout.Values)
+        {
+            nearest = Math.Min(nearest, (place.Position - camera).Length - place.Radius);
+        }
+
+        return nearest;
     }
 
     private BodyVisual CreateVisual(Body body)

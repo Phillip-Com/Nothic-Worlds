@@ -110,6 +110,50 @@ public class SystemLayoutTests
         Assert.Equal(-radius, path[2].X, 1e-6);   // Half
     }
 
+    [Theory]
+    [InlineData(SystemScale.True)]
+    [InlineData(SystemScale.Readable)]
+    public void OrbitPath_StaysSmooth_OnAVeryElongatedOrbit(SystemScale scale)
+    {
+        World world = World.CreateNew();
+        Body planet = world.Bodies[0];
+        planet.Orbit = planet.Orbit! with { Eccentricity = 0.95, ClosestApproachDegrees = 30 };
+
+        IReadOnlyList<Vector3D> path =
+            SystemLayout.OrbitPath(planet, world.Bodies[1], scale, samples: 256);
+
+        // No step around the path turns more than a few degrees as seen from the parent, even
+        // at the closest approach where the body moves fastest.
+        for (int i = 0; i < path.Count; i++)
+        {
+            Vector3D a = path[i];
+            Vector3D b = path[(i + 1) % path.Count];
+            double turn = double.RadiansToDegrees(
+                Math.Acos(Math.Clamp(a.Dot(b) / (a.Length * b.Length), -1, 1)));
+            Assert.True(turn < 15, $"step {i} turns {turn:0.0}°");
+        }
+    }
+
+    [Fact]
+    public void OrbitPath_PointsLieOnTheBodysActualPath()
+    {
+        World world = World.CreateNew();
+        Body planet = world.Bodies[0];
+        planet.Orbit = planet.Orbit! with { Eccentricity = 0.9, StartAngleDegrees = 70 };
+
+        IReadOnlyList<double> times = OrbitMath.EvenlySpacedTimes(planet.Orbit, 64);
+        IReadOnlyList<Vector3D> path =
+            SystemLayout.OrbitPath(planet, world.Bodies[1], SystemScale.True, samples: 64);
+
+        Assert.Equal(0, times[0], 1e-9);  // Starts where the body is at time 0
+        for (int i = 0; i < 64; i++)
+        {
+            Vector3D actual = OrbitMath.OffsetFromParent(planet.Orbit, times[i]) * (1 / 6371.0);
+            Assert.Equal(actual.X, path[i].X, 1e-6);
+            Assert.Equal(actual.Z, path[i].Z, 1e-6);
+        }
+    }
+
     [Fact]
     public void OrbitPath_OfABodyWithoutAnOrbit_IsEmpty()
     {

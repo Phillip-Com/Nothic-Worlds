@@ -10,7 +10,7 @@ public sealed class Body
     public string Name { get; set; } = "Planet";
 
     /// <summary>What kind of body this is.</summary>
-    public BodyKind Kind { get; init; } = BodyKind.Planet;
+    public BodyKind Kind { get; set; } = BodyKind.Planet;
 
     /// <summary>The largest allowed radius, in km (far beyond the biggest known stars).</summary>
     public const double MaxRadiusKm = 1e10;
@@ -61,6 +61,19 @@ public sealed class Body
         return double.IsFinite(AxialTiltDegrees) && AxialTiltDegrees is >= 0 and <= 180
             ? Orbit?.Problem()
             : "a body's axial tilt must be 0° to 180°";
+    }
+
+    /// <summary>
+    /// True if <paramref name="other"/> would save exactly the same body: the same name, kind,
+    /// size, day, tilt, orbit, and surface. Used to tell whether the world still matches its
+    /// saved file.
+    /// </summary>
+    public bool HasSameContent(Body other)
+    {
+        return Id == other.Id && Name == other.Name && Kind == other.Kind
+            && RadiusKm == other.RadiusKm && DayLengthHours == other.DayLengthHours
+            && AxialTiltDegrees == other.AxialTiltDegrees && Orbit == other.Orbit
+            && Surface.HasSameContent(other.Surface);
     }
 
     /// <summary>Returns an independent copy of this body.</summary>

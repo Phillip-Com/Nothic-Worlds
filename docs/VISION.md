@@ -91,7 +91,10 @@ on it. Owner's decisions:
   elongation and tilt. Periods are set freely, not derived from physics.
 - **Time display** until calendars exist: "Day N, hh:mm" in the selected planet's own days.
 - **Three PRs:** Core (PR #16), then the app's system view and time controls (PR #17), then
-  editing (add/remove bodies, system tree, body properties).
+  editing (add/remove bodies, system tree, body properties) (PR #18).
+- **Editing (owner, 2026-09-30):** deleting a body also deletes everything orbiting it (Ctrl+Z
+  brings it all back). The system tree and properties live in a **left panel**, opened by a
+  **System…** toolbar button.
 
 ---
 
@@ -130,6 +133,10 @@ Each entry uses this format:
   when you're close to it, so it doesn't cut through the globe.
 - **Floating origin:** positions are worked out in full precision. The scene is drawn around
   the focused body, so true-scale systems millions of units across stay precise near the camera.
+- **Near clipping follows the nearest surface (bug fix, PR #18):** the camera's near plane is 2%
+  of the distance to the closest body's surface (never under 0.001 of the focused body's radius).
+  It used to be fixed at that tiny minimum. Zoomed far out at true scale (about 59,000 units),
+  the depth buffer then lacked the precision to draw distant things, and orbit lines vanished.
 - Benchmark (8k map, fullscreen, back to back with `main`): ~154 → ~147 fps, video memory
   144 → 151 MB, for the added sun, its light, and orbit lines.
 
@@ -221,18 +228,60 @@ as realistic or simple.
 ### 4.2 Interface Layout (`UI`)
 
 **UI-01 — Main screen layout** · Idea · Base
+**Keyboard and number fields (owner's request, PR #18):** while a text or number field is being
+edited, the camera ignores WASD and the arrow keys. In number fields, Up/Down change the value
+by one step (ten with Shift; `godot/UI/NumberFields.cs`). Clicking the view (not a panel)
+finishes editing, so the keys move the camera again.
 **Intent:** The main view shows the world or map in the center. Panels along the sides of the
 screen hold tools, journals, and similar content.
 **Notes:** Views that need a lot of space, like large diagrams, may need their own tab or page
 (see `LORE-04`).
 **Implementation:** —
 
-**UI-02 — System tree panel** · Deferred · Base
+**UI-02 — System tree panel** · Implemented (PR #18) · Base
 **Intent:** A compact tree view of the star system's hierarchy (e.g. Sun ▸ Planet ▸ Moon) showing
 which bodies orbit which. It likely lives in a side panel and doubles as a way to select bodies for
 editing. This is separate from lore relationships (`LORE-04`).
-**Notes:** Tabled. Revisit when multiple bodies are introduced.
-**Implementation:** —
+**Notes:** Was tabled until multiple bodies existed (M4).
+**Implementation (PR #18):** `godot/UI/SystemPanel.cs`, opened by **System…** in the toolbar,
+on the left (owner's choice).
+- **Tree:** built from `SystemHierarchy.ChildrenOf`, starting from bodies without an orbit. Picking
+  a body selects it and flies there. The tree is rebuilt only when names, kinds, or parents change.
+- **Add Planet / Add Moon / Add Star / Delete.** Starting values come from Core's
+  `Simulation/NewBodies.cs` (tested): Earth-, Moon-, and Sun-like sizes. Each new orbit goes 1.6×
+  farther out than the widest around the same parent, siblings are spread by the golden angle,
+  and starting periods grow as real ones do (period² ∝ distance³). Delete removes the body and
+  everything orbiting it (`SystemHierarchy.DescendantsOf`), with no confirmation because Ctrl+Z
+  restores it. The last body can't be deleted.
+- **Properties:** name, kind (planet ↔ moon; stars stay stars), radius, day length, axial tilt,
+  and the orbit. The orbit fields are the parent (only bodies that wouldn't make a loop), the
+  distance in km or AU, the period, and the start angle. A switch shows the extras: elongation,
+  closest point, tilt, and tilt direction. Values that aren't allowed are refused with the
+  reason, and the fields go back to the real values.
+- **Path and live updates while editing (owner's request):** while the panel is open, the
+  selected body's path is always drawn, even close up, in the selection yellow
+  (`SystemView.HighlightedOrbit`). Number fields apply as you type (`SpinBox.UpdateOnTextChanged`,
+  via `NumberFields.WithLiveTyping`), so the path, position, and size update on every keystroke.
+  Updates from the world never overwrite a field being typed in (`ShowValue`), and half-typed
+  numbers don't flash error messages. Rapid typing merges into one undo step. Same for the
+  Pieces panel's fields.
+- **Full-circle angles wrap (owner's request):** start angle, closest point, and tilt direction
+  (0–360°), and a piece's rotation (0–360°) and longitude (−180–180°), wrap around when stepped or
+  typed past their ends: 359 + 1 is 0, and 0 − 1 is 359 (`NumberFields.WithWrapAround`). Angles
+  with real limits (axial and orbit tilt 0–180°, latitude ±90°) stop at their limits.
+- **Smooth paths at high elongation (bug fix):** orbit lines used to be sampled at even time
+  steps, so a very elongated orbit had only a few points where the body rushes past its parent,
+  drawn as a sharp-cornered path the body didn't follow. Points are now spread evenly along the
+  curve (`OrbitMath.EvenlySpacedTimes`, steps in eccentric anomaly), and each one is still exactly
+  where the body is at that moment. The test that reproduces the bug failed before the fix, with
+  steps turning over 16°.
+- **Make Center (owner's request and decision, 2026-09-30: "swap places, keep motion"):** the
+  selected body becomes the center of its system. `SystemHierarchy.MakeCenter` flips the chain
+  between it and the old center: each body it orbited now circles the one below it on the same
+  path, mirrored (start and closest-approach directions +180°, everything else unchanged).
+  Other orbits stay as they were. A test proves every body keeps the same position relative to
+  the others at any time, even with elongated, tilted orbits. Make a planet the center and the
+  sun circles it once a year; the time bar's "1 year" then follows the sun's trip.
 
 **UI-03 — Undo and redo** · Implemented (PR #14) · Base
 **Intent (owner, 2026-09-30):** undo and redo for edits, "sooner rather than later", so mistakes
@@ -599,7 +648,7 @@ place).
 
 ### 4.4 Celestial Bodies (`BOD`)
 
-**BOD-01 — Suns, planets, and moons** · In Progress (Core and system view done, PR #17) · Base
+**BOD-01 — Suns, planets, and moons** · Implemented (M4) · Base
 **Intent:** A system can have multiple suns and moons, plus planets.
 **Implementation (Core, PR #16):**
 - `Body` gains `Kind` (star, planet, moon), `RadiusKm`, `DayLengthHours`, `AxialTiltDegrees`,
@@ -622,6 +671,21 @@ place).
   body swaps the two.
 - **Undo across bodies:** each step remembers its body (`SurfaceSnapshot`). Undoing selects that
   body, so the change is visible. "Matches the saved file" compares every body.
+**Implementation (editing, PR #18):** bodies are added, deleted, and edited in the System panel
+(`UI-02`). `WorldSession` has `AddBodyAsync`, `RemoveBodyAsync`, `RenameBody`, `SetBodyKind`,
+`SetBodyPhysical`, `SetOrbit`, and `PossibleParents`.
+- **Undo snapshots** now copy every body (`EditSnapshot`), so adding, deleting, and editing
+  bodies are undoable like everything else. Undo selects the body that was being edited.
+  `Body.HasSameContent` makes "matches the saved file" cover body properties and orbits too.
+- **Maps** are handled in one place (`ShowMapsAsync`): it makes every globe show the right image
+  (full size for the selected body, previews for the others, loaded in the background). It runs
+  after every change, so adds, deletes, undo, and selection all keep the maps right.
+- `SystemView.Sync` updates the scene in place: it creates, removes, or rebuilds only the changed
+  bodies, so loaded maps aren't reloaded.
+- **Verified in the running app** (real panel buttons): added a moon, a planet, and a companion
+  star; edited a radius; moved a moon to another planet; deleted a planet with what orbits it,
+  then undid it; undid and redid the whole session (back to "saved" at the start); and save →
+  reopen kept the system. Benchmark: same as `main` back to back (~141 fps).
 
 **BOD-02 — Non-standard bodies** · Idea · Base
 **Intent:** Support bodies that aren't spheres, such as flat worlds and world trees.
@@ -651,7 +715,7 @@ architecture implications. This needs a design review before any related data fo
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
-**SIM-01 — Designed ("on-rails") orbits** · In Progress (Core done, PR #16) · Base
+**SIM-01 — Designed ("on-rails") orbits** · Implemented (M4; edited in the System panel) · Base
 **Intent:** The default. Bodies follow the paths the user sets, and they stay stable forever.
 **Implementation (Core, PR #16):**
 - `Model/Orbit.cs` is an **immutable** record: parent, distance, period, start angle, plus
@@ -662,7 +726,7 @@ architecture implications. This needs a design review before any related data fo
   full-precision `Geometry/Vector3D` (km across a whole system).
 - The exact math is in docs/world-format.md, so any viewer can reproduce positions.
 
-**SIM-02 — Time simulation** · In Progress (Core and time bar done, PR #17) · Base
+**SIM-02 — Time simulation** · Implemented (M4) · Base
 **Intent:** A world clock that advances the system. It lets the user track dates and the positions
 of suns and moons at any point in time.
 **Implementation (Core, PR #16):** `World.TimeDays` is the clock (standard days, saved with the
@@ -672,6 +736,12 @@ world). `Simulation/BodyClock.cs` gives each body's spin angle and its local "Da
 Play/Pause, speed (1 hour to 1 year per second), the selected body's date, **Go to…** a day and
 hour, and the **True scale** switch. `WorldSession.SetTime` moves the clock. Like the camera, the
 clock is saved but isn't an unsaved change.
+**Steps and gliding (owner's request, PR #18):** **−** / **+** step the clock by a chosen amount:
+1 hour, 1 day, 1 week, 30 days, or 1 year. Steps are measured on the selected body: days in its
+own day length, and a year is one trip around its star, or its planet's trip for a moon
+(`BodyClock.YearDays`, tested). Steps and **Go to…** **glide**: the clock runs to the new time
+over 0.8 s with a smooth start and stop, so bodies sweep along their real orbits instead of
+popping into place. Clicking again mid-glide adds to where it's heading. Stepping pauses Play.
 
 **SIM-03 — Physics mode (toggle)** · Idea · Advanced (probably)
 **Intent:** An optional toggle that simulates the system with real-world physics, so the user can
