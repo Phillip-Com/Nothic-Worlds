@@ -140,6 +140,67 @@ public class SystemTests
         Assert.Equal(degrees, BodyClock.SpinDegrees(body, timeDays), 1e-9);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(12.3)]
+    [InlineData(400)]
+    public void MakeCenter_KeepsEveryBodyInTheSamePlaceRelativeToTheOthers(double time)
+    {
+        List<Body> bodies = SunPlanetMoon();
+        // Elongated and tilted, so the flip is checked for every kind of orbit.
+        bodies[1].Orbit = bodies[1].Orbit! with
+        {
+            Eccentricity = 0.3,
+            ClosestApproachDegrees = 40,
+            TiltDegrees = 12,
+            TiltDirectionDegrees = 70,
+            StartAngleDegrees = 200,
+        };
+        Dictionary<Guid, Vector3D> before = SystemPositions.At(bodies, time);
+
+        foreach ((Guid id, Orbit? orbit) in SystemHierarchy.MakeCenter(bodies, _moonId))
+        {
+            bodies.First(b => b.Id == id).Orbit = orbit;
+        }
+
+        Dictionary<Guid, Vector3D> after = SystemPositions.At(bodies, time);
+        Assert.Null(SystemHierarchy.Problem(bodies));
+        Assert.Equal(Vector3D.Zero, after[_moonId]);
+        foreach (Body body in bodies)
+        {
+            Vector3D expected = before[body.Id] - before[_moonId];
+            Assert.Equal(expected.X, after[body.Id].X, 1e-3);
+            Assert.Equal(expected.Y, after[body.Id].Y, 1e-3);
+            Assert.Equal(expected.Z, after[body.Id].Z, 1e-3);
+        }
+    }
+
+    [Fact]
+    public void MakeCenter_FlipsTheChain_AndLeavesOtherOrbitsAlone()
+    {
+        List<Body> bodies = SunPlanetMoon();
+        var outer = new Body
+        {
+            Name = "Outer",
+            Orbit = new Orbit { ParentId = _sunId, DistanceKm = 5e8, PeriodDays = 4000 },
+        };
+        bodies.Add(outer);
+
+        Dictionary<Guid, Orbit?> changes = SystemHierarchy.MakeCenter(bodies, _planetId);
+
+        Assert.Null(changes[_planetId]);
+        Assert.Equal(_planetId, changes[_sunId]!.ParentId);  // The sun now circles the planet
+        Assert.Equal(365, changes[_sunId]!.PeriodDays);       // ...once a year
+        Assert.False(changes.ContainsKey(_moonId));           // The moon still orbits the planet
+        Assert.False(changes.ContainsKey(outer.Id));          // The outer planet: still the sun
+    }
+
+    [Fact]
+    public void MakeCenter_OfTheCenter_ChangesNothing()
+    {
+        Assert.Empty(SystemHierarchy.MakeCenter(SunPlanetMoon(), _sunId));
+    }
+
     [Fact]
     public void Year_IsThePlanetsTripAroundItsStar_EvenForAMoon()
     {
@@ -147,6 +208,20 @@ public class SystemTests
 
         Assert.Equal(365, BodyClock.YearDays(bodies, bodies[1]));  // The planet
         Assert.Equal(365, BodyClock.YearDays(bodies, bodies[2]));  // Its moon
+    }
+
+    [Fact]
+    public void Year_InAPlanetCenteredSystem_IsTheStarsTripAroundThePlanet()
+    {
+        List<Body> bodies = SunPlanetMoon();
+        bodies[1].Orbit = bodies[1].Orbit! with { PeriodDays = 500 };
+        foreach ((Guid id, Orbit? orbit) in SystemHierarchy.MakeCenter(bodies, _planetId))
+        {
+            bodies.First(b => b.Id == id).Orbit = orbit;
+        }
+
+        Assert.Equal(500, BodyClock.YearDays(bodies, bodies[1]));  // The planet, now central
+        Assert.Equal(500, BodyClock.YearDays(bodies, bodies[2]));  // Its moon
     }
 
     [Fact]

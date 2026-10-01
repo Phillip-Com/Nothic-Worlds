@@ -22,15 +22,26 @@ public static class BodyClock
 
     /// <summary>
     /// How long a year is for a body, in standard days: one trip of the body (or, for a moon,
-    /// its planet) around its star. Falls back to 365.25 days for a body with no star above it.
+    /// its planet) around its star. In a planet-centered system, where the star circles the
+    /// planet instead, it's the star's trip. Falls back to 365.25 days with no star in either
+    /// place.
     /// </summary>
     public static double YearDays(IReadOnlyList<Body> bodies, Body body)
     {
         var byId = bodies.ToDictionary(b => b.Id);
         var seen = new HashSet<Guid>();
-        for (Body current = body; current.Orbit is Orbit orbit && seen.Add(current.Id);)
+        for (Body current = body; seen.Add(current.Id);)
         {
-            if (!byId.TryGetValue(orbit.ParentId, out Body? parent))
+            // A star circling this body (or its planet) sets the year from the other side.
+            Body? circlingStar = bodies.FirstOrDefault(b =>
+                b.Kind == BodyKind.Star && b.Orbit?.ParentId == current.Id);
+            if (circlingStar is not null)
+            {
+                return circlingStar.Orbit!.PeriodDays;
+            }
+
+            if (current.Orbit is not Orbit orbit
+                || !byId.TryGetValue(orbit.ParentId, out Body? parent))
             {
                 break;
             }
