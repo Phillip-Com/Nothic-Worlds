@@ -261,6 +261,16 @@ on the left (owner's choice).
   Updates from the world never overwrite a field being typed in (`ShowValue`), and half-typed
   numbers don't flash error messages. Rapid typing merges into one undo step. Same for the
   Pieces panel's fields.
+- **Full-circle angles wrap (owner's request):** start angle, closest point, and tilt direction
+  (0–360°), and a piece's rotation (0–360°) and longitude (−180–180°), wrap around when stepped or
+  typed past their ends: 359 + 1 is 0, and 0 − 1 is 359 (`NumberFields.WithWrapAround`). Angles
+  with real limits (axial and orbit tilt 0–180°, latitude ±90°) stop at their limits.
+- **Smooth paths at high elongation (bug fix):** orbit lines used to be sampled at even time
+  steps, so a very elongated orbit had only a few points where the body rushes past its parent,
+  drawn as a sharp-cornered path the body didn't follow. Points are now spread evenly along the
+  curve (`OrbitMath.EvenlySpacedTimes`, steps in eccentric anomaly), and each one is still exactly
+  where the body is at that moment. The test that reproduces the bug failed before the fix, with
+  steps turning over 16°.
 - **Make Center (owner's request and decision, 2026-09-30: "swap places, keep motion"):** the
   selected body becomes the center of its system. `SystemHierarchy.MakeCenter` flips the chain
   between it and the old center: each body it orbited now circles the one below it on the same
