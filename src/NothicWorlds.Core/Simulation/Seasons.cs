@@ -134,7 +134,13 @@ public static class Seasons
             return null;
         }
 
-        Season northern = recent[^1].Kind switch
+        return SeasonsAfter(recent[^1].Kind);
+    }
+
+    /// <summary>The season each hemisphere enters at a solstice or equinox.</summary>
+    public static (Season Northern, Season Southern) SeasonsAfter(SeasonEventKind kind)
+    {
+        Season northern = kind switch
         {
             SeasonEventKind.NorthernSpringEquinox => Season.Spring,
             SeasonEventKind.NorthernSummerSolstice => Season.Summer,
