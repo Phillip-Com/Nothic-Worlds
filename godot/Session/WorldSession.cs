@@ -478,6 +478,36 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
+    /// Makes a body the center of its system (owner decision: "swap places, keep motion"): it
+    /// stops orbiting, and the bodies it orbited flip to circle it on the same paths, so every
+    /// body stays in the same place relative to the others.
+    /// </summary>
+    /// <returns>True if anything changed (false if the body was already the center).</returns>
+    public bool MakeCenter(Guid bodyId)
+    {
+        if (FindBody(bodyId) is not Body body)
+        {
+            return false;
+        }
+
+        Dictionary<Guid, Orbit?> changes = SystemHierarchy.MakeCenter(World.Bodies, bodyId);
+        if (changes.Count == 0)
+        {
+            return false;
+        }
+
+        RecordUndo($"Make {body.Name} the Center");
+        foreach ((Guid id, Orbit? orbit) in changes)
+        {
+            FindBody(id)!.Orbit = orbit;
+        }
+
+        SyncView();
+        MarkChanged();
+        return true;
+    }
+
+    /// <summary>
     /// The bodies a body could orbit: every other body except those orbiting it (which would
     /// make a loop).
     /// </summary>

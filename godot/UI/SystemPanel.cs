@@ -28,6 +28,7 @@ public partial class SystemPanel : CanvasLayer
     private Tree _tree = null!;
     private Button _addMoonButton = null!;
     private Button _deleteButton = null!;
+    private Button _centerButton = null!;
     private LineEdit _name = null!;
     private OptionButton _kind = null!;
     private Label _kindLabel = null!;
@@ -138,6 +139,11 @@ public partial class SystemPanel : CanvasLayer
         _deleteButton = CreateButton("Delete", () => _ = DeleteAsync(),
             "Delete the selected body and everything orbiting it (Ctrl+Z brings them back)");
         buttons.AddChild(_deleteButton);
+        _centerButton = CreateButton("Make Center", MakeCenter,
+            "Put the selected body at the center of its system. The bodies it orbited circle " +
+            "it instead, on the same paths, so everything stays in the same place relative " +
+            "to everything else (e.g. a planet-centered system, with the sun going around it)");
+        buttons.AddChild(_centerButton);
         return buttons;
     }
 
@@ -260,6 +266,7 @@ public partial class SystemPanel : CanvasLayer
         _addMoonButton.Disabled = selected.Kind == BodyKind.Star;
         _deleteButton.Disabled = SystemHierarchy.DescendantsOf(bodies, selected.Id).Count + 1
             >= bodies.Count;
+        _centerButton.Disabled = selected.Orbit is null;
         ShowSelected();
     }
 
@@ -479,6 +486,15 @@ public partial class SystemPanel : CanvasLayer
             (int)(aroundStar ? DistanceUnit.AstronomicalUnits : DistanceUnit.Kilometers)));
         ShowSelected();
         Toolbar?.ShowInfo($"Added {body.Name}. Set its size, day, and orbit here.");
+    }
+
+    private void MakeCenter()
+    {
+        if (Session is not null && Session.MakeCenter(Session.SelectedBodyId))
+        {
+            Toolbar?.ShowInfo($"{Session.SelectedBody.Name} is now the center of its system " +
+                "(Ctrl+Z to undo).");
+        }
     }
 
     // No confirmation: deleting can be undone (owner decision).
