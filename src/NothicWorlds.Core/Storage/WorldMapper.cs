@@ -20,6 +20,7 @@ internal static class WorldMapper
             Name = world.Name,
             CreatedUtc = world.CreatedUtc,
             ModifiedUtc = world.ModifiedUtc,
+            TimeDays = world.TimeDays,
             Bodies = world.Bodies.Select(ToDocument).ToList(),
             View = world.View is null ? null : ToDocument(world.View),
         };
@@ -28,7 +29,9 @@ internal static class WorldMapper
     /// <exception cref="WorldFileException">The document has missing or invalid data.</exception>
     public static World ToWorld(WorldDocument document)
     {
-        Require(document.Bodies is { Count: > 0 }, "it has no planet");
+        Require(document.Bodies is { Count: > 0 }, "it has no bodies");
+        Require(document.TimeDays is null || double.IsFinite(document.TimeDays.Value),
+            "its clock isn't a number");
 
         var world = new World
         {
@@ -37,8 +40,10 @@ internal static class WorldMapper
             CreatedUtc = document.CreatedUtc,
             ModifiedUtc = document.ModifiedUtc,
             View = document.View is null ? null : ToView(document.View),
+            TimeDays = document.TimeDays ?? 0,
         };
         world.Bodies.AddRange(document.Bodies.Select(ToBody));
+        RequireNoProblem(Simulation.SystemHierarchy.Problem(world.Bodies));
         return world;
     }
 
@@ -50,6 +55,10 @@ internal static class WorldMapper
             Id = body.Id,
             Name = body.Name,
             Kind = WorldFormat.BodyKindName(body.Kind),
+            RadiusKm = body.RadiusKm,
+            DayLengthHours = body.DayLengthHours,
+            AxialTilt = body.AxialTiltDegrees,
+            Orbit = body.Orbit is Orbit orbit ? ToDocument(orbit) : null,
             Surface = new SurfaceDocument
             {
                 Map = map is null ? null : new MapDocument
@@ -143,6 +152,39 @@ internal static class WorldMapper
         return warp;
     }
 
+    private static OrbitDocument ToDocument(Orbit orbit)
+    {
+        return new OrbitDocument
+        {
+            Parent = orbit.ParentId,
+            DistanceKm = orbit.DistanceKm,
+            PeriodDays = orbit.PeriodDays,
+            StartAngle = orbit.StartAngleDegrees,
+            Eccentricity = NullIfZero(orbit.Eccentricity),
+            ClosestApproach = NullIfZero(orbit.ClosestApproachDegrees),
+            Tilt = NullIfZero(orbit.TiltDegrees),
+            TiltDirection = NullIfZero(orbit.TiltDirectionDegrees),
+        };
+    }
+
+    private static Orbit ToOrbit(OrbitDocument document)
+    {
+        return new Orbit
+        {
+            ParentId = document.Parent,
+            DistanceKm = document.DistanceKm,
+            PeriodDays = document.PeriodDays,
+            StartAngleDegrees = document.StartAngle,
+            Eccentricity = document.Eccentricity ?? 0,
+            ClosestApproachDegrees = document.ClosestApproach ?? 0,
+            TiltDegrees = document.Tilt ?? 0,
+            TiltDirectionDegrees = document.TiltDirection ?? 0,
+        };
+    }
+
+    // The optional orbit extras are left out of the file when they're 0 (a flat circle).
+    private static double? NullIfZero(double value) => value == 0 ? null : value;
+
     private static CalibrationDocument ToDocument(MapCalibration calibration)
     {
         return new CalibrationDocument
@@ -188,7 +230,12 @@ internal static class WorldMapper
             Id = document.Id,
             Name = RequireText(document.Name, "planet name"),
             Kind = WorldFormat.ParseBodyKind(document.Kind),
+            RadiusKm = document.RadiusKm,
+            DayLengthHours = document.DayLengthHours,
+            AxialTiltDegrees = document.AxialTilt,
+            Orbit = document.Orbit is OrbitDocument orbit ? ToOrbit(orbit) : null,
         };
+        RequireNoProblem(body.Problem());
         body.Surface.FillColor = fillColor;
         if (document.Surface.Pieces is List<PieceDocument> pieces)
         {
@@ -246,6 +293,14 @@ internal static class WorldMapper
     {
         Require(!string.IsNullOrWhiteSpace(text), $"the {what} is missing");
         return text!;
+    }
+
+    private static void RequireNoProblem(string? problem)
+    {
+        if (problem is not null)
+        {
+            Require(false, problem);
+        }
     }
 
     private static void Require(bool condition, string problem)
