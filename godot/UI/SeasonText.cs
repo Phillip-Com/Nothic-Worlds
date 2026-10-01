@@ -9,7 +9,9 @@ namespace NothicWorlds.UI;
 /// </summary>
 public static class SeasonText
 {
-    /// <summary>An event's name, from the north's point of view: "Northern summer solstice".</summary>
+    /// <summary>
+    /// An event's name, from the north's point of view: "Northern summer solstice".
+    /// </summary>
     public static string Name(SeasonEventKind kind)
     {
         return kind switch

@@ -63,25 +63,38 @@ public partial class TimeControls : CanvasLayer
 
     public override void _Ready()
     {
-        var panel = new PanelContainer();
-        panel.SetAnchorsAndOffsetsPreset(
+        // The date and seasons sit in their own panel above the buttons, so long calendar
+        // dates never widen the button row into the camera text at the bottom-left.
+        var stack = new VBoxContainer();
+        stack.SetAnchorsAndOffsetsPreset(
             Control.LayoutPreset.BottomRight, Control.LayoutPresetMode.Minsize, ScreenMargin);
-        panel.GrowHorizontal = Control.GrowDirection.Begin;
-        panel.GrowVertical = Control.GrowDirection.Begin;
-        AddChild(panel);
+        stack.GrowHorizontal = Control.GrowDirection.Begin;
+        stack.GrowVertical = Control.GrowDirection.Begin;
+        AddChild(stack);
 
-        var rows = new VBoxContainer();
-        panel.AddChild(rows);
-        var row = new HBoxContainer();
-        rows.AddChild(row);
+        var info = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd };
+        stack.AddChild(info);
+        var infoRows = new VBoxContainer();
+        info.AddChild(infoRows);
+        _time = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Right,
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            TooltipText = "The date on the selected body, counted in its own days (in its " +
+                "calendar, if it has one)",
+        };
+        infoRows.AddChild(_time);
         _seasons = new Label
         {
             HorizontalAlignment = HorizontalAlignment.Right,
             MouseFilter = Control.MouseFilterEnum.Pass,
-            TooltipText = "The selected body's seasons in each hemisphere, from where its " +
-                "star stands, and its next solstice or equinox",
         };
-        rows.AddChild(_seasons);
+        infoRows.AddChild(_seasons);
+
+        var panel = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd };
+        stack.AddChild(panel);
+        var row = new HBoxContainer();
+        panel.AddChild(row);
 
         _playButton = CreateButton(
             "Play", TogglePlaying, "Run the world clock: every body moves and spins");
@@ -111,11 +124,6 @@ public partial class TimeControls : CanvasLayer
         row.AddChild(_step);
         row.AddChild(CreateButton("+", () => Step(+1),
             "Step the clock forward (the bodies glide into place)"));
-
-        _time = new Label { CustomMinimumSize = new Vector2(220, 0) };
-        _time.TooltipText = "The date on the selected body, counted in its own days (in its " +
-            "calendar, if it has one)";
-        row.AddChild(_time);
 
         row.AddChild(CreateButton("Go to…", AskForDate, "Jump to a date and hour"));
 
@@ -248,9 +256,12 @@ public partial class TimeControls : CanvasLayer
         SeasonTimeline seasons = Session.SelectedSeasons;
         if (seasons.SeasonAt(now) is { } current && seasons.NextEvent(now) is SeasonEvent next)
         {
-            _seasons.Text = $"{SeasonText.Current(current)}  ·  Next: " +
-                $"{SeasonText.Name(next.Kind)}, {BodyClock.Describe(body, next.TimeDays)} " +
-                $"({SeasonText.HowFar(body, now, next.TimeDays)})";
+            _seasons.Text = $"{SeasonText.Current(current)}  ·  " +
+                $"{SeasonText.Name(next.Kind)} {SeasonText.HowFar(body, now, next.TimeDays)}";
+            _seasons.TooltipText = $"The seasons in each hemisphere, from where the star " +
+                $"stands.\nNext: {SeasonText.Name(next.Kind)}, " +
+                $"{BodyClock.Describe(body, next.TimeDays)} " +
+                $"({SeasonText.SouthernNote(next.Kind)}).";
             _seasons.Visible = true;
         }
         else
