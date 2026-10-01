@@ -140,6 +140,25 @@ public class SystemTests
         Assert.Equal(degrees, BodyClock.SpinDegrees(body, timeDays), 1e-9);
     }
 
+    [Fact]
+    public void Year_IsThePlanetsTripAroundItsStar_EvenForAMoon()
+    {
+        List<Body> bodies = SunPlanetMoon();
+
+        Assert.Equal(365, BodyClock.YearDays(bodies, bodies[1]));  // The planet
+        Assert.Equal(365, BodyClock.YearDays(bodies, bodies[2]));  // Its moon
+    }
+
+    [Fact]
+    public void Year_WithoutAStar_IsAnEarthYear()
+    {
+        List<Body> bodies = SunPlanetMoon();
+
+        Assert.Equal(365.25, BodyClock.YearDays(bodies, bodies[0]));  // The sun itself
+        var lonePlanet = new Body();
+        Assert.Equal(365.25, BodyClock.YearDays([lonePlanet], lonePlanet));
+    }
+
     [Theory]
     [InlineData(0, 24, 0)]
     [InlineData(6371, 0, 0)]

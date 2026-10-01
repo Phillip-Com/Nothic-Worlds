@@ -21,6 +21,32 @@ public static class BodyClock
     }
 
     /// <summary>
+    /// How long a year is for a body, in standard days: one trip of the body (or, for a moon,
+    /// its planet) around its star. Falls back to 365.25 days for a body with no star above it.
+    /// </summary>
+    public static double YearDays(IReadOnlyList<Body> bodies, Body body)
+    {
+        var byId = bodies.ToDictionary(b => b.Id);
+        var seen = new HashSet<Guid>();
+        for (Body current = body; current.Orbit is Orbit orbit && seen.Add(current.Id);)
+        {
+            if (!byId.TryGetValue(orbit.ParentId, out Body? parent))
+            {
+                break;
+            }
+
+            if (parent.Kind == BodyKind.Star)
+            {
+                return orbit.PeriodDays;
+            }
+
+            current = parent;
+        }
+
+        return 365.25;
+    }
+
+    /// <summary>
     /// The day and time of day on the body at <paramref name="timeDays"/>. Time 0 is the start
     /// of day 1. Hours are standard hours since the body's day began, so a 30-hour day runs
     /// from 0:00 to 29:59.
