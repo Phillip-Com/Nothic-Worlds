@@ -1,20 +1,28 @@
 using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Maps;
 using NothicWorlds.Core.Model;
+using NothicWorlds.Core.Simulation;
 
 namespace NothicWorlds.Core.Tests.Model;
 
 public class WorldTests
 {
     [Fact]
-    public void CreateNew_HasOneUnmappedPlanet()
+    public void CreateNew_IsAnUnmappedPlanetCirclingASun()
     {
         World world = World.CreateNew("Test");
 
-        Body planet = Assert.Single(world.Bodies);
+        Assert.Equal(2, world.Bodies.Count);
+        Body planet = world.Bodies[0];
+        Body sun = world.Bodies[1];
         Assert.Equal(BodyKind.Planet, planet.Kind);
+        Assert.Equal(BodyKind.Star, sun.Kind);
         Assert.Null(planet.Surface.Map);
         Assert.Equal(SurfaceSettings.DefaultFillColor, planet.Surface.FillColor);
+        Assert.Equal(sun.Id, planet.Orbit!.ParentId);
+        Assert.Null(sun.Orbit);
+        Assert.Null(SystemHierarchy.Problem(world.Bodies));
+        Assert.All(world.Bodies, body => Assert.Null(body.Problem()));
     }
 
     [Fact]
@@ -49,7 +57,7 @@ public class WorldTests
         Assert.NotEqual("Changed", copy.Name);
         Assert.Equal(MapProjection.Robinson, copy.Bodies[0].Surface.Map!.Projection);
         Assert.Equal(new RgbColor(9, 8, 7), copy.Bodies[0].Surface.FillColor);
-        Assert.Single(copy.Bodies);
+        Assert.Equal(original.Bodies.Count - 1, copy.Bodies.Count);
     }
 
     [Fact]

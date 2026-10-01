@@ -57,11 +57,33 @@ public sealed class World
         return copy;
     }
 
-    /// <summary>Creates a new world with a single, unmapped planet.</summary>
+    /// <summary>
+    /// Creates a new world: a Sun-like star with one unmapped, Earth-like planet circling it once
+    /// a year (VISION.md BOD-01). The planet comes first, as the body most users start with.
+    /// </summary>
     public static World CreateNew(string name = "Untitled World")
     {
         var world = new World { Name = name };
-        world.Bodies.Add(new Body { Name = "Planet", Kind = BodyKind.Planet });
+        var sun = new Body
+        {
+            Name = "Sun",
+            Kind = BodyKind.Star,
+            RadiusKm = 696_000,
+            DayLengthHours = 609.6,
+        };
+        world.Bodies.Add(new Body
+        {
+            Name = "Planet",
+            Kind = BodyKind.Planet,
+            AxialTiltDegrees = 23.4,
+            Orbit = new Orbit
+            {
+                ParentId = sun.Id,
+                DistanceKm = 149_600_000,
+                PeriodDays = 365.25,
+            },
+        });
+        world.Bodies.Add(sun);
         return world;
     }
 }

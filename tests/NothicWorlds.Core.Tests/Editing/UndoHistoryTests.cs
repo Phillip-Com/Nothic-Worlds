@@ -149,6 +149,20 @@ public class UndoHistoryTests
     }
 
     [Fact]
+    public void Undo_CanKeepACurrentStateThatDependsOnTheStep()
+    {
+        // As in the app: each step belongs to one planet, and redo must keep that same
+        // planet's current state.
+        var history = new UndoHistory<(string Planet, int Value)>();
+        history.Record("Edit B", ("B", 1));
+
+        (string planet, int value) = history.Undo(step => (step.Planet, 99));
+
+        Assert.Equal(("B", 1), (planet, value));
+        Assert.Equal(("B", 99), history.Redo(step => (step.Planet, 1)));
+    }
+
+    [Fact]
     public void UndoWithNothingToUndo_Throws()
     {
         Assert.Throws<InvalidOperationException>(() => new UndoHistory<int>().Undo(0));
