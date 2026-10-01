@@ -18,9 +18,20 @@ public partial class PlanetSurface : MeshInstance3D
     // apart, blended smoothly by the GPU in between.
     private const int TableSamples = 2048;
 
+    // The warp lookup atlas: one WarpLookup tile per piece slot, 8 across and 4 down.
+    private const int WarpTilesAcross = 8;
+    private const int WarpTilesDown = SurfaceSettings.MaxPieces / WarpTilesAcross;
+
     private ShaderMaterial _material = null!;
     private ImageTexture? _latitudeTable;
     private ImageTexture? _longitudeTable;
+
+    // The atlas's contents (4 floats per cell), and which lookup each tile holds, so only
+    // changed tiles are rewritten.
+    private readonly float[] _warpAtlas = new float[
+        WarpTilesAcross * WarpTilesDown * WarpLookup.Size * WarpLookup.Size * 4];
+    private readonly WarpLookup?[] _warpTiles = new WarpLookup?[SurfaceSettings.MaxPieces];
+    private ImageTexture? _warpTexture;
 
     /// <summary>True if a map image is currently applied.</summary>
     public bool HasMap { get; private set; }
@@ -98,10 +109,12 @@ public partial class PlanetSurface : MeshInstance3D
     }
 
     /// <summary>
-    /// Shows map pieces on the planet (VISION.md MAP-02), bottom to top. Only the first
-    /// <see cref="SurfaceSettings.MaxPieces"/> are drawn. Cheap to call whenever a piece moves.
+    /// Shows map pieces on the planet (VISION.md MAP-02), bottom to top, each with its warp
+    /// lookup if it's warped. Only the first <see cref="SurfaceSettings.MaxPieces"/> are drawn.
+    /// Cheap to call whenever a piece moves.
     /// </summary>
-    public void SetPieces(IReadOnlyList<(Texture2D Texture, PieceProjection Projection)> pieces)
+    public void SetPieces(
+        IReadOnlyList<(Texture2D Texture, PieceProjection Projection, WarpLookup? Warp)> pieces)
     {
         const int slots = SurfaceSettings.MaxPieces;
         int count = Math.Min(pieces.Count, slots);
@@ -111,10 +124,13 @@ public partial class PlanetSurface : MeshInstance3D
         var norths = new Vector3[slots];
         var frames = new Vector4[slots];
         var limits = new Vector2[slots];
+        var warpTiles = new int[slots];
+        var warpRects = new Vector4[slots];
+        bool atlasChanged = false;
 
         for (int i = 0; i < count; i++)
         {
-            (Texture2D texture, PieceProjection projection) = pieces[i];
+            (Texture2D texture, PieceProjection projection, WarpLookup? warp) = pieces[i];
             textures.Add(texture);
             centers[i] = projection.CenterDirection.ToGodot();
             easts[i] = projection.EastDirection.ToGodot();
@@ -124,10 +140,35 @@ public partial class PlanetSurface : MeshInstance3D
                 (float)projection.SinRotation,
                 (float)(1.0 / projection.WidthRadians),
                 (float)(1.0 / projection.HeightRadians));
+            double reach = warp is null
+                ? projection.ReachRadians
+                : Math.Max(projection.ReachRadians,
+                    warp.ReachRadians(projection.WidthRadians, projection.HeightRadians));
             limits[i] = new Vector2(
-                (float)Math.Cos(Math.Min(projection.ReachRadians, Math.PI)),
+                (float)Math.Cos(Math.Min(reach, Math.PI)),
                 (float)(projection.WidthRadians / Math.Max(texture.GetWidth(), 1)));
+
+            warpTiles[i] = warp is null ? -1 : i;
+            if (warp is not null)
+            {
+                warpRects[i] = new Vector4(
+                    (float)warp.MinU, (float)warp.MinV, (float)warp.MaxU, (float)warp.MaxV);
+                atlasChanged |= WriteWarpTile(i, warp);
+            }
         }
+
+        for (int i = count; i < slots; i++)
+        {
+            warpTiles[i] = -1;
+        }
+
+        if (atlasChanged || _warpTexture is null)
+        {
+            UploadWarpAtlas();
+        }
+
+        _material.SetShaderParameter("piece_warp_tiles", warpTiles);
+        _material.SetShaderParameter("piece_warp_rects", warpRects);
 
         _material.SetShaderParameter("piece_textures", textures);
         _material.SetShaderParameter("piece_centers", centers);
@@ -158,6 +199,46 @@ public partial class PlanetSurface : MeshInstance3D
         MapTexture = null;
         HasMap = false;
         ShowGrid = true;
+    }
+
+    // Copies a lookup into its tile of the atlas, unless that tile already holds it.
+    private bool WriteWarpTile(int tile, WarpLookup warp)
+    {
+        if (ReferenceEquals(_warpTiles[tile], warp))
+        {
+            return false;
+        }
+
+        const int size = WarpLookup.Size;
+        int atlasWidth = WarpTilesAcross * size;
+        int left = tile % WarpTilesAcross * size;
+        int top = tile / WarpTilesAcross * size;
+        ReadOnlySpan<float> values = warp.Values;
+        for (int row = 0; row < size; row++)
+        {
+            values.Slice(row * size * 4, size * 4)
+                .CopyTo(_warpAtlas.AsSpan(((top + row) * atlasWidth + left) * 4, size * 4));
+        }
+
+        _warpTiles[tile] = warp;
+        return true;
+    }
+
+    private void UploadWarpAtlas()
+    {
+        byte[] bytes = new byte[_warpAtlas.Length * sizeof(float)];
+        Buffer.BlockCopy(_warpAtlas, 0, bytes, 0, bytes.Length);
+        Image image = Image.CreateFromData(WarpTilesAcross * WarpLookup.Size,
+            WarpTilesDown * WarpLookup.Size, false, Image.Format.Rgbaf, bytes);
+        if (_warpTexture is null)
+        {
+            _warpTexture = ImageTexture.CreateFromImage(image);
+            _material.SetShaderParameter("piece_warp_atlas", _warpTexture);
+        }
+        else
+        {
+            _warpTexture.Update(image);
+        }
     }
 
     // Writes a table of 32-bit floats into a one-pixel-tall texture, reusing the existing

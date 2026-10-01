@@ -36,6 +36,8 @@ public partial class PiecesPanel : CanvasLayer
     private SpinBox _rotation = null!;
     private SpinBox _width = null!;
     private Button _upButton = null!;
+    private Button _editPointsButton = null!;
+    private Button _resetPointsButton = null!;
     private Button _downButton = null!;
     private FileDialog _fileDialog = null!;
     private bool _open;
@@ -62,6 +64,12 @@ public partial class PiecesPanel : CanvasLayer
 
     /// <summary>The selected piece's id, or null.</summary>
     public Guid? SelectedPieceId => _selectedId;
+
+    /// <summary>
+    /// True while the selected piece shows a handle on every point of its cut (Edit Points),
+    /// instead of its move/resize/rotate handles.
+    /// </summary>
+    public bool IsEditingPoints { get; private set; }
 
     /// <summary>Whether the panel is open (it's still hidden while the toolbar is).</summary>
     public bool IsPanelOpen
@@ -194,6 +202,23 @@ public partial class PiecesPanel : CanvasLayer
         delete.TooltipText = "Remove this piece (Delete key). Ctrl+Z brings it back.";
         buttons.AddChild(delete);
         details.AddChild(buttons);
+
+        var pointButtons = new HFlowContainer();
+        _editPointsButton = new Button
+        {
+            Text = "Edit Points",
+            ToggleMode = true,
+            FocusMode = Control.FocusModeEnum.None,
+        };
+        _editPointsButton.Toggled += SetEditingPoints;
+        _editPointsButton.TooltipText =
+            "Drag the points of the cut on the globe; the image stretches to follow " +
+            "(or double-click the piece). Esc to finish.";
+        _resetPointsButton = CreateButton("Reset Points", ResetPoints);
+        _resetPointsButton.TooltipText = "Undo all stretching: back to the cut as drawn";
+        pointButtons.AddChild(_editPointsButton);
+        pointButtons.AddChild(_resetPointsButton);
+        details.AddChild(pointButtons);
         return details;
     }
 
@@ -285,6 +310,13 @@ public partial class PiecesPanel : CanvasLayer
         ShowSelected();
     }
 
+    /// <summary>Turns Edit Points on or off for the selected piece.</summary>
+    public void SetEditingPoints(bool editing)
+    {
+        IsEditingPoints = editing && _selectedId is not null;
+        ShowSelected();
+    }
+
     /// <summary>Selects a piece (null for none), in the list and on the globe.</summary>
     public void Select(Guid? id)
     {
@@ -294,6 +326,7 @@ public partial class PiecesPanel : CanvasLayer
         }
 
         _selectedId = id;
+        IsEditingPoints = false;
         SyncWithWorld();
         SelectionChanged?.Invoke();
     }
@@ -317,6 +350,8 @@ public partial class PiecesPanel : CanvasLayer
         _longitude.SetValueNoSignal(piece.Center.LongitudeDegrees);
         _rotation.SetValueNoSignal(piece.RotationDegrees);
         _width.SetValueNoSignal(piece.WidthDegrees);
+        _editPointsButton.SetPressedNoSignal(IsEditingPoints);
+        _resetPointsButton.Disabled = piece.WarpedPoints is null;
         int position = _listed.IndexOf(piece);
         _upButton.Disabled = position == 0;
         _downButton.Disabled = position == _listed.Count - 1;
@@ -348,6 +383,14 @@ public partial class PiecesPanel : CanvasLayer
         if (SelectedPiece() is MapPiece piece)
         {
             Session?.MovePieceInOrder(piece.Id, steps);
+        }
+    }
+
+    private void ResetPoints()
+    {
+        if (SelectedPiece() is MapPiece piece)
+        {
+            Session?.ResetPiecePoints(piece.Id);
         }
     }
 
