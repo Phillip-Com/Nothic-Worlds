@@ -141,14 +141,49 @@ public partial class SystemView : Node3D
         }
 
         _visuals.Clear();
+        Sync(world);
+        FocusImmediately(focusId);
+    }
+
+    /// <summary>
+    /// Brings the visuals up to date after bodies were added, removed, or changed, keeping the
+    /// rest (and their loaded maps) as they are.
+    /// </summary>
+    /// <returns>The bodies whose visuals were created anew, so their surfaces are blank.</returns>
+    public HashSet<Guid> Sync(World world)
+    {
+        var present = new HashSet<Guid>(world.Bodies.Select(body => body.Id));
+        foreach (Guid gone in _visuals.Keys.Where(id => !present.Contains(id)).ToList())
+        {
+            _visuals[gone].Free();
+            _visuals.Remove(gone);
+        }
+
+        // A star and a planet are drawn differently, so a body that changed between them is
+        // rebuilt.
+        var created = new HashSet<Guid>();
         foreach (Body body in world.Bodies)
         {
-            _visuals[body.Id] = CreateVisual(body);
+            bool isStar = body.Kind == BodyKind.Star;
+            if (!_visuals.TryGetValue(body.Id, out BodyVisual? visual)
+                || (visual.Surface is null) != isStar)
+            {
+                visual?.Free();
+                _visuals[body.Id] = CreateVisual(body);
+                created.Add(body.Id);
+            }
         }
 
         RebuildOrbitLines();
-        _focusId = focusId;
+        return created;
+    }
+
+    /// <summary>Centers the view on a body straight away, with no flight.</summary>
+    public void FocusImmediately(Guid bodyId)
+    {
+        _focusId = bodyId;
         _flightProgress = 1.0;
+        Camera?.ClearFocusOffset();
         Place();
     }
 
@@ -161,9 +196,18 @@ public partial class SystemView : Node3D
     /// <summary>Flies the view to a body, which then stays at the scene's center.</summary>
     public void FlyTo(Guid bodyId)
     {
-        if (bodyId == _focusId || !_layout.ContainsKey(bodyId))
+        if (bodyId == _focusId)
         {
             return;
+        }
+
+        if (!_layout.ContainsKey(bodyId))
+        {
+            Place();  // A body added a moment ago isn't placed until the next frame.
+            if (!_layout.ContainsKey(bodyId))
+            {
+                return;
+            }
         }
 
         _flightFrom = Origin;
