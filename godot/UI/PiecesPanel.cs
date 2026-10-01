@@ -181,10 +181,8 @@ public partial class PiecesPanel : CanvasLayer
         _rotation = AddNumberField(grid, "Rotation", 0, 360, 0.1, "°");
         _width = AddNumberField(grid, "Width", PieceProjection.MinimumWidthDegrees,
             PieceProjection.MaximumWidthDegrees, 0.1, "°");
-        _longitude.AllowGreater = true;  // Wrapped round, e.g. 190° becomes -170°.
-        _longitude.AllowLesser = true;
-        _rotation.AllowGreater = true;
-        _rotation.AllowLesser = true;
+        _longitude.WithWrapAround();  // E.g. 190° becomes -170°.
+        _rotation.WithWrapAround();   // E.g. 370° becomes 10°.
         _latitude.TooltipText = "Where the piece's center is: north positive, south negative";
         _longitude.TooltipText = "Where the piece's center is: east positive, west negative";
         _rotation.TooltipText = "Clockwise turn; 0° keeps the top of the piece facing north";

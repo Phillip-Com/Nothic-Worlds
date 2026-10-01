@@ -9,6 +9,8 @@ namespace NothicWorlds.UI;
 /// Shift), instead of moving the camera.</item>
 /// <item>Live fields apply as the user types, so the world updates immediately (owner's
 /// request: live updates while editing a body).</item>
+/// <item>Full-circle angles wrap around: past the top comes back at the bottom, and the other
+/// way (owner's request). Angles with real limits, like a tilt of 0–180°, don't wrap.</item>
 /// </list>
 /// </summary>
 public static class NumberFields
@@ -47,6 +49,28 @@ public static class NumberFields
         field.UpdateOnTextChanged = true;
         field.GetLineEdit().FocusExited += editingFinished;
         return field.WithArrowKeys();
+    }
+
+    /// <summary>
+    /// Makes the field wrap around its range, for full-circle angles: stepping past the top
+    /// (e.g. 360°) comes back at the bottom (0°), and below the bottom comes back at the top.
+    /// The top itself counts as the bottom (360° is 0°). Returns the field, for chaining.
+    /// </summary>
+    public static SpinBox WithWrapAround(this SpinBox field)
+    {
+        field.AllowGreater = true;
+        field.AllowLesser = true;
+        field.ValueChanged += value =>
+        {
+            double span = field.MaxValue - field.MinValue;
+            if (span > 0 && (value >= field.MaxValue || value < field.MinValue))
+            {
+                // Setting it fires ValueChanged again, now in range, so the world gets the
+                // wrapped value too.
+                field.Value = field.MinValue + ((value - field.MinValue) % span + span) % span;
+            }
+        };
+        return field;
     }
 
     /// <summary>

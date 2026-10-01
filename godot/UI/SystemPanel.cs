@@ -222,7 +222,8 @@ public partial class SystemPanel : CanvasLayer
         _period = AddField(grid, "Period", 0.0001, Orbit.MaxPeriodDays, 0.01, "days",
             CommitOrbit);
         _period.TooltipText = "How long one trip around takes (Earth: 365.25 days)";
-        _startAngle = AddField(grid, "Start angle", -360, 360, 1, "°", CommitOrbit);
+        _startAngle = AddField(grid, "Start angle", 0, 360, 1, "°", CommitOrbit)
+            .WithWrapAround();
         _startAngle.TooltipText = "Where along the orbit the body is at day 1";
         layout.AddChild(grid);
 
@@ -238,11 +239,13 @@ public partial class SystemPanel : CanvasLayer
         _eccentricity = AddField(extras, "Elongation", 0, Orbit.MaxEccentricity, 0.01, "",
             CommitOrbit);
         _eccentricity.TooltipText = "0 is a circle; up to 0.95 (eccentricity)";
-        _closestApproach = AddField(extras, "Closest point", -360, 360, 1, "°", CommitOrbit);
+        _closestApproach = AddField(extras, "Closest point", 0, 360, 1, "°", CommitOrbit)
+            .WithWrapAround();
         _closestApproach.TooltipText = "Which way the elongated orbit points (closest approach)";
         _orbitTilt = AddField(extras, "Tilt", 0, 180, 0.1, "°", CommitOrbit);
         _orbitTilt.TooltipText = "0 is flat, 90 passes over the poles, over 90 runs backwards";
-        _tiltDirection = AddField(extras, "Tilt direction", -360, 360, 1, "°", CommitOrbit);
+        _tiltDirection = AddField(extras, "Tilt direction", 0, 360, 1, "°", CommitOrbit)
+            .WithWrapAround();
         _tiltDirection.TooltipText = "Where the orbit rises north through the flat plane";
         _extras = extras;
         _extras.Visible = false;
