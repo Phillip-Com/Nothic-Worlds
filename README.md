@@ -36,6 +36,13 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 | Performance overlay | — | F3 |
 | New world / Open / Save / Save As | **File** menu | Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S |
 | Undo / Redo | **Edit** menu | Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) |
+| Fly to another body (sun, planet, moon) | Click it, its dot, or its name | — |
+
+A new world is a small star system: a sun with one planet orbiting it. Zoom out to see the whole
+system, and click any body to fly to it. The map tools work on the selected body; stars have no
+map. The time bar (bottom right) plays the world clock at the chosen speed, shows the date on
+the selected body in its own days, jumps to a day with **Go to…**, and switches between a
+readable view and **True scale**.
 
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers

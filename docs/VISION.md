@@ -90,8 +90,8 @@ on it. Owner's decisions:
 - **Orbits:** simple (distance, period, start position; circles by default), with optional
   elongation and tilt. Periods are set freely, not derived from physics.
 - **Time display** until calendars exist: "Day N, hh:mm" in the selected planet's own days.
-- **Three PRs:** Core (PR #16), then the app's system view and time controls, then editing
-  (add/remove bodies, system tree, body properties).
+- **Three PRs:** Core (PR #16), then the app's system view and time controls (PR #17), then
+  editing (add/remove bodies, system tree, body properties).
 
 ---
 
@@ -106,7 +106,7 @@ Each entry uses this format:
 
 ### 4.1 Rendering & Navigation (`REN`)
 
-**REN-01 — 3D world rendering** · In Progress (single planet done in M1) · Base
+**REN-01 — 3D world rendering** · In Progress (star systems drawn, PR #17) · Base
 **Intent:** Render worlds and bodies in 3D. This grew from the original "3D render of a 2D world" concept.
 **Implementation (M1, PR #3):**
 - The planet is a `SphereMesh` (radius 1, 128×64 segments) in `godot/Scenes/main.tscn`, with one
@@ -118,8 +118,22 @@ Each entry uses this format:
   on-screen width at any zoom.
 - The axis convention (+Y north, longitude 0 faces +Z, 90° east faces +X) is shared with Core's
   `SphericalCoordinates`. Keep the shader and Core in sync.
+**Implementation (system view, PR #17):** `godot/Rendering/SystemView.cs` draws every body.
+- Planets and moons are a shared unit sphere with their own `PlanetSurface` and a copy of the
+  planet material. The node's transform spins the body (its day length), tilts its axis, and
+  scales it to its display size. Because the shader works in the body's own space, maps,
+  pieces, and handles stay attached to the turning surface.
+- Stars are glowing spheres with an `OmniLight3D`, with no fall-off and no shadows, so suns
+  light the planets around them. The old fixed `DirectionalLight3D` is only used when a world
+  has no stars.
+- Faint orbit lines come from Core's `SystemLayout.OrbitPath`. A body's own orbit line hides
+  when you're close to it, so it doesn't cut through the globe.
+- **Floating origin:** positions are worked out in full precision. The scene is drawn around
+  the focused body, so true-scale systems millions of units across stay precise near the camera.
+- Benchmark (8k map, fullscreen, back to back with `main`): ~154 → ~147 fps, video memory
+  144 → 151 MB, for the added sun, its light, and orbit lines.
 
-**REN-02 — Multi-scale navigation (system → planet → local region)** · In Progress (planet camera done in M1) · Base
+**REN-02 — Multi-scale navigation (system → planet → local region)** · In Progress (planet and system views done, PR #17) · Base
 **Intent:** Move smoothly from viewing the whole star system down to a local region on a planet.
 M1 covers these camera controls for a single planet:
 - **Orbit:** drag to spin the globe / circle the camera around it
@@ -144,6 +158,21 @@ M1 covers these camera controls for a single planet:
   it gets pushed back out.
 - The indicator reads `PlanetCamera.CurrentAction` and `PlanetCamera.PanMode`. It updates its text
   only when something changes.
+**Implementation (system view, PR #17):**
+- Zooming out goes from the selected body to the whole system: the camera's reach (in the focused
+  body's radii) follows the system's size. The same camera, controls, and pan modes work at
+  every scale.
+- **Click any other body** (its globe, its dot, or its label) to select it and **fly there**.
+  Over 1.2 s the scene's center glides to the new body and the camera rescales to its size.
+  From close up the framing is kept (the new body fills the screen the same way); from far out
+  the real distance is kept, so flying to a big star doesn't zoom out. A click only counts if
+  the mouse barely moved, so dragging to orbit never changes the selection.
+- `godot/UI/BodyMarkers.cs`: bodies too small to see get a colored dot (stars yellow, planets
+  blue, moons gray), and other bodies get their name when seen from afar.
+- **Readable / true scale** (owner's choice): the toggle in the time bar. Core's
+  `Simulation/SystemLayout.cs` (tested) compresses sizes and distances with a power curve (0.4).
+  It keeps every direction and the order of distances, and keeps orbits clear of the bodies at
+  each end. An Earth-sized planet is 1 unit in both modes.
 **Known issue (deferred by the owner):** when the view is slid so the planet is near the screen
 edge, the planet looks stretched into an oval. This comes from the camera's wide 75° field of view.
 A narrower lens (~45–50°) would reduce it but changes the look of everything else, so the owner
@@ -570,7 +599,7 @@ place).
 
 ### 4.4 Celestial Bodies (`BOD`)
 
-**BOD-01 — Suns, planets, and moons** · In Progress (Core done, PR #16) · Base
+**BOD-01 — Suns, planets, and moons** · In Progress (Core and system view done, PR #17) · Base
 **Intent:** A system can have multiple suns and moons, plus planets.
 **Implementation (Core, PR #16):**
 - `Body` gains `Kind` (star, planet, moon), `RadiusKm`, `DayLengthHours`, `AxialTiltDegrees`,
@@ -581,6 +610,18 @@ place).
   `ChildrenOf` is ready for the system tree (`UI-02`).
 - World file **format version 5**. Older worlds' single planet gets Earth's size, a 24-hour day,
   and no tilt.
+**Implementation (app, PR #17):**
+- **New worlds** start as a Sun-like star with one Earth-like planet circling it once a year
+  (`World.CreateNew`). Older worlds keep their single planet, lit as before.
+- **Selected body** (`WorldSession.SelectedBodyId`, `SelectBodyAsync`): the map tools (import,
+  map type, calibrate, pieces) work on it. They're disabled for stars, which have no map. The
+  first planet or moon is selected when a world opens.
+- **Maps per body:** only the selected body's map is loaded at full size. The others show a
+  1024-pixel preview (`MapImageLoader.LoadPreviewAsync`, loaded in the background after a world
+  opens), so a system of mapped planets fits the baseline laptop's graphics memory. Selecting a
+  body swaps the two.
+- **Undo across bodies:** each step remembers its body (`SurfaceSnapshot`). Undoing selects that
+  body, so the change is visible. "Matches the saved file" compares every body.
 
 **BOD-02 — Non-standard bodies** · Idea · Base
 **Intent:** Support bodies that aren't spheres, such as flat worlds and world trees.
@@ -621,12 +662,16 @@ architecture implications. This needs a design review before any related data fo
   full-precision `Geometry/Vector3D` (km across a whole system).
 - The exact math is in docs/world-format.md, so any viewer can reproduce positions.
 
-**SIM-02 — Time simulation** · In Progress (Core done, PR #16) · Base
+**SIM-02 — Time simulation** · In Progress (Core and time bar done, PR #17) · Base
 **Intent:** A world clock that advances the system. It lets the user track dates and the positions
 of suns and moons at any point in time.
 **Implementation (Core, PR #16):** `World.TimeDays` is the clock (standard days, saved with the
 world). `Simulation/BodyClock.cs` gives each body's spin angle and its local "Day N, hh:mm"
 (`LocalTime`), counted in that body's own day length.
+**Implementation (time bar, PR #17):** `godot/UI/TimeControls.cs`, in the bottom-right corner:
+Play/Pause, speed (1 hour to 1 year per second), the selected body's date, **Go to…** a day and
+hour, and the **True scale** switch. `WorldSession.SetTime` moves the clock. Like the camera, the
+clock is saved but isn't an unsaved change.
 
 **SIM-03 — Physics mode (toggle)** · Idea · Advanced (probably)
 **Intent:** An optional toggle that simulates the system with real-world physics, so the user can
