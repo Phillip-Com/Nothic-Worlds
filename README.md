@@ -44,6 +44,12 @@ map. The time bar (bottom right) plays the world clock at the chosen speed, show
 the selected body in its own days, jumps to a day with **Go to…**, and switches between a
 readable view and **True scale**.
 
+**System…** opens the system panel on the left. It shows the tree of bodies (click one to fly
+there), lets you **Add Planet**, **Add Moon**, or **Add Star**, and **Delete** the selected body
+along with everything orbiting it (Ctrl+Z brings it back). It also edits the selected body's
+name, kind, radius, day length, axial tilt, and orbit: what it orbits, distance (km or AU),
+period, and starting position. Switch on "Elongated or tilted orbit" for more.
+
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers
 back after a crash.

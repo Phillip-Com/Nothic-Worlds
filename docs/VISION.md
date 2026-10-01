@@ -91,7 +91,10 @@ on it. Owner's decisions:
   elongation and tilt. Periods are set freely, not derived from physics.
 - **Time display** until calendars exist: "Day N, hh:mm" in the selected planet's own days.
 - **Three PRs:** Core (PR #16), then the app's system view and time controls (PR #17), then
-  editing (add/remove bodies, system tree, body properties).
+  editing (add/remove bodies, system tree, body properties) (PR #18).
+- **Editing (owner, 2026-09-30):** deleting a body also deletes everything orbiting it (Ctrl+Z
+  brings it all back). The system tree and properties live in a **left panel**, opened by a
+  **System…** toolbar button.
 
 ---
 
@@ -227,12 +230,26 @@ screen hold tools, journals, and similar content.
 (see `LORE-04`).
 **Implementation:** —
 
-**UI-02 — System tree panel** · Deferred · Base
+**UI-02 — System tree panel** · Implemented (PR #18) · Base
 **Intent:** A compact tree view of the star system's hierarchy (e.g. Sun ▸ Planet ▸ Moon) showing
 which bodies orbit which. It likely lives in a side panel and doubles as a way to select bodies for
 editing. This is separate from lore relationships (`LORE-04`).
-**Notes:** Tabled. Revisit when multiple bodies are introduced.
-**Implementation:** —
+**Notes:** Was tabled until multiple bodies existed (M4).
+**Implementation (PR #18):** `godot/UI/SystemPanel.cs`, opened by **System…** in the toolbar,
+on the left (owner's choice).
+- **Tree:** built from `SystemHierarchy.ChildrenOf`, starting from bodies without an orbit. Picking
+  a body selects it and flies there. The tree is rebuilt only when names, kinds, or parents change.
+- **Add Planet / Add Moon / Add Star / Delete.** Starting values come from Core's
+  `Simulation/NewBodies.cs` (tested): Earth-, Moon-, and Sun-like sizes. Each new orbit goes 1.6×
+  farther out than the widest around the same parent, siblings are spread by the golden angle,
+  and starting periods grow as real ones do (period² ∝ distance³). Delete removes the body and
+  everything orbiting it (`SystemHierarchy.DescendantsOf`), with no confirmation because Ctrl+Z
+  restores it. The last body can't be deleted.
+- **Properties:** name, kind (planet ↔ moon; stars stay stars), radius, day length, axial tilt,
+  and the orbit. The orbit fields are the parent (only bodies that wouldn't make a loop), the
+  distance in km or AU, the period, and the start angle. A switch shows the extras: elongation,
+  closest point, tilt, and tilt direction. Values that aren't allowed are refused with the
+  reason, and the fields go back to the real values.
 
 **UI-03 — Undo and redo** · Implemented (PR #14) · Base
 **Intent (owner, 2026-09-30):** undo and redo for edits, "sooner rather than later", so mistakes
@@ -599,7 +616,7 @@ place).
 
 ### 4.4 Celestial Bodies (`BOD`)
 
-**BOD-01 — Suns, planets, and moons** · In Progress (Core and system view done, PR #17) · Base
+**BOD-01 — Suns, planets, and moons** · Implemented (M4) · Base
 **Intent:** A system can have multiple suns and moons, plus planets.
 **Implementation (Core, PR #16):**
 - `Body` gains `Kind` (star, planet, moon), `RadiusKm`, `DayLengthHours`, `AxialTiltDegrees`,
@@ -622,6 +639,21 @@ place).
   body swaps the two.
 - **Undo across bodies:** each step remembers its body (`SurfaceSnapshot`). Undoing selects that
   body, so the change is visible. "Matches the saved file" compares every body.
+**Implementation (editing, PR #18):** bodies are added, deleted, and edited in the System panel
+(`UI-02`). `WorldSession` has `AddBodyAsync`, `RemoveBodyAsync`, `RenameBody`, `SetBodyKind`,
+`SetBodyPhysical`, `SetOrbit`, and `PossibleParents`.
+- **Undo snapshots** now copy every body (`EditSnapshot`), so adding, deleting, and editing
+  bodies are undoable like everything else. Undo selects the body that was being edited.
+  `Body.HasSameContent` makes "matches the saved file" cover body properties and orbits too.
+- **Maps** are handled in one place (`ShowMapsAsync`): it makes every globe show the right image
+  (full size for the selected body, previews for the others, loaded in the background). It runs
+  after every change, so adds, deletes, undo, and selection all keep the maps right.
+- `SystemView.Sync` updates the scene in place: it creates, removes, or rebuilds only the changed
+  bodies, so loaded maps aren't reloaded.
+- **Verified in the running app** (real panel buttons): added a moon, a planet, and a companion
+  star; edited a radius; moved a moon to another planet; deleted a planet with what orbits it,
+  then undid it; undid and redid the whole session (back to "saved" at the start); and save →
+  reopen kept the system. Benchmark: same as `main` back to back (~141 fps).
 
 **BOD-02 — Non-standard bodies** · Idea · Base
 **Intent:** Support bodies that aren't spheres, such as flat worlds and world trees.
@@ -651,7 +683,7 @@ architecture implications. This needs a design review before any related data fo
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
-**SIM-01 — Designed ("on-rails") orbits** · In Progress (Core done, PR #16) · Base
+**SIM-01 — Designed ("on-rails") orbits** · Implemented (M4; edited in the System panel) · Base
 **Intent:** The default. Bodies follow the paths the user sets, and they stay stable forever.
 **Implementation (Core, PR #16):**
 - `Model/Orbit.cs` is an **immutable** record: parent, distance, period, start angle, plus
@@ -662,7 +694,7 @@ architecture implications. This needs a design review before any related data fo
   full-precision `Geometry/Vector3D` (km across a whole system).
 - The exact math is in docs/world-format.md, so any viewer can reproduce positions.
 
-**SIM-02 — Time simulation** · In Progress (Core and time bar done, PR #17) · Base
+**SIM-02 — Time simulation** · Implemented (M4) · Base
 **Intent:** A world clock that advances the system. It lets the user track dates and the positions
 of suns and moons at any point in time.
 **Implementation (Core, PR #16):** `World.TimeDays` is the clock (standard days, saved with the
