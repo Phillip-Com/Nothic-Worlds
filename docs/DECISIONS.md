@@ -7,6 +7,7 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-09-30 | **Make Center**: any body can become the center of its system; the bodies it orbited flip to circle it on the same paths, keeping every relative position | In PR | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) | VISION.md `UI-02` |
 | 2026-09-30 | Deleting a body **also deletes everything orbiting it**; Ctrl+Z brings it all back | In PR | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) | VISION.md `UI-02` |
 | 2026-09-30 | System tree and body properties in a **left panel, opened by a System… button** | In PR | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) | VISION.md `UI-02` |
 | 2026-09-30 | Milestone 4: **star system basics** (suns, planets, moons, designed orbits, world clock, system view) | Merged | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) · `56cb993` | VISION.md §3 |

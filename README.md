@@ -51,7 +51,9 @@ arrow keys back to the camera.
 
 **System…** opens the system panel on the left. It shows the tree of bodies (click one to fly
 there), lets you **Add Planet**, **Add Moon**, or **Add Star**, and **Delete** the selected body
-along with everything orbiting it (Ctrl+Z brings it back). It also edits the selected body's
+along with everything orbiting it (Ctrl+Z brings it back). **Make Center** puts the selected
+body at the center of its system, with the bodies it orbited now circling it on the same paths
+(for example, a planet-centered system with the sun going around it). It also edits the selected body's
 name, kind, radius, day length, axial tilt, and orbit: what it orbits, distance (km or AU),
 period, and starting position. Switch on "Elongated or tilted orbit" for more.
 

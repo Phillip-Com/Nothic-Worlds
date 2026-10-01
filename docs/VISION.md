@@ -254,6 +254,13 @@ on the left (owner's choice).
   distance in km or AU, the period, and the start angle. A switch shows the extras: elongation,
   closest point, tilt, and tilt direction. Values that aren't allowed are refused with the
   reason, and the fields go back to the real values.
+- **Make Center (owner's request and decision, 2026-09-30: "swap places, keep motion"):** the
+  selected body becomes the center of its system. `SystemHierarchy.MakeCenter` flips the chain
+  between it and the old center: each body it orbited now circles the one below it on the same
+  path, mirrored (start and closest-approach directions +180°, everything else unchanged).
+  Other orbits stay as they were. A test proves every body keeps the same position relative to
+  the others at any time, even with elongated, tilted orbits. Make a planet the center and the
+  sun circles it once a year; the time bar's "1 year" then follows the sun's trip.
 
 **UI-03 — Undo and redo** · Implemented (PR #14) · Base
 **Intent (owner, 2026-09-30):** undo and redo for edits, "sooner rather than later", so mistakes
