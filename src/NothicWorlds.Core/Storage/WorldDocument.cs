@@ -11,6 +11,7 @@ internal sealed class WorldDocument
     public required string Name { get; init; }
     public required DateTimeOffset CreatedUtc { get; init; }
     public required DateTimeOffset ModifiedUtc { get; init; }
+    public double? TimeDays { get; init; }  // Added in format version 5
     public required List<BodyDocument> Bodies { get; init; }
     public ViewDocument? View { get; init; }
 }
@@ -20,7 +21,25 @@ internal sealed class BodyDocument
     public required Guid Id { get; init; }
     public required string Name { get; init; }
     public required string Kind { get; init; }
+    public required double RadiusKm { get; init; }  // Added in format version 5
+    public required double DayLengthHours { get; init; }  // Added in format version 5
+    public required double AxialTilt { get; init; }  // Added in format version 5
+    public OrbitDocument? Orbit { get; init; }  // Added in format version 5
     public required SurfaceDocument Surface { get; init; }
+}
+
+internal sealed class OrbitDocument
+{
+    public required Guid Parent { get; init; }
+    public required double DistanceKm { get; init; }
+    public required double PeriodDays { get; init; }
+    public required double StartAngle { get; init; }
+
+    // Optional extras, omitted when 0 (a flat circle).
+    public double? Eccentricity { get; init; }
+    public double? ClosestApproach { get; init; }
+    public double? Tilt { get; init; }
+    public double? TiltDirection { get; init; }
 }
 
 internal sealed class SurfaceDocument

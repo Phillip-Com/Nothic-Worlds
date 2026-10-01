@@ -74,12 +74,24 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
   format (PR #7), then the app side (File menu, unsaved changes, recovery copies) (PR #8).
 - **Complete** (PR #8 merged 2026-09-30).
 
-**Milestone 3: Map Fitting** · In Progress
+**Milestone 3: Map Fitting** · Complete (PR #15 merged 2026-09-30)
 - **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace (PR #10).
 - **Part 2:** `MAP-02` cut and place. Core first (PR #11), then the Cut editor, Pieces panel,
   and live drawing (PR #12), then drag handles on the globe (PR #13), then undo/redo (`UI-03`,
   PR #14, brought forward by the owner so warping has it from the start), then point warping
   (PR #15).
+
+**Milestone 4: Star System Basics** · In Progress (owner's choice, 2026-09-30)
+Suns, planets, and moons on designed orbits, a world clock, and zooming out to the whole
+system (`BOD-01`, `SIM-01`, `SIM-02`, `REN-02`, `UI-02`). Calendars, seasons, and eclipses build
+on it. Owner's decisions:
+- **Scale:** a readable view by default, with distances compressed and bodies enlarged so everything is
+  visible and clickable, plus a **true-scale toggle**. Data is always in real units (km, days).
+- **Orbits:** simple (distance, period, start position; circles by default), with optional
+  elongation and tilt. Periods are set freely, not derived from physics.
+- **Time display** until calendars exist: "Day N, hh:mm" in the selected planet's own days.
+- **Three PRs:** Core (PR #16), then the app's system view and time controls, then editing
+  (add/remove bodies, system tree, body properties).
 
 ---
 
@@ -558,9 +570,17 @@ place).
 
 ### 4.4 Celestial Bodies (`BOD`)
 
-**BOD-01 — Suns, planets, and moons** · Idea · Base
+**BOD-01 — Suns, planets, and moons** · In Progress (Core done, PR #16) · Base
 **Intent:** A system can have multiple suns and moons, plus planets.
-**Implementation:** —
+**Implementation (Core, PR #16):**
+- `Body` gains `Kind` (star, planet, moon), `RadiusKm`, `DayLengthHours`, `AxialTiltDegrees`,
+  and an optional `Orbit`, plus `Problem()` validation. Every body keeps its own `Surface` (map,
+  pieces, calibration).
+- `Simulation/SystemHierarchy.cs`: any body can orbit any other (including a sun around a sun).
+  Chains of parents must end at a body without an orbit; missing parents and loops are refused.
+  `ChildrenOf` is ready for the system tree (`UI-02`).
+- World file **format version 5**. Older worlds' single planet gets Earth's size, a 24-hour day,
+  and no tilt.
 
 **BOD-02 — Non-standard bodies** · Idea · Base
 **Intent:** Support bodies that aren't spheres, such as flat worlds and world trees.
@@ -590,14 +610,23 @@ architecture implications. This needs a design review before any related data fo
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
-**SIM-01 — Designed ("on-rails") orbits** · Idea · Base
+**SIM-01 — Designed ("on-rails") orbits** · In Progress (Core done, PR #16) · Base
 **Intent:** The default. Bodies follow the paths the user sets, and they stay stable forever.
-**Implementation:** —
+**Implementation (Core, PR #16):**
+- `Model/Orbit.cs` is an **immutable** record: parent, distance, period, start angle, plus
+  optional eccentricity, closest-approach direction, tilt, and tilt direction.
+- `Simulation/OrbitMath.cs` computes the offset from the parent at any time directly (Kepler's
+  equation, so elongated orbits speed up near the parent). It's deterministic, and jumping to
+  any date costs the same. `SystemPositions.At` stacks offsets up the chain of parents, in
+  full-precision `Geometry/Vector3D` (km across a whole system).
+- The exact math is in docs/world-format.md, so any viewer can reproduce positions.
 
-**SIM-02 — Time simulation** · Idea · Base
+**SIM-02 — Time simulation** · In Progress (Core done, PR #16) · Base
 **Intent:** A world clock that advances the system. It lets the user track dates and the positions
 of suns and moons at any point in time.
-**Implementation:** —
+**Implementation (Core, PR #16):** `World.TimeDays` is the clock (standard days, saved with the
+world). `Simulation/BodyClock.cs` gives each body's spin angle and its local "Day N, hh:mm"
+(`LocalTime`), counted in that body's own day length.
 
 **SIM-03 — Physics mode (toggle)** · Idea · Advanced (probably)
 **Intent:** An optional toggle that simulates the system with real-world physics, so the user can

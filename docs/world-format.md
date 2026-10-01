@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 4** (see **Version history** at the end)
+**Current format version: 5** (see **Version history** at the end)
 
 ## Container
 
@@ -20,16 +20,45 @@ A `.nworld` file is a standard **zip archive** containing:
   which also blocks names that try to escape the archive (`../`).
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB.
 
-## `world.json` (version 4)
+## `world.json` (version 5)
 
 ```json
 {
-  "formatVersion": 4,
+  "formatVersion": 5,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
   "modifiedUtc": "2026-09-30T13:30:00+00:00",
+  "timeDays": 400.5,
   "bodies": [
+    {
+      "id": "51515151-5151-5151-5151-515151515151",
+      "name": "Sol",
+      "kind": "star",
+      "radiusKm": 696000,
+      "dayLengthHours": 609.5,
+      "axialTilt": 0,
+      "surface": { "fillColor": "#E6EDF5" }
+    },
+    {
+      "id": "70707070-7070-7070-7070-707070707070",
+      "name": "Luna",
+      "kind": "moon",
+      "radiusKm": 1737.5,
+      "dayLengthHours": 660,
+      "axialTilt": 1.5,
+      "orbit": {
+        "parent": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "distanceKm": 384400,
+        "periodDays": 27.5,
+        "startAngle": 0,
+        "eccentricity": 0.25,
+        "closestApproach": 45,
+        "tilt": 5.25,
+        "tiltDirection": 120
+      },
+      "surface": { "fillColor": "#E6EDF5" }
+    },
     {
       "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       "name": "Aerth",
@@ -81,10 +110,23 @@ A `.nworld` file is a standard **zip archive** containing:
 | `id` | yes | GUID; stays the same across saves |
 | `name` | yes | World name, not empty |
 | `createdUtc`, `modifiedUtc` | yes | ISO 8601 timestamps |
-| `bodies` | yes, 1 or more | Celestial bodies. Version 1 apps create exactly one planet. |
-| `bodies[].id` | yes | GUID |
+| `timeDays` | no | The world clock: standard (24-hour) days since time 0. Default 0. |
+| `bodies` | yes, 1 or more | Celestial bodies: suns, planets, and moons. |
+| `bodies[].id` | yes | GUID, unique within the world |
 | `bodies[].name` | yes | Not empty |
-| `bodies[].kind` | yes | `"planet"` |
+| `bodies[].kind` | yes | `"star"`, `"planet"`, or `"moon"` |
+| `bodies[].radiusKm` | yes | Above 0, at most 10¹⁰ |
+| `bodies[].dayLengthHours` | yes | Time for one spin, in standard hours. Above 0, at most 10⁷. |
+| `bodies[].axialTilt` | yes | Degrees the spin axis leans, 0 to 180 |
+| `bodies[].orbit` | no | The body's designed orbit around another body. Omitted for a body at the system's center. Every chain of parents must end at a body without an orbit (no missing parents, no loops). |
+| `…orbit.parent` | yes | The `id` of the body it circles |
+| `…orbit.distanceKm` | yes | The orbit's size (semi-major axis), center to center. Above 0, at most 10¹³. |
+| `…orbit.periodDays` | yes | Standard days per trip around. Above 0, at most 10⁹. Set freely, not derived from physics. |
+| `…orbit.startAngle` | yes | Degrees: where the body is at time 0 (see the orbit math below) |
+| `…orbit.eccentricity` | no | How elongated: 0 (default, a circle) to 0.95 |
+| `…orbit.closestApproach` | no | Degrees: the direction of the closest approach. Default 0. |
+| `…orbit.tilt` | no | Degrees from the reference plane, 0 (default) to 180. Over 90 runs backwards. |
+| `…orbit.tiltDirection` | no | Degrees: where the orbit rises north through the reference plane. Default 0. |
 | `bodies[].surface.map` | no | Omitted when the planet has no map |
 | `…map.asset` | yes | Asset entry name (see Container) |
 | `…map.projection` | yes | Map type: `equirectangular` (Globe map), `mercator` (Flat map), `robinson`, `winkel-tripel`, `mollweide`, `gall-peters`, `polar`, `two-hemispheres` |
@@ -136,6 +178,22 @@ coordinates** over the outline (Floater; Hormann & Floater for any polygon shape
 box's true proportions. Points on the outline move in a straight line between their two ends.
 (`PieceWarp` in Core.)
 
+**Orbits** (`OrbitMath` in Core). All angles are measured in the reference plane (y = 0) from
++x, counterclockwise seen from the north (+y): the direction at angle θ is
+(cos θ, 0, −sin θ). With distance *a*, eccentricity *e*, period *P*, start angle *L*, closest
+approach *ϖ*, tilt *i*, and tilt direction *Ω*, the position relative to the parent at time
+*t* (days) is found like this:
+1. Mean anomaly *M* = (*L* − *ϖ*) + 360° × *t* / *P*. Solve Kepler's equation
+   *M* = *E* − *e*·sin *E* for *E*.
+2. In the orbit's own plane: *x* = *a*(cos *E* − *e*), *y* = *a*√(1 − *e*²)·sin *E*. This is the
+   vector (*x*, 0, −*y*).
+3. Turn it by (*ϖ* − *Ω*) about +y, then tilt it by *i* about +x (right-handed: +y toward +z),
+   then turn it by *Ω* about +y. "Turning by φ about +y" maps (x, y, z) to
+   (x cos φ + z sin φ, y, −x sin φ + z cos φ).
+
+A body's position is its parent's position plus this offset. Bodies without an orbit sit at
+(0, 0, 0). A body turns once on its axis every `dayLengthHours`, eastward.
+
 ## Safe saving
 
 1. Write the complete new file next to the target as `<name>.nworld.saving`, and flush it to disk.
@@ -152,3 +210,4 @@ If anything fails, the existing world file is left untouched.
 | 2 | Added optional `map.calibration` (grid calibration, `MAP-05`) | Nothing to change: version 1 maps have no calibration |
 | 3 | Added optional `surface.pieces` (cut and place, `MAP-02`) | Nothing to change: version 2 surfaces have no pieces |
 | 4 | Added optional `pieces[].warp` (Edit Points, `MAP-02`) | Nothing to change: version 3 pieces aren't warped |
+| 5 | Star systems (M4): `timeDays`; bodies gain `radiusKm`, `dayLengthHours`, `axialTilt`, optional `orbit`; kinds `star` and `moon` | Each body gets `radiusKm` 6371, `dayLengthHours` 24, `axialTilt` 0, and no orbit |

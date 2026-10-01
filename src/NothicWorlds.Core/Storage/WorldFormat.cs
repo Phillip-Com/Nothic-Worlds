@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -43,6 +43,8 @@ internal static partial class WorldFormat
     private static readonly Dictionary<BodyKind, string> _bodyKindNames = new()
     {
         [BodyKind.Planet] = "planet",
+        [BodyKind.Star] = "star",
+        [BodyKind.Moon] = "moon",
     };
 
     // Upgrades older documents one version at a time: entry 0 turns version 1 into version 2,
@@ -60,9 +62,29 @@ internal static partial class WorldFormat
         // 3 → 4: pieces gained an optional "warp" (Edit Points, MAP-02). Version 3 pieces are
         // simply unwarped.
         document => document,
+
+        // 4 → 5: bodies gained a size, day length, and axial tilt, plus an optional orbit, and
+        // the world a clock (star systems, M4). Older worlds hold one planet, which gets Earth's
+        // size, a 24-hour day, and no tilt, and stays at the center with no orbit.
+        AddBodyDefaults,
     ];
 
     public static string ProjectionName(MapProjection projection) => _projectionNames[projection];
+
+    private static JsonObject AddBodyDefaults(JsonObject document)
+    {
+        if (document["bodies"] is JsonArray bodies)
+        {
+            foreach (JsonObject body in bodies.OfType<JsonObject>())
+            {
+                body["radiusKm"] ??= 6371.0;
+                body["dayLengthHours"] ??= 24.0;
+                body["axialTilt"] ??= 0.0;
+            }
+        }
+
+        return document;
+    }
 
     public static MapProjection ParseProjection(string? name) =>
         Parse(_projectionNames, name, "map type");

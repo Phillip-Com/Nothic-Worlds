@@ -295,6 +295,154 @@ public sealed class WorldPackageTests : IDisposable
         }
         """;
 
+    // A version 5 world file (adds star systems: body sizes, days, tilts, orbits, and the world
+    // clock), exactly as this version writes it. If this test fails, the file format changed:
+    // that must be deliberate, with a new format version, a migration, and a new golden file.
+    // Never edit this.
+    private const string GoldenV5Json = """
+        {
+          "formatVersion": 5,
+          "id": "11111111-2222-3333-4444-555555555555",
+          "name": "Aerth",
+          "createdUtc": "2026-09-30T12:00:00+00:00",
+          "modifiedUtc": "2026-09-30T13:30:00+00:00",
+          "timeDays": 400.5,
+          "bodies": [
+            {
+              "id": "51515151-5151-5151-5151-515151515151",
+              "name": "Sol",
+              "kind": "star",
+              "radiusKm": 696000,
+              "dayLengthHours": 609.5,
+              "axialTilt": 0,
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aerth",
+              "kind": "planet",
+              "radiusKm": 6000,
+              "dayLengthHours": 26.5,
+              "axialTilt": 23.5,
+              "orbit": {
+                "parent": "51515151-5151-5151-5151-515151515151",
+                "distanceKm": 149600000,
+                "periodDays": 365.25,
+                "startAngle": 90
+              },
+              "surface": {
+                "map": {
+                  "asset": "assets/0123456789abcdef0123456789abcdef.png",
+                  "projection": "winkel-tripel",
+                  "calibration": {
+                    "latitudes": [
+                      {
+                        "latitude": 30,
+                        "drawnAs": 33.5
+                      }
+                    ],
+                    "longitudes": [
+                      {
+                        "longitude": -180,
+                        "drawnAs": -185
+                      },
+                      {
+                        "longitude": 0,
+                        "drawnAs": 2
+                      }
+                    ]
+                  }
+                },
+                "pieces": [
+                  {
+                    "id": "99999999-8888-7777-6666-555555555555",
+                    "name": "Northern Isles",
+                    "asset": "assets/fedcba9876543210fedcba9876543210.png",
+                    "outline": {
+                      "sourceAspectRatio": 1.5,
+                      "points": [
+                        [
+                          0.25,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.5
+                        ],
+                        [
+                          0.25,
+                          0.5
+                        ]
+                      ]
+                    },
+                    "latitude": 55,
+                    "longitude": -20.5,
+                    "rotation": 15,
+                    "width": 12.5,
+                    "warp": [
+                      [
+                        0,
+                        0
+                      ],
+                      [
+                        1.25,
+                        -0.125
+                      ],
+                      [
+                        1,
+                        1
+                      ],
+                      [
+                        0,
+                        1
+                      ]
+                    ]
+                  }
+                ],
+                "fillColor": "#112233"
+              }
+            },
+            {
+              "id": "70707070-7070-7070-7070-707070707070",
+              "name": "Luna",
+              "kind": "moon",
+              "radiusKm": 1737.5,
+              "dayLengthHours": 660,
+              "axialTilt": 1.5,
+              "orbit": {
+                "parent": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "distanceKm": 384400,
+                "periodDays": 27.5,
+                "startAngle": 0,
+                "eccentricity": 0.25,
+                "closestApproach": 45,
+                "tilt": 5.25,
+                "tiltDirection": 120
+              },
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            }
+          ],
+          "view": {
+            "latitude": 20,
+            "longitude": -45.5,
+            "altitude": 1.25,
+            "focusOffset": [
+              0.5,
+              0,
+              -0.25
+            ]
+          }
+        }
+        """;
+
     private static readonly byte[] _imageBytes = Encoding.ASCII.GetBytes("pretend PNG bytes");
     private static readonly byte[] _pieceBytes = Encoding.ASCII.GetBytes("pretend piece PNG");
 
@@ -378,13 +526,50 @@ public sealed class WorldPackageTests : IDisposable
     // ----- The file format itself -----
 
     [Fact]
-    public void WrittenJson_MatchesTheGoldenVersion4File()
+    public void WrittenJson_MatchesTheGoldenVersion5File()
     {
         string path = PathFor("golden.nworld");
 
-        WorldPackage.Save(path, WarpedGoldenWorld(), AssetsWithPiece());
+        WorldPackage.Save(path, SystemGoldenWorld(), AssetsWithPiece());
 
-        Assert.Equal(Normalize(GoldenV4Json), Normalize(ReadEntry(path, "world.json")));
+        Assert.Equal(Normalize(GoldenV5Json), Normalize(ReadEntry(path, "world.json")));
+    }
+
+    [Fact]
+    public void GoldenVersion5File_LoadsAsExpected()
+    {
+        string path = WriteRawPackage("golden-v5.nworld", GoldenV5Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        AssertSameWorld(SystemGoldenWorld(), WorldPackage.Load(path).World);
+    }
+
+    [Fact]
+    public void OlderFiles_GetEarthLikeBodiesAndNoOrbit()
+    {
+        string path = WriteRawPackage("golden-v4-upgrade.nworld", GoldenV4Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        World world = WorldPackage.Load(path).World;
+
+        Body planet = Assert.Single(world.Bodies);
+        Assert.Equal(6371, planet.RadiusKm);
+        Assert.Equal(24, planet.DayLengthHours);
+        Assert.Equal(0, planet.AxialTiltDegrees);
+        Assert.Null(planet.Orbit);
+        Assert.Equal(0, world.TimeDays);
+    }
+
+    [Fact]
+    public void CircularOrbits_WriteNoExtras()
+    {
+        string path = PathFor("circle.nworld");
+
+        WorldPackage.Save(path, SystemGoldenWorld(), AssetsWithPiece());
+
+        // Only the moon's orbit has extras; the planet's circle writes just four values.
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(
+            ReadEntry(path, "world.json"), "\"eccentricity\""));
     }
 
     [Fact]
@@ -471,7 +656,7 @@ public sealed class WorldPackageTests : IDisposable
 
         WorldPackage.Save(newPath, loaded.World, loaded.Assets);
 
-        Assert.Contains("\"formatVersion\": 4", ReadEntry(newPath, "world.json"));
+        Assert.Contains("\"formatVersion\": 5", ReadEntry(newPath, "world.json"));
         AssertSameWorld(GoldenWorld(), WorldPackage.Load(newPath).World);
     }
 
@@ -576,7 +761,7 @@ public sealed class WorldPackageTests : IDisposable
     public void Load_NewerFormatVersion_IsRefusedWithAClearMessage()
     {
         string path = WriteRawPackage(
-            "future.nworld", GoldenV4Json.Replace("\"formatVersion\": 4", "\"formatVersion\": 5"),
+            "future.nworld", GoldenV5Json.Replace("\"formatVersion\": 5", "\"formatVersion\": 6"),
             (AssetName, _imageBytes));
 
         WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
@@ -630,6 +815,46 @@ public sealed class WorldPackageTests : IDisposable
             (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
 
         Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
+    }
+
+    [Theory]
+    [InlineData("\"kind\": \"star\"", "\"kind\": \"comet\"")]                // Unknown kind
+    [InlineData("\"radiusKm\": 696000", "\"radiusKm\": -1")]                  // No size
+    [InlineData("\"dayLengthHours\": 26.5", "\"dayLengthHours\": 0")]         // No day
+    [InlineData("\"axialTilt\": 23.5", "\"axialTilt\": 200")]                // Over 180°
+    [InlineData("\"periodDays\": 365.25", "\"periodDays\": 0")]               // Never moves
+    [InlineData("\"eccentricity\": 0.25", "\"eccentricity\": 1")]             // Never closes
+    [InlineData("\"tilt\": 5.25", "\"tilt\": -3")]                            // Negative tilt
+    [InlineData("\"timeDays\": 400.5", "\"timeDays\": \"soon\"")]              // Not a time
+    [InlineData("\"parent\": \"51515151-5151-5151-5151-515151515151\"",
+        "\"parent\": \"12121212-1212-1212-1212-121212121212\"")]              // Missing parent
+    [InlineData("\"parent\": \"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\"",
+        "\"parent\": \"70707070-7070-7070-7070-707070707070\"")]              // Orbits itself
+    public void Load_DamagedStarSystem_IsRejected(string find, string replace)
+    {
+        string json = Normalize(GoldenV5Json).Replace(find, replace);
+        Assert.NotEqual(Normalize(GoldenV5Json), json);  // The edit really applied.
+        string path = WriteRawPackage("damaged-v5.nworld", json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
+    }
+
+    [Fact]
+    public void Load_BodiesOrbitingInALoop_IsRejected()
+    {
+        // The sun orbits the moon, which orbits the planet, which orbits the sun.
+        string json = Normalize(GoldenV5Json).Replace(
+            "\"kind\": \"star\",",
+            "\"kind\": \"star\",\n\"orbit\": { \"parent\": " +
+            "\"70707070-7070-7070-7070-707070707070\", \"distanceKm\": 1, " +
+            "\"periodDays\": 1, \"startAngle\": 0 },");
+        string path = WriteRawPackage("loop.nworld", json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
+
+        Assert.Contains("loop", error.Message);
     }
 
     [Fact]
@@ -776,6 +1001,55 @@ public sealed class WorldPackageTests : IDisposable
         };
     }
 
+    // A version 5 star system: a sun at the center, the mapped planet around it, and a moon on
+    // an elongated, tilted orbit around the planet.
+    private static World SystemGoldenWorld()
+    {
+        World world = WarpedGoldenWorld();
+        world.TimeDays = 400.5;
+        Body planet = world.Bodies[0];
+        var sunId = Guid.Parse("51515151-5151-5151-5151-515151515151");
+        planet.RadiusKm = 6000;
+        planet.DayLengthHours = 26.5;
+        planet.AxialTiltDegrees = 23.5;
+        planet.Orbit = new Orbit
+        {
+            ParentId = sunId,
+            DistanceKm = 149600000,
+            PeriodDays = 365.25,
+            StartAngleDegrees = 90,
+        };
+        world.Bodies.Insert(0, new Body
+        {
+            Id = sunId,
+            Name = "Sol",
+            Kind = BodyKind.Star,
+            RadiusKm = 696000,
+            DayLengthHours = 609.5,
+        });
+        world.Bodies.Add(new Body
+        {
+            Id = Guid.Parse("70707070-7070-7070-7070-707070707070"),
+            Name = "Luna",
+            Kind = BodyKind.Moon,
+            RadiusKm = 1737.5,
+            DayLengthHours = 660,
+            AxialTiltDegrees = 1.5,
+            Orbit = new Orbit
+            {
+                ParentId = planet.Id,
+                DistanceKm = 384400,
+                PeriodDays = 27.5,
+                StartAngleDegrees = 0,
+                Eccentricity = 0.25,
+                ClosestApproachDegrees = 45,
+                TiltDegrees = 5.25,
+                TiltDirectionDegrees = 120,
+            },
+        });
+        return world;
+    }
+
     private static World WarpedGoldenWorld()
     {
         World world = PiecesGoldenWorld();
@@ -787,6 +1061,7 @@ public sealed class WorldPackageTests : IDisposable
     private static void AssertSameWorld(World expected, World actual)
     {
         Assert.Equal(expected.Id, actual.Id);
+        Assert.Equal(expected.TimeDays, actual.TimeDays);
         Assert.Equal(expected.Name, actual.Name);
         Assert.Equal(expected.CreatedUtc, actual.CreatedUtc);
         Assert.Equal(expected.ModifiedUtc, actual.ModifiedUtc);
@@ -799,6 +1074,10 @@ public sealed class WorldPackageTests : IDisposable
             Assert.Equal(e.Id, a.Id);
             Assert.Equal(e.Name, a.Name);
             Assert.Equal(e.Kind, a.Kind);
+            Assert.Equal(e.RadiusKm, a.RadiusKm);
+            Assert.Equal(e.DayLengthHours, a.DayLengthHours);
+            Assert.Equal(e.AxialTiltDegrees, a.AxialTiltDegrees);
+            Assert.Equal(e.Orbit, a.Orbit);
             Assert.Equal(e.Surface.FillColor, a.Surface.FillColor);
             Assert.Equal(e.Surface.Map?.AssetName, a.Surface.Map?.AssetName);
             Assert.Equal(e.Surface.Map?.Projection, a.Surface.Map?.Projection);
