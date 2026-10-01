@@ -1,3 +1,5 @@
+using NothicWorlds.Core.Maps;
+
 namespace NothicWorlds.Core.Model;
 
 /// <summary>What's drawn on a body's surface (VISION.md MAP-01, MAP-03, MAP-04).</summary>
@@ -28,4 +30,81 @@ public sealed class SurfaceSettings
     /// southern hemisphere).
     /// </summary>
     public RgbColor FillColor { get; set; } = DefaultFillColor;
+
+    /// <summary>Returns an independent copy (e.g. a snapshot for undo).</summary>
+    public SurfaceSettings Clone()
+    {
+        var copy = new SurfaceSettings();
+        copy.RestoreFrom(this);
+        return copy;
+    }
+
+    /// <summary>
+    /// Makes these settings an independent copy of <paramref name="source"/> (e.g. to undo an
+    /// edit). Nothing is shared with the source except immutable parts.
+    /// </summary>
+    public void RestoreFrom(SurfaceSettings source)
+    {
+        FillColor = source.FillColor;
+        Map = source.Map is SurfaceMap map
+            ? new SurfaceMap
+            {
+                AssetName = map.AssetName,
+                Projection = map.Projection,
+                Calibration = map.Calibration,  // Immutable, safe to share.
+            }
+            : null;
+        Pieces.Clear();
+        Pieces.AddRange(source.Pieces.Select(piece => piece.Clone()));
+    }
+
+    /// <summary>
+    /// True if <paramref name="other"/> would save exactly the same surface: the same map, map
+    /// type, calibration, fill color, and pieces (in the same order, with the same names, cuts,
+    /// and placement). Used to tell whether the world still matches its saved file.
+    /// </summary>
+    public bool HasSameContent(SurfaceSettings other)
+    {
+        return FillColor == other.FillColor
+            && SameMap(Map, other.Map)
+            && Pieces.Count == other.Pieces.Count
+            && Pieces.Zip(other.Pieces).All(pair => SamePiece(pair.First, pair.Second));
+    }
+
+    private static bool SameMap(SurfaceMap? a, SurfaceMap? b)
+    {
+        if (a is null || b is null)
+        {
+            return a is null && b is null;
+        }
+
+        return a.AssetName == b.AssetName
+            && a.Projection == b.Projection
+            && SameCalibration(a.Calibration, b.Calibration);
+    }
+
+    private static bool SameCalibration(MapCalibration? a, MapCalibration? b)
+    {
+        if (ReferenceEquals(a, b))
+        {
+            return true;  // Immutable, so usually shared between copies.
+        }
+
+        return a is not null && b is not null
+            && a.Latitudes.SequenceEqual(b.Latitudes)
+            && a.Longitudes.SequenceEqual(b.Longitudes);
+    }
+
+    private static bool SamePiece(MapPiece a, MapPiece b)
+    {
+        return a.Id == b.Id
+            && a.Name == b.Name
+            && a.AssetName == b.AssetName
+            && a.Center == b.Center
+            && a.RotationDegrees == b.RotationDegrees
+            && a.WidthDegrees == b.WidthDegrees
+            && (ReferenceEquals(a.Outline, b.Outline)
+                || (a.Outline.SourceAspectRatio == b.Outline.SourceAspectRatio
+                    && a.Outline.Points.SequenceEqual(b.Outline.Points)));
+    }
 }

@@ -24,6 +24,7 @@ public partial class RecoveryService : Node
 
     private RecoveryStore _store = null!;
     private bool _isWriting;
+    private bool _wasUnsaved;
 
     public override void _Ready()
     {
@@ -39,6 +40,7 @@ public partial class RecoveryService : Node
         // A saved world, or one whose changes the user chose to discard, no longer needs a copy.
         Session.Saved += _store.Delete;
         Session.WorldClosed += _store.Delete;
+        Session.Changed += DeleteCopyIfBackToSaved;
 
         var timer = new Godot.Timer { WaitTime = IntervalSeconds, Autostart = true };
         timer.Timeout += () => _ = WriteCopyAsync();
@@ -46,6 +48,19 @@ public partial class RecoveryService : Node
 
         // After the rest of the app is ready, so dialogs and the message line exist.
         Callable.From(OfferRecovery).CallDeferred();
+    }
+
+    // Undoing back to exactly what's saved makes the copy pointless (and a crash would then
+    // offer to "recover" what's already in the file).
+    private void DeleteCopyIfBackToSaved()
+    {
+        bool unsaved = Session!.HasUnsavedChanges;
+        if (_wasUnsaved && !unsaved)
+        {
+            _store.Delete(Session.World.Id);
+        }
+
+        _wasUnsaved = unsaved;
     }
 
     private async Task WriteCopyAsync()

@@ -19,16 +19,7 @@ public sealed class Body
     public Body Clone()
     {
         var copy = new Body { Id = Id, Name = Name, Kind = Kind };
-        copy.Surface.FillColor = Surface.FillColor;
-        copy.Surface.Pieces.AddRange(Surface.Pieces.Select(piece => piece.Clone()));
-        copy.Surface.Map = Surface.Map is SurfaceMap map
-            ? new SurfaceMap
-            {
-                AssetName = map.AssetName,
-                Projection = map.Projection,
-                Calibration = map.Calibration,  // Immutable, safe to share.
-            }
-            : null;
+        copy.Surface.RestoreFrom(Surface);
         return copy;
     }
 }

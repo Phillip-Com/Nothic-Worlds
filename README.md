@@ -35,6 +35,7 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 | Toggle lat/long grid | — | G |
 | Performance overlay | — | F3 |
 | New world / Open / Save / Save As | **File** menu | Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S |
+| Undo / Redo | **Edit** menu | Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) |
 
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers
@@ -73,6 +74,7 @@ While the Pieces panel is open, click a piece on the globe to select it, then:
 | Resize (keeps proportions) | Drag a corner square |
 | Rotate | Drag the round handle above it (hold Shift to snap to 15°) |
 | Deselect | Click empty space or press Esc |
+| Delete | Delete key or the panel's Delete button (Ctrl+Z brings it back) |
 
 The panel's fields set exact latitude, longitude, rotation, and width. Pieces higher in the list
 cover lower ones. Up to 32 pieces per planet, all saved with the world.

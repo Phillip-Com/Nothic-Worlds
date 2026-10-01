@@ -1,5 +1,6 @@
 using Godot;
 using NothicWorlds.Controls;
+using NothicWorlds.Core.Editing;
 using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Maps;
 using NothicWorlds.Core.Model;
@@ -19,6 +20,8 @@ namespace NothicWorlds.Session;
 /// <remarks>
 /// Moving the camera doesn't count as an unsaved change (it would make the warning appear
 /// constantly), but the current view is included whenever the world is saved.
+/// Every edit can be undone: each one records a copy of the planet's surface first (see
+/// <see cref="UndoAsync"/>).
 /// </remarks>
 public partial class WorldSession : Node
 {
@@ -31,8 +34,21 @@ public partial class WorldSession : Node
     // The map type picked while no map is loaded; the next import uses it.
     private MapProjection _projectionWithoutMap = MapProjection.Mercator;
 
-    // Increases with every edit, so a save only clears "unsaved" if nothing changed meanwhile.
+    // Increases with every edit, so a gesture can tell whether it changed anything.
     private int _editVersion;
+
+    // Undo/redo: snapshots of the planet's surface. While a gesture (a drag, or a calibration
+    // session) is under way, its edits add up to one step, recorded when it ends.
+    private readonly UndoHistory<SurfaceSettings> _history = new();
+    private (string Description, SurfaceSettings Before, int Version)? _gesture;
+
+    // Copies of images only the undo history still needs (see AssetStash).
+    private AssetStash? _stash;
+
+    // The surface as it is in the saved file (or as a new world started), so the world counts
+    // as saved whenever it matches again, e.g. after undoing back to it. Null when there's
+    // nothing to match (a recovered world is unsaved until it's saved).
+    private SurfaceSettings? _savedSurface;
 
     /// <summary>Raised when anything shown about the world changes (name, file, unsaved state,
     /// busy state, or contents).</summary>
@@ -56,7 +72,10 @@ public partial class WorldSession : Node
     /// <summary>Where the world is saved, or null if it never has been.</summary>
     public string? FilePath { get; private set; }
 
-    /// <summary>True if the world has changes that aren't saved.</summary>
+    /// <summary>
+    /// True if the world differs from its saved file. Undoing back to exactly what was saved
+    /// makes it false again.
+    /// </summary>
     public bool HasUnsavedChanges { get; private set; }
 
     /// <summary>True while a save or open is in progress.</summary>
@@ -86,6 +105,13 @@ public partial class WorldSession : Node
         ShowSurfaceSettings();
     }
 
+    public override void _ExitTree()
+    {
+        // However the app ends, don't leave the undo copies in the temporary folder.
+        _stash?.Dispose();
+        _stash = null;
+    }
+
     /// <summary>Replaces the open world with a new, empty one. Unsaved changes are discarded,
     /// so ask the user first.</summary>
     public void NewWorld()
@@ -96,8 +122,10 @@ public partial class WorldSession : Node
         FilePath = null;
         MapCheck = null;
         HasUnsavedChanges = false;
+        _savedSurface = MainBody.Surface.Clone();
         _projectionWithoutMap = MapProjection.Mercator;
         _pieceTextures = [];
+        ResetHistory();
         ReleaseDecodedSource();
         Surface?.ClearMap();
         ShowSurfaceSettings();
@@ -145,12 +173,29 @@ public partial class WorldSession : Node
         World.View = Camera?.GetView();
         World snapshot = World.Clone();
         var assets = new Dictionary<string, IAssetSource>(_assets);
-        int versionAtSave = _editVersion;
+        List<string> neededByHistory = AssetsOnlyInHistory(snapshot, fullPath);
 
         SetBusy(true);
         try
         {
-            await Task.Run(() => WorldPackage.Save(fullPath, snapshot, assets));
+            Dictionary<string, FileAssetSource> kept = await Task.Run(() =>
+            {
+                // Copy them out first: the save replaces the file they're in.
+                Dictionary<string, FileAssetSource> copies = neededByHistory.ToDictionary(
+                    name => name, name => Stash().Keep(name, assets[name]));
+                WorldPackage.Save(fullPath, snapshot, assets);
+                return copies;
+            });
+            foreach ((string name, FileAssetSource copy) in kept)
+            {
+                _assets[name] = copy;
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            throw new WorldFileException(
+                $"Couldn't save: an image kept for undo couldn't be copied ({error.Message}).",
+                error);
         }
         finally
         {
@@ -158,7 +203,8 @@ public partial class WorldSession : Node
         }
 
         FilePath = fullPath;
-        HasUnsavedChanges = _editVersion != versionAtSave;
+        _savedSurface = snapshot.Bodies[0].Surface;  // A private copy, made before saving.
+        UpdateUnsavedState();
 
         // The saved assets now live in the world file, so later saves no longer depend on the
         // original image files (which the user may move or delete). Only images the world
@@ -193,6 +239,7 @@ public partial class WorldSession : Node
 
         string assetName = WorldPackage.CreateAssetName(Path.GetExtension(imagePath));
         _assets[assetName] = new FileAssetSource(Path.GetFullPath(imagePath));
+        RecordUndo("Import Map");
         MainBody.Surface.Map = new SurfaceMap { AssetName = assetName, Projection = Projection };
         MapCheck = map.Check;
         Surface?.SetMap(map.Texture);
@@ -209,6 +256,7 @@ public partial class WorldSession : Node
             return;
         }
 
+        RecordUndo("Clear Map");
         _projectionWithoutMap = Projection;
         MainBody.Surface.Map = null;
         MapCheck = null;
@@ -226,6 +274,7 @@ public partial class WorldSession : Node
 
         if (MainBody.Surface.Map is SurfaceMap map)
         {
+            RecordUndo("Change Map Type");
             map.Projection = projection;
             MarkChanged();
         }
@@ -251,6 +300,7 @@ public partial class WorldSession : Node
             return;
         }
 
+        RecordUndo("Calibrate Map");
         map.Calibration = calibration;
         Surface?.SetCalibration(calibration);
         MarkChanged();
@@ -267,13 +317,15 @@ public partial class WorldSession : Node
     public CalibrationSnapshot BeginCalibration()
     {
         IsCalibrating = true;
-        return new CalibrationSnapshot(Calibration, HasUnsavedChanges);
+        BeginGesture("Calibrate Map");
+        return new CalibrationSnapshot(Calibration);
     }
 
     /// <summary>Finishes calibrating (after Done or Cancel).</summary>
     public void EndCalibration()
     {
         IsCalibrating = false;
+        EndGesture();
     }
 
     /// <summary>
@@ -289,8 +341,9 @@ public partial class WorldSession : Node
 
         map.Calibration = snapshot.Calibration;
         Surface?.SetCalibration(snapshot.Calibration);
+        _gesture = null;  // Nothing to undo: everything is back as it was.
         _editVersion++;
-        HasUnsavedChanges = snapshot.WasUnsaved;
+        UpdateUnsavedState();
         Changed?.Invoke();
     }
 
@@ -380,6 +433,7 @@ public partial class WorldSession : Node
             WidthDegrees = Math.Clamp(widthDegrees,
                 PieceProjection.MinimumWidthDegrees, PieceProjection.MaximumWidthDegrees),
         };
+        RecordUndo($"Add {piece.Name}");
         MainBody.Surface.Pieces.Add(piece);
         _pieceTextures[piece.Id] = texture;
         ShowPieces();
@@ -396,6 +450,7 @@ public partial class WorldSession : Node
             return;
         }
 
+        RecordUndo($"Place {piece.Name}", mergeKey: ("place", id));
         piece.Center = center;
         piece.RotationDegrees = ((rotationDegrees % 360) + 360) % 360;
         piece.WidthDegrees = Math.Clamp(widthDegrees,
@@ -410,6 +465,7 @@ public partial class WorldSession : Node
         if (FindPiece(id) is MapPiece piece && !string.IsNullOrWhiteSpace(name)
             && piece.Name != name.Trim())
         {
+            RecordUndo($"Rename {piece.Name}");
             piece.Name = name.Trim();
             MarkChanged();
         }
@@ -423,8 +479,8 @@ public partial class WorldSession : Node
             return;
         }
 
+        RecordUndo($"Delete {piece.Name}");
         MainBody.Surface.Pieces.Remove(piece);
-        _pieceTextures.Remove(id);
         ShowPieces();
         MarkChanged();
     }
@@ -444,6 +500,7 @@ public partial class WorldSession : Node
         }
 
         MapPiece piece = pieces[index];
+        RecordUndo($"Reorder {piece.Name}");
         pieces.RemoveAt(index);
         pieces.Insert(target, piece);
         ShowPieces();
@@ -479,9 +536,85 @@ public partial class WorldSession : Node
             return;
         }
 
+        RecordUndo("Change Fill Color", mergeKey: "fill color");
         MainBody.Surface.FillColor = color;
         ShowSurfaceSettings();
         MarkChanged();
+    }
+
+    /// <summary>
+    /// True if Undo is possible now: there's a step to undo, and nothing is in progress (a save,
+    /// open, drag, calibration, or cut).
+    /// </summary>
+    public bool CanUndo => _history.CanUndo && IsIdleForHistory;
+
+    /// <summary>True if Redo is possible now (see <see cref="CanUndo"/>).</summary>
+    public bool CanRedo => _history.CanRedo && IsIdleForHistory;
+
+    /// <summary>What Undo would undo, e.g. "Move Piece 1", or null.</summary>
+    public string? UndoDescription => _history.UndoDescription;
+
+    /// <summary>What Redo would redo, or null.</summary>
+    public string? RedoDescription => _history.RedoDescription;
+
+    /// <summary>
+    /// Takes back the last edit. If that brings back a different map image, the image is
+    /// reloaded (a few seconds for a large map).
+    /// </summary>
+    /// <returns>What was undone and, if the map image couldn't be shown, a warning.</returns>
+    /// <exception cref="InvalidOperationException">Undo isn't possible now.</exception>
+    public Task<(string Description, string? Warning)> UndoAsync()
+    {
+        if (!CanUndo)
+        {
+            throw new InvalidOperationException("There's nothing to undo right now.");
+        }
+
+        string description = _history.UndoDescription!;
+        return RestoreAsync(_history.Undo(MainBody.Surface.Clone()), description);
+    }
+
+    /// <summary>Re-applies the last undone edit (see <see cref="UndoAsync"/>).</summary>
+    /// <exception cref="InvalidOperationException">Redo isn't possible now.</exception>
+    public Task<(string Description, string? Warning)> RedoAsync()
+    {
+        if (!CanRedo)
+        {
+            throw new InvalidOperationException("There's nothing to redo right now.");
+        }
+
+        string description = _history.RedoDescription!;
+        return RestoreAsync(_history.Redo(MainBody.Surface.Clone()), description);
+    }
+
+    /// <summary>
+    /// Starts a gesture, such as dragging a piece: its edits (however many) become one undo
+    /// step, recorded by <see cref="EndGesture"/>, and only if anything changed.
+    /// </summary>
+    /// <param name="description">What the gesture does, e.g. "Move Piece 1".</param>
+    public void BeginGesture(string description)
+    {
+        EndGesture();
+        _gesture = (description, MainBody.Surface.Clone(), _editVersion);
+        Changed?.Invoke();  // Undo isn't available mid-gesture.
+    }
+
+    /// <summary>Ends the gesture started by <see cref="BeginGesture"/>.</summary>
+    public void EndGesture()
+    {
+        if (_gesture is not (string description, SurfaceSettings before, int version))
+        {
+            return;
+        }
+
+        _gesture = null;
+        if (version != _editVersion)
+        {
+            _history.Record(description, before);
+            ForgetUnusedTextures();
+        }
+
+        Changed?.Invoke();
     }
 
     /// <summary>
@@ -490,6 +623,7 @@ public partial class WorldSession : Node
     public void Close()
     {
         CloseCurrentWorld();
+        ResetHistory();
     }
 
     private async Task<string?> LoadAndShowAsync(string readPath, string? savedPath, bool unsaved)
@@ -533,11 +667,13 @@ public partial class WorldSession : Node
         }
 
         CloseCurrentWorld();
+        ResetHistory();
         _pieceTextures = pieceTextures;
         World = loaded.World;
         _assets = new Dictionary<string, IAssetSource>(loaded.Assets);
         FilePath = savedPath;
         HasUnsavedChanges = unsaved;
+        _savedSurface = unsaved ? null : World.Bodies[0].Surface.Clone();
         MapCheck = map?.Check;
         _projectionWithoutMap = MapProjection.Mercator;
         if (map is not null)
@@ -597,11 +733,113 @@ public partial class WorldSession : Node
         Surface.SetCalibration(Calibration);
     }
 
+    private bool IsIdleForHistory =>
+        !IsBusy && _gesture is null && !IsCalibrating && !IsCutting;
+
+    // Call just before changing the surface. Inside a gesture, the gesture records it instead.
+    private void RecordUndo(string description, object? mergeKey = null)
+    {
+        if (_gesture is null)
+        {
+            _history.Record(description, MainBody.Surface.Clone(), mergeKey);
+            ForgetUnusedTextures();
+        }
+    }
+
+    // Puts back a snapshot from the history, reloading the map image if it's a different one.
+    private async Task<(string Description, string? Warning)> RestoreAsync(
+        SurfaceSettings state, string description)
+    {
+        string? previousMap = MainBody.Surface.Map?.AssetName;
+        MainBody.Surface.RestoreFrom(state);
+        string? warning = null;
+        if (MainBody.Surface.Map?.AssetName is not string mapAsset)
+        {
+            MapCheck = null;
+            Surface?.ClearMap();
+        }
+        else if (mapAsset != previousMap)
+        {
+            SetBusy(true);
+            try
+            {
+                LoadedMap map = await MapImageLoader.LoadAsync(_assets[mapAsset], mapAsset);
+                MapCheck = map.Check;
+                Surface?.SetMap(map.Texture);
+            }
+            catch (MapLoadException error)
+            {
+                // The map stays in the world data, so saving keeps it.
+                MapCheck = null;
+                Surface?.ClearMap();
+                warning = $"The map image couldn't be shown: {error.Message}";
+            }
+            finally
+            {
+                SetBusy(false);
+            }
+        }
+
+        ShowSurfaceSettings();
+        ShowPieces();
+        ForgetUnusedTextures();
+        MarkChanged();
+        return (description, warning);
+    }
+
+    // Piece textures are kept while the world or its undo history still has the piece, so
+    // undoing a delete is instant. The rest are freed.
+    private void ForgetUnusedTextures()
+    {
+        var used = new HashSet<Guid>(_history.States.Append(MainBody.Surface)
+            .SelectMany(state => state.Pieces.Select(piece => piece.Id)));
+        foreach (Guid id in _pieceTextures.Keys.Where(id => !used.Contains(id)).ToList())
+        {
+            _pieceTextures.Remove(id);
+        }
+    }
+
+    // Images the undo history needs but the world being saved doesn't, which are read from the
+    // file about to be replaced. They must be copied out first, or undo couldn't bring them back.
+    private List<string> AssetsOnlyInHistory(World saving, string savePath)
+    {
+        var saved = new HashSet<string>(WorldPackage.ReferencedAssetNames(saving));
+        return [.. _history.States
+            .SelectMany(state => state.Pieces.Select(piece => piece.AssetName)
+                .Append(state.Map?.AssetName))
+            .OfType<string>()
+            .Distinct()
+            .Where(name => !saved.Contains(name)
+                && _assets.GetValueOrDefault(name) is PackageAssetSource source
+                && string.Equals(source.PackagePath, savePath,
+                    StringComparison.OrdinalIgnoreCase))];
+    }
+
+    private AssetStash Stash()
+    {
+        return _stash ??= new AssetStash(Path.Combine(
+            Path.GetTempPath(), "NothicWorlds", $"undo-{Guid.NewGuid():N}"));
+    }
+
+    private void ResetHistory()
+    {
+        _history.Clear();
+        _gesture = null;
+        _stash?.Dispose();
+        _stash = null;
+    }
+
     private void MarkChanged()
     {
         _editVersion++;
-        HasUnsavedChanges = true;
+        UpdateUnsavedState();
         Changed?.Invoke();
+    }
+
+    private void UpdateUnsavedState()
+    {
+        HasUnsavedChanges =
+            _savedSurface is null || !MainBody.Surface.HasSameContent(_savedSurface);
     }
 
     private void CloseCurrentWorld()
