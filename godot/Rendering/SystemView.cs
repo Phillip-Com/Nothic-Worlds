@@ -358,8 +358,26 @@ public partial class SystemView : Node3D
 
         Camera.PlanetRadius = (float)focusRadius;
         Camera.MaxAltitude = (float)Math.Max(8.0, 2.5 * extent / focusRadius);
-        Camera.Near = (float)(focusRadius * 0.001);
+        Camera.Near = (float)Math.Max(focusRadius * 0.001, NearestSurfaceDistance() * 0.02);
         Camera.Far = (float)Math.Max(100.0 * focusRadius, 6.0 * extent);
+    }
+
+    // How far the camera is from the closest body's surface. The near clipping distance follows
+    // it: tiny up close, so the camera can get right down to the ground, and larger when zoomed
+    // out. A near distance fixed at a tiny value made the depth buffer run out of precision far
+    // away (at true scale the camera can be ~59,000 units out), so distant orbit lines and
+    // bodies failed the depth test and weren't drawn.
+    private double NearestSurfaceDistance()
+    {
+        Vector3 at = Camera!.GlobalPosition;
+        var camera = new Vector3D(at.X, at.Y, at.Z) + Origin;
+        double nearest = double.MaxValue;
+        foreach (DisplayBody place in _layout.Values)
+        {
+            nearest = Math.Min(nearest, (place.Position - camera).Length - place.Radius);
+        }
+
+        return nearest;
     }
 
     private BodyVisual CreateVisual(Body body)
