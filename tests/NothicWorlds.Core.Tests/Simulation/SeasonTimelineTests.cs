@@ -59,6 +59,18 @@ public class SeasonTimelineTests
     }
 
     [Fact]
+    public void LatestEvent_BeganTheCurrentSeason()
+    {
+        (List<Body> bodies, Body planet) = EarthLike();
+        SeasonTimeline timeline = SeasonTimeline.Around(bodies, planet, 0);
+
+        SeasonEvent latest = timeline.LatestEvent(200)!.Value;
+
+        Assert.Equal(SeasonEventKind.NorthernSummerSolstice, latest.Kind);
+        Assert.Equal(timeline.YearAround(200)[0], latest);
+    }
+
+    [Fact]
     public void NoSeasons_GivesNoAnswers()
     {
         (List<Body> bodies, Body planet) = EarthLike();
@@ -68,6 +80,7 @@ public class SeasonTimelineTests
         Assert.Empty(timeline.Events);
         Assert.Null(timeline.SeasonAt(100));
         Assert.Null(timeline.NextEvent(100));
+        Assert.Null(timeline.LatestEvent(100));
     }
 
     // The same sun and planet as SeasonsTests: northern winter solstice at time 0.

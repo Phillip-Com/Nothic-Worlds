@@ -111,18 +111,18 @@ public static class Seasons
         }
 
         double step = BodyClock.YearDays(bodies, body) / SamplesPerYear;
-        double Declination(double t) => StarDeclinationDegrees(bodies, body, star, t);
+        Func<double, double> declination = DeclinationFunction(bodies, body, star);
 
         double previousTime = fromDays;
-        double previous = Declination(previousTime);
-        double previousSlope = Declination(previousTime + step / 100) - previous;
+        double previous = declination(previousTime);
+        double previousSlope = declination(previousTime + step / 100) - previous;
         for (double time = fromDays + step; previousTime < toDays; time += step)
         {
-            double value = Declination(time);
+            double value = declination(time);
             double slope = value - previous;
             if ((previous < 0) != (value < 0))
             {
-                double crossing = Bisect(Declination, previousTime, time, previous < 0);
+                double crossing = Bisect(declination, previousTime, time, previous < 0);
                 events.Add(new SeasonEvent(previous < 0
                     ? SeasonEventKind.NorthernSpringEquinox
                     : SeasonEventKind.NorthernAutumnEquinox, crossing));
@@ -131,7 +131,7 @@ public static class Seasons
             if ((previousSlope > 0) != (slope > 0) && previousSlope != 0)
             {
                 bool peak = previousSlope > 0;
-                double extreme = Extreme(Declination, previousTime - step, time, peak);
+                double extreme = Extreme(declination, previousTime - step, time, peak);
                 events.Add(new SeasonEvent(peak
                     ? SeasonEventKind.NorthernSummerSolstice
                     : SeasonEventKind.NorthernWinterSolstice, extreme));
@@ -187,6 +187,52 @@ public static class Seasons
         };
         Season southern = (Season)(((int)northern + 2) % 4);
         return (northern, southern);
+    }
+
+    // The star's declination over time, made quick to evaluate thousands of times: it works out
+    // the two chains of orbits once (instead of every body's position at every step), and adds
+    // up just their offsets.
+    private static Func<double, double> DeclinationFunction(
+        IReadOnlyList<Body> bodies, Body body, Body star)
+    {
+        if (SystemHierarchy.Problem(bodies) is string problem)
+        {
+            throw new ArgumentException($"The star system is invalid: {problem}.", nameof(bodies));
+        }
+
+        var byId = bodies.ToDictionary(b => b.Id);
+        List<Orbit> bodyChain = OrbitsFromCenter(body, byId);
+        List<Orbit> starChain = OrbitsFromCenter(star, byId);
+        Vector3D pole = BodyOrientation.NorthPole(body);
+        return timeDays =>
+        {
+            Vector3D toStar = PositionAlong(starChain, timeDays) - PositionAlong(bodyChain, timeDays);
+            double sine = toStar.Dot(pole) / toStar.Length;
+            return double.RadiansToDegrees(Math.Asin(Math.Clamp(sine, -1, 1)));
+        };
+    }
+
+    // The orbits linking a body to the system's center (the hierarchy has no loops).
+    private static List<Orbit> OrbitsFromCenter(Body body, Dictionary<Guid, Body> byId)
+    {
+        var chain = new List<Orbit>();
+        for (Body current = body; current.Orbit is Orbit orbit; current = byId[orbit.ParentId])
+        {
+            chain.Add(orbit);
+        }
+
+        return chain;
+    }
+
+    private static Vector3D PositionAlong(List<Orbit> chain, double timeDays)
+    {
+        Vector3D position = Vector3D.Zero;
+        foreach (Orbit orbit in chain)
+        {
+            position += OrbitMath.OffsetFromParent(orbit, timeDays);
+        }
+
+        return position;
     }
 
     // Narrows down where a smooth function crosses zero between two times.

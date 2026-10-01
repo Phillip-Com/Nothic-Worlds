@@ -61,6 +61,17 @@ public sealed class SeasonTimeline
     /// </summary>
     public (Season Northern, Season Southern)? SeasonAt(double timeDays)
     {
+        return LatestEvent(timeDays) is SeasonEvent latest
+            ? Seasons.SeasonsAfter(latest.Kind)
+            : null;
+    }
+
+    /// <summary>
+    /// The event that began the current season (the latest at or before a time), or null if
+    /// there isn't one in the stretch.
+    /// </summary>
+    public SeasonEvent? LatestEvent(double timeDays)
+    {
         SeasonEvent? latest = null;
         foreach (SeasonEvent e in _events)
         {
@@ -72,7 +83,7 @@ public sealed class SeasonTimeline
             latest = e;
         }
 
-        return latest is SeasonEvent found ? Seasons.SeasonsAfter(found.Kind) : null;
+        return latest;
     }
 
     /// <summary>The next event after a time, or null if there isn't one in the stretch.</summary>
