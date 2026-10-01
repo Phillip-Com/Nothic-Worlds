@@ -82,14 +82,10 @@ public static class SystemLayout
 
         double parentRadius = DisplayRadius(parent.RadiusKm, scale);
         double childRadius = DisplayRadius(body.RadiusKm, scale);
-        var points = new Vector3D[samples];
-        for (int i = 0; i < samples; i++)
-        {
-            Vector3D offset = OrbitMath.OffsetFromParent(orbit, orbit.PeriodDays * i / samples);
-            points[i] = DisplayOffset(offset, parentRadius, childRadius, scale);
-        }
-
-        return points;
+        // Spread evenly along the curve, so very elongated orbits stay smooth where the body
+        // moves fastest.
+        return [.. OrbitMath.EvenlySpacedTimes(orbit, samples).Select(time => DisplayOffset(
+            OrbitMath.OffsetFromParent(orbit, time), parentRadius, childRadius, scale))];
     }
 
     private static DisplayBody Place(
