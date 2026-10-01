@@ -58,6 +58,31 @@ public static class BodyClock
     }
 
     /// <summary>
+    /// The date and time on the body as words: in its calendar if it has one ("14 Highsun 1203,
+    /// Moonday, 14:30"), otherwise "Day 1,204, 14:30" (VISION.md CAL-01, SIM-02).
+    /// </summary>
+    public static string Describe(Body body, double timeDays)
+    {
+        LocalTime local = LocalTimeOn(body, timeDays);
+        if (body.Calendar is not Calendar calendar)
+        {
+            return local.ToString();
+        }
+
+        CalendarDate date = CalendarMath.DateOf(calendar, local.Day - 1);
+        return $"{CalendarMath.Format(calendar, date)}, {local.Hour}:{local.Minute:00}";
+    }
+
+    /// <summary>
+    /// The world time (standard days) at a given day and hour on the body. Day index 0 is the
+    /// day at time 0 (day 1, or the calendar's start date); hours are standard hours into it.
+    /// </summary>
+    public static double TimeAt(Body body, long dayIndex, double hours)
+    {
+        return (dayIndex * body.DayLengthHours + hours) / 24.0;
+    }
+
+    /// <summary>
     /// The day and time of day on the body at <paramref name="timeDays"/>. Time 0 is the start
     /// of day 1. Hours are standard hours since the body's day began, so a 30-hour day runs
     /// from 0:00 to 29:59.

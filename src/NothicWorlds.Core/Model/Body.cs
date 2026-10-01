@@ -37,6 +37,17 @@ public sealed class Body
     public double AxialTiltDegrees { get; set; }
 
     /// <summary>
+    /// Which way the spin axis leans, in degrees: the direction the north pole tips toward,
+    /// measured like orbit angles (0 is the reference direction, counting counterclockwise seen
+    /// from the north). Together with the orbit, it decides when in the year each season falls
+    /// (VISION.md CAL-03).
+    /// </summary>
+    public double AxialTiltDirectionDegrees { get; set; }
+
+    /// <summary>The body's own calendar (VISION.md CAL-01), or null to count plain days.</summary>
+    public Calendar? Calendar { get; set; }
+
+    /// <summary>
     /// The path this body follows around its parent (VISION.md SIM-01), or null if it sits
     /// still at the system's center (usually the main sun).
     /// </summary>
@@ -58,9 +69,13 @@ public sealed class Body
             return $"a body's day must be above 0 and at most {MaxDayLengthHours:g} hours";
         }
 
-        return double.IsFinite(AxialTiltDegrees) && AxialTiltDegrees is >= 0 and <= 180
-            ? Orbit?.Problem()
-            : "a body's axial tilt must be 0° to 180°";
+        if (!double.IsFinite(AxialTiltDegrees) || AxialTiltDegrees is < 0 or > 180
+            || !double.IsFinite(AxialTiltDirectionDegrees))
+        {
+            return "a body's axial tilt must be 0° to 180°, with a direction";
+        }
+
+        return Orbit?.Problem() ?? Calendar?.Problem();
     }
 
     /// <summary>
@@ -72,7 +87,9 @@ public sealed class Body
     {
         return Id == other.Id && Name == other.Name && Kind == other.Kind
             && RadiusKm == other.RadiusKm && DayLengthHours == other.DayLengthHours
-            && AxialTiltDegrees == other.AxialTiltDegrees && Orbit == other.Orbit
+            && AxialTiltDegrees == other.AxialTiltDegrees
+            && AxialTiltDirectionDegrees == other.AxialTiltDirectionDegrees
+            && Orbit == other.Orbit && Calendar == other.Calendar
             && Surface.HasSameContent(other.Surface);
     }
 
@@ -87,7 +104,9 @@ public sealed class Body
             RadiusKm = RadiusKm,
             DayLengthHours = DayLengthHours,
             AxialTiltDegrees = AxialTiltDegrees,
+            AxialTiltDirectionDegrees = AxialTiltDirectionDegrees,
             Orbit = Orbit,  // Immutable, safe to share.
+            Calendar = Calendar,  // Immutable, safe to share.
         };
         copy.Surface.RestoreFrom(Surface);
         return copy;
