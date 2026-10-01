@@ -4,4 +4,6 @@ namespace NothicWorlds.Core.Model;
 public enum BodyKind
 {
     Planet,
+    Star,
+    Moon,
 }

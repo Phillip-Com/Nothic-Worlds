@@ -12,13 +12,70 @@ public sealed class Body
     /// <summary>What kind of body this is.</summary>
     public BodyKind Kind { get; init; } = BodyKind.Planet;
 
+    /// <summary>The largest allowed radius, in km (far beyond the biggest known stars).</summary>
+    public const double MaxRadiusKm = 1e10;
+
+    /// <summary>The longest allowed day, in hours.</summary>
+    public const double MaxDayLengthHours = 1e7;
+
     /// <summary>What's drawn on the body's surface.</summary>
     public SurfaceSettings Surface { get; } = new();
+
+    /// <summary>The body's radius in km (Earth's by default).</summary>
+    public double RadiusKm { get; set; } = 6371.0;
+
+    /// <summary>
+    /// How long the body takes to spin once, in standard hours (VISION.md SIM-02): the length
+    /// of its day. 24 by default.
+    /// </summary>
+    public double DayLengthHours { get; set; } = 24.0;
+
+    /// <summary>
+    /// How far the body's spin axis leans, in degrees (0 = upright, 90 = on its side, over 90 =
+    /// spinning backwards). Drives seasons later (CAL-03).
+    /// </summary>
+    public double AxialTiltDegrees { get; set; }
+
+    /// <summary>
+    /// The path this body follows around its parent (VISION.md SIM-01), or null if it sits
+    /// still at the system's center (usually the main sun).
+    /// </summary>
+    public Orbit? Orbit { get; set; }
+
+    /// <summary>
+    /// What's wrong with the body's size, day, tilt, or orbit, or null if they're usable.
+    /// </summary>
+    public string? Problem()
+    {
+        if (!double.IsFinite(RadiusKm) || RadiusKm <= 0 || RadiusKm > MaxRadiusKm)
+        {
+            return $"a body's radius must be above 0 and at most {MaxRadiusKm:g} km";
+        }
+
+        if (!double.IsFinite(DayLengthHours) || DayLengthHours <= 0
+            || DayLengthHours > MaxDayLengthHours)
+        {
+            return $"a body's day must be above 0 and at most {MaxDayLengthHours:g} hours";
+        }
+
+        return double.IsFinite(AxialTiltDegrees) && AxialTiltDegrees is >= 0 and <= 180
+            ? Orbit?.Problem()
+            : "a body's axial tilt must be 0° to 180°";
+    }
 
     /// <summary>Returns an independent copy of this body.</summary>
     public Body Clone()
     {
-        var copy = new Body { Id = Id, Name = Name, Kind = Kind };
+        var copy = new Body
+        {
+            Id = Id,
+            Name = Name,
+            Kind = Kind,
+            RadiusKm = RadiusKm,
+            DayLengthHours = DayLengthHours,
+            AxialTiltDegrees = AxialTiltDegrees,
+            Orbit = Orbit,  // Immutable, safe to share.
+        };
         copy.Surface.RestoreFrom(Surface);
         return copy;
     }

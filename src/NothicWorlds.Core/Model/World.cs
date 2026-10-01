@@ -22,10 +22,16 @@ public sealed class World
     public DateTimeOffset ModifiedUtc { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>
-    /// The world's celestial bodies. Currently always one planet. It's a list so suns, moons,
-    /// and more can be added later without changing the file layout.
+    /// The world's celestial bodies: suns, planets, and moons (VISION.md BOD-01). Bodies with an
+    /// orbit circle their parent; see <c>Simulation.SystemHierarchy</c> for the rules.
     /// </summary>
     public List<Body> Bodies { get; } = [];
+
+    /// <summary>
+    /// The world clock (VISION.md SIM-02), in standard days since the world's time 0. Every
+    /// body's position and spin follow from it.
+    /// </summary>
+    public double TimeDays { get; set; }
 
     /// <summary>
     /// Where the camera was looking when the world was saved, or null for the default.
@@ -45,6 +51,7 @@ public sealed class World
             CreatedUtc = CreatedUtc,
             ModifiedUtc = ModifiedUtc,
             View = View,  // Immutable record, safe to share.
+            TimeDays = TimeDays,
         };
         copy.Bodies.AddRange(Bodies.Select(body => body.Clone()));
         return copy;
