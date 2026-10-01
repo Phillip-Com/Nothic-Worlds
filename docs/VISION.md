@@ -81,7 +81,7 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
   PR #14, brought forward by the owner so warping has it from the start), then point warping
   (PR #15).
 
-**Milestone 4: Star System Basics** · In Progress (owner's choice, 2026-09-30)
+**Milestone 4: Star System Basics** · Complete (PR #18 merged 2026-10-01; owner's choice, 2026-09-30)
 Suns, planets, and moons on designed orbits, a world clock, and zooming out to the whole
 system (`BOD-01`, `SIM-01`, `SIM-02`, `REN-02`, `UI-02`). Calendars, seasons, and eclipses build
 on it. Owner's decisions:

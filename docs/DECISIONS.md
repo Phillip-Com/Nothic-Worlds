@@ -7,9 +7,9 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-09-30 | **Make Center**: any body can become the center of its system; the bodies it orbited flip to circle it on the same paths, keeping every relative position | In PR | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) | VISION.md `UI-02` |
-| 2026-09-30 | Deleting a body **also deletes everything orbiting it**; Ctrl+Z brings it all back | In PR | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) | VISION.md `UI-02` |
-| 2026-09-30 | System tree and body properties in a **left panel, opened by a System… button** | In PR | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) | VISION.md `UI-02` |
+| 2026-09-30 | **Make Center**: any body can become the center of its system; the bodies it orbited flip to circle it on the same paths, keeping every relative position | Merged | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) · `425248d` | VISION.md `UI-02` |
+| 2026-09-30 | Deleting a body **also deletes everything orbiting it**; Ctrl+Z brings it all back | Merged | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) · `425248d` | VISION.md `UI-02` |
+| 2026-09-30 | System tree and body properties in a **left panel, opened by a System… button** | Merged | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) · `425248d` | VISION.md `UI-02` |
 | 2026-09-30 | Milestone 4: **star system basics** (suns, planets, moons, designed orbits, world clock, system view) | Merged | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) · `56cb993` | VISION.md §3 |
 | 2026-09-30 | System view: **readable scale by default, with a true-scale toggle**; data always in real units | Merged | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) · `56cb993` | Built in the next PR |
 | 2026-09-30 | Orbits: **simple** (distance, period, start), circles by default, with optional elongation and tilt; periods set freely | Merged | [#16](https://github.com/Phillip-Com/Nothic-Worlds/pull/16) · `56cb993` | VISION.md `SIM-01` |
