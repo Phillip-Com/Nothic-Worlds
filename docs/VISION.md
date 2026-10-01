@@ -78,7 +78,8 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
 - **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace (PR #10).
 - **Part 2:** `MAP-02` cut and place. Core first (PR #11), then the Cut editor, Pieces panel,
   and live drawing (PR #12), then drag handles on the globe (PR #13), then undo/redo (`UI-03`,
-  PR #14, brought forward by the owner so warping has it from the start), then point warping.
+  PR #14, brought forward by the owner so warping has it from the start), then point warping
+  (PR #15).
 
 ---
 
@@ -262,7 +263,7 @@ future work.
 - **Verified orientation:** a generated test map with markers at 0°/0°, 45°N, 45°E, 45°W, and
   180° shows north up, east to the right, and no seam.
 
-**MAP-02 — Manual map placement onto the globe** · In Progress (handles done, PR #13) · Base
+**MAP-02 — Manual map placement onto the globe** · Implemented (M3) · Base
 **Intent:** For maps that aren't in a supported layout, the user cuts the image up and places it
 onto the globe themselves, adjusting for distortion and distance. (Flat maps don't map one-to-one
 onto spheres: areas near the equator are close to true size, and areas near the poles are stretched.)
@@ -285,6 +286,8 @@ onto spheres: areas near the equator are close to true size, and areas near the 
   cut** on the globe (4 corners for a rectangle, each clicked point for a freeform cut), and the
   image stretches smoothly to follow. What was cut out doesn't change. Needs world file format
   version 4 (where each point was dragged to). Its own PR, after the handles.
+- **Entering Edit Points (owner, 2026-09-30):** the panel's **Edit Points** toggle, or
+  **double-clicking** a piece. Esc (or clicking empty space) leaves it.
 - **Count:** up to a few dozen, drawn **live** for instant feedback. The limit is **32 per
   planet**, to keep the Base tier fast; the cost is measured in the app PR.
 **How pieces sit on the globe:** like a sticker. Distances from the piece's center are true
@@ -362,7 +365,31 @@ earlier ones.
 - **Verified in the running app** (simulated mouse input through the real input path): a click
   selected a piece, and dragging the body, rotate handle, and corner moved, turned, and resized
   it. Clicking empty space deselected it, and left-drag then orbited the camera.
-**Still to do (next PR):** point warping (Edit Points), world file format version 4.
+**Implementation (Edit Points, PR #15):**
+- **Data:** `MapPiece.WarpedPoints`, one position per outline point in the piece's box, so a
+  warp moves, turns, and resizes with its piece. World file format version 4 (optional
+  `warp`); version 3 files upgrade with nothing to change.
+- **The stretch** (`Core/Maps/PieceWarp.cs`): mean value coordinates over the outline. Every
+  position is a smooth blend of the outline points, exact at each point, straight along each
+  edge, with no creases, for any outline shape (tested with a concave L). It's fast enough for
+  hundreds of points.
+- **Drawing:** `BakeLookup` maps a 48 × 48 mesh (one extra cell past each side) through the
+  stretch and rasterizes the **reverse** into a 64 × 64 `WarpLookup`: for each spot of the
+  stretched piece, which spot of the image belongs there. All lookups share one 512 × 256 float
+  atlas, rewritten only per changed tile. The shader blends the four nearest cells exactly like
+  `WarpLookup.Sample`, and cuts the edge exactly where the image ends (not along the cells), so
+  edges stay as clean as unwarped pieces. The quick distance check uses the stretched reach.
+- **Clicking** uses the same lookup (`PieceManipulation.PieceAt` with
+  `WorldSession.WarpLookupFor`), so what's drawn and what's clickable agree.
+- **UI:** `PieceHandles` shows a handle on every point in Edit Points, and the outline follows
+  the stretched shape. The normal frame (corners and rotate handle) wraps the stretched shape.
+  `PiecesPanel` has **Edit Points** (toggle) and **Reset Points**. Each point drag is one undo
+  step ("Edit Points of Piece 1"), and so is Reset.
+- **Verified in the running app** (real input): double-click entered Edit Points, dragging the
+  top-right point stretched the image smoothly, Esc left the mode, clicking the stretched area
+  selected the piece, Ctrl+Z/Ctrl+Y removed and restored the warp, and save → reopen kept it.
+- **Benchmark (32 large pieces, all warped):** ~120 → ~92 fps, video memory unchanged. Still
+  Base.
 
 **MAP-05 — Grid calibration (adjust how the map's lines project)** · Implemented (M3) · Base
 **Intent:** Raised by the owner while testing `MAP-04`. The built-in map types require the image
