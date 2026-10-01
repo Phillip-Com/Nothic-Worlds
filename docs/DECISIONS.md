@@ -7,10 +7,10 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-09-30 | A world that **matches its saved file** counts as saved (e.g. after undoing back to it) | In PR | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) | VISION.md `UI-03` |
-| 2026-09-30 | **Undo/redo** brought forward, before map warping; covers **all world edits** (pieces, map type, fill color, calibration, Import/Clear Map) | In PR | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) | VISION.md `UI-03` |
-| 2026-09-30 | Undo/redo through an **Edit menu** (names what will be undone) plus Ctrl+Z and Ctrl+Y / Ctrl+Shift+Z | In PR | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) | |
-| 2026-09-30 | The **Delete** key deletes the selected piece; deleting **no longer asks first** because it can be undone | In PR | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) | |
+| 2026-09-30 | A world that **matches its saved file** counts as saved (e.g. after undoing back to it) | Merged | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) · `1d80a42` | VISION.md `UI-03` |
+| 2026-09-30 | **Undo/redo** brought forward, before map warping; covers **all world edits** (pieces, map type, fill color, calibration, Import/Clear Map) | Merged | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) · `1d80a42` | VISION.md `UI-03` |
+| 2026-09-30 | Undo/redo through an **Edit menu** (names what will be undone) plus Ctrl+Z and Ctrl+Y / Ctrl+Shift+Z | Merged | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) · `1d80a42` | |
+| 2026-09-30 | The **Delete** key deletes the selected piece; deleting **no longer asks first** because it can be undone | Merged | [#14](https://github.com/Phillip-Com/Nothic-Worlds/pull/14) · `1d80a42` | |
 | 2026-09-30 | Pieces are handled **like stamps in other map makers**: click to select, drag to move, corners resize, a handle rotates; number fields kept for exact values | Merged | [#13](https://github.com/Phillip-Com/Nothic-Worlds/pull/13) · `e79c89f` | Owner found typing numbers hard as the main control. VISION.md `MAP-02` |
 | 2026-09-30 | Corner resizing **keeps proportions**; stretching one way is done by warping | Merged | [#13](https://github.com/Phillip-Com/Nothic-Worlds/pull/13) · `e79c89f` | |
 | 2026-09-30 | **Warping**: drag every point of a piece's cut on the globe and the image stretches to follow | Merged | [#13](https://github.com/Phillip-Com/Nothic-Worlds/pull/13) · `e79c89f` | Recorded here; built in the next PR (world file format version 4) |
