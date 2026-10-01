@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -55,6 +55,10 @@ internal static partial class WorldFormat
 
         // 2 → 3: surfaces gained an optional "pieces" list (MAP-02). Version 2 worlds have
         // none, so again only the version number changes.
+        document => document,
+
+        // 3 → 4: pieces gained an optional "warp" (Edit Points, MAP-02). Version 3 pieces are
+        // simply unwarped.
         document => document,
     ];
 

@@ -40,6 +40,7 @@ internal sealed class PieceDocument
     public required double Longitude { get; init; }
     public required double Rotation { get; init; }
     public required double Width { get; init; }
+    public List<double[]>? Warp { get; init; }  // Added in format version 4
 }
 
 internal sealed class OutlineDocument

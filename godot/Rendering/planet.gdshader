@@ -60,6 +60,17 @@ uniform vec4 piece_frames[32];
 // x: cosine of the piece's reach (quick skip for far-away pixels); y: radians per texel.
 uniform vec2 piece_limits[32];
 
+// Warped pieces (Edit Points): each one's reverse lookup (Core WarpLookup) is a 64 x 64 tile in
+// this atlas, 8 tiles across and 4 down. Each cell holds the unwarped box position (rg) and
+// whether the piece covers it (b). Read with texelFetch, so no filtering is needed.
+uniform sampler2D piece_warp_atlas : repeat_disable, filter_nearest;
+// Each piece's tile in the atlas, or -1 if it isn't warped.
+uniform int piece_warp_tiles[32];
+// The part of each piece's box its lookup covers: (min u, min v, max u, max v).
+uniform vec4 piece_warp_rects[32];
+const int WARP_SIZE = 64;
+const int WARP_TILES_ACROSS = 8;
+
 uniform vec3 base_color : source_color = vec3(0.13, 0.27, 0.45);
 uniform vec3 grid_color : source_color = vec3(0.75, 0.8, 0.9);
 uniform vec3 highlight_color : source_color = vec3(1.0, 0.8, 0.35);
@@ -268,6 +279,40 @@ vec3 sample_map(float true_lat, float true_lon) {
 	return mix(map_color, fill_color, fill);
 }
 
+// Turns a position in a warped piece's box into the unwarped position drawn there. Returns false
+// if the piece doesn't cover it. Must match WarpLookup.Sample in Core exactly.
+bool unwarp(int piece, inout vec2 uv) {
+	vec4 rect = piece_warp_rects[piece];
+	vec2 cell = (uv - rect.xy) / (rect.zw - rect.xy) * float(WARP_SIZE) - 0.5;
+	if (cell.x < -1.0 || cell.y < -1.0
+			|| cell.x > float(WARP_SIZE) || cell.y > float(WARP_SIZE)) {
+		return false;
+	}
+
+	ivec2 base = ivec2(floor(cell));
+	vec2 f = cell - vec2(base);
+	int tile = piece_warp_tiles[piece];
+	ivec2 origin = ivec2(tile % WARP_TILES_ACROSS, tile / WARP_TILES_ACROSS) * WARP_SIZE;
+	float covered = 0.0;
+	vec2 sum = vec2(0.0);
+	for (int dy = 0; dy <= 1; dy++) {
+		for (int dx = 0; dx <= 1; dx++) {
+			ivec2 at = clamp(base + ivec2(dx, dy), ivec2(0), ivec2(WARP_SIZE - 1));
+			vec4 value = texelFetch(piece_warp_atlas, origin + at, 0);
+			float weight = (dx == 0 ? 1.0 - f.x : f.x) * (dy == 0 ? 1.0 - f.y : f.y) * value.b;
+			covered += weight;
+			sum += weight * value.rg;
+		}
+	}
+
+	if (covered < 0.5) {
+		return false;
+	}
+	// The lookup reaches a little past the piece; cut its edge exactly where the box ends.
+	uv = sum / covered;
+	return uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0;
+}
+
 // Draws each piece covering this point, in order. `pixel_angle` is how much of the globe (in
 // radians) one screen pixel covers here; it picks the texture's detail level, since the usual
 // automatic choice doesn't work inside a loop that skips pixels.
@@ -291,7 +336,11 @@ vec3 draw_pieces(vec3 color, vec3 direction, float pixel_angle) {
 		float right = x * frame.x - y * frame.y;
 		float up = x * frame.y + y * frame.x;
 		vec2 uv = vec2(0.5 + right * frame.z, 0.5 - up * frame.w);
-		if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+		if (piece_warp_tiles[i] >= 0) {
+			if (!unwarp(i, uv)) {
+				continue;
+			}
+		} else if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
 			continue;
 		}
 

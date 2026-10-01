@@ -16,28 +16,49 @@ public static class PieceManipulation
     /// </summary>
     /// <param name="pieces">The planet's pieces, bottom to top.</param>
     /// <param name="point">The position on the globe.</param>
-    public static MapPiece? PieceAt(IReadOnlyList<MapPiece> pieces, GeoCoordinate point)
+    /// <param name="lookupFor">
+    /// The baked lookup of each warped piece (see <see cref="PieceWarp.BakeLookup"/>), if the
+    /// caller keeps them; otherwise they're baked as needed.
+    /// </param>
+    public static MapPiece? PieceAt(
+        IReadOnlyList<MapPiece> pieces,
+        GeoCoordinate point,
+        Func<MapPiece, WarpLookup?>? lookupFor = null)
     {
         for (int i = pieces.Count - 1; i >= 0; i--)
         {
             MapPiece piece = pieces[i];
-            MapImagePosition box = PieceProjection.For(piece).ToBoxPosition(point);
-            if (box.IsOutsideMap)
-            {
-                continue;
-            }
-
-            PieceOutline outline = piece.Outline;
-            var onImage = new ImagePoint(
-                outline.MinU + box.U * (outline.MaxU - outline.MinU),
-                outline.MinV + box.V * (outline.MaxV - outline.MinV));
-            if (outline.Contains(onImage))
+            WarpLookup? lookup = piece.WarpedPoints is null
+                ? null
+                : lookupFor?.Invoke(piece) ?? PieceWarp.For(piece)!.BakeLookup();
+            if (UnwarpedBoxPosition(piece, lookup, point) is ImagePoint box
+                && piece.Outline.Contains(ToImage(piece.Outline, box)))
             {
                 return piece;
             }
         }
 
         return null;
+    }
+
+    // Where a globe position falls in the piece's unwarped box, or null if it's off the piece.
+    private static ImagePoint? UnwarpedBoxPosition(
+        MapPiece piece, WarpLookup? lookup, GeoCoordinate point)
+    {
+        MapImagePosition box = PieceProjection.For(piece).ToBoxPosition(point);
+        if (lookup is not null)
+        {
+            return lookup.Sample(new ImagePoint(box.U, box.V));
+        }
+
+        return box.IsOutsideMap ? null : new ImagePoint(box.U, box.V);
+    }
+
+    private static ImagePoint ToImage(PieceOutline outline, ImagePoint box)
+    {
+        return new ImagePoint(
+            outline.MinU + box.U * (outline.MaxU - outline.MinU),
+            outline.MinV + box.V * (outline.MaxV - outline.MinV));
     }
 
     /// <summary>

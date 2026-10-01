@@ -75,6 +75,7 @@ While the Pieces panel is open, click a piece on the globe to select it, then:
 | Rotate | Drag the round handle above it (hold Shift to snap to 15°) |
 | Deselect | Click empty space or press Esc |
 | Delete | Delete key or the panel's Delete button (Ctrl+Z brings it back) |
+| Stretch (Edit Points) | Double-click the piece (or **Edit Points** in the panel), then drag any point of the cut; Esc when done. **Reset Points** undoes all stretching. |
 
 The panel's fields set exact latitude, longitude, rotation, and width. Pieces higher in the list
 cover lower ones. Up to 32 pieces per planet, all saved with the world.

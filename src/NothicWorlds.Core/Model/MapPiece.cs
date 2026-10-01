@@ -39,6 +39,14 @@ public sealed class MapPiece
     /// </summary>
     public double WidthDegrees { get; set; } = 30.0;
 
+    /// <summary>
+    /// Where each point of the cut has been dragged to (Edit Points), in the piece's box: 0–1
+    /// from its top-left before warping, and possibly beyond. One per outline point, in the same
+    /// order. Null if the piece isn't warped. Replace the whole list to change it; it's never
+    /// edited in place, so copies can share it.
+    /// </summary>
+    public IReadOnlyList<ImagePoint>? WarpedPoints { get; set; }
+
     /// <summary>Returns an independent copy of this piece.</summary>
     public MapPiece Clone()
     {
@@ -51,6 +59,7 @@ public sealed class MapPiece
             Center = Center,
             RotationDegrees = RotationDegrees,
             WidthDegrees = WidthDegrees,
+            WarpedPoints = WarpedPoints,  // Never edited in place, safe to share.
         };
     }
 }

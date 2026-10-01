@@ -29,6 +29,10 @@ public partial class WorldSession : Node
 
     // Each piece's baked texture, and the most recently decoded source image (for cutting).
     private Dictionary<Guid, Texture2D> _pieceTextures = [];
+
+    // Each warped piece's baked lookup, with the warp it was baked from (rebaked when it changes).
+    private readonly Dictionary<Guid, (IReadOnlyList<ImagePoint> Points, WarpLookup Lookup)>
+        _warpLookups = [];
     private (string Name, Image Image)? _decodedSource;
 
     // The map type picked while no map is loaded; the next import uses it.
@@ -507,6 +511,67 @@ public partial class WorldSession : Node
         MarkChanged();
     }
 
+    /// <summary>
+    /// Moves one point of a piece's cut on the globe (Edit Points): the image stretches to
+    /// follow. Cheap enough to call while dragging; wrap a drag in a gesture.
+    /// </summary>
+    /// <param name="id">The piece.</param>
+    /// <param name="pointIndex">Which point of its outline.</param>
+    /// <param name="position">Where it goes, in the piece's box (may be outside 0–1).</param>
+    public void MovePiecePoint(Guid id, int pointIndex, ImagePoint position)
+    {
+        if (FindPiece(id) is not MapPiece piece
+            || pointIndex < 0 || pointIndex >= piece.Outline.Points.Count
+            || !double.IsFinite(position.U) || !double.IsFinite(position.V))
+        {
+            return;
+        }
+
+        RecordUndo($"Edit Points of {piece.Name}");
+        ImagePoint[] points =
+            [.. piece.WarpedPoints ?? PieceWarp.UnwarpedPoints(piece.Outline)];
+        points[pointIndex] = position;
+        piece.WarpedPoints = points;  // A new list: never edited in place.
+        ShowPieces();
+        MarkChanged();
+    }
+
+    /// <summary>Removes a piece's warp, back to its cut shape as drawn.</summary>
+    public void ResetPiecePoints(Guid id)
+    {
+        if (FindPiece(id) is not MapPiece { WarpedPoints: not null } piece)
+        {
+            return;
+        }
+
+        RecordUndo($"Reset Points of {piece.Name}");
+        piece.WarpedPoints = null;
+        ShowPieces();
+        MarkChanged();
+    }
+
+    /// <summary>
+    /// The baked lookup of a warped piece (null if it isn't warped), for finding it under the
+    /// mouse. Kept until the warp changes.
+    /// </summary>
+    public WarpLookup? WarpLookupFor(MapPiece piece)
+    {
+        if (piece.WarpedPoints is not IReadOnlyList<ImagePoint> points)
+        {
+            return null;
+        }
+
+        if (_warpLookups.TryGetValue(piece.Id, out var cached)
+            && ReferenceEquals(cached.Points, points))
+        {
+            return cached.Lookup;
+        }
+
+        WarpLookup lookup = new PieceWarp(piece.Outline, points).BakeLookup();
+        _warpLookups[piece.Id] = (points, lookup);
+        return lookup;
+    }
+
     private MapPiece? FindPiece(Guid id) => MainBody.Surface.Pieces.Find(p => p.Id == id);
 
     private string NextPieceName()
@@ -523,9 +588,14 @@ public partial class WorldSession : Node
     // Sends every piece that has a texture to the planet, bottom to top.
     private void ShowPieces()
     {
+        foreach (Guid id in _warpLookups.Keys.Where(id => FindPiece(id) is null).ToList())
+        {
+            _warpLookups.Remove(id);
+        }
+
         Surface?.SetPieces([.. Pieces
             .Where(p => _pieceTextures.ContainsKey(p.Id))
-            .Select(p => (_pieceTextures[p.Id], PieceProjection.For(p)))]);
+            .Select(p => (_pieceTextures[p.Id], PieceProjection.For(p), WarpLookupFor(p)))]);
     }
 
     /// <summary>Changes the color used where the map doesn't cover the globe.</summary>

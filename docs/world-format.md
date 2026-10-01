@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 3** (see **Version history** at the end)
+**Current format version: 4** (see **Version history** at the end)
 
 ## Container
 
@@ -20,11 +20,11 @@ A `.nworld` file is a standard **zip archive** containing:
   which also blocks names that try to escape the archive (`../`).
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB.
 
-## `world.json` (version 3)
+## `world.json` (version 4)
 
 ```json
 {
-  "formatVersion": 3,
+  "formatVersion": 4,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -58,7 +58,8 @@ A `.nworld` file is a standard **zip archive** containing:
             "latitude": 55,
             "longitude": -20.5,
             "rotation": 15,
-            "width": 12.5
+            "width": 12.5,
+            "warp": [[0, 0], [1.25, -0.125], [1, 1], [0, 1]]
           }
         ],
         "fillColor": "#112233"
@@ -98,6 +99,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…pieces[].latitude`, `longitude` | yes | Where the center of the outline's bounding box sits on the globe |
 | `…pieces[].rotation` | yes | Degrees, clockwise from "up = north" |
 | `…pieces[].width` | yes | Degrees of arc the bounding box spans left to right (0.1 to 180). The height follows from the box's true shape. |
+| `…pieces[].warp` | no | Edit Points (`MAP-02`): where each outline point has been dragged to, as `[u, v]` in the piece's box (0–1 from its top-left before warping; may go beyond). Exactly one per `outline.points`, in the same order. Omitted when the piece isn't warped. |
 | `bodies[].surface.fillColor` | yes | `#RRGGBB`. Color where the map doesn't cover the globe |
 | `view` | no | Camera when saved. Omitted means the default view. |
 | `view.latitude`, `longitude` | yes | Degrees; camera direction from the focus point |
@@ -128,6 +130,12 @@ a point at arc distance *d* and compass bearing *b* (clockwise from north) from 
 so the bounding box spans `width` by `width` ÷ box aspect ratio. Box position (0, 0) is the
 top-left. (`PieceProjection` in Core.)
 
+A warped piece is stretched before it's laid on the globe: each outline point moves from its
+place in the box to its `warp` position, and every other position follows by **mean value
+coordinates** over the outline (Floater; Hormann & Floater for any polygon shape), measured at the
+box's true proportions. Points on the outline move in a straight line between their two ends.
+(`PieceWarp` in Core.)
+
 ## Safe saving
 
 1. Write the complete new file next to the target as `<name>.nworld.saving`, and flush it to disk.
@@ -143,3 +151,4 @@ If anything fails, the existing world file is left untouched.
 | 1 | First release: world, one planet, map image + map type, fill color, camera view | — |
 | 2 | Added optional `map.calibration` (grid calibration, `MAP-05`) | Nothing to change: version 1 maps have no calibration |
 | 3 | Added optional `surface.pieces` (cut and place, `MAP-02`) | Nothing to change: version 2 surfaces have no pieces |
+| 4 | Added optional `pieces[].warp` (Edit Points, `MAP-02`) | Nothing to change: version 3 pieces aren't warped |

@@ -82,6 +82,7 @@ internal static class WorldMapper
             Longitude = piece.Center.LongitudeDegrees,
             Rotation = piece.RotationDegrees,
             Width = piece.WidthDegrees,
+            Warp = piece.WarpedPoints?.Select(p => new[] { p.U, p.V }).ToList(),
         };
     }
 
@@ -99,12 +100,17 @@ internal static class WorldMapper
 
         PieceOutline outline;
         GeoCoordinate center;
+        IReadOnlyList<ImagePoint>? warp = null;
         try
         {
             outline = PieceOutline.Create(
                 document.Outline.Points.Select(p => new ImagePoint(p[0], p[1])),
                 document.Outline.SourceAspectRatio);
             center = new GeoCoordinate(document.Latitude, document.Longitude);
+            if (document.Warp is List<double[]> warpPoints)
+            {
+                warp = ToWarp(warpPoints, outline);
+            }
         }
         catch (ArgumentException error)
         {
@@ -120,7 +126,21 @@ internal static class WorldMapper
             Center = center,
             RotationDegrees = document.Rotation,
             WidthDegrees = document.Width,
+            WarpedPoints = warp,
         };
+    }
+
+    // A piece's warp: one finite position per outline point. Positions may lie well outside the
+    // box (a small piece stretched far), so only absurd values are refused.
+    private static IReadOnlyList<ImagePoint> ToWarp(List<double[]> points, PieceOutline outline)
+    {
+        const double limit = 1e6;
+        Require(points.All(p => p is { Length: 2 } && p.All(
+                value => double.IsFinite(value) && Math.Abs(value) <= limit)),
+            "a map piece's warp is invalid");
+        ImagePoint[] warp = [.. points.Select(p => new ImagePoint(p[0], p[1]))];
+        _ = new PieceWarp(outline, warp);  // Checks there's one position per outline point.
+        return warp;
     }
 
     private static CalibrationDocument ToDocument(MapCalibration calibration)

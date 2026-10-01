@@ -190,6 +190,111 @@ public sealed class WorldPackageTests : IDisposable
         }
         """;
 
+    // A version 4 world file (adds piece warps), exactly as this version writes it. If this test
+    // fails, the file format changed: that must be deliberate, with a new format version, a
+    // migration, and a new golden file. Never edit this.
+    private const string GoldenV4Json = """
+        {
+          "formatVersion": 4,
+          "id": "11111111-2222-3333-4444-555555555555",
+          "name": "Aerth",
+          "createdUtc": "2026-09-30T12:00:00+00:00",
+          "modifiedUtc": "2026-09-30T13:30:00+00:00",
+          "bodies": [
+            {
+              "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aerth",
+              "kind": "planet",
+              "surface": {
+                "map": {
+                  "asset": "assets/0123456789abcdef0123456789abcdef.png",
+                  "projection": "winkel-tripel",
+                  "calibration": {
+                    "latitudes": [
+                      {
+                        "latitude": 30,
+                        "drawnAs": 33.5
+                      }
+                    ],
+                    "longitudes": [
+                      {
+                        "longitude": -180,
+                        "drawnAs": -185
+                      },
+                      {
+                        "longitude": 0,
+                        "drawnAs": 2
+                      }
+                    ]
+                  }
+                },
+                "pieces": [
+                  {
+                    "id": "99999999-8888-7777-6666-555555555555",
+                    "name": "Northern Isles",
+                    "asset": "assets/fedcba9876543210fedcba9876543210.png",
+                    "outline": {
+                      "sourceAspectRatio": 1.5,
+                      "points": [
+                        [
+                          0.25,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.5
+                        ],
+                        [
+                          0.25,
+                          0.5
+                        ]
+                      ]
+                    },
+                    "latitude": 55,
+                    "longitude": -20.5,
+                    "rotation": 15,
+                    "width": 12.5,
+                    "warp": [
+                      [
+                        0,
+                        0
+                      ],
+                      [
+                        1.25,
+                        -0.125
+                      ],
+                      [
+                        1,
+                        1
+                      ],
+                      [
+                        0,
+                        1
+                      ]
+                    ]
+                  }
+                ],
+                "fillColor": "#112233"
+              }
+            }
+          ],
+          "view": {
+            "latitude": 20,
+            "longitude": -45.5,
+            "altitude": 1.25,
+            "focusOffset": [
+              0.5,
+              0,
+              -0.25
+            ]
+          }
+        }
+        """;
+
     private static readonly byte[] _imageBytes = Encoding.ASCII.GetBytes("pretend PNG bytes");
     private static readonly byte[] _pieceBytes = Encoding.ASCII.GetBytes("pretend piece PNG");
 
@@ -273,13 +378,32 @@ public sealed class WorldPackageTests : IDisposable
     // ----- The file format itself -----
 
     [Fact]
-    public void WrittenJson_MatchesTheGoldenVersion3File()
+    public void WrittenJson_MatchesTheGoldenVersion4File()
     {
         string path = PathFor("golden.nworld");
 
+        WorldPackage.Save(path, WarpedGoldenWorld(), AssetsWithPiece());
+
+        Assert.Equal(Normalize(GoldenV4Json), Normalize(ReadEntry(path, "world.json")));
+    }
+
+    [Fact]
+    public void GoldenVersion4File_LoadsAsExpected()
+    {
+        string path = WriteRawPackage("golden-v4.nworld", GoldenV4Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        AssertSameWorld(WarpedGoldenWorld(), WorldPackage.Load(path).World);
+    }
+
+    [Fact]
+    public void UnwarpedPieces_WriteNoWarp()
+    {
+        string path = PathFor("unwarped.nworld");
+
         WorldPackage.Save(path, PiecesGoldenWorld(), AssetsWithPiece());
 
-        Assert.Equal(Normalize(GoldenV3Json), Normalize(ReadEntry(path, "world.json")));
+        Assert.DoesNotContain("\"warp\"", ReadEntry(path, "world.json"));
     }
 
     [Fact]
@@ -347,7 +471,7 @@ public sealed class WorldPackageTests : IDisposable
 
         WorldPackage.Save(newPath, loaded.World, loaded.Assets);
 
-        Assert.Contains("\"formatVersion\": 3", ReadEntry(newPath, "world.json"));
+        Assert.Contains("\"formatVersion\": 4", ReadEntry(newPath, "world.json"));
         AssertSameWorld(GoldenWorld(), WorldPackage.Load(newPath).World);
     }
 
@@ -452,7 +576,7 @@ public sealed class WorldPackageTests : IDisposable
     public void Load_NewerFormatVersion_IsRefusedWithAClearMessage()
     {
         string path = WriteRawPackage(
-            "future.nworld", GoldenV3Json.Replace("\"formatVersion\": 3", "\"formatVersion\": 4"),
+            "future.nworld", GoldenV4Json.Replace("\"formatVersion\": 4", "\"formatVersion\": 5"),
             (AssetName, _imageBytes));
 
         WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
@@ -492,6 +616,36 @@ public sealed class WorldPackageTests : IDisposable
             (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
 
         Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
+    }
+
+    [Theory]
+    [InlineData("1.25,", "\"far\",")]                                    // Not a number
+    [InlineData("-0.125\n", "-0.125, 3\n")]                               // Three values
+    [InlineData("1.25,", "1e9,")]                                         // Absurdly far
+    public void Load_DamagedWarp_IsRejected(string find, string replace)
+    {
+        string json = Normalize(GoldenV4Json).Replace(find, replace);
+        Assert.NotEqual(Normalize(GoldenV4Json), json);  // The edit really applied.
+        string path = WriteRawPackage("damaged-v4.nworld", json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
+    }
+
+    [Fact]
+    public void WarpWithTheWrongNumberOfPoints_IsNeverSaved()
+    {
+        // Saving reads the new file back before replacing anything, so a bad warp is caught
+        // there and never reaches the disk.
+        World world = WarpedGoldenWorld();
+        world.Bodies[0].Surface.Pieces[0].WarpedPoints = [new(0, 0), new(1, 0), new(1, 1)];
+        string path = PathFor("short-warp.nworld");
+
+        WorldFileException error = Assert.Throws<WorldFileException>(
+            () => WorldPackage.Save(path, world, AssetsWithPiece()));
+
+        Assert.Contains("one finite position for each point", error.Message);
+        Assert.Empty(Directory.GetFiles(_folder));
     }
 
     [Theory]
@@ -622,6 +776,14 @@ public sealed class WorldPackageTests : IDisposable
         };
     }
 
+    private static World WarpedGoldenWorld()
+    {
+        World world = PiecesGoldenWorld();
+        world.Bodies[0].Surface.Pieces[0].WarpedPoints =
+            [new(0, 0), new(1.25, -0.125), new(1, 1), new(0, 1)];
+        return world;
+    }
+
     private static void AssertSameWorld(World expected, World actual)
     {
         Assert.Equal(expected.Id, actual.Id);
@@ -657,6 +819,7 @@ public sealed class WorldPackageTests : IDisposable
                 Assert.Equal(ep.Center, ap.Center);
                 Assert.Equal(ep.RotationDegrees, ap.RotationDegrees);
                 Assert.Equal(ep.WidthDegrees, ap.WidthDegrees);
+                Assert.Equal(ep.WarpedPoints, ap.WarpedPoints);
             }
         }
     }
