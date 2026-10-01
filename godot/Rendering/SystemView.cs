@@ -319,12 +319,9 @@ public partial class SystemView : Node3D
 
     private void PlaceBody(BodyVisual visual, Body body, DisplayBody place, double timeDays)
     {
-        // Spin about the body's own axis, then lean the axis by the tilt.
-        double spin = double.DegreesToRadians(BodyClock.SpinDegrees(body, timeDays));
-        double tilt = double.DegreesToRadians(body.AxialTiltDegrees);
-        Basis basis = new Basis(Vector3.Right, (float)tilt) * new Basis(Vector3.Up, (float)spin);
         visual.Root.Transform = new Transform3D(
-            basis.Scaled(Vector3.One * (float)place.Radius), ToScene(place.Position));
+            Orientation(body, timeDays).Scaled(Vector3.One * (float)place.Radius),
+            ToScene(place.Position));
         if (visual.Light is OmniLight3D light)
         {
             light.Position = ToScene(place.Position);
@@ -339,6 +336,19 @@ public partial class SystemView : Node3D
             line.Visible = highlighted || body.Id != _focusId
                 || (Camera?.CurrentAltitude ?? float.MaxValue) > OwnOrbitLineAltitude;
         }
+    }
+
+    // The body spins about its own axis, and the axis leans by the tilt toward the tilt
+    // direction, so the north pole points exactly where Core's BodyOrientation (and so the
+    // season calculations) says.
+    private static Basis Orientation(Body body, double timeDays)
+    {
+        var spin = new Basis(
+            Vector3.Up, (float)double.DegreesToRadians(BodyClock.SpinDegrees(body, timeDays)));
+        Vector3D lean = BodyOrientation.LeanDirection(body);
+        Vector3 axis = Vector3.Up.Cross(new Vector3((float)lean.X, 0, (float)lean.Z));
+        double tilt = double.DegreesToRadians(body.AxialTiltDegrees);
+        return tilt == 0 ? spin : new Basis(axis.Normalized(), (float)tilt) * spin;
     }
 
     // Scales the camera to the focused body and lets it zoom out far enough to see the whole
