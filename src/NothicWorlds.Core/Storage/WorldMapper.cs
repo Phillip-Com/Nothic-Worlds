@@ -58,7 +58,9 @@ internal static class WorldMapper
             RadiusKm = body.RadiusKm,
             DayLengthHours = body.DayLengthHours,
             AxialTilt = body.AxialTiltDegrees,
+            AxialTiltDirection = body.AxialTiltDirectionDegrees,
             Orbit = body.Orbit is Orbit orbit ? ToDocument(orbit) : null,
+            Calendar = body.Calendar is Calendar calendar ? ToDocument(calendar) : null,
             Surface = new SurfaceDocument
             {
                 Map = map is null ? null : new MapDocument
@@ -152,6 +154,45 @@ internal static class WorldMapper
         return warp;
     }
 
+    private static CalendarDocument ToDocument(Calendar calendar)
+    {
+        return new CalendarDocument
+        {
+            Months = [.. calendar.Months.Select(m => new MonthDocument
+            {
+                Name = m.Name,
+                Days = m.Days,
+            })],
+            Weekdays = calendar.Weekdays.Count == 0 ? null : [.. calendar.Weekdays],
+            FirstYear = calendar.FirstYear,
+            Era = calendar.Era,
+            Start = new CalendarStartDocument
+            {
+                Month = calendar.StartMonth,
+                Day = calendar.StartDay,
+                Weekday = calendar.StartWeekday,
+            },
+        };
+    }
+
+    // Checked fully afterwards by Body.Problem (through Calendar.Problem).
+    private static Calendar ToCalendar(CalendarDocument document)
+    {
+        Require(document.Months is not null && document.Start is not null
+                && document.Months.All(m => m is not null),
+            "a calendar is incomplete");
+        return new Calendar
+        {
+            Months = [.. document.Months!.Select(m => new CalendarMonth(m.Name, m.Days))],
+            Weekdays = document.Weekdays is null ? [] : [.. document.Weekdays],
+            FirstYear = document.FirstYear,
+            Era = document.Era,
+            StartMonth = document.Start!.Month,
+            StartDay = document.Start.Day,
+            StartWeekday = document.Start.Weekday,
+        };
+    }
+
     private static OrbitDocument ToDocument(Orbit orbit)
     {
         return new OrbitDocument
@@ -233,7 +274,11 @@ internal static class WorldMapper
             RadiusKm = document.RadiusKm,
             DayLengthHours = document.DayLengthHours,
             AxialTiltDegrees = document.AxialTilt,
+            AxialTiltDirectionDegrees = document.AxialTiltDirection,
             Orbit = document.Orbit is OrbitDocument orbit ? ToOrbit(orbit) : null,
+            Calendar = document.Calendar is CalendarDocument calendar
+                ? ToCalendar(calendar)
+                : null,
         };
         RequireNoProblem(body.Problem());
         body.Surface.FillColor = fillColor;

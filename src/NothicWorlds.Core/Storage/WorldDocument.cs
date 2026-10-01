@@ -24,8 +24,32 @@ internal sealed class BodyDocument
     public required double RadiusKm { get; init; }  // Added in format version 5
     public required double DayLengthHours { get; init; }  // Added in format version 5
     public required double AxialTilt { get; init; }  // Added in format version 5
+    public required double AxialTiltDirection { get; init; }  // Added in format version 6
     public OrbitDocument? Orbit { get; init; }  // Added in format version 5
+    public CalendarDocument? Calendar { get; init; }  // Added in format version 6
     public required SurfaceDocument Surface { get; init; }
+}
+
+internal sealed class CalendarDocument
+{
+    public required List<MonthDocument> Months { get; init; }
+    public List<string>? Weekdays { get; init; }  // Omitted for a calendar without weeks
+    public required long FirstYear { get; init; }
+    public string? Era { get; init; }
+    public required CalendarStartDocument Start { get; init; }
+}
+
+internal sealed class MonthDocument
+{
+    public required string Name { get; init; }
+    public required int Days { get; init; }
+}
+
+internal sealed class CalendarStartDocument
+{
+    public required int Month { get; init; }
+    public required int Day { get; init; }
+    public int Weekday { get; init; }
 }
 
 internal sealed class OrbitDocument
