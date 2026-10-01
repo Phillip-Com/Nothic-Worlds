@@ -234,7 +234,7 @@ public partial class PiecesPanel : CanvasLayer
             Suffix = suffix,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
         };
-        field.WithArrowKeys().ValueChanged += _ => CommitPlacement();
+        field.WithLiveTyping(ShowSelected).ValueChanged += _ => CommitPlacement();
         grid.AddChild(field);
         return field;
     }
@@ -346,10 +346,10 @@ public partial class PiecesPanel : CanvasLayer
             _name.Text = piece.Name;
         }
 
-        _latitude.SetValueNoSignal(piece.Center.LatitudeDegrees);
-        _longitude.SetValueNoSignal(piece.Center.LongitudeDegrees);
-        _rotation.SetValueNoSignal(piece.RotationDegrees);
-        _width.SetValueNoSignal(piece.WidthDegrees);
+        _latitude.ShowValue(piece.Center.LatitudeDegrees);
+        _longitude.ShowValue(piece.Center.LongitudeDegrees);
+        _rotation.ShowValue(piece.RotationDegrees);
+        _width.ShowValue(piece.WidthDegrees);
         _editPointsButton.SetPressedNoSignal(IsEditingPoints);
         _resetPointsButton.Disabled = piece.WarpedPoints is null;
         int position = _listed.IndexOf(piece);

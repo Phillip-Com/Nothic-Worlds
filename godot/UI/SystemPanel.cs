@@ -60,6 +60,12 @@ public partial class SystemPanel : CanvasLayer
     /// <summary>Where messages go. The panel hides whenever the toolbar does.</summary>
     [Export] public MapToolbar? Toolbar { get; set; }
 
+    /// <summary>
+    /// The system view: while the panel shows, it always draws the selected body's path,
+    /// highlighted (owner's request).
+    /// </summary>
+    [Export] public Rendering.SystemView? System { get; set; }
+
     private enum DistanceUnit
     {
         Kilometers,
@@ -262,6 +268,7 @@ public partial class SystemPanel : CanvasLayer
         }
 
         SelectInTree(Session.SelectedBodyId);
+        HighlightPath();
         Body selected = Session.SelectedBody;
         _addMoonButton.Disabled = selected.Kind == BodyKind.Star;
         _deleteButton.Disabled = SystemHierarchy.DescendantsOf(bodies, selected.Id).Count + 1
@@ -359,9 +366,9 @@ public partial class SystemPanel : CanvasLayer
             _kind.Select(_kind.GetItemIndex((int)body.Kind));
         }
 
-        _radius.SetValueNoSignal(body.RadiusKm);
-        _dayLength.SetValueNoSignal(body.DayLengthHours);
-        _axialTilt.SetValueNoSignal(body.AxialTiltDegrees);
+        _radius.ShowValue(body.RadiusKm);
+        _dayLength.ShowValue(body.DayLengthHours);
+        _axialTilt.ShowValue(body.AxialTiltDegrees);
 
         _orbitFields.Visible = body.Orbit is not null;
         _noOrbit.Visible = body.Orbit is null;
@@ -388,13 +395,13 @@ public partial class SystemPanel : CanvasLayer
 
         bool inAu = SelectedUnit() == DistanceUnit.AstronomicalUnits;
         _distance.Step = inAu ? 0.001 : 1;
-        _distance.SetValueNoSignal(inAu ? orbit.DistanceKm / KmPerAu : orbit.DistanceKm);
-        _period.SetValueNoSignal(orbit.PeriodDays);
-        _startAngle.SetValueNoSignal(orbit.StartAngleDegrees);
-        _eccentricity.SetValueNoSignal(orbit.Eccentricity);
-        _closestApproach.SetValueNoSignal(orbit.ClosestApproachDegrees);
-        _orbitTilt.SetValueNoSignal(orbit.TiltDegrees);
-        _tiltDirection.SetValueNoSignal(orbit.TiltDirectionDegrees);
+        _distance.ShowValue(inAu ? orbit.DistanceKm / KmPerAu : orbit.DistanceKm);
+        _period.ShowValue(orbit.PeriodDays);
+        _startAngle.ShowValue(orbit.StartAngleDegrees);
+        _eccentricity.ShowValue(orbit.Eccentricity);
+        _closestApproach.ShowValue(orbit.ClosestApproachDegrees);
+        _orbitTilt.ShowValue(orbit.TiltDegrees);
+        _tiltDirection.ShowValue(orbit.TiltDirectionDegrees);
 
         // Extras show if this orbit uses them (or the user opened them).
         bool usesExtras = orbit.Eccentricity != 0 || orbit.TiltDegrees != 0;
@@ -462,10 +469,11 @@ public partial class SystemPanel : CanvasLayer
         ReportProblem(Session.SetOrbit(Session.SelectedBodyId, orbit));
     }
 
-    // Shows why an edit was refused, and puts the fields back to the body's real values.
+    // Shows why an edit was refused, and puts the fields back to the body's real values. While
+    // the user is still typing, half-typed numbers just don't apply yet, without a message.
     private void ReportProblem(string? problem)
     {
-        if (problem is not null)
+        if (problem is not null && GetViewport().GuiGetFocusOwner() is not LineEdit)
         {
             Toolbar?.ShowError($"Can't use that: {problem}.");
             ShowSelected();
@@ -514,6 +522,16 @@ public partial class SystemPanel : CanvasLayer
     private void UpdateVisibility()
     {
         Visible = _open && (Toolbar?.Visible ?? true);
+        HighlightPath();
+    }
+
+    // While editing, the selected body's path always shows, highlighted.
+    private void HighlightPath()
+    {
+        if (System is not null)
+        {
+            System.HighlightedOrbit = Visible ? Session?.SelectedBodyId : null;
+        }
     }
 
     private SpinBox AddField(GridContainer grid, string label, double min, double max,
@@ -536,7 +554,7 @@ public partial class SystemPanel : CanvasLayer
             Suffix = suffix,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
         };
-        field.WithArrowKeys().ValueChanged += _ => changed();
+        field.WithLiveTyping(ShowSelected).ValueChanged += _ => changed();
         return field;
     }
 

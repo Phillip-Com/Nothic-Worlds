@@ -52,6 +52,13 @@ public partial class SystemView : Node3D
         AlbedoColor = _orbitColor,
     };
 
+    // The path of the body being edited: the selection color, fully visible.
+    private readonly StandardMaterial3D _highlightMaterial = new()
+    {
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        AlbedoColor = new Color(1.0f, 0.85f, 0.2f),
+    };
+
     private SystemScale _scale = SystemScale.Readable;
     private Dictionary<Guid, DisplayBody> _layout = [];
     private Guid _focusId;
@@ -72,6 +79,12 @@ public partial class SystemView : Node3D
 
     /// <summary>The planet surface material; each planet and moon gets its own copy.</summary>
     [Export] public ShaderMaterial? PlanetMaterial { get; set; }
+
+    /// <summary>
+    /// The body whose path is highlighted and always shown, even close up (while the System
+    /// panel edits it), or null for none.
+    /// </summary>
+    public Guid? HighlightedOrbit { get; set; }
 
     /// <summary>Raised after every body has been placed for this frame.</summary>
     public event Action? Placed;
@@ -321,7 +334,9 @@ public partial class SystemView : Node3D
             && _layout.TryGetValue(orbit.ParentId, out DisplayBody parent))
         {
             line.Position = ToScene(parent.Position);
-            line.Visible = body.Id != _focusId
+            bool highlighted = body.Id == HighlightedOrbit;
+            line.MaterialOverride = highlighted ? _highlightMaterial : null;
+            line.Visible = highlighted || body.Id != _focusId
                 || (Camera?.CurrentAltitude ?? float.MaxValue) > OwnOrbitLineAltitude;
         }
     }
