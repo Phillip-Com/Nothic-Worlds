@@ -12,6 +12,9 @@ namespace NothicWorlds.Maps;
 /// </summary>
 public static class MapImageLoader
 {
+    /// <summary>The width of a map preview (see <see cref="LoadPreviewAsync"/>).</summary>
+    public const int PreviewWidth = 1024;
+
     /// <summary>
     /// Loads and prepares the image at <paramref name="path"/>. Must be called from the main
     /// thread, which is where the result is returned.
@@ -46,6 +49,31 @@ public static class MapImageLoader
         using (image)
         {
             return new LoadedMap(ImageTexture.CreateFromImage(image), check);
+        }
+    }
+
+    /// <summary>
+    /// Loads a small preview of a map (at most <see cref="PreviewWidth"/> wide) for a body seen
+    /// from afar, so far-away planets cost little graphics memory. Must be called from the main
+    /// thread.
+    /// </summary>
+    /// <exception cref="MapLoadException">The image is unsupported or unreadable.</exception>
+    public static async Task<Texture2D> LoadPreviewAsync(IAssetSource source, string name)
+    {
+        string extension = Path.GetExtension(name).TrimStart('.').ToLowerInvariant();
+        Image image = await Task.Run(() =>
+        {
+            Image decoded = Decode(ReadAll(source), extension);
+            int width = Math.Min(PreviewWidth, decoded.GetWidth());
+            int height = Math.Max(1, (int)Math.Round(
+                (double)decoded.GetHeight() * width / decoded.GetWidth()));
+            ShrinkTo(decoded, width, height);
+            decoded.GenerateMipmaps();
+            return decoded;
+        });
+        using (image)
+        {
+            return ImageTexture.CreateFromImage(image);
         }
     }
 

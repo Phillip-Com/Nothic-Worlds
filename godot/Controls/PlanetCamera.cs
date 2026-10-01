@@ -33,9 +33,19 @@ public partial class PlanetCamera : Camera3D
     [Export] public float MinAltitude { get; set; } = 0.05f;
 
     /// <summary>
-    /// Farthest the camera can get from its focus point, as a fraction of the radius.
+    /// Farthest the camera can get from its focus point, as a fraction of the radius. Lowering
+    /// it pulls the camera in if it's farther out.
     /// </summary>
-    [Export] public float MaxAltitude { get; set; } = 8.0f;
+    [Export]
+    public float MaxAltitude
+    {
+        get => _maxAltitude;
+        set
+        {
+            _maxAltitude = value;
+            _targetAltitude = Mathf.Clamp(_targetAltitude, MinAltitude, value);
+        }
+    }
 
     /// <summary>
     /// Below this altitude (in radii), panning slides across the surface. Above it, panning
@@ -66,6 +76,7 @@ public partial class PlanetCamera : Camera3D
     // panning. Its direction from the focus point is a latitude/longitude, and its distance is
     // the altitude. Longitudes are kept unwrapped (e.g. 400°) so easing never takes the long
     // way around.
+    private float _maxAltitude = 8.0f;
     private double _targetLatitude;
     private double _targetLongitude;
     private float _targetAltitude;
@@ -78,6 +89,9 @@ public partial class PlanetCamera : Camera3D
     // The mouse button that started the current drag, if any.
     private MouseButton _dragButton = MouseButton.None;
     private bool _keyboardPanning;
+
+    /// <summary>How far the camera is from the surface, in planet radii.</summary>
+    public float CurrentAltitude => _currentAltitude;
 
     /// <summary>How panning currently behaves, based on zoom.</summary>
     public PanMode PanMode =>
@@ -180,6 +194,26 @@ public partial class PlanetCamera : Camera3D
     {
         float altitude = _targetAltitude / Mathf.Pow(ZoomStepFactor, steps);
         _targetAltitude = Mathf.Clamp(altitude, MinAltitude, MaxAltitude);
+    }
+
+    /// <summary>
+    /// Puts the camera at an altitude straight away, with no easing (e.g. while the view flies
+    /// between bodies). Kept within the camera's limits.
+    /// </summary>
+    public void SetAltitudeImmediately(float altitude)
+    {
+        _targetAltitude = Mathf.Clamp(altitude, MinAltitude, MaxAltitude);
+        _currentAltitude = _targetAltitude;
+    }
+
+    /// <summary>
+    /// Re-centers the view on the planet, keeping the angle and zoom (e.g. when the view moves
+    /// to another body).
+    /// </summary>
+    public void ClearFocusOffset()
+    {
+        _targetFocusOffset = Vector3.Zero;
+        _currentFocusOffset = Vector3.Zero;
     }
 
     /// <summary>Returns to the starting view, centered on the planet.</summary>

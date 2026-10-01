@@ -5,7 +5,7 @@
 [ext_resource type="Script" uid="uid://bjw3mq48xq4eq" path="res://Controls/PlanetCamera.cs" id="3_camera"]
 [ext_resource type="Script" uid="uid://drb6l6wugk8su" path="res://Diagnostics/PerformanceOverlay.cs" id="4_overlay"]
 [ext_resource type="Script" path="res://UI/CameraModeIndicator.cs" id="5_indicator"]
-[ext_resource type="Script" path="res://Rendering/PlanetSurface.cs" id="6_surface"]
+[ext_resource type="Script" path="res://Rendering/SystemView.cs" id="6_system"]
 [ext_resource type="Script" path="res://UI/MapToolbar.cs" id="7_toolbar"]
 [ext_resource type="Script" path="res://Session/WorldSession.cs" id="8_session"]
 [ext_resource type="Script" path="res://UI/FileMenu.cs" id="9_filemenu"]
@@ -15,6 +15,8 @@
 [ext_resource type="Script" path="res://UI/CutEditor.cs" id="13_cut"]
 [ext_resource type="Script" path="res://Controls/PieceHandles.cs" id="14_handles"]
 [ext_resource type="Script" path="res://UI/EditMenu.cs" id="15_edit"]
+[ext_resource type="Script" path="res://UI/TimeControls.cs" id="16_time"]
+[ext_resource type="Script" path="res://UI/BodyMarkers.cs" id="17_markers"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -32,22 +34,18 @@ shader_parameter/highlight_color = Color(1, 0.8, 0.35, 1)
 shader_parameter/grid_spacing_degrees = 15.0
 shader_parameter/grid_line_pixels = 1.2
 
-[sub_resource type="SphereMesh" id="SphereMesh_planet"]
-material = SubResource("ShaderMaterial_planet")
-radius = 1.0
-height = 2.0
-radial_segments = 128
-rings = 64
-
 [node name="Main" type="Node3D" unique_id=1552545889]
 script = ExtResource("1_main")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1045668579]
 environment = SubResource("Environment_space")
 
-[node name="Planet" type="MeshInstance3D" parent="." unique_id=245576071]
-mesh = SubResource("SphereMesh_planet")
-script = ExtResource("6_surface")
+[node name="SystemView" type="Node3D" parent="." node_paths=PackedStringArray("Session", "Camera", "FallbackLight")]
+script = ExtResource("6_system")
+Session = NodePath("../WorldSession")
+Camera = NodePath("../PlanetCamera")
+FallbackLight = NodePath("../Sun")
+PlanetMaterial = SubResource("ShaderMaterial_planet")
 
 [node name="Sun" type="DirectionalLight3D" parent="." unique_id=235107944]
 transform = Transform3D(0.8678192, 0.28464645, -0.4072668, 0, 0.819648, 0.57286745, 0.4968801, -0.49714535, 0.7113063, 0, 0, 0)
@@ -58,9 +56,9 @@ near = 0.001
 far = 100.0
 script = ExtResource("3_camera")
 
-[node name="WorldSession" type="Node" parent="." node_paths=PackedStringArray("Surface", "Camera")]
+[node name="WorldSession" type="Node" parent="." node_paths=PackedStringArray("System", "Camera")]
 script = ExtResource("8_session")
-Surface = NodePath("../Planet")
+System = NodePath("../SystemView")
 Camera = NodePath("../PlanetCamera")
 
 [node name="PerformanceOverlay" type="CanvasLayer" parent="." unique_id=638997302]
@@ -112,4 +110,17 @@ Panel = NodePath("../PiecesPanel")
 [node name="EditMenu" type="Node" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
 script = ExtResource("15_edit")
 Session = NodePath("../WorldSession")
+Toolbar = NodePath("../MapToolbar")
+
+[node name="TimeControls" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Toolbar")]
+script = ExtResource("16_time")
+Session = NodePath("../WorldSession")
+System = NodePath("../SystemView")
+Toolbar = NodePath("../MapToolbar")
+
+[node name="BodyMarkers" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar")]
+script = ExtResource("17_markers")
+Session = NodePath("../WorldSession")
+System = NodePath("../SystemView")
+Camera = NodePath("../PlanetCamera")
 Toolbar = NodePath("../MapToolbar")
