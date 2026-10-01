@@ -40,9 +40,14 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 
 A new world is a small star system: a sun with one planet orbiting it. Zoom out to see the whole
 system, and click any body to fly to it. The map tools work on the selected body; stars have no
-map. The time bar (bottom right) plays the world clock at the chosen speed, shows the date on
-the selected body in its own days, jumps to a day with **Go to…**, and switches between a
-readable view and **True scale**.
+map. The time bar (bottom right) plays the world clock at the chosen speed, steps it back or forward
+with **−** / **+** (by an hour, day, week, 30 days, or year of the selected body), shows the date
+on the selected body in its own days, jumps to a day with **Go to…**, and switches between a
+readable view and **True scale**. Steps and jumps glide smoothly, so you can watch the bodies
+move into place.
+
+In number fields, Up/Down change the value (Shift for bigger steps). Click the view to give the
+arrow keys back to the camera.
 
 **System…** opens the system panel on the left. It shows the tree of bodies (click one to fly
 there), lets you **Add Planet**, **Add Moon**, or **Add Star**, and **Delete** the selected body

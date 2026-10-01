@@ -224,6 +224,10 @@ as realistic or simple.
 ### 4.2 Interface Layout (`UI`)
 
 **UI-01 — Main screen layout** · Idea · Base
+**Keyboard and number fields (owner's request, PR #18):** while a text or number field is being
+edited, the camera ignores WASD and the arrow keys. In number fields, Up/Down change the value
+by one step (ten with Shift; `godot/UI/NumberFields.cs`). Clicking the view (not a panel)
+finishes editing, so the keys move the camera again.
 **Intent:** The main view shows the world or map in the center. Panels along the sides of the
 screen hold tools, journals, and similar content.
 **Notes:** Views that need a lot of space, like large diagrams, may need their own tab or page
@@ -704,6 +708,12 @@ world). `Simulation/BodyClock.cs` gives each body's spin angle and its local "Da
 Play/Pause, speed (1 hour to 1 year per second), the selected body's date, **Go to…** a day and
 hour, and the **True scale** switch. `WorldSession.SetTime` moves the clock. Like the camera, the
 clock is saved but isn't an unsaved change.
+**Steps and gliding (owner's request, PR #18):** **−** / **+** step the clock by a chosen amount:
+1 hour, 1 day, 1 week, 30 days, or 1 year. Steps are measured on the selected body: days in its
+own day length, and a year is one trip around its star, or its planet's trip for a moon
+(`BodyClock.YearDays`, tested). Steps and **Go to…** **glide**: the clock runs to the new time
+over 0.8 s with a smooth start and stop, so bodies sweep along their real orbits instead of
+popping into place. Clicking again mid-glide adds to where it's heading. Stepping pauses Play.
 
 **SIM-03 — Physics mode (toggle)** · Idea · Advanced (probably)
 **Intent:** An optional toggle that simulates the system with real-world physics, so the user can
