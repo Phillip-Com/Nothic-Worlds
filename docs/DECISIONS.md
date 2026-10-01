@@ -7,6 +7,11 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-01 | Milestone 5: **calendars and seasons**; the accuracy toggle (CAL-02) later | In PR | [#19](https://github.com/Phillip-Com/Nothic-Worlds/pull/19) | VISION.md §3 |
+| 2026-10-01 | Calendars **belong to bodies** (any planet or moon); months, weekdays, years with an era, start date; no leap days yet | In PR | [#19](https://github.com/Phillip-Com/Nothic-Worlds/pull/19) | VISION.md `CAL-01` |
+| 2026-10-01 | Seasons shown in the time bar, as a year overview in the panel, and **as markers on the orbit** | In PR | [#19](https://github.com/Phillip-Com/Nothic-Worlds/pull/19) | Built in the next PR. VISION.md `CAL-03` |
+| 2026-10-01 | Milestone 5 in **two PRs**: Core, then the app | In PR | [#19](https://github.com/Phillip-Com/Nothic-Worlds/pull/19) | |
+| 2026-10-01 | World file **format version 6**: axial tilt direction and optional calendars | In PR | [#19](https://github.com/Phillip-Com/Nothic-Worlds/pull/19) | docs/world-format.md version history |
 | 2026-09-30 | **Make Center**: any body can become the center of its system; the bodies it orbited flip to circle it on the same paths, keeping every relative position | Merged | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) · `425248d` | VISION.md `UI-02` |
 | 2026-09-30 | Deleting a body **also deletes everything orbiting it**; Ctrl+Z brings it all back | Merged | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) · `425248d` | VISION.md `UI-02` |
 | 2026-09-30 | System tree and body properties in a **left panel, opened by a System… button** | Merged | [#18](https://github.com/Phillip-Com/Nothic-Worlds/pull/18) · `425248d` | VISION.md `UI-02` |

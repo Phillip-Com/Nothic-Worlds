@@ -96,6 +96,18 @@ on it. Owner's decisions:
   brings it all back). The system tree and properties live in a **left panel**, opened by a
   **System…** toolbar button.
 
+**Milestone 5: Calendars and Seasons** · In Progress (owner's choice, 2026-10-01)
+Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the simulation
+(`CAL-03`). The accuracy toggle (`CAL-02`) comes later. Owner's decisions:
+- **Calendars belong to bodies:** any planet or moon can have its own. The time bar shows the
+  selected body's calendar, or "Day N" without one.
+- **Calendar features:** named months of any length, named weekdays, year numbering with an
+  optional era, and the date at time 0. No leap days for now.
+- **Seasons shown** in the time bar (the current season in each hemisphere and the next solstice
+  or equinox), as a year overview in the body's panel with Go to buttons, and **as markers on
+  the orbit** where each solstice and equinox happens.
+- **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app.
+
 ---
 
 ## 4. Feature Areas
@@ -754,19 +766,41 @@ see how their system might fall apart.
 
 ### 4.6 Time & Calendar (`CAL`)
 
-**CAL-01 — User-defined calendar** · Idea · Base
+**CAL-01 — User-defined calendar** · In Progress (Core done, PR #19) · Base
 **Intent:** The default. The user defines their calendar, and it doesn't have to be
 astronomically accurate. Some users won't care about the calendar at all, so it must be optional.
-**Implementation:** —
+**Implementation (Core, PR #19):**
+- `Model/Calendar.cs` is an **immutable** record on `Body.Calendar` (optional, owner's choice: per
+  body). It holds months (`CalendarMonth`: name, days), weekday names, the first year, an optional
+  era, and the start date and weekday at time 0. `Problem()` validates it, and equality compares
+  the lists.
+- `Simulation/CalendarMath.cs`: `DateOf` (day index → date, including negative days),
+  `DayIndexOf` (the reverse, for Go to), and `Format` ("14 Highsun 1203 of the Third Age,
+  Moonday"). `BodyClock.Describe` gives the time bar's text, with the calendar date if the body
+  has one and otherwise "Day N". `BodyClock.TimeAt` converts a day and hour back to world time.
+- World file **format version 6** (optional `calendar`).
 
 **CAL-02 — Calendar accuracy mode (toggle)** · Idea · Base
 **Intent:** An optional toggle that makes the world fit the calendar. The tool adjusts the
 system's parameters (e.g. orbital periods, rotation speed) so the user's calendar becomes accurate.
 **Implementation:** —
 
-**CAL-03 — Solstices, equinoxes, and seasons** · Idea · Base
+**CAL-03 — Solstices, equinoxes, and seasons** · In Progress (Core done, PR #19) · Base
 **Intent:** Derived from the system's configuration.
-**Implementation:** —
+**Implementation (Core, PR #19):**
+- Bodies gain **`AxialTiltDirectionDegrees`** (which way the north pole leans).
+  `Simulation/BodyOrientation.NorthPole` is the one rule for the axis. The renderer orients globes
+  with it too (checked in the app: the drawn pole matches Core exactly), so what's shown always
+  matches the seasons.
+- `Simulation/Seasons.cs`: the star's declination (how far north or south of the body's equator
+  it stands) over time. Solstices are its peaks and lows; equinoxes are its zero crossings.
+  Each is found by sampling 720 times a year, then refined exactly (bisection or golden-section
+  search). `EventsBetween`, `NextEvent`, and `SeasonAt` (northern and southern; opposite in the
+  south). `StarFor` finds the star, including for moons and planet-centered systems.
+- Tested: four events a quarter year apart on an Earth-like orbit; the star exactly at the tilt
+  at a solstice and on the equator at an equinox; uneven seasons on an elongated orbit (Kepler);
+  identical seasons after Make Center; moons get seasons from the star; no tilt or no star means
+  no seasons; deterministic.
 
 ### 4.7 Events (`EVT`)
 
