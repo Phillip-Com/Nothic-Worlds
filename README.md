@@ -70,9 +70,13 @@ The panel also lists the selected body's eclipses in the coming year: solar ecli
 moons in front of the star) and lunar ones (a moon in its shadow), each with its type, date, how
 deep and how long, and a **Go to** button (a moon shows the same eclipses as its planet). The
 time bar's **Go to…** dialog always offers a jump to the next solar and the next lunar
-eclipse. Each moon's previous and next eclipse are also
-marked on its orbit (when they're within one orbit of now): gold-ringed dark disks for solar
-eclipses, dark red disks for lunar ones.
+eclipse. Each moon's previous and next eclipse are also marked on its orbit (when they're within
+one orbit of now): gold-ringed dark disks for solar eclipses, dark red disks for lunar ones.
+
+**Journal…** opens the journal on the right (in place of the Pieces panel). Search and sort your
+entries, add one with **New Entry**, and write: each entry has a title, an optional place (a
+planet, moon, or star), and text. Changes go into the world as you type, and Ctrl+Z undoes them.
+Deleting a body keeps the entries about it, just without their place.
 
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers
