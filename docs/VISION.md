@@ -106,7 +106,8 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Seasons shown** in the time bar (the current season in each hemisphere and the next solstice
   or equinox), as a year overview in the body's panel with Go to buttons, and **as markers on
   the orbit** where each solstice and equinox happens.
-- **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app.
+- **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
+  (PR #20).
 
 ---
 
@@ -766,7 +767,7 @@ see how their system might fall apart.
 
 ### 4.6 Time & Calendar (`CAL`)
 
-**CAL-01 — User-defined calendar** · In Progress (Core done, PR #19) · Base
+**CAL-01 — User-defined calendar** · Implemented (M5) · Base
 **Intent:** The default. The user defines their calendar, and it doesn't have to be
 astronomically accurate. Some users won't care about the calendar at all, so it must be optional.
 **Implementation (Core, PR #19):**
@@ -780,12 +781,28 @@ astronomically accurate. Some users won't care about the calendar at all, so it 
   has one and otherwise "Day N". `BodyClock.TimeAt` converts a day and hour back to world time.
 - World file **format version 6** (optional `calendar`).
 
+**Implementation (app, PR #20):**
+- `godot/UI/CalendarDialog.cs`: the editor, opened from **Calendar · Edit…** in the System panel
+  (planets and moons only). Months (name, days) and weekdays are lists with ↑ ↓ ✕ and Add;
+  first year, era, and start month/day/weekday below. A summary compares the calendar year with
+  the body's real year. Save applies everything as **one undo step**; problems (from
+  `Calendar.Problem()`) show in the dialog, which stays open. **Remove Calendar** goes back to
+  counting days. A body without a calendar starts from twelve months that share its year's days
+  and a seven-day week, ready to rename (Claude's choice).
+- `WorldSession.SetCalendar(bodyId, calendar?)` is the one edit path (undoable).
+- The time bar shows `BodyClock.Describe` (the calendar date), and **Go to…** asks for year,
+  month, day, and hour when the body has a calendar (`CalendarMath.DayIndexOf` +
+  `BodyClock.TimeAt`), or day and hour without one. `TimeControls.GlideTo` is public so other UI
+  can glide the clock.
+- The date and season lines sit in their own small panel above the time bar's buttons, so long
+  calendar dates never push the buttons into the camera text.
+
 **CAL-02 — Calendar accuracy mode (toggle)** · Idea · Base
 **Intent:** An optional toggle that makes the world fit the calendar. The tool adjusts the
 system's parameters (e.g. orbital periods, rotation speed) so the user's calendar becomes accurate.
 **Implementation:** —
 
-**CAL-03 — Solstices, equinoxes, and seasons** · In Progress (Core done, PR #19) · Base
+**CAL-03 — Solstices, equinoxes, and seasons** · Implemented (M5) · Base
 **Intent:** Derived from the system's configuration.
 **Implementation (Core, PR #19):**
 - Bodies gain **`AxialTiltDirectionDegrees`** (which way the north pole leans).
@@ -801,6 +818,28 @@ system's parameters (e.g. orbital periods, rotation speed) so the user's calenda
   at a solstice and on the equator at an equinox; uneven seasons on an elongated orbit (Kepler);
   identical seasons after Make Center; moons get seasons from the star; no tilt or no star means
   no seasons; deterministic.
+
+**Implementation (app, PR #20):**
+- **Axis direction** field (0–360°, wraps) next to Axial tilt in the System panel;
+  `WorldSession.SetBodyPhysical` takes it too.
+- `Simulation/SeasonTimeline.cs` (Core): a body's events for two years either side of a time,
+  worked out once. `SeasonAt`, `NextEvent`, `LatestEvent`, and `YearAround` (the event that began
+  the current season plus the next three) answer from it. `WorldSession.SelectedSeasons` caches
+  one for the selected body and redoes it only after an edit, a new selection, or a year of
+  clock time. The search adds up just the two chains of orbits it needs, so a timeline takes
+  ~4 ms on the baseline laptop (instead of 30+ ms).
+- **Time bar:** a line under the date, e.g. "Northern spring, southern autumn · Northern summer
+  solstice in 83 days"; its tooltip gives the full date.
+- **System panel** (`godot/UI/CalendarSection.cs`): the year of events with their dates and
+  **Go to** buttons (they glide the clock there).
+- **Orbit markers** (`godot/UI/BodyMarkers.cs`): the same four events drawn on the orbit that
+  shows the body's year (`Seasons.OrbitShowingYear`: its own orbit, its planet's for a moon, or
+  the star's in a planet-centered system), placed with `SystemLayout.OrbitPoint`. Equinoxes are
+  dots and solstices are diamonds, colored by the northern season they begin. Markers off the
+  screen are skipped: a point nearly beside the camera projects millions of pixels away, and
+  the engine stalled 30–50 ms drawing shapes there (caught by the benchmark).
+- Wording in one place: `godot/UI/SeasonText.cs`. Events are named for the north ("Northern
+  summer solstice"); the south's season shows alongside.
 
 ### 4.7 Events (`EVT`)
 

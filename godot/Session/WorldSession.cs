@@ -53,6 +53,9 @@ public partial class WorldSession : Node
     // Increases with every edit, so a gesture can tell whether it changed anything.
     private int _editVersion;
 
+    // The selected body's seasons, and which world, edit, and body they were worked out for.
+    private (World World, int Version, Guid BodyId, SeasonTimeline Timeline)? _seasons;
+
     // Undo/redo: snapshots of every body. While a gesture (a drag, or a calibration session) is
     // under way, its edits add up to one step, recorded when it ends.
     private readonly UndoHistory<EditSnapshot> _history = new();
@@ -405,11 +408,12 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
-    /// Changes a body's size, day length, and axial tilt. Rapid changes (holding a field's
-    /// arrow) are one undo step.
+    /// Changes a body's size, day length, and axial tilt (how far its axis leans, and which
+    /// way). Rapid changes (holding a field's arrow) are one undo step.
     /// </summary>
     /// <returns>What's wrong with the values (nothing is changed then), or null.</returns>
-    public string? SetBodyPhysical(Guid bodyId, double radiusKm, double dayHours, double tilt)
+    public string? SetBodyPhysical(
+        Guid bodyId, double radiusKm, double dayHours, double tilt, double tiltDirection)
     {
         if (FindBody(bodyId) is not Body body)
         {
@@ -421,6 +425,7 @@ public partial class WorldSession : Node
             RadiusKm = radiusKm,
             DayLengthHours = dayHours,
             AxialTiltDegrees = tilt,
+            AxialTiltDirectionDegrees = tiltDirection,
         };
         if (check.Problem() is string problem)
         {
@@ -428,7 +433,7 @@ public partial class WorldSession : Node
         }
 
         if (body.RadiusKm == radiusKm && body.DayLengthHours == dayHours
-            && body.AxialTiltDegrees == tilt)
+            && body.AxialTiltDegrees == tilt && body.AxialTiltDirectionDegrees == tiltDirection)
         {
             return null;
         }
@@ -437,6 +442,7 @@ public partial class WorldSession : Node
         body.RadiusKm = radiusKm;
         body.DayLengthHours = dayHours;
         body.AxialTiltDegrees = tilt;
+        body.AxialTiltDirectionDegrees = tiltDirection;
         SyncView();
         MarkChanged();
         TimeChanged?.Invoke();  // The date shown depends on the day length.
@@ -505,6 +511,58 @@ public partial class WorldSession : Node
         SyncView();
         MarkChanged();
         return true;
+    }
+
+    /// <summary>
+    /// Replaces a body's calendar (VISION.md CAL-01), or removes it with null. Stars don't
+    /// have calendars.
+    /// </summary>
+    /// <returns>What's wrong with the calendar (nothing is changed then), or null.</returns>
+    public string? SetCalendar(Guid bodyId, Calendar? calendar)
+    {
+        if (FindBody(bodyId) is not Body body || body.Kind == BodyKind.Star)
+        {
+            return null;
+        }
+
+        if (calendar?.Problem() is string problem)
+        {
+            return problem;
+        }
+
+        if (Equals(body.Calendar, calendar))
+        {
+            return null;
+        }
+
+        RecordUndo(calendar is null
+            ? $"Remove {body.Name}'s Calendar"
+            : $"Edit {body.Name}'s Calendar");
+        body.Calendar = calendar;
+        MarkChanged();
+        TimeChanged?.Invoke();  // The date shown uses the calendar.
+        return null;
+    }
+
+    /// <summary>
+    /// The selected body's solstices and equinoxes around the current time (VISION.md CAL-03).
+    /// They're worked out again only after an edit, a new selection, or a year of time passing.
+    /// </summary>
+    public SeasonTimeline SelectedSeasons
+    {
+        get
+        {
+            if (_seasons is var (world, version, bodyId, timeline) && world == World
+                && version == _editVersion && bodyId == SelectedBodyId
+                && timeline.Covers(TimeDays))
+            {
+                return timeline;
+            }
+
+            SeasonTimeline fresh = SeasonTimeline.Around(World.Bodies, SelectedBody, TimeDays);
+            _seasons = (World, _editVersion, SelectedBodyId, fresh);
+            return fresh;
+        }
     }
 
     /// <summary>

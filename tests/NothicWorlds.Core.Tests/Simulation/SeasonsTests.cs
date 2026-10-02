@@ -144,6 +144,40 @@ public class SeasonsTests
             Seasons.EventsBetween(bodies, planet, 5, 700));
     }
 
+    [Fact]
+    public void YearShowsOnThePlanetsOrbit_ForThePlanetAndItsMoon()
+    {
+        (List<Body> bodies, Body planet) = EarthLike();
+        var moon = new Body
+        {
+            Kind = BodyKind.Moon,
+            Orbit = new Orbit { ParentId = planet.Id, DistanceKm = 384_400, PeriodDays = 27.3 },
+        };
+        bodies.Add(moon);
+
+        Assert.Same(planet, Seasons.OrbitShowingYear(bodies, planet));
+        Assert.Same(planet, Seasons.OrbitShowingYear(bodies, moon));
+    }
+
+    [Fact]
+    public void YearShowsOnTheStarsOrbit_InAPlanetCenteredSystem()
+    {
+        (List<Body> bodies, Body planet) = EarthLike();
+        foreach ((Guid id, Orbit? orbit) in SystemHierarchy.MakeCenter(bodies, planet.Id))
+        {
+            bodies.First(b => b.Id == id).Orbit = orbit;
+        }
+
+        Assert.Same(bodies[0], Seasons.OrbitShowingYear(bodies, planet));
+    }
+
+    [Fact]
+    public void NoStar_MeansNoOrbitShowsTheYear()
+    {
+        var lonePlanet = new Body();
+        Assert.Null(Seasons.OrbitShowingYear([lonePlanet], lonePlanet));
+    }
+
     // A sun and an Earth-like planet: tilt 23.4° leaning toward +X, starting at +X from the sun
     // (so the north pole leans away from it: northern winter solstice at time 0).
     private static (List<Body> Bodies, Body Planet) EarthLike()

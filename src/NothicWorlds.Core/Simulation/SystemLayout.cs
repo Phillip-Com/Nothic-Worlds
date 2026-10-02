@@ -80,12 +80,25 @@ public static class SystemLayout
             return [];
         }
 
-        double parentRadius = DisplayRadius(parent.RadiusKm, scale);
-        double childRadius = DisplayRadius(body.RadiusKm, scale);
         // Spread evenly along the curve, so very elongated orbits stay smooth where the body
         // moves fastest.
-        return [.. OrbitMath.EvenlySpacedTimes(orbit, samples).Select(time => DisplayOffset(
-            OrbitMath.OffsetFromParent(orbit, time), parentRadius, childRadius, scale))];
+        return [.. OrbitMath.EvenlySpacedTimes(orbit, samples)
+            .Select(time => OrbitPoint(body, parent, time, scale))];
+    }
+
+    /// <summary>
+    /// Where on its drawn orbit a body is at a time, relative to its parent's display position
+    /// (e.g. to mark an event on the orbit line). Zero for a body without an orbit.
+    /// </summary>
+    public static Vector3D OrbitPoint(Body body, Body parent, double timeDays, SystemScale scale)
+    {
+        if (body.Orbit is not Orbit orbit)
+        {
+            return Vector3D.Zero;
+        }
+
+        return DisplayOffset(OrbitMath.OffsetFromParent(orbit, timeDays),
+            DisplayRadius(parent.RadiusKm, scale), DisplayRadius(body.RadiusKm, scale), scale);
     }
 
     private static DisplayBody Place(

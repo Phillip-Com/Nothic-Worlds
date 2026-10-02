@@ -7,10 +7,11 @@ using NothicWorlds.Session;
 namespace NothicWorlds.UI;
 
 /// <summary>
-/// The time bar in the bottom-right corner (VISION.md SIM-02, REN-02): play or pause the world
-/// clock, pick how fast it runs, step it back or forward by a chosen amount, see the date on the
-/// selected body ("Day 1,204, 14:30" in that body's own days, owner's choice until calendars
-/// exist), jump to a day, and switch the system view between readable and true scale.
+/// The time bar in the bottom-right corner (VISION.md SIM-02, REN-02, CAL-01, CAL-03): play or
+/// pause the world clock, pick how fast it runs, step it back or forward by a chosen amount, see
+/// the date on the selected body (in its calendar, or "Day 1,204, 14:30" in its own days
+/// without one), jump to a date, and switch the system view between readable and true scale.
+/// A second line shows the body's seasons and its next solstice or equinox.
 /// </summary>
 /// <remarks>
 /// Steps and jumps glide: the clock runs quickly to the new time (owner's request), so bodies
@@ -42,9 +43,13 @@ public partial class TimeControls : CanvasLayer
     private (double From, double To, double Progress)? _glide;
     private OptionButton _speed = null!;
     private Label _time = null!;
+    private Label _seasons = null!;
     private ConfirmationDialog _goToDialog = null!;
+    private SpinBox _goToYear = null!;
+    private OptionButton _goToMonth = null!;
     private SpinBox _goToDay = null!;
     private SpinBox _goToHour = null!;
+    private Control[] _calendarOnly = [];
     private bool _playing;
 
     /// <summary>The open world, whose clock this runs.</summary>
@@ -58,13 +63,36 @@ public partial class TimeControls : CanvasLayer
 
     public override void _Ready()
     {
-        var panel = new PanelContainer();
-        panel.SetAnchorsAndOffsetsPreset(
+        // The date and seasons sit in their own panel above the buttons, so long calendar
+        // dates never widen the button row into the camera text at the bottom-left.
+        var stack = new VBoxContainer();
+        stack.SetAnchorsAndOffsetsPreset(
             Control.LayoutPreset.BottomRight, Control.LayoutPresetMode.Minsize, ScreenMargin);
-        panel.GrowHorizontal = Control.GrowDirection.Begin;
-        panel.GrowVertical = Control.GrowDirection.Begin;
-        AddChild(panel);
+        stack.GrowHorizontal = Control.GrowDirection.Begin;
+        stack.GrowVertical = Control.GrowDirection.Begin;
+        AddChild(stack);
 
+        var info = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd };
+        stack.AddChild(info);
+        var infoRows = new VBoxContainer();
+        info.AddChild(infoRows);
+        _time = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Right,
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            TooltipText = "The date on the selected body, counted in its own days (in its " +
+                "calendar, if it has one)",
+        };
+        infoRows.AddChild(_time);
+        _seasons = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Right,
+            MouseFilter = Control.MouseFilterEnum.Pass,
+        };
+        infoRows.AddChild(_seasons);
+
+        var panel = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd };
+        stack.AddChild(panel);
         var row = new HBoxContainer();
         panel.AddChild(row);
 
@@ -97,11 +125,7 @@ public partial class TimeControls : CanvasLayer
         row.AddChild(CreateButton("+", () => Step(+1),
             "Step the clock forward (the bodies glide into place)"));
 
-        _time = new Label { CustomMinimumSize = new Vector2(220, 0) };
-        _time.TooltipText = "The date on the selected body, counted in its own days";
-        row.AddChild(_time);
-
-        row.AddChild(CreateButton("Go to…", AskForDay, "Jump to a day and hour"));
+        row.AddChild(CreateButton("Go to…", AskForDate, "Jump to a date and hour"));
 
         var trueScale = new CheckButton
         {
@@ -134,6 +158,7 @@ public partial class TimeControls : CanvasLayer
 
         Session.TimeChanged += ShowTime;
         Session.SelectionChanged += ShowTime;
+        Session.Changed += ShowTime;  // Edits can move the seasons (tilt, orbit, calendar).
         Session.WorldClosed += _ =>
         {
             SetPlaying(false);
@@ -196,8 +221,11 @@ public partial class TimeControls : CanvasLayer
         };
     }
 
-    // Runs the clock smoothly to a time; playing stops so the bodies settle there.
-    private void GlideTo(double timeDays)
+    /// <summary>
+    /// Runs the clock smoothly to a time (standard days); playing stops so the bodies settle
+    /// there.
+    /// </summary>
+    public void GlideTo(double timeDays)
     {
         if (Session is null || !double.IsFinite(timeDays))
         {
@@ -222,10 +250,27 @@ public partial class TimeControls : CanvasLayer
         }
 
         Body body = Session.SelectedBody;
-        _time.Text = $"{body.Name}: {BodyClock.LocalTimeOn(body, Session.TimeDays)}";
+        double now = Session.TimeDays;
+        _time.Text = $"{body.Name}: {BodyClock.Describe(body, now)}";
+
+        SeasonTimeline seasons = Session.SelectedSeasons;
+        if (seasons.SeasonAt(now) is { } current && seasons.NextEvent(now) is SeasonEvent next)
+        {
+            _seasons.Text = $"{SeasonText.Current(current)}  ·  " +
+                $"{SeasonText.Name(next.Kind)} {SeasonText.HowFar(body, now, next.TimeDays)}";
+            _seasons.TooltipText = $"The seasons in each hemisphere, from where the star " +
+                $"stands.\nNext: {SeasonText.Name(next.Kind)}, " +
+                $"{BodyClock.Describe(body, next.TimeDays)} " +
+                $"({SeasonText.SouthernNote(next.Kind)}).";
+            _seasons.Visible = true;
+        }
+        else
+        {
+            _seasons.Visible = false;
+        }
     }
 
-    private void AskForDay()
+    private void AskForDate()
     {
         if (Session is null)
         {
@@ -234,35 +279,79 @@ public partial class TimeControls : CanvasLayer
 
         Body body = Session.SelectedBody;
         LocalTime now = BodyClock.LocalTimeOn(body, Session.TimeDays);
-        _goToDialog.Title = $"Go to a Day on {body.Name}";
-        _goToDay.Value = now.Day;
+        foreach (Control field in _calendarOnly)
+        {
+            field.Visible = body.Calendar is not null;
+        }
+
+        if (body.Calendar is Calendar calendar)
+        {
+            CalendarDate date = CalendarMath.DateOf(calendar, now.Day - 1);
+            _goToMonth.Clear();
+            foreach (CalendarMonth month in calendar.Months)
+            {
+                _goToMonth.AddItem(month.Name);
+            }
+
+            _goToYear.Value = date.Year;
+            _goToMonth.Select(date.Month);
+            ShowMonthDays();
+            _goToDay.Value = date.Day;
+        }
+        else
+        {
+            _goToDay.MinValue = -1e9;
+            _goToDay.MaxValue = 1e9;
+            _goToDay.Value = now.Day;
+        }
+
+        _goToDialog.Title = $"Go to a Date on {body.Name}";
         _goToHour.MaxValue = Math.Max(0, body.DayLengthHours - 0.01);
         _goToHour.Value = now.Hour + now.Minute / 60.0;
-        _goToDialog.PopupCentered(new Vector2I(340, 160));
+        _goToDialog.ResetSize();
+        _goToDialog.PopupCentered(new Vector2I(340, 0));
     }
 
-    private void GoToDay()
+    // Limits the day field to the chosen month's days.
+    private void ShowMonthDays()
+    {
+        if (Session?.SelectedBody.Calendar is Calendar calendar && _goToMonth.Selected >= 0)
+        {
+            _goToDay.MinValue = 1;
+            _goToDay.MaxValue = calendar.Months[_goToMonth.Selected].Days;
+        }
+    }
+
+    private void GoToDate()
     {
         if (Session is null)
         {
             return;
         }
 
-        // Day 1 starts at time 0; hours are standard hours into the body's day.
-        double dayLength = Session.SelectedBody.DayLengthHours;
-        double hours = (_goToDay.Value - 1) * dayLength + _goToHour.Value;
-        GlideTo(hours / 24.0);
+        // Day index 0 is the day at time 0 (day 1, or the calendar's start date).
+        Body body = Session.SelectedBody;
+        long dayIndex = body.Calendar is Calendar calendar
+            ? CalendarMath.DayIndexOf(calendar, (long)_goToYear.Value,
+                Math.Max(0, _goToMonth.Selected), (int)_goToDay.Value)
+            : (long)_goToDay.Value - 1;
+        GlideTo(BodyClock.TimeAt(body, dayIndex, _goToHour.Value));
     }
 
     private void BuildGoToDialog()
     {
+        _goToYear = new SpinBox
+        {
+            MinValue = -1e12,
+            MaxValue = 1e12,
+            Step = 1,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+        }.WithArrowKeys();
+        _goToMonth = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _goToMonth.ItemSelected += _ => ShowMonthDays();
         _goToDay = new SpinBox
         {
-            MinValue = -1e9,
-            MaxValue = 1e9,
             Step = 1,
-            AllowGreater = true,
-            AllowLesser = true,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
         }.WithArrowKeys();
         _goToHour = new SpinBox
@@ -272,14 +361,23 @@ public partial class TimeControls : CanvasLayer
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
         }.WithArrowKeys();
         var grid = new GridContainer { Columns = 2 };
-        grid.AddChild(new Label { Text = "Day" });
-        grid.AddChild(_goToDay);
-        grid.AddChild(new Label { Text = "Hour" });
-        grid.AddChild(_goToHour);
+        Label yearLabel = AddRow(grid, "Year", _goToYear);
+        Label monthLabel = AddRow(grid, "Month", _goToMonth);
+        AddRow(grid, "Day", _goToDay);
+        AddRow(grid, "Hour", _goToHour);
+        _calendarOnly = [yearLabel, _goToYear, monthLabel, _goToMonth];
         _goToDialog = new ConfirmationDialog { OkButtonText = "Go" };
         _goToDialog.AddChild(grid);
-        _goToDialog.Confirmed += GoToDay;
+        _goToDialog.Confirmed += GoToDate;
         AddChild(_goToDialog);
+    }
+
+    private static Label AddRow(GridContainer grid, string text, Control field)
+    {
+        var label = new Label { Text = text };
+        grid.AddChild(label);
+        grid.AddChild(field);
+        return label;
     }
 
     private static Button CreateButton(string text, Action pressed, string tooltip)

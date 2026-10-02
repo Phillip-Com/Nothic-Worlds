@@ -162,4 +162,21 @@ public class SystemLayoutTests
         Assert.Empty(SystemLayout.OrbitPath(
             world.Bodies[1], world.Bodies[0], SystemScale.Readable));
     }
+
+    [Theory]
+    [InlineData(SystemScale.Readable)]
+    [InlineData(SystemScale.True)]
+    public void OrbitPoint_IsWhereTheBodyIsDrawn(SystemScale scale)
+    {
+        World world = World.CreateNew();
+        Body planet = world.Bodies[0];
+        Body sun = world.Bodies[1];
+        planet.Orbit = planet.Orbit! with { Eccentricity = 0.4, StartAngleDegrees = 30 };
+
+        Dictionary<Guid, DisplayBody> layout = SystemLayout.At(world.Bodies, 123.4, scale);
+        Vector3D expected = layout[planet.Id].Position - layout[sun.Id].Position;
+        Vector3D point = SystemLayout.OrbitPoint(planet, sun, 123.4, scale);
+
+        Assert.Equal(0, (point - expected).Length, 1e-9);
+    }
 }
