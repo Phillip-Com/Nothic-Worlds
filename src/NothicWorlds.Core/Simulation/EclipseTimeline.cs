@@ -43,12 +43,12 @@ public sealed class EclipseTimeline
     }
 
     /// <summary>
-    /// True if the stretch can answer for <paramref name="timeDays"/>: any eclipse under way
-    /// then, and a whole year after it.
+    /// True if the stretch can answer for <paramref name="timeDays"/>: a quarter year before it
+    /// (for the last eclipse of each moon) and a whole year after it.
     /// </summary>
     public bool Covers(double timeDays)
     {
-        return timeDays - _yearDays * 0.01 >= FromDays && timeDays + _yearDays <= ToDays;
+        return timeDays - _yearDays * 0.25 >= FromDays && timeDays + _yearDays <= ToDays;
     }
 
     /// <summary>

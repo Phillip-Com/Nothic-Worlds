@@ -66,6 +66,14 @@ weekdays, year numbering (with an optional era), and the date the clock starts o
 panel lists the year's solstices and equinoxes with **Go to** buttons, and they are marked on the
 orbit too (equinoxes as dots, solstices as diamonds).
 
+The panel also lists the selected body's eclipses in the coming year: solar eclipses (one of its
+moons in front of the star) and lunar ones (a moon in its shadow), each with its type, date, how
+deep and how long, and a **Go to** button (a moon shows the same eclipses as its planet). The
+time bar's **Go to…** dialog always offers a jump to the next solar and the next lunar
+eclipse. Each moon's previous and next eclipse are also
+marked on its orbit (when they're within one orbit of now): gold-ringed dark disks for solar
+eclipses, dark red disks for lunar ones.
+
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers
 back after a crash.

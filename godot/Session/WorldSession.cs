@@ -56,6 +56,12 @@ public partial class WorldSession : Node
     // The selected body's seasons, and which world, edit, and body they were worked out for.
     private (World World, int Version, Guid BodyId, SeasonTimeline Timeline)? _seasons;
 
+    // The selected body's eclipses, worked out in the background (see SelectedEclipses): the
+    // latest result, and what's being worked out now.
+    private (World World, int Version, Guid BodyId, EclipseTimeline Timeline)? _eclipses;
+    private (World World, int Version, Guid BodyId)? _eclipsesUnderway;
+    private (World World, int Version, Guid BodyId)? _eclipsesFailed;
+
     // Undo/redo: snapshots of every body. While a gesture (a drag, or a calibration session) is
     // under way, its edits add up to one step, recorded when it ends.
     private readonly UndoHistory<EditSnapshot> _history = new();
@@ -78,6 +84,12 @@ public partial class WorldSession : Node
 
     /// <summary>Raised when the world clock changes (often: every frame while it runs).</summary>
     public event Action? TimeChanged;
+
+    /// <summary>
+    /// Raised when the selected body's eclipses have been worked out (see
+    /// <see cref="SelectedEclipses"/>).
+    /// </summary>
+    public event Action? EclipsesReady;
 
     /// <summary>Raised when a world is closed (replaced or the app quits), with its ID.</summary>
     public event Action<Guid>? WorldClosed;
@@ -562,6 +574,33 @@ public partial class WorldSession : Node
             SeasonTimeline fresh = SeasonTimeline.Around(World.Bodies, SelectedBody, TimeDays);
             _seasons = (World, _editVersion, SelectedBodyId, fresh);
             return fresh;
+        }
+    }
+
+    /// <summary>
+    /// The selected body's eclipses around the current time (VISION.md EVT-01), or null while
+    /// they're being worked out. Working them out takes several milliseconds, so it happens in
+    /// the background, on a copy of the bodies, and only once something asks;
+    /// <see cref="EclipsesReady"/> is raised when they're in. They're worked out again after an
+    /// edit, a new selection, or half a year of clock time (meanwhile the last ones stay).
+    /// </summary>
+    public EclipseTimeline? SelectedEclipses
+    {
+        get
+        {
+            if (_eclipses is not var (world, version, bodyId, timeline) || world != World
+                || version != _editVersion || bodyId != SelectedBody.Id)
+            {
+                StartWorkingOutEclipses();
+                return null;
+            }
+
+            if (!timeline.Covers(TimeDays))
+            {
+                StartWorkingOutEclipses();
+            }
+
+            return timeline;
         }
     }
 
@@ -1378,6 +1417,41 @@ public partial class WorldSession : Node
     {
         return (world.Bodies.FirstOrDefault(body => body.Kind != BodyKind.Star)
             ?? world.Bodies[0]).Id;
+    }
+
+    // Works out the selected body's eclipses in the background, unless that's already under
+    // way (whoever asks next starts it again if the world moved on meanwhile), or it failed
+    // for this same world.
+    private async void StartWorkingOutEclipses()
+    {
+        (World World, int Version, Guid BodyId) wanted = (World, _editVersion, SelectedBody.Id);
+        if (_eclipsesUnderway is not null || _eclipsesFailed == wanted)
+        {
+            return;
+        }
+
+        _eclipsesUnderway = wanted;
+        List<Body> bodies = CloneBodies(World.Bodies);
+        Body body = bodies.First(b => b.Id == wanted.BodyId);
+        double time = TimeDays;
+        try
+        {
+            EclipseTimeline timeline =
+                await Task.Run(() => EclipseTimeline.Around(bodies, body, time));
+            _eclipses = (wanted.World, wanted.Version, wanted.BodyId, timeline);
+        }
+        catch (ArgumentException exception)
+        {
+            // An invalid system can't have eclipses; edits never leave one, so this is a bug.
+            GD.PushError($"Couldn't work out eclipses: {exception.Message}");
+            _eclipsesFailed = wanted;
+        }
+        finally
+        {
+            _eclipsesUnderway = null;
+        }
+
+        EclipsesReady?.Invoke();
     }
 
     private static List<Body> CloneBodies(IEnumerable<Body> bodies)

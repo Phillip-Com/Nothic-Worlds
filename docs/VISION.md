@@ -111,13 +111,15 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 **Milestone 6: Eclipses** · In Progress (owner's choice, 2026-10-01)
 Eclipses found from where the bodies are (`EVT-01`). Owner's decisions:
 - **The selected body's eclipses:** solar eclipses seen from it (its moons passing in front of
-  the star), and lunar eclipses of its moons (or of itself, for a moon). Not the whole system,
-  and no transits of planets across the star.
+  the star), and lunar eclipses of its moons. A selected moon has the same ones its planet sees
+  with it: lunar (in the planet's shadow) and solar (in front of the star, seen from the
+  planet; added 2026-10-02 at the owner's request). Not the whole system, and no transits of
+  planets across the star.
 - **Shown** as a list in the System panel (the coming year, with dates and Go to buttons) and
   **as markers on the moon's orbit**. Not in the time bar.
 - **Detail:** the type (total, annular, partial, or penumbral), start, peak, and end, and how
   much is covered.
-- **Two PRs:** Core (eclipse search and tests) (PR #21), then the app.
+- **Two PRs:** Core (eclipse search and tests) (PR #21), then the app (PR #22).
 - Not included for now: where on the surface an eclipse is seen (its path across the map), and
   drawing the shadow in 3D. Eclipses are worked out, never saved, so the file format is
   unchanged.
@@ -856,12 +858,13 @@ system's parameters (e.g. orbital periods, rotation speed) so the user's calenda
 
 ### 4.7 Events (`EVT`)
 
-**EVT-01 — Eclipses** · In Progress (Core done, PR #21) · Base
+**EVT-01 — Eclipses** · Implemented (M6) · Base
 **Intent:** Simulated from body positions.
 **Implementation (Core, PR #21):**
 - `Simulation/Eclipses.cs`: every eclipse is a body passing through another's shadow. The
   star's light past the blocker makes the **umbra** (star fully hidden; past its point, the
   **antumbra**, where a ring of light stays) and the wider **penumbra** (star partly hidden).
+  A moon's eclipses are its planet's eclipses with it, solar and lunar (PR #22).
   `Between(bodies, body, from, to)` steps through time measuring how far the shadowed body is
   from the shadow's center (60 points per moon orbit), finds each close pass, and refines it:
   roughly first, since most passes miss, then exactly (`TimeSearch`). Each `Eclipse` has its
@@ -886,6 +889,32 @@ system's parameters (e.g. orbital periods, rotation speed) so the user's calenda
   year; shallow passes are partial or penumbral; grazing passes are found and near misses
   aren't; a moon sees its own lunar eclipses; the same after Make Center; none for stars or
   moonless planets; deterministic.
+
+**Implementation (app, PR #22):**
+- `WorldSession.SelectedEclipses` returns the selected body's `EclipseTimeline`, or null while
+  it's being worked out. It's worked out **in the background** (`Task.Run`, on a copy of the
+  bodies), one at a time, only when something asks, and again after an edit, a new selection,
+  or half a year of clock time (the last one stays meanwhile). `EclipsesReady` fires when it's
+  in. A failure (which edits can't cause) is logged once, not retried every frame.
+- **System panel** (`godot/UI/EclipseSection.cs`, under Seasons; hidden for stars): the coming
+  year's eclipses, including one under way, at most 12, each with its title ("Total solar
+  eclipse (Moon)", "Partial lunar eclipse of Moon", or "… (in Earth's shadow)" for the selected
+  moon), date, depth and length ("94% of the star hidden · 5.1 h"), start and end in the
+  tooltip, and **Go to** (glides to the peak). "Working them out…" shows meanwhile. It only
+  updates while the panel shows.
+- **Orbit markers** (`godot/UI/EclipseMarkers.cs`, its own overlay): where the moon is at an
+  eclipse's peak, on its orbit around the planet's current position. **Only each moon's previous
+  and next eclipse**, and only while within one trip of the moon around its planet from now
+  (owner's request, after a first version marked every eclipse of the year in a ring). Solar: a
+  dark disk ringed in gold; lunar: a dark red disk; labelled "Previous: Total lunar", "Next:
+  Annular solar", and so on. Cached until the timeline changes or an eclipse peaks; off-screen
+  markers are skipped. `EclipseTimeline.Covers` looks back a quarter year so the previous one
+  is always known.
+- **Go to… dialog** (`godot/UI/NextEclipseJumps.cs`): below the date fields, the selected
+  body's next solar and next lunar eclipse with their dates and type, each with a **Go** button
+  that closes the dialog and glides to the peak (owner's request). "None in the coming year" or
+  "working it out…" otherwise; hidden for stars.
+- Wording in one place: `godot/UI/EclipseText.cs`.
 
 **EVT-02 — Meteor showers and asteroid events** · Idea · —
 **Intent:** Simulated celestial events.
