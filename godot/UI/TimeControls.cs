@@ -50,6 +50,7 @@ public partial class TimeControls : CanvasLayer
     private SpinBox _goToDay = null!;
     private SpinBox _goToHour = null!;
     private Control[] _calendarOnly = [];
+    private NextEclipseJumps _eclipseJumps = null!;
     private bool _playing;
 
     /// <summary>The open world, whose clock this runs.</summary>
@@ -305,6 +306,8 @@ public partial class TimeControls : CanvasLayer
             _goToDay.Value = now.Day;
         }
 
+        _eclipseJumps.Visible = body.Kind != BodyKind.Star;
+        _eclipseJumps.Refresh();
         _goToDialog.Title = $"Go to a Date on {body.Name}";
         _goToHour.MaxValue = Math.Max(0, body.DayLengthHours - 0.01);
         _goToHour.Value = now.Hour + now.Minute / 60.0;
@@ -367,7 +370,25 @@ public partial class TimeControls : CanvasLayer
         AddRow(grid, "Hour", _goToHour);
         _calendarOnly = [yearLabel, _goToYear, monthLabel, _goToMonth];
         _goToDialog = new ConfirmationDialog { OkButtonText = "Go" };
-        _goToDialog.AddChild(grid);
+
+        // Owner's request: the next solar and lunar eclipse are always one click away.
+        _eclipseJumps = new NextEclipseJumps
+        {
+            Session = Session!,
+            Jump = peak =>
+            {
+                _goToDialog.Hide();
+                GlideTo(peak);
+            },
+        };
+        var layout = new VBoxContainer();
+        layout.AddChild(grid);
+        if (Session is not null)
+        {
+            layout.AddChild(_eclipseJumps);
+        }
+
+        _goToDialog.AddChild(layout);
         _goToDialog.Confirmed += GoToDate;
         AddChild(_goToDialog);
     }

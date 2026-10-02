@@ -11,7 +11,7 @@ public static class EclipseText
     /// <summary>
     /// What an eclipse is, from the selected body's point of view: "Total solar eclipse
     /// (Moon)", "Partial lunar eclipse of Moon", or, for the moon itself, "Total lunar eclipse
-    /// (in Earth's shadow)".
+    /// (in Earth's shadow)" and "Total solar eclipse (seen from Earth)".
     /// </summary>
     public static string Title(Eclipse eclipse, Body selected, IReadOnlyList<Body> bodies)
     {
@@ -19,7 +19,9 @@ public static class EclipseText
         string NameOf(Guid id) => bodies.FirstOrDefault(b => b.Id == id)?.Name ?? "?";
         if (eclipse.Kind == EclipseKind.Solar)
         {
-            return $"{kind} ({NameOf(eclipse.BlockerId)})";
+            return eclipse.BlockerId == selected.Id
+                ? $"{kind} (seen from {NameOf(eclipse.ShadowedId)})"
+                : $"{kind} ({NameOf(eclipse.BlockerId)})";
         }
 
         return eclipse.ShadowedId == selected.Id
