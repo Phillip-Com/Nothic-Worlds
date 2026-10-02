@@ -22,6 +22,9 @@ internal static class WorldMapper
             ModifiedUtc = world.ModifiedUtc,
             TimeDays = world.TimeDays,
             Bodies = world.Bodies.Select(ToDocument).ToList(),
+            Journal = NullIfEmpty(world.Journal.Select(ToDocument)),
+            Timelines = NullIfEmpty(world.Timelines.Select(ToDocument)),
+            Events = NullIfEmpty(world.Events.Select(ToDocument)),
             View = world.View is null ? null : ToDocument(world.View),
         };
     }
@@ -44,7 +47,136 @@ internal static class WorldMapper
         };
         world.Bodies.AddRange(document.Bodies.Select(ToBody));
         RequireNoProblem(Simulation.SystemHierarchy.Problem(world.Bodies));
+        world.Journal.AddRange((document.Journal ?? []).Select(ToEntry));
+        world.Timelines.AddRange((document.Timelines ?? []).Select(ToTimeline));
+        world.Events.AddRange((document.Events ?? []).Select(ToEvent));
+        RequireNoProblem(LoreRules.Problem(world));
         return world;
+    }
+
+    // Lists that are empty are left out of the file.
+    private static List<T>? NullIfEmpty<T>(IEnumerable<T> items)
+    {
+        List<T> list = [.. items];
+        return list.Count == 0 ? null : list;
+    }
+
+    private static JournalEntryDocument ToDocument(JournalEntry entry)
+    {
+        return new JournalEntryDocument
+        {
+            Id = entry.Id,
+            Title = entry.Title,
+            Text = entry.Text.Length == 0 ? null : entry.Text,
+            Location = entry.Location is LoreLocation location ? ToDocument(location) : null,
+            CreatedUtc = entry.CreatedUtc,
+            EditedUtc = entry.EditedUtc,
+        };
+    }
+
+    // Checked fully afterwards by LoreRules.Problem (through JournalEntry.Problem).
+    private static JournalEntry ToEntry(JournalEntryDocument document)
+    {
+        Require(document is not null, "a journal entry is empty");
+        return new JournalEntry
+        {
+            Id = document!.Id,
+            Title = document.Title ?? "",
+            Text = document.Text ?? "",
+            Location = document.Location is LocationDocument location
+                ? ToLocation(location)
+                : null,
+            CreatedUtc = document.CreatedUtc,
+            EditedUtc = document.EditedUtc,
+        };
+    }
+
+    private static TimelineDocument ToDocument(Timeline timeline)
+    {
+        return new TimelineDocument
+        {
+            Id = timeline.Id,
+            Name = timeline.Name,
+            Color = timeline.Color.ToHex(),
+            Hidden = timeline.Hidden ? true : null,
+        };
+    }
+
+    private static Timeline ToTimeline(TimelineDocument document)
+    {
+        Require(document is not null, "a timeline is empty");
+        Require(RgbColor.TryParseHex(document!.Color, out RgbColor color),
+            $"invalid timeline color '{document.Color}'");
+        return new Timeline
+        {
+            Id = document.Id,
+            Name = document.Name ?? "",
+            Color = color,
+            Hidden = document.Hidden ?? false,
+        };
+    }
+
+    private static EventDocument ToDocument(TimelineEvent timelineEvent)
+    {
+        return new EventDocument
+        {
+            Id = timelineEvent.Id,
+            Timeline = timelineEvent.TimelineId,
+            Title = timelineEvent.Title,
+            Description = timelineEvent.Description.Length == 0
+                ? null
+                : timelineEvent.Description,
+            Start = timelineEvent.StartDays,
+            End = timelineEvent.EndDays,
+            Location = timelineEvent.Location is LoreLocation location
+                ? ToDocument(location)
+                : null,
+            Entries = timelineEvent.EntryIds.Count == 0 ? null : [.. timelineEvent.EntryIds],
+        };
+    }
+
+    private static TimelineEvent ToEvent(EventDocument document)
+    {
+        Require(document is not null, "a timeline event is empty");
+        return new TimelineEvent
+        {
+            Id = document!.Id,
+            TimelineId = document.Timeline,
+            Title = document.Title ?? "",
+            Description = document.Description ?? "",
+            StartDays = document.Start,
+            EndDays = document.End,
+            Location = document.Location is LocationDocument location
+                ? ToLocation(location)
+                : null,
+            EntryIds = document.Entries is null ? [] : [.. document.Entries],
+        };
+    }
+
+    private static LocationDocument ToDocument(LoreLocation location)
+    {
+        return new LocationDocument
+        {
+            Body = location.BodyId,
+            Latitude = location.Pin?.LatitudeDegrees,
+            Longitude = location.Pin?.LongitudeDegrees,
+        };
+    }
+
+    private static LoreLocation ToLocation(LocationDocument document)
+    {
+        if (document.Latitude is null && document.Longitude is null)
+        {
+            return new LoreLocation(document.Body);
+        }
+
+        Require(document.Latitude is double latitude && double.IsFinite(latitude)
+                && latitude is >= -90 and <= 90
+                && document.Longitude is double longitude && double.IsFinite(longitude)
+                && longitude is >= -180 and <= 180,
+            "a pinned location is invalid");
+        return new LoreLocation(document.Body,
+            new GeoCoordinate(document.Latitude!.Value, document.Longitude!.Value));
     }
 
     private static BodyDocument ToDocument(Body body)

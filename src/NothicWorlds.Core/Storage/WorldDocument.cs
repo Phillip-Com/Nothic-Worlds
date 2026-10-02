@@ -13,7 +13,47 @@ internal sealed class WorldDocument
     public required DateTimeOffset ModifiedUtc { get; init; }
     public double? TimeDays { get; init; }  // Added in format version 5
     public required List<BodyDocument> Bodies { get; init; }
+    public List<JournalEntryDocument>? Journal { get; init; }  // Added in format version 7
+    public List<TimelineDocument>? Timelines { get; init; }  // Added in format version 7
+    public List<EventDocument>? Events { get; init; }  // Added in format version 7
     public ViewDocument? View { get; init; }
+}
+
+internal sealed class JournalEntryDocument
+{
+    public required Guid Id { get; init; }
+    public required string Title { get; init; }
+    public string? Text { get; init; }  // Omitted when empty
+    public LocationDocument? Location { get; init; }
+    public required DateTimeOffset CreatedUtc { get; init; }
+    public required DateTimeOffset EditedUtc { get; init; }
+}
+
+internal sealed class LocationDocument
+{
+    public required Guid Body { get; init; }
+    public double? Latitude { get; init; }  // Both or neither: the pin
+    public double? Longitude { get; init; }
+}
+
+internal sealed class TimelineDocument
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required string Color { get; init; }
+    public bool? Hidden { get; init; }  // Omitted when shown
+}
+
+internal sealed class EventDocument
+{
+    public required Guid Id { get; init; }
+    public required Guid Timeline { get; init; }
+    public required string Title { get; init; }
+    public string? Description { get; init; }  // Omitted when empty
+    public required double Start { get; init; }
+    public double? End { get; init; }  // Omitted for a moment
+    public LocationDocument? Location { get; init; }
+    public List<Guid>? Entries { get; init; }  // Omitted when it links to none
 }
 
 internal sealed class BodyDocument

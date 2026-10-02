@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 6** (see **Version history** at the end)
+**Current format version: 7** (see **Version history** at the end)
 
 ## Container
 
@@ -20,11 +20,11 @@ A `.nworld` file is a standard **zip archive** containing:
   which also blocks names that try to escape the archive (`../`).
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB.
 
-## `world.json` (version 6)
+## `world.json` (version 7)
 
 ```json
 {
-  "formatVersion": 6,
+  "formatVersion": 7,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -110,6 +110,36 @@ A `.nworld` file is a standard **zip archive** containing:
       }
     }
   ],
+  "journal": [
+    {
+      "id": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+      "title": "The Founding",
+      "text": "First line.\nSecond line.",
+      "location": {
+        "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "latitude": 12.5,
+        "longitude": -30.25
+      },
+      "createdUtc": "2026-10-02T09:00:00+00:00",
+      "editedUtc": "2026-10-02T10:15:00+00:00"
+    }
+  ],
+  "timelines": [
+    { "id": "7e7e7e7e-7e7e-7e7e-7e7e-7e7e7e7e7e7e", "name": "The Empire", "color": "#C04040" },
+    { "id": "7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f", "name": "House Vael", "color": "#40A060",
+      "hidden": true }
+  ],
+  "events": [
+    {
+      "id": "0f0f0f0f-0f0f-0f0f-0f0f-0f0f0f0f0f0f",
+      "timeline": "7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f",
+      "title": "The Long War",
+      "description": "Twelve years of war.",
+      "start": 400,
+      "end": 4783.25,
+      "entries": [ "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1" ]
+    }
+  ],
   "view": {
     "latitude": 20,
     "longitude": -45.5,
@@ -165,10 +195,33 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…pieces[].width` | yes | Degrees of arc the bounding box spans left to right (0.1 to 180). The height follows from the box's true shape. |
 | `…pieces[].warp` | no | Edit Points (`MAP-02`): where each outline point has been dragged to, as `[u, v]` in the piece's box (0–1 from its top-left before warping; may go beyond). Exactly one per `outline.points`, in the same order. Omitted when the piece isn't warped. |
 | `bodies[].surface.fillColor` | yes | `#RRGGBB`. Color where the map doesn't cover the globe |
+| `journal` | no | Journal entries (`LORE-02`), in the order they were added. Omitted when there are none. Up to 10,000. |
+| `…journal[].id` | yes | GUID, unique among entries |
+| `…journal[].title` | yes | Not empty, up to 200 characters |
+| `…journal[].text` | no | Plain text with `\n` line breaks, up to 200,000 characters. Omitted when empty. |
+| `…journal[].location` | no | Where it's about (see **Locations** below). Omitted for nowhere in particular. |
+| `…journal[].createdUtc`, `editedUtc` | yes | Real-world times it was written and last changed (for sorting) |
+| `timelines` | no | Named timelines (`LORE-03`), in lane order. Omitted when there are none. Up to 100. |
+| `…timelines[].id`, `name` | yes | GUID, unique among timelines; name not empty, up to 100 characters |
+| `…timelines[].color` | yes | `#RRGGBB`: its lane's color |
+| `…timelines[].hidden` | no | `true` if its lane is hidden from the timeline strip. Omitted when shown. |
+| `events` | no | Timeline events (`LORE-03`). Omitted when there are none. Up to 10,000. |
+| `…events[].id` | yes | GUID, unique among events |
+| `…events[].timeline` | yes | The `id` of the timeline it's on (must exist) |
+| `…events[].title` | yes | Not empty, up to 200 characters |
+| `…events[].description` | no | Plain text, up to 20,000 characters. Omitted when empty. |
+| `…events[].start` | yes | When it happens (or begins), in standard days, like `timeDays` |
+| `…events[].end` | no | When it ends, not before `start`. Omitted for a moment. |
+| `…events[].location` | no | Where it happens (see **Locations**) |
+| `…events[].entries` | no | The `id`s of journal entries it links to, each once (every one must exist). Links are many to many and stored only here; an entry's events are the ones listing it. Omitted when none. |
 | `view` | no | Camera when saved. Omitted means the default view. |
 | `view.latitude`, `longitude` | yes | Degrees; camera direction from the focus point |
 | `view.altitude` | yes | In planet radii above the surface |
 | `view.focusOffset` | no | `[x, y, z]` view-pan offset from the planet's center; default `[0, 0, 0]` |
+
+**Locations** (journal entries and events): `body` is the `id` of a body that exists. An
+optional pin on its surface is given by `latitude` (−90 to 90) and `longitude` (−180 to 180),
+both or neither; without them it means the body as a whole.
 
 Names written for enums (`kind`, `projection`) are fixed strings. They're not the code's enum
 names, so renaming code never changes the format.
@@ -248,3 +301,4 @@ If anything fails, the existing world file is left untouched.
 | 4 | Added optional `pieces[].warp` (Edit Points, `MAP-02`) | Nothing to change: version 3 pieces aren't warped |
 | 5 | Star systems (M4): `timeDays`; bodies gain `radiusKm`, `dayLengthHours`, `axialTilt`, optional `orbit`; kinds `star` and `moon` | Each body gets `radiusKm` 6371, `dayLengthHours` 24, `axialTilt` 0, and no orbit |
 | 6 | Calendars and seasons (M5): bodies gain `axialTiltDirection` and an optional `calendar` | Each body gets `axialTiltDirection` 0 and no calendar |
+| 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |

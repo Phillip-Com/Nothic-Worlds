@@ -616,6 +616,242 @@ public sealed class WorldPackageTests : IDisposable
         }
         """;
 
+    // A version 7 world file: the version 6 world with a journal, two timelines (one hidden),
+    // and two events (a moment and a span) linked to the entries. Never edit this.
+    private const string GoldenV7Json = """
+        {
+          "formatVersion": 7,
+          "id": "11111111-2222-3333-4444-555555555555",
+          "name": "Aerth",
+          "createdUtc": "2026-09-30T12:00:00+00:00",
+          "modifiedUtc": "2026-09-30T13:30:00+00:00",
+          "timeDays": 400.5,
+          "bodies": [
+            {
+              "id": "51515151-5151-5151-5151-515151515151",
+              "name": "Sol",
+              "kind": "star",
+              "radiusKm": 696000,
+              "dayLengthHours": 609.5,
+              "axialTilt": 0,
+              "axialTiltDirection": 0,
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aerth",
+              "kind": "planet",
+              "radiusKm": 6000,
+              "dayLengthHours": 26.5,
+              "axialTilt": 23.5,
+              "axialTiltDirection": 45,
+              "orbit": {
+                "parent": "51515151-5151-5151-5151-515151515151",
+                "distanceKm": 149600000,
+                "periodDays": 365.25,
+                "startAngle": 90
+              },
+              "calendar": {
+                "months": [
+                  {
+                    "name": "Frost",
+                    "days": 30
+                  },
+                  {
+                    "name": "Highsun",
+                    "days": 31
+                  }
+                ],
+                "weekdays": [
+                  "Moonday",
+                  "Starday"
+                ],
+                "firstYear": 1203,
+                "era": "of the Third Age",
+                "start": {
+                  "month": 1,
+                  "day": 5,
+                  "weekday": 1
+                }
+              },
+              "surface": {
+                "map": {
+                  "asset": "assets/0123456789abcdef0123456789abcdef.png",
+                  "projection": "winkel-tripel",
+                  "calibration": {
+                    "latitudes": [
+                      {
+                        "latitude": 30,
+                        "drawnAs": 33.5
+                      }
+                    ],
+                    "longitudes": [
+                      {
+                        "longitude": -180,
+                        "drawnAs": -185
+                      },
+                      {
+                        "longitude": 0,
+                        "drawnAs": 2
+                      }
+                    ]
+                  }
+                },
+                "pieces": [
+                  {
+                    "id": "99999999-8888-7777-6666-555555555555",
+                    "name": "Northern Isles",
+                    "asset": "assets/fedcba9876543210fedcba9876543210.png",
+                    "outline": {
+                      "sourceAspectRatio": 1.5,
+                      "points": [
+                        [
+                          0.25,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.5
+                        ],
+                        [
+                          0.25,
+                          0.5
+                        ]
+                      ]
+                    },
+                    "latitude": 55,
+                    "longitude": -20.5,
+                    "rotation": 15,
+                    "width": 12.5,
+                    "warp": [
+                      [
+                        0,
+                        0
+                      ],
+                      [
+                        1.25,
+                        -0.125
+                      ],
+                      [
+                        1,
+                        1
+                      ],
+                      [
+                        0,
+                        1
+                      ]
+                    ]
+                  }
+                ],
+                "fillColor": "#112233"
+              }
+            },
+            {
+              "id": "70707070-7070-7070-7070-707070707070",
+              "name": "Luna",
+              "kind": "moon",
+              "radiusKm": 1737.5,
+              "dayLengthHours": 660,
+              "axialTilt": 1.5,
+              "axialTiltDirection": 0,
+              "orbit": {
+                "parent": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "distanceKm": 384400,
+                "periodDays": 27.5,
+                "startAngle": 0,
+                "eccentricity": 0.25,
+                "closestApproach": 45,
+                "tilt": 5.25,
+                "tiltDirection": 120
+              },
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            }
+          ],
+          "journal": [
+            {
+              "id": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+              "title": "The Founding",
+              "text": "First line.\nSecond line.",
+              "location": {
+                "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "latitude": 12.5,
+                "longitude": -30.25
+              },
+              "createdUtc": "2026-10-02T09:00:00+00:00",
+              "editedUtc": "2026-10-02T10:15:00+00:00"
+            },
+            {
+              "id": "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2",
+              "title": "Notes on Luna",
+              "location": {
+                "body": "70707070-7070-7070-7070-707070707070"
+              },
+              "createdUtc": "2026-10-02T11:00:00+00:00",
+              "editedUtc": "2026-10-02T11:00:00+00:00"
+            }
+          ],
+          "timelines": [
+            {
+              "id": "7e7e7e7e-7e7e-7e7e-7e7e-7e7e7e7e7e7e",
+              "name": "The Empire",
+              "color": "#C04040"
+            },
+            {
+              "id": "7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f",
+              "name": "House Vael",
+              "color": "#40A060",
+              "hidden": true
+            }
+          ],
+          "events": [
+            {
+              "id": "0e0e0e0e-0e0e-0e0e-0e0e-0e0e0e0e0e0e",
+              "timeline": "7e7e7e7e-7e7e-7e7e-7e7e-7e7e7e7e7e7e",
+              "title": "Coronation",
+              "start": 120.5,
+              "location": {
+                "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "latitude": 12.5,
+                "longitude": -30.25
+              },
+              "entries": [
+                "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1"
+              ]
+            },
+            {
+              "id": "0f0f0f0f-0f0f-0f0f-0f0f-0f0f0f0f0f0f",
+              "timeline": "7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f",
+              "title": "The Long War",
+              "description": "Twelve years of war.",
+              "start": 400,
+              "end": 4783.25,
+              "entries": [
+                "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+                "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2"
+              ]
+            }
+          ],
+          "view": {
+            "latitude": 20,
+            "longitude": -45.5,
+            "altitude": 1.25,
+            "focusOffset": [
+              0.5,
+              0,
+              -0.25
+            ]
+          }
+        }
+        """;
+
     private static readonly byte[] _imageBytes = Encoding.ASCII.GetBytes("pretend PNG bytes");
     private static readonly byte[] _pieceBytes = Encoding.ASCII.GetBytes("pretend piece PNG");
 
@@ -699,13 +935,55 @@ public sealed class WorldPackageTests : IDisposable
     // ----- The file format itself -----
 
     [Fact]
-    public void WrittenJson_MatchesTheGoldenVersion6File()
+    public void WrittenJson_MatchesTheGoldenVersion7File()
     {
         string path = PathFor("golden.nworld");
 
-        WorldPackage.Save(path, CalendarGoldenWorld(), AssetsWithPiece());
+        WorldPackage.Save(path, LoreGoldenWorld(), AssetsWithPiece());
 
-        Assert.Equal(Normalize(GoldenV6Json), Normalize(ReadEntry(path, "world.json")));
+        Assert.Equal(Normalize(GoldenV7Json), Normalize(ReadEntry(path, "world.json")));
+    }
+
+    [Fact]
+    public void GoldenVersion7File_LoadsAsExpected()
+    {
+        string path = WriteRawPackage("golden-v7.nworld", GoldenV7Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        AssertSameWorld(LoreGoldenWorld(), WorldPackage.Load(path).World);
+    }
+
+    [Fact]
+    public void Version6Files_HaveNoJournalOrTimelines()
+    {
+        string path = WriteRawPackage("golden-v6-upgrade.nworld", GoldenV6Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        World world = WorldPackage.Load(path).World;
+
+        Assert.Empty(world.Journal);
+        Assert.Empty(world.Timelines);
+        Assert.Empty(world.Events);
+    }
+
+    [Theory]
+    [InlineData("\"title\": \"Coronation\"", "\"title\": \"  \"")]       // Untitled event
+    [InlineData("\"end\": 4783.25", "\"end\": 399")]                        // Ends before it starts
+    [InlineData("\"latitude\": 12.5,", "\"latitude\": 95,")]                 // Pin off the globe
+    [InlineData("\"color\": \"#C04040\"", "\"color\": \"red\"")]            // Unreadable color
+    [InlineData("\"timeline\": \"7e7e7e7e", "\"timeline\": \"7d7e7e7e")]      // No such timeline
+    [InlineData("\"e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2\"\n      ]",
+        "\"e3e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2\"\n      ]")]                    // Missing entry
+    [InlineData("\"body\": \"70707070", "\"body\": \"71707070")]             // No such body
+    [InlineData("\"id\": \"e2e2e2e2", "\"id\": \"e1e1e1e1")]                 // Two entries, one ID
+    public void Load_DamagedLore_IsRejected(string find, string replace)
+    {
+        string json = Normalize(GoldenV7Json).Replace(find, replace);
+        Assert.NotEqual(Normalize(GoldenV7Json), json);  // The edit really applied.
+        string path = WriteRawPackage("damaged-v7.nworld", json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
     }
 
     [Fact]
@@ -853,7 +1131,7 @@ public sealed class WorldPackageTests : IDisposable
 
         WorldPackage.Save(newPath, loaded.World, loaded.Assets);
 
-        Assert.Contains("\"formatVersion\": 6", ReadEntry(newPath, "world.json"));
+        Assert.Contains("\"formatVersion\": 7", ReadEntry(newPath, "world.json"));
         AssertSameWorld(GoldenWorld(), WorldPackage.Load(newPath).World);
     }
 
@@ -958,7 +1236,7 @@ public sealed class WorldPackageTests : IDisposable
     public void Load_NewerFormatVersion_IsRefusedWithAClearMessage()
     {
         string path = WriteRawPackage(
-            "future.nworld", GoldenV6Json.Replace("\"formatVersion\": 6", "\"formatVersion\": 7"),
+            "future.nworld", GoldenV7Json.Replace("\"formatVersion\": 7", "\"formatVersion\": 8"),
             (AssetName, _imageBytes));
 
         WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
@@ -1069,6 +1347,21 @@ public sealed class WorldPackageTests : IDisposable
         WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
 
         Assert.Contains("loop", error.Message);
+    }
+
+    [Fact]
+    public void LinkToAMissingJournalEntry_IsNeverSaved()
+    {
+        // Like a bad warp: caught when the new file is read back, before anything is replaced.
+        World world = LoreGoldenWorld();
+        world.Journal.RemoveAt(1);
+        string path = PathFor("dangling-link.nworld");
+
+        WorldFileException error = Assert.Throws<WorldFileException>(
+            () => WorldPackage.Save(path, world, AssetsWithPiece()));
+
+        Assert.Contains("missing journal entry", error.Message);
+        Assert.Empty(Directory.GetFiles(_folder));
     }
 
     [Fact]
@@ -1215,6 +1508,68 @@ public sealed class WorldPackageTests : IDisposable
         };
     }
 
+    // A version 7 world: the version 6 world with a journal and timelines. One entry has a
+    // pinned place and two lines of text, the other just a body; one timeline is hidden; one
+    // event is a moment linked to one entry, the other a span linked to both.
+    private static World LoreGoldenWorld()
+    {
+        World world = CalendarGoldenWorld();
+        Guid planet = world.Bodies[1].Id;
+        Guid moon = world.Bodies[2].Id;
+        var founding = new JournalEntry
+        {
+            Id = Guid.Parse("e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1"),
+            Title = "The Founding",
+            Text = "First line.\nSecond line.",
+            Location = new LoreLocation(planet, new GeoCoordinate(12.5, -30.25)),
+            CreatedUtc = DateTimeOffset.Parse("2026-10-02T09:00:00+00:00"),
+            EditedUtc = DateTimeOffset.Parse("2026-10-02T10:15:00+00:00"),
+        };
+        var notes = new JournalEntry
+        {
+            Id = Guid.Parse("e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2"),
+            Title = "Notes on Luna",
+            Location = new LoreLocation(moon),
+            CreatedUtc = DateTimeOffset.Parse("2026-10-02T11:00:00+00:00"),
+            EditedUtc = DateTimeOffset.Parse("2026-10-02T11:00:00+00:00"),
+        };
+        var empire = new Timeline
+        {
+            Id = Guid.Parse("7e7e7e7e-7e7e-7e7e-7e7e-7e7e7e7e7e7e"),
+            Name = "The Empire",
+            Color = new RgbColor(0xC0, 0x40, 0x40),
+        };
+        var vael = new Timeline
+        {
+            Id = Guid.Parse("7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f"),
+            Name = "House Vael",
+            Color = new RgbColor(0x40, 0xA0, 0x60),
+            Hidden = true,
+        };
+        world.Journal.AddRange([founding, notes]);
+        world.Timelines.AddRange([empire, vael]);
+        world.Events.Add(new TimelineEvent
+        {
+            Id = Guid.Parse("0e0e0e0e-0e0e-0e0e-0e0e-0e0e0e0e0e0e"),
+            TimelineId = empire.Id,
+            Title = "Coronation",
+            StartDays = 120.5,
+            Location = new LoreLocation(planet, new GeoCoordinate(12.5, -30.25)),
+            EntryIds = [founding.Id],
+        });
+        world.Events.Add(new TimelineEvent
+        {
+            Id = Guid.Parse("0f0f0f0f-0f0f-0f0f-0f0f-0f0f0f0f0f0f"),
+            TimelineId = vael.Id,
+            Title = "The Long War",
+            Description = "Twelve years of war.",
+            StartDays = 400,
+            EndDays = 4783.25,
+            EntryIds = [founding.Id, notes.Id],
+        });
+        return world;
+    }
+
     // A version 6 world: the version 5 system, with the planet's axis leaning toward 45° and
     // the planet keeping its own calendar.
     private static World CalendarGoldenWorld()
@@ -1300,6 +1655,9 @@ public sealed class WorldPackageTests : IDisposable
         Assert.Equal(expected.CreatedUtc, actual.CreatedUtc);
         Assert.Equal(expected.ModifiedUtc, actual.ModifiedUtc);
         Assert.Equal(expected.View, actual.View);
+        Assert.Equal(expected.Journal, actual.Journal);
+        Assert.Equal(expected.Timelines, actual.Timelines);
+        Assert.Equal(expected.Events, actual.Events);
         Assert.Equal(expected.Bodies.Count, actual.Bodies.Count);
         for (int i = 0; i < expected.Bodies.Count; i++)
         {
