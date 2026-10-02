@@ -66,13 +66,12 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
 - Import an image and wrap it onto the planet (`MAP-01`, in its simplest form)
 - Camera: zoom in and out, pan, and move around the planet (`REN-02`, basic form)
 
-**Milestone 2: Maps + Saving** · In Progress (owner's choice, 2026-09-30)
+**Milestone 2: Maps + Saving** · Complete (PR #8 merged 2026-09-30; owner's choice, 2026-09-30)
 - **Part 1:** `MAP-03`, better wrapping for hand-drawn maps (Flat map mode) (PR #5). This grew
   into `MAP-04`, atlas and circular map types (PR #6).
 - **Part 2:** the **world save format** (`SAV-01`, `SAV-02`), so work persists between sessions.
   It's foundational, because every later feature adds data to it. Split into two PRs: the Core
   format (PR #7), then the app side (File menu, unsaved changes, recovery copies) (PR #8).
-- **Complete** (PR #8 merged 2026-09-30).
 
 **Milestone 3: Map Fitting** · Complete (PR #15 merged 2026-09-30)
 - **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace (PR #10).
@@ -96,7 +95,7 @@ on it. Owner's decisions:
   brings it all back). The system tree and properties live in a **left panel**, opened by a
   **System…** toolbar button.
 
-**Milestone 5: Calendars and Seasons** · In Progress (owner's choice, 2026-10-01)
+**Milestone 5: Calendars and Seasons** · Complete (PR #20 merged 2026-10-01; owner's choice, 2026-10-01)
 Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the simulation
 (`CAL-03`). The accuracy toggle (`CAL-02`) comes later. Owner's decisions:
 - **Calendars belong to bodies:** any planet or moon can have its own. The time bar shows the

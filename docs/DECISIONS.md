@@ -7,9 +7,9 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-10-01 | A body without a calendar starts the editor from **twelve months sharing its year and a seven-day week** | In PR | [#20](https://github.com/Phillip-Com/Nothic-Worlds/pull/20) | Claude's choice; easy to reshape. VISION.md `CAL-01` |
-| 2026-10-01 | Seasons and orbit markers name events **for the northern hemisphere**, with the south's season alongside | In PR | [#20](https://github.com/Phillip-Com/Nothic-Worlds/pull/20) | Claude's choice. VISION.md `CAL-03` |
-| 2026-10-01 | Orbit markers sit on the orbit that shows the body's year: **its own, its planet's for a moon, the star's in a planet-centered system** | In PR | [#20](https://github.com/Phillip-Com/Nothic-Worlds/pull/20) | VISION.md `CAL-03` |
+| 2026-10-01 | A body without a calendar starts the editor from **twelve months sharing its year and a seven-day week** | Merged | [#20](https://github.com/Phillip-Com/Nothic-Worlds/pull/20) · `bc7ec77` | Claude's choice; easy to reshape. VISION.md `CAL-01` |
+| 2026-10-01 | Seasons and orbit markers name events **for the northern hemisphere**, with the south's season alongside | Merged | [#20](https://github.com/Phillip-Com/Nothic-Worlds/pull/20) · `bc7ec77` | Claude's choice. VISION.md `CAL-03` |
+| 2026-10-01 | Orbit markers sit on the orbit that shows the body's year: **its own, its planet's for a moon, the star's in a planet-centered system** | Merged | [#20](https://github.com/Phillip-Com/Nothic-Worlds/pull/20) · `bc7ec77` | VISION.md `CAL-03` |
 | 2026-10-01 | Milestone 5: **calendars and seasons**; the accuracy toggle (CAL-02) later | Merged | [#19](https://github.com/Phillip-Com/Nothic-Worlds/pull/19) · `491e2f5` | VISION.md §3 |
 | 2026-10-01 | Calendars **belong to bodies** (any planet or moon); months, weekdays, years with an era, start date; no leap days yet | Merged | [#19](https://github.com/Phillip-Com/Nothic-Worlds/pull/19) · `491e2f5` | VISION.md `CAL-01` |
 | 2026-10-01 | Seasons shown in the time bar, as a year overview in the panel, and **as markers on the orbit** | Merged | [#19](https://github.com/Phillip-Com/Nothic-Worlds/pull/19) · `491e2f5` | Built in the next PR. VISION.md `CAL-03` |
