@@ -7,11 +7,11 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-10-01 | Milestone 6: **eclipses** (`EVT-01`) | In PR | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) | VISION.md §3 |
-| 2026-10-01 | Eclipses of the **selected body**: solar (its moons in front of the star) and lunar (its moons, or itself as a moon, in a shadow); no transits | In PR | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) | VISION.md `EVT-01` |
-| 2026-10-01 | Eclipses shown as a **panel list with Go to** and **as markers on the orbit**; not in the time bar | In PR | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) | Built in the next PR |
-| 2026-10-01 | Each eclipse gives its **type (total, annular, partial, penumbral), start, peak, end, and coverage** | In PR | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) | VISION.md `EVT-01` |
-| 2026-10-01 | Milestone 6 in **two PRs**: Core, then the app | In PR | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) | |
+| 2026-10-01 | Milestone 6: **eclipses** (`EVT-01`) | Merged | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) · `50d0fd3` | VISION.md §3 |
+| 2026-10-01 | Eclipses of the **selected body**: solar (its moons in front of the star) and lunar (its moons, or itself as a moon, in a shadow); no transits | Merged | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) · `50d0fd3` | VISION.md `EVT-01` |
+| 2026-10-01 | Eclipses shown as a **panel list with Go to** and **as markers on the orbit**; not in the time bar | Merged | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) · `50d0fd3` | Built in the next PR |
+| 2026-10-01 | Each eclipse gives its **type (total, annular, partial, penumbral), start, peak, end, and coverage** | Merged | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) · `50d0fd3` | VISION.md `EVT-01` |
+| 2026-10-01 | Milestone 6 in **two PRs**: Core, then the app | Merged | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) · `50d0fd3` | |
 | 2026-10-01 | A body without a calendar starts the editor from **twelve months sharing its year and a seven-day week** | Merged | [#20](https://github.com/Phillip-Com/Nothic-Worlds/pull/20) · `bc7ec77` | Claude's choice; easy to reshape. VISION.md `CAL-01` |
 | 2026-10-01 | Seasons and orbit markers name events **for the northern hemisphere**, with the south's season alongside | Merged | [#20](https://github.com/Phillip-Com/Nothic-Worlds/pull/20) · `bc7ec77` | Claude's choice. VISION.md `CAL-03` |
 | 2026-10-01 | Orbit markers sit on the orbit that shows the body's year: **its own, its planet's for a moon, the star's in a planet-centered system** | Merged | [#20](https://github.com/Phillip-Com/Nothic-Worlds/pull/20) · `bc7ec77` | VISION.md `CAL-03` |
