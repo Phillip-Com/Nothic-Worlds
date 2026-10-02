@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 6;
+    public const int CurrentVersion = 7;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -71,6 +71,10 @@ internal static partial class WorldFormat
         // 5 → 6: bodies gained an axial tilt direction and an optional calendar (calendars and
         // seasons, M5). Older bodies lean toward direction 0 and count plain days.
         document => SetOnEveryBody(document, "axialTiltDirection", 0.0),
+
+        // 6 → 7: the world gained optional "journal", "timelines", and "events" lists
+        // (journals and timelines, M7). Older worlds simply have none.
+        document => document,
     ];
 
     public static string ProjectionName(MapProjection projection) => _projectionNames[projection];
