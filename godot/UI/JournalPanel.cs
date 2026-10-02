@@ -29,6 +29,8 @@ public partial class JournalPanel : CanvasLayer
     private LineEdit _title = null!;
     private OptionButton _place = null!;
     private Label _pin = null!;
+    private Button _pinButton = null!;
+    private Button _unpinButton = null!;
     private TextEdit _text = null!;
     private Label _links = null!;
     private Label _dates = null!;
@@ -45,6 +47,9 @@ public partial class JournalPanel : CanvasLayer
 
     /// <summary>The toolbar: the panel hides whenever it does.</summary>
     [Export] public MapToolbar? Toolbar { get; set; }
+
+    /// <summary>Places pins by clicking on the globe.</summary>
+    [Export] public Controls.PinPlacer? Placer { get; set; }
 
     private enum SortOrder
     {
@@ -201,8 +206,26 @@ public partial class JournalPanel : CanvasLayer
         _place.ItemSelected += _ => Commit();
         placeRow.AddChild(_place);
         editor.AddChild(placeRow);
-        _pin = new Label { TooltipText = "Pins are set on the globe (coming soon)" };
-        editor.AddChild(_pin);
+        var pinRow = new HBoxContainer();
+        _pin = new Label { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        pinRow.AddChild(_pin);
+        _pinButton = new Button
+        {
+            Text = "Pin on Globe…",
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Click the spot on the place's globe (Esc cancels)",
+        };
+        _pinButton.Pressed += PlacePin;
+        pinRow.AddChild(_pinButton);
+        _unpinButton = new Button
+        {
+            Text = "Remove Pin",
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Keep the place, without a spot on it",
+        };
+        _unpinButton.Pressed += RemovePin;
+        pinRow.AddChild(_unpinButton);
+        editor.AddChild(pinRow);
 
         _text = new TextEdit
         {
@@ -238,6 +261,13 @@ public partial class JournalPanel : CanvasLayer
 
     private JournalEntry? Selected =>
         Session?.World.Journal.FirstOrDefault(e => e.Id == _selectedId);
+
+    /// <summary>Selects an entry and shows it in the editor (e.g. from a pin's pop-up).</summary>
+    public void SelectEntry(Guid entryId)
+    {
+        _search.Text = "";  // So it's in the list.
+        Select(entryId);
+    }
 
     private void Select(Guid entryId)
     {
@@ -284,6 +314,46 @@ public partial class JournalPanel : CanvasLayer
             Text = _text.Text,
             Location = ChosenPlace(entry.Location),
         });
+        _problem.Text = problem is null ? "" : $"Not saved yet: {problem}.";
+    }
+
+    private Body? PlaceBody(LoreLocation? place)
+    {
+        return place is null
+            ? null
+            : Session!.World.Bodies.FirstOrDefault(b => b.Id == place.BodyId);
+    }
+
+    // Places a pin for the selected entry on its place's globe.
+    private void PlacePin()
+    {
+        if (Placer is null || Selected is not { Location: LoreLocation place } entry)
+        {
+            return;
+        }
+
+        Guid entryId = entry.Id;
+        Placer.Start(place.BodyId, spot =>
+        {
+            if (Session?.World.Journal.FirstOrDefault(e => e.Id == entryId) is JournalEntry now)
+            {
+                Report(Session.UpdateJournalEntry(
+                    now with { Location = new LoreLocation(place.BodyId, spot) }));
+            }
+        });
+    }
+
+    private void RemovePin()
+    {
+        if (Session is not null && Selected is { Location: LoreLocation place } entry)
+        {
+            Report(Session.UpdateJournalEntry(
+                entry with { Location = new LoreLocation(place.BodyId) }));
+        }
+    }
+
+    private void Report(string? problem)
+    {
         _problem.Text = problem is null ? "" : $"Not saved yet: {problem}.";
     }
 
@@ -400,12 +470,16 @@ public partial class JournalPanel : CanvasLayer
         }
 
         ShowPlaces(entry.Location);
+        Body? placeBody = PlaceBody(entry.Location);
         _pin.Text = entry.Location?.Pin is { } pin
-            ? $"Pinned at {Math.Abs(pin.LatitudeDegrees):0.##}° " +
-                $"{(pin.LatitudeDegrees >= 0 ? "N" : "S")}, " +
-                $"{Math.Abs(pin.LongitudeDegrees):0.##}° {(pin.LongitudeDegrees >= 0 ? "E" : "W")}"
-            : "";
-        _pin.Visible = _pin.Text != "";
+            ? $"Pinned at {PlaceText.Describe(pin)}"
+            : placeBody is null ? "" : "No pin";
+        _pinButton.Visible = placeBody is not null;
+        _pinButton.Disabled = placeBody?.Kind == BodyKind.Star;
+        _pinButton.TooltipText = _pinButton.Disabled
+            ? "Stars have no surface to pin"
+            : "Click the spot on the place's globe (Esc cancels)";
+        _unpinButton.Visible = entry.Location?.Pin is not null;
         _links.Text = LinksText(entry);
         _dates.Text = $"Written {entry.CreatedUtc.ToLocalTime():g}  ·  " +
             $"edited {entry.EditedUtc.ToLocalTime():g}";

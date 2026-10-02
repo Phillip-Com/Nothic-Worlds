@@ -20,16 +20,25 @@ public partial class EventDialog : ConfirmationDialog
     private CheckBox _lasts = null!;
     private DateFields _end = null!;
     private OptionButton _place = null!;
+    private Label _pin = null!;
+    private Button _pinButton = null!;
+    private Button _unpinButton = null!;
     private TextEdit _description = null!;
     private VBoxContainer _entries = null!;
     private Label _problem = null!;
     private TimelineEvent? _editing;
+
+    // The place as edited so far, including its pin (saved with the rest).
+    private LoreLocation? _location;
 
     /// <summary>The open world. Set it before adding the dialog to the tree.</summary>
     public WorldSession Session { get; init; } = null!;
 
     /// <summary>Glides the clock to a time (standard days), for the Go to button.</summary>
     public Action<double>? GlideTo { get; init; }
+
+    /// <summary>Places pins by clicking on the globe (no pin buttons without it).</summary>
+    public Controls.PinPlacer? Placer { get; init; }
 
     public override void _Ready()
     {
@@ -57,8 +66,14 @@ public partial class EventDialog : ConfirmationDialog
         _timeline = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         AddLabelled(grid, "Timeline", _timeline);
         _place = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _place.ItemSelected += _ =>
+        {
+            _location = ChosenPlace(_location);
+            ShowPin();
+        };
         AddLabelled(grid, "Place", _place);
         layout.AddChild(grid);
+        layout.AddChild(BuildPinRow());
 
         layout.AddChild(new Label { Text = "Starts" });
         _start = new DateFields();
@@ -102,7 +117,9 @@ public partial class EventDialog : ConfirmationDialog
         _problem.Text = "";
         _title.Text = timelineEvent.Title;
         ShowTimelines(timelineEvent.TimelineId);
+        _location = timelineEvent.Location;
         ShowPlaces(timelineEvent.Location);
+        ShowPin();
         _start.ShowTime(body, timelineEvent.StartDays);
         _lasts.ButtonPressed = timelineEvent.EndDays is not null;
         _end.ShowTime(body, timelineEvent.EndDays ?? timelineEvent.StartDays);
@@ -125,7 +142,7 @@ public partial class EventDialog : ConfirmationDialog
             TimelineId = Guid.Parse(_timeline.GetItemMetadata(_timeline.Selected).AsString()),
             StartDays = _start.TimeDays,
             EndDays = _lasts.ButtonPressed ? _end.TimeDays : null,
-            Location = ChosenPlace(original.Location),
+            Location = ChosenPlace(_location),
             Description = _description.Text,
             EntryIds = [.. _entries.GetChildren().OfType<CheckBox>()
                 .Where(box => box.ButtonPressed)
@@ -156,6 +173,63 @@ public partial class EventDialog : ConfirmationDialog
         {
             GlideTo?.Invoke(_start.TimeDays);
         }
+    }
+
+    private Control BuildPinRow()
+    {
+        var row = new HBoxContainer();
+        _pin = new Label { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        row.AddChild(_pin);
+        _pinButton = new Button
+        {
+            Text = "Pin on Globe…",
+            TooltipText = "Click the spot on the place's globe (Esc cancels)",
+        };
+        _pinButton.Pressed += PlacePin;
+        row.AddChild(_pinButton);
+        _unpinButton = new Button
+        {
+            Text = "Remove Pin",
+            TooltipText = "Keep the place, without a spot on it",
+        };
+        _unpinButton.Pressed += () =>
+        {
+            _location = _location is null ? null : new LoreLocation(_location.BodyId);
+            ShowPin();
+        };
+        row.AddChild(_unpinButton);
+        return row;
+    }
+
+    private void ShowPin()
+    {
+        Body? body = _location is null
+            ? null
+            : Session.World.Bodies.FirstOrDefault(b => b.Id == _location.BodyId);
+        _pin.Text = _location?.Pin is { } pin
+            ? $"Pinned at {PlaceText.Describe(pin)}"
+            : body is null ? "" : "No pin";
+        _pinButton.Visible = Placer is not null && body is not null;
+        _pinButton.Disabled = body?.Kind == BodyKind.Star;
+        _unpinButton.Visible = _location?.Pin is not null;
+    }
+
+    // Steps aside while the spot is clicked on the globe, then comes back with everything as
+    // it was (nothing is saved until Save).
+    private void PlacePin()
+    {
+        if (Placer is null || _location is not LoreLocation place)
+        {
+            return;
+        }
+
+        Hide();
+        Placer.Start(place.BodyId, spot =>
+        {
+            _location = new LoreLocation(place.BodyId, spot);
+            ShowPin();
+            PopupCentered();
+        }, cancelled: () => PopupCentered());
     }
 
     private void ShowTimelines(Guid current)
