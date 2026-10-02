@@ -53,6 +53,12 @@ public partial class MapToolbar : CanvasLayer
     /// <summary>The Pieces panel, shown and hidden by the Pieces… button.</summary>
     [Export] public PiecesPanel? Pieces { get; set; }
 
+    /// <summary>
+    /// The Journal panel, shown and hidden by the Journal… button. It shares the right side
+    /// with the Pieces panel, one at a time (owner's choice).
+    /// </summary>
+    [Export] public JournalPanel? Journal { get; set; }
+
     /// <summary>Space at the start of the toolbar row, where the File menu goes.</summary>
     public HBoxContainer MenuArea { get; } = new();
 
@@ -101,15 +107,36 @@ public partial class MapToolbar : CanvasLayer
 
         var piecesButton = CreateButton(
             "Pieces…", "Cut pieces from the map or other images and place them on the globe");
+        var journalButton = CreateButton(
+            "Journal…", "The world's journal: write entries about places and history");
         piecesButton.ToggleMode = true;
+        journalButton.ToggleMode = true;
         piecesButton.Toggled += open =>
         {
             if (Pieces is not null)
             {
                 Pieces.IsPanelOpen = open;
             }
+
+            if (open)
+            {
+                journalButton.ButtonPressed = false;  // One panel on the right at a time.
+            }
+        };
+        journalButton.Toggled += open =>
+        {
+            if (Journal is not null)
+            {
+                Journal.IsPanelOpen = open;
+            }
+
+            if (open)
+            {
+                piecesButton.ButtonPressed = false;
+            }
         };
         controls.AddChild(piecesButton);
+        controls.AddChild(journalButton);
 
         controls.AddChild(CreateLabel("  Map type:"));
         _mapType = CreateMapTypeDropdown();
