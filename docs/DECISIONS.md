@@ -7,6 +7,8 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-02 | Eclipses are worked out **in the background**, only when the panel or markers ask | In PR | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) | ~7 ms each on the baseline laptop; keeps edits smooth. VISION.md `EVT-01` |
+| 2026-10-02 | The panel lists **at most 12** eclipses (the coming year) | In PR | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) | Claude's choice; many moons can mean dozens a year |
 | 2026-10-01 | Milestone 6: **eclipses** (`EVT-01`) | Merged | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) · `50d0fd3` | VISION.md §3 |
 | 2026-10-01 | Eclipses of the **selected body**: solar (its moons in front of the star) and lunar (its moons, or itself as a moon, in a shadow); no transits | Merged | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) · `50d0fd3` | VISION.md `EVT-01` |
 | 2026-10-01 | Eclipses shown as a **panel list with Go to** and **as markers on the orbit**; not in the time bar | Merged | [#21](https://github.com/Phillip-Com/Nothic-Worlds/pull/21) · `50d0fd3` | Built in the next PR |

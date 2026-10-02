@@ -117,7 +117,7 @@ Eclipses found from where the bodies are (`EVT-01`). Owner's decisions:
   **as markers on the moon's orbit**. Not in the time bar.
 - **Detail:** the type (total, annular, partial, or penumbral), start, peak, and end, and how
   much is covered.
-- **Two PRs:** Core (eclipse search and tests) (PR #21), then the app.
+- **Two PRs:** Core (eclipse search and tests) (PR #21), then the app (PR #22).
 - Not included for now: where on the surface an eclipse is seen (its path across the map), and
   drawing the shadow in 3D. Eclipses are worked out, never saved, so the file format is
   unchanged.
@@ -856,7 +856,7 @@ system's parameters (e.g. orbital periods, rotation speed) so the user's calenda
 
 ### 4.7 Events (`EVT`)
 
-**EVT-01 — Eclipses** · In Progress (Core done, PR #21) · Base
+**EVT-01 — Eclipses** · Implemented (M6) · Base
 **Intent:** Simulated from body positions.
 **Implementation (Core, PR #21):**
 - `Simulation/Eclipses.cs`: every eclipse is a body passing through another's shadow. The
@@ -886,6 +886,24 @@ system's parameters (e.g. orbital periods, rotation speed) so the user's calenda
   year; shallow passes are partial or penumbral; grazing passes are found and near misses
   aren't; a moon sees its own lunar eclipses; the same after Make Center; none for stars or
   moonless planets; deterministic.
+
+**Implementation (app, PR #22):**
+- `WorldSession.SelectedEclipses` returns the selected body's `EclipseTimeline`, or null while
+  it's being worked out. It's worked out **in the background** (`Task.Run`, on a copy of the
+  bodies), one at a time, only when something asks, and again after an edit, a new selection,
+  or half a year of clock time (the last one stays meanwhile). `EclipsesReady` fires when it's
+  in. A failure (which edits can't cause) is logged once, not retried every frame.
+- **System panel** (`godot/UI/EclipseSection.cs`, under Seasons; hidden for stars): the coming
+  year's eclipses, including one under way, at most 12, each with its title ("Total solar
+  eclipse (Moon)", "Partial lunar eclipse of Moon", or "… (in Earth's shadow)" for the selected
+  moon), date, depth and length ("94% of the star hidden · 5.1 h"), start and end in the
+  tooltip, and **Go to** (glides to the peak). "Working them out…" shows meanwhile. It only
+  updates while the panel shows.
+- **Orbit markers** (`godot/UI/EclipseMarkers.cs`, its own overlay): where the moon is at each
+  coming eclipse's peak, on its orbit around the planet's current position. Solar: a dark disk
+  ringed in gold; lunar: a dark red disk; labelled "Total solar", "Partial lunar", and so on.
+  Cached until the timeline changes or an eclipse ends; off-screen markers are skipped.
+- Wording in one place: `godot/UI/EclipseText.cs`.
 
 **EVT-02 — Meteor showers and asteroid events** · Idea · —
 **Intent:** Simulated celestial events.
