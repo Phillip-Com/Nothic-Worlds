@@ -53,6 +53,10 @@ public partial class WorldSession : Node
     // Increases with every edit, so a gesture can tell whether it changed anything.
     private int _editVersion;
 
+    // Increases with every edit that could change the simulation (not journal writing), so the
+    // seasons and eclipses are only worked out again when they might have changed.
+    private int _systemVersion;
+
     // The selected body's seasons, and which world, edit, and body they were worked out for.
     private (World World, int Version, Guid BodyId, SeasonTimeline Timeline)? _seasons;
 
@@ -74,6 +78,7 @@ public partial class WorldSession : Node
     // saved whenever it matches again, e.g. after undoing back to it. Null when there's nothing
     // to match (a recovered world is unsaved until it's saved).
     private List<Body>? _savedBodies;
+    private LoreState? _savedLore;
 
     /// <summary>Raised when anything shown about the world changes (name, file, unsaved state,
     /// busy state, selection, bodies, or contents).</summary>
@@ -161,6 +166,7 @@ public partial class WorldSession : Node
     {
         SelectedBodyId = DefaultSelection(World);
         _savedBodies = CloneBodies(World.Bodies);
+        _savedLore = LoreState.Of(World);
         ShowWorld();
     }
 
@@ -183,6 +189,7 @@ public partial class WorldSession : Node
         SelectedBodyId = DefaultSelection(World);
         HasUnsavedChanges = false;
         _savedBodies = CloneBodies(World.Bodies);
+        _savedLore = LoreState.Of(World);
         _projectionWithoutMap = MapProjection.Mercator;
         _pieceTextures = [];
         ResetHistory();
@@ -264,6 +271,7 @@ public partial class WorldSession : Node
 
         FilePath = fullPath;
         _savedBodies = snapshot.Bodies;  // A private copy, made before saving.
+        _savedLore = LoreState.Of(snapshot);
         UpdateUnsavedState();
 
         // The saved assets now live in the world file, so later saves no longer depend on the
@@ -377,6 +385,7 @@ public partial class WorldSession : Node
         var removed = new HashSet<Guid>(descendants.Select(d => d.Id)) { bodyId };
         Guid? parent = body.Orbit?.ParentId;
         World.Bodies.RemoveAll(b => removed.Contains(b.Id));
+        ClearPlacesOn(removed);
         if (removed.Contains(SelectedBodyId))
         {
             SelectedBodyId = parent is Guid p && FindBody(p) is not null
@@ -565,14 +574,14 @@ public partial class WorldSession : Node
         get
         {
             if (_seasons is var (world, version, bodyId, timeline) && world == World
-                && version == _editVersion && bodyId == SelectedBodyId
+                && version == _systemVersion && bodyId == SelectedBodyId
                 && timeline.Covers(TimeDays))
             {
                 return timeline;
             }
 
             SeasonTimeline fresh = SeasonTimeline.Around(World.Bodies, SelectedBody, TimeDays);
-            _seasons = (World, _editVersion, SelectedBodyId, fresh);
+            _seasons = (World, _systemVersion, SelectedBodyId, fresh);
             return fresh;
         }
     }
@@ -589,7 +598,7 @@ public partial class WorldSession : Node
         get
         {
             if (_eclipses is not var (world, version, bodyId, timeline) || world != World
-                || version != _editVersion || bodyId != SelectedBody.Id)
+                || version != _systemVersion || bodyId != SelectedBody.Id)
             {
                 StartWorkingOutEclipses();
                 return null;
@@ -743,6 +752,7 @@ public partial class WorldSession : Node
         Surface?.SetCalibration(snapshot.Calibration);
         _gesture = null;  // Nothing to undo: everything is back as it was.
         _editVersion++;
+        _systemVersion++;
         UpdateUnsavedState();
         Changed?.Invoke();
     }
@@ -1133,11 +1143,13 @@ public partial class WorldSession : Node
         HasUnsavedChanges = unsaved;
         SelectedBodyId = selected;
         _savedBodies = unsaved ? null : CloneBodies(World.Bodies);
+        _savedLore = unsaved ? null : LoreState.Of(World);
         _projectionWithoutMap = MapProjection.Mercator;
         _fullMap = fullMap;
         ShowWorld();
         Camera?.SetView(World.View);
         _editVersion++;
+        _systemVersion++;
         SelectionChanged?.Invoke();
         TimeChanged?.Invoke();
         Changed?.Invoke();
@@ -1424,7 +1436,8 @@ public partial class WorldSession : Node
     // for this same world.
     private async void StartWorkingOutEclipses()
     {
-        (World World, int Version, Guid BodyId) wanted = (World, _editVersion, SelectedBody.Id);
+        (World World, int Version, Guid BodyId) wanted =
+            (World, _systemVersion, SelectedBody.Id);
         if (_eclipsesUnderway is not null || _eclipsesFailed == wanted)
         {
             return;
@@ -1462,7 +1475,8 @@ public partial class WorldSession : Node
     private bool IsIdleForHistory =>
         !IsBusy && _gesture is null && !IsCalibrating && !IsCutting;
 
-    private EditSnapshot Snapshot() => new(SelectedBodyId, CloneBodies(World.Bodies));
+    private EditSnapshot Snapshot() =>
+        new(SelectedBodyId, CloneBodies(World.Bodies), LoreState.Of(World));
 
     // Call just before changing the world. Inside a gesture, the gesture records it instead.
     private void RecordUndo(string description, object? mergeKey = null)
@@ -1480,6 +1494,7 @@ public partial class WorldSession : Node
     {
         World.Bodies.Clear();
         World.Bodies.AddRange(CloneBodies(snapshot.Bodies));
+        snapshot.Lore.RestoreTo(World);
         Guid select = FindBody(snapshot.SelectedBodyId) is not null
             ? snapshot.SelectedBodyId
             : DefaultSelection(World);
@@ -1550,23 +1565,30 @@ public partial class WorldSession : Node
         _stash = null;
     }
 
-    private void MarkChanged()
+    // `systemChanged` false: only journal writing changed, so the simulation caches stay.
+    private void MarkChanged(bool systemChanged = true)
     {
         _editVersion++;
+        if (systemChanged)
+        {
+            _systemVersion++;
+        }
+
         UpdateUnsavedState();
         Changed?.Invoke();
     }
 
     private void UpdateUnsavedState()
     {
-        if (_savedBodies is null || _savedBodies.Count != World.Bodies.Count)
+        if (_savedBodies is null || _savedLore is null
+            || _savedBodies.Count != World.Bodies.Count)
         {
             HasUnsavedChanges = true;
             return;
         }
 
         var saved = _savedBodies.ToDictionary(body => body.Id);
-        HasUnsavedChanges = World.Bodies.Any(body =>
+        HasUnsavedChanges = !_savedLore.Matches(World) || World.Bodies.Any(body =>
             !saved.TryGetValue(body.Id, out Body? before) || !body.HasSameContent(before));
     }
 
@@ -1599,5 +1621,5 @@ public partial class WorldSession : Node
     }
 
     // Every body at one moment, and which one was selected (so undo can show it), for undo.
-    private sealed record EditSnapshot(Guid SelectedBodyId, List<Body> Bodies);
+    private sealed record EditSnapshot(Guid SelectedBodyId, List<Body> Bodies, LoreState Lore);
 }
