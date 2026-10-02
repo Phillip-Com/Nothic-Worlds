@@ -122,7 +122,11 @@ Writing the world's history and lore (`LORE-02`, `LORE-03`). Owner's decisions:
 - **Event dates:** a moment, with an optional end for things that last (drawn as bars). Stored
   as world time and shown in the selected body's calendar.
 - **Four PRs:** Core (model, links, places, format v7) (PR #23); the journal panel (PR #24);
-  the timeline strip; pins on the globe.
+  the timeline strip (PR #25); pins on the globe.
+- **The strip (owner's choices, 2026-10-02):** clicking an event jumps the clock there and
+  double-clicking edits it; deleting a timeline deletes its events (one undo step); events
+  aren't dragged to new dates yet; the strip shows only the user's events, not seasons or
+  eclipses.
 - **Deleting a body** keeps the entries and events placed on it, with their place cleared, in
   the same undo step (owner's choice, 2026-10-02).
 - **The Journal panel shares the right side with the Pieces panel**, one at a time (owner's
@@ -993,7 +997,7 @@ out later.
 - Journal writing no longer makes the seasons and eclipses work themselves out again:
   `WorldSession` keeps a separate system version for those caches.
 
-**LORE-03 — Timelines** · In Progress (Core done, PR #23) · Base
+**LORE-03 — Timelines** · In Progress (Core and strip done, PRs #23, #25) · Base
 **Intent:** Timelines of events. They become relevant once orbiting bodies are introduced, and
 they're key helpers for the calendar features (`CAL-01`–`CAL-03`, `SIM-02`).
 **Implementation (Core, PR #23):**
@@ -1004,6 +1008,29 @@ they're key helpers for the calendar features (`CAL-01`–`CAL-03`, `SIM-02`).
   place, and the journal entries it links to (`EntryIds`, each once). Equality compares the
   links too.
 - Validation, file format, and tests: see `LORE-02`.
+
+**Implementation (strip, PR #25):**
+- `godot/UI/TimelineStrip.cs`, shown by **Timeline…** in the toolbar: a band above the time bar
+  with **New Event** (at the current time, then its editor), **Timelines…**, **Now**, and zoom
+  buttons. `godot/UI/TimelineCanvas.cs` draws it: a ruler, a lane per shown timeline (its name
+  and color), events as dots (moments) or bars (spans), and a line at the current time. The
+  wheel zooms around the pointer (a minute to ~27,000 years per pixel), dragging scrolls,
+  clicking an event glides the clock to its start and highlights it, double-clicking opens its
+  editor; tooltips give the title, timeline, and dates. Each lane's events are drawn in time
+  order, and a label is skipped where it would run into the one before.
+- `Simulation/TimeRuler.cs` (Core, tested): the ruler's ticks. It picks the finest unit that
+  fits (hours, days, months, or years in the selected body's calendar; round day numbers
+  without one) and labels each tick in the body's own terms.
+- `godot/UI/EventDialog.cs`: title, timeline, start and optional end ("Lasts until…"), place,
+  description, and the linked journal entries as checkboxes. Save is one undo step; problems
+  show in the dialog; **Delete Event** and **Go to** are there too. The date fields are
+  `godot/UI/DateFields.cs`, now shared with the time bar's **Go to…** dialog.
+- `godot/UI/TimelinesDialog.cs`: add, rename, recolor, show/hide, reorder, and delete timelines;
+  each change applies at once and is undoable.
+- Session (`WorldSession.Lore.cs`): `AddTimeline` (with the next of six lane colors),
+  `UpdateTimeline`, `MoveTimeline`, `DeleteTimeline` (with its events), `AddEvent` (on the first
+  shown timeline, making a "History" timeline if there's none), `UpdateEvent` (checks the
+  timeline, links, and place still exist), `DeleteEvent`.
 
 **LORE-04 — Lore relationship diagrams** · Deferred · —
 **Intent:** Diagrams of connections between characters, factions, and nations (e.g. family trees,

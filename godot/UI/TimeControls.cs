@@ -45,11 +45,7 @@ public partial class TimeControls : CanvasLayer
     private Label _time = null!;
     private Label _seasons = null!;
     private ConfirmationDialog _goToDialog = null!;
-    private SpinBox _goToYear = null!;
-    private OptionButton _goToMonth = null!;
-    private SpinBox _goToDay = null!;
-    private SpinBox _goToHour = null!;
-    private Control[] _calendarOnly = [];
+    private DateFields _goToDate = null!;
     private NextEclipseJumps _eclipseJumps = null!;
     private bool _playing;
 
@@ -279,96 +275,17 @@ public partial class TimeControls : CanvasLayer
         }
 
         Body body = Session.SelectedBody;
-        LocalTime now = BodyClock.LocalTimeOn(body, Session.TimeDays);
-        foreach (Control field in _calendarOnly)
-        {
-            field.Visible = body.Calendar is not null;
-        }
-
-        if (body.Calendar is Calendar calendar)
-        {
-            CalendarDate date = CalendarMath.DateOf(calendar, now.Day - 1);
-            _goToMonth.Clear();
-            foreach (CalendarMonth month in calendar.Months)
-            {
-                _goToMonth.AddItem(month.Name);
-            }
-
-            _goToYear.Value = date.Year;
-            _goToMonth.Select(date.Month);
-            ShowMonthDays();
-            _goToDay.Value = date.Day;
-        }
-        else
-        {
-            _goToDay.MinValue = -1e9;
-            _goToDay.MaxValue = 1e9;
-            _goToDay.Value = now.Day;
-        }
-
+        _goToDate.ShowTime(body, Session.TimeDays);
         _eclipseJumps.Visible = body.Kind != BodyKind.Star;
         _eclipseJumps.Refresh();
         _goToDialog.Title = $"Go to a Date on {body.Name}";
-        _goToHour.MaxValue = Math.Max(0, body.DayLengthHours - 0.01);
-        _goToHour.Value = now.Hour + now.Minute / 60.0;
         _goToDialog.ResetSize();
         _goToDialog.PopupCentered(new Vector2I(340, 0));
     }
 
-    // Limits the day field to the chosen month's days.
-    private void ShowMonthDays()
-    {
-        if (Session?.SelectedBody.Calendar is Calendar calendar && _goToMonth.Selected >= 0)
-        {
-            _goToDay.MinValue = 1;
-            _goToDay.MaxValue = calendar.Months[_goToMonth.Selected].Days;
-        }
-    }
-
-    private void GoToDate()
-    {
-        if (Session is null)
-        {
-            return;
-        }
-
-        // Day index 0 is the day at time 0 (day 1, or the calendar's start date).
-        Body body = Session.SelectedBody;
-        long dayIndex = body.Calendar is Calendar calendar
-            ? CalendarMath.DayIndexOf(calendar, (long)_goToYear.Value,
-                Math.Max(0, _goToMonth.Selected), (int)_goToDay.Value)
-            : (long)_goToDay.Value - 1;
-        GlideTo(BodyClock.TimeAt(body, dayIndex, _goToHour.Value));
-    }
-
     private void BuildGoToDialog()
     {
-        _goToYear = new SpinBox
-        {
-            MinValue = -1e12,
-            MaxValue = 1e12,
-            Step = 1,
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-        }.WithArrowKeys();
-        _goToMonth = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-        _goToMonth.ItemSelected += _ => ShowMonthDays();
-        _goToDay = new SpinBox
-        {
-            Step = 1,
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-        }.WithArrowKeys();
-        _goToHour = new SpinBox
-        {
-            MinValue = 0,
-            Step = 0.25,
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-        }.WithArrowKeys();
-        var grid = new GridContainer { Columns = 2 };
-        Label yearLabel = AddRow(grid, "Year", _goToYear);
-        Label monthLabel = AddRow(grid, "Month", _goToMonth);
-        AddRow(grid, "Day", _goToDay);
-        AddRow(grid, "Hour", _goToHour);
-        _calendarOnly = [yearLabel, _goToYear, monthLabel, _goToMonth];
+        _goToDate = new DateFields();
         _goToDialog = new ConfirmationDialog { OkButtonText = "Go" };
 
         // Owner's request: the next solar and lunar eclipse are always one click away.
@@ -382,23 +299,15 @@ public partial class TimeControls : CanvasLayer
             },
         };
         var layout = new VBoxContainer();
-        layout.AddChild(grid);
+        layout.AddChild(_goToDate);
         if (Session is not null)
         {
             layout.AddChild(_eclipseJumps);
         }
 
         _goToDialog.AddChild(layout);
-        _goToDialog.Confirmed += GoToDate;
+        _goToDialog.Confirmed += () => GlideTo(_goToDate.TimeDays);
         AddChild(_goToDialog);
-    }
-
-    private static Label AddRow(GridContainer grid, string text, Control field)
-    {
-        var label = new Label { Text = text };
-        grid.AddChild(label);
-        grid.AddChild(field);
-        return label;
     }
 
     private static Button CreateButton(string text, Action pressed, string tooltip)

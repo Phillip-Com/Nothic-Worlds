@@ -78,6 +78,13 @@ entries, add one with **New Entry**, and write: each entry has a title, an optio
 planet, moon, or star), and text. Changes go into the world as you type, and Ctrl+Z undoes them.
 Deleting a body keeps the entries about it, just without their place.
 
+**Timeline…** shows your world's history in a strip above the time bar: a lane for each timeline,
+with events as dots (a moment) or bars (something that lasts). Scroll the wheel to zoom from
+hours to millennia, drag to move through time, click an event to go there, and double-click to
+edit it: title, timeline, dates, place, description, and the journal entries it links to.
+**New Event** adds one at the current time; **Timelines…** adds, renames, recolors, hides,
+reorders, and deletes timelines (deleting one deletes its events; Ctrl+Z brings them back).
+
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers
 back after a crash.
