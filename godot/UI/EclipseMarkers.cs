@@ -9,9 +9,11 @@ using NothicWorlds.Session;
 namespace NothicWorlds.UI;
 
 /// <summary>
-/// Marks the selected body's coming eclipses on the moon's orbit (VISION.md EVT-01; owner's
-/// request): where the moon is at each eclipse's peak. Solar eclipses are dark disks ringed in
-/// gold (the moon in front of the star); lunar ones are dark red disks (the moon in shadow).
+/// Marks eclipses on the moon's orbit (VISION.md EVT-01; owner's request): where the moon is
+/// at an eclipse's peak. Only each moon's previous and next eclipse are marked, and only while
+/// they're within one trip of the moon around its planet from now (owner's request: a ring of
+/// every eclipse in the year was too much). Solar eclipses are dark disks ringed in gold (the
+/// moon in front of the star); lunar ones are dark red disks (the moon in shadow).
 /// </summary>
 /// <remarks>
 /// The orbit is drawn around the planet's current position, as the orbit line is, so the
@@ -44,8 +46,10 @@ public partial class EclipseMarkers : CanvasLayer
     /// <summary>The toolbar: the markers hide whenever it does (calibrating, cutting).</summary>
     [Export] public MapToolbar? Toolbar { get; set; }
 
-    // The markers being shown, for one eclipse timeline from the first eclipse not yet over.
-    private sealed record MarkerPlan(EclipseTimeline Timeline, int First, Marker[] Markers);
+    // The markers that may show: each moon's previous and next eclipse, for one timeline and
+    // number of eclipses already peaked (so it changes only when an eclipse peaks). Whether
+    // each is within an orbit of now is checked as it's drawn.
+    private sealed record MarkerPlan(EclipseTimeline Timeline, int Peaked, Marker[] Markers);
 
     // One eclipse: the moon whose orbit it sits on, that orbit's parent, and what it shows.
     private readonly record struct Marker(
@@ -82,9 +86,11 @@ public partial class EclipseMarkers : CanvasLayer
 
         Font font = _overlay.GetThemeDefaultFont();
         Rect2 onScreen = _overlay.GetRect().Grow(OffScreenMarginPixels);
+        double now = Session.TimeDays;
         foreach (Marker marker in CurrentPlan(timeline).Markers)
         {
-            if (!System!.Layout.TryGetValue(marker.Parent.Id, out DisplayBody parentPlace))
+            if (Math.Abs(marker.PeakDays - now) > marker.Moon.Orbit!.PeriodDays
+                || !System!.Layout.TryGetValue(marker.Parent.Id, out DisplayBody parentPlace))
             {
                 continue;
             }
@@ -112,18 +118,21 @@ public partial class EclipseMarkers : CanvasLayer
         }
     }
 
-    // The markers to show now: the cached ones, unless the timeline changed or an eclipse ended.
+    // The markers that may show now: the cached ones, unless the timeline changed or another
+    // eclipse peaked.
     private MarkerPlan CurrentPlan(EclipseTimeline timeline)
     {
-        int first = FirstNotOver(timeline, Session!.TimeDays);
-        if (_plan is { } cached && cached.Timeline == timeline && cached.First == first)
+        double now = Session!.TimeDays;
+        int peaked = PeakedBy(timeline, now);
+        if (_plan is { } cached && cached.Timeline == timeline && cached.Peaked == peaked)
         {
             return cached;
         }
 
         IReadOnlyList<Body> bodies = Session.World.Bodies;
-        var markers = new List<Marker>();
-        foreach (Eclipse eclipse in timeline.Upcoming(Session.TimeDays))
+        var previous = new Dictionary<Guid, Marker>();
+        var next = new Dictionary<Guid, Marker>();
+        foreach (Eclipse eclipse in timeline.Eclipses)
         {
             Body? blocker = bodies.FirstOrDefault(b => b.Id == eclipse.BlockerId);
             Body? shadowed = bodies.FirstOrDefault(b => b.Id == eclipse.ShadowedId);
@@ -136,26 +145,34 @@ public partial class EclipseMarkers : CanvasLayer
             (Body moon, Body parent) = blocker.Orbit?.ParentId == shadowed.Id
                 ? (blocker, shadowed)
                 : (shadowed, blocker);
-            markers.Add(new Marker(moon, parent, eclipse.PeakDays,
-                eclipse.Kind == EclipseKind.Solar, EclipseText.Short(eclipse)));
-        }
-
-        _plan = new MarkerPlan(timeline, first, [.. markers]);
-        return _plan;
-    }
-
-    // The index of the first eclipse not over by a time (a loop, so it allocates nothing).
-    private static int FirstNotOver(EclipseTimeline timeline, double timeDays)
-    {
-        IReadOnlyList<Eclipse> eclipses = timeline.Eclipses;
-        for (int i = 0; i < eclipses.Count; i++)
-        {
-            if (eclipses[i].EndDays >= timeDays)
+            bool isPast = eclipse.PeakDays <= now;
+            string label = $"{(isPast ? "Previous" : "Next")}: {EclipseText.Short(eclipse)}";
+            var marker = new Marker(moon, parent, eclipse.PeakDays,
+                eclipse.Kind == EclipseKind.Solar, label);
+            if (isPast)
             {
-                return i;
+                previous[moon.Id] = marker;  // In order, so the last one wins.
+            }
+            else
+            {
+                next.TryAdd(moon.Id, marker);
             }
         }
 
-        return eclipses.Count;
+        _plan = new MarkerPlan(timeline, peaked, [.. previous.Values, .. next.Values]);
+        return _plan;
+    }
+
+    // How many eclipses have peaked by a time (a loop, so it allocates nothing).
+    private static int PeakedBy(EclipseTimeline timeline, double timeDays)
+    {
+        IReadOnlyList<Eclipse> eclipses = timeline.Eclipses;
+        int count = 0;
+        while (count < eclipses.Count && eclipses[count].PeakDays <= timeDays)
+        {
+            count++;
+        }
+
+        return count;
     }
 }

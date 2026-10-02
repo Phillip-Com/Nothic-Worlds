@@ -899,10 +899,14 @@ system's parameters (e.g. orbital periods, rotation speed) so the user's calenda
   moon), date, depth and length ("94% of the star hidden · 5.1 h"), start and end in the
   tooltip, and **Go to** (glides to the peak). "Working them out…" shows meanwhile. It only
   updates while the panel shows.
-- **Orbit markers** (`godot/UI/EclipseMarkers.cs`, its own overlay): where the moon is at each
-  coming eclipse's peak, on its orbit around the planet's current position. Solar: a dark disk
-  ringed in gold; lunar: a dark red disk; labelled "Total solar", "Partial lunar", and so on.
-  Cached until the timeline changes or an eclipse ends; off-screen markers are skipped.
+- **Orbit markers** (`godot/UI/EclipseMarkers.cs`, its own overlay): where the moon is at an
+  eclipse's peak, on its orbit around the planet's current position. **Only each moon's previous
+  and next eclipse**, and only while within one trip of the moon around its planet from now
+  (owner's request, after a first version marked every eclipse of the year in a ring). Solar: a
+  dark disk ringed in gold; lunar: a dark red disk; labelled "Previous: Total lunar", "Next:
+  Annular solar", and so on. Cached until the timeline changes or an eclipse peaks; off-screen
+  markers are skipped. `EclipseTimeline.Covers` looks back a quarter year so the previous one
+  is always known.
 - Wording in one place: `godot/UI/EclipseText.cs`.
 
 **EVT-02 — Meteor showers and asteroid events** · Idea · —

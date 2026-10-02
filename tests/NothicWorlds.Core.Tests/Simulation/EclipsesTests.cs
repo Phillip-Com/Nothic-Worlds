@@ -191,6 +191,9 @@ public class EclipsesTests
 
         Assert.True(timeline.Covers(100));
         Assert.False(timeline.Covers(500));
+        // It looks back a quarter year, for each moon's previous eclipse.
+        Assert.True(timeline.Covers(100 - 365.25 * 0.24));
+        Assert.False(timeline.Covers(100 - 365.25 * 0.26));
         Assert.Equal(Eclipses.Between(bodies, earth, timeline.FromDays, timeline.ToDays),
             timeline.Eclipses);
 
