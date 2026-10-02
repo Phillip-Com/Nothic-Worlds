@@ -34,6 +34,20 @@ public sealed class World
     public double TimeDays { get; set; }
 
     /// <summary>
+    /// The world's journal entries (VISION.md LORE-02), in the order they were added.
+    /// </summary>
+    public List<JournalEntry> Journal { get; } = [];
+
+    /// <summary>The world's named timelines (VISION.md LORE-03), in lane order.</summary>
+    public List<Timeline> Timelines { get; } = [];
+
+    /// <summary>
+    /// The events on the timelines (VISION.md LORE-03). See <see cref="LoreRules"/> for how
+    /// they tie to timelines, entries, and bodies.
+    /// </summary>
+    public List<TimelineEvent> Events { get; } = [];
+
+    /// <summary>
     /// Where the camera was looking when the world was saved, or null for the default.
     /// </summary>
     public CameraView? View { get; set; }
@@ -54,6 +68,11 @@ public sealed class World
             TimeDays = TimeDays,
         };
         copy.Bodies.AddRange(Bodies.Select(body => body.Clone()));
+
+        // Entries, timelines, and events are immutable records, safe to share.
+        copy.Journal.AddRange(Journal);
+        copy.Timelines.AddRange(Timelines);
+        copy.Events.AddRange(Events);
         return copy;
     }
 
