@@ -50,6 +50,7 @@ public partial class SystemPanel : CanvasLayer
     private SpinBox _orbitTilt = null!;
     private SpinBox _tiltDirection = null!;
     private CalendarSection? _calendar;
+    private EclipseSection? _eclipses;
     private bool _open;
     private bool _syncing;
 
@@ -134,6 +135,9 @@ public partial class SystemPanel : CanvasLayer
         layout.AddChild(new HSeparator());
         _calendar = new CalendarSection { Session = Session, Time = Time };
         layout.AddChild(_calendar);
+        layout.AddChild(new HSeparator());
+        _eclipses = new EclipseSection { Session = Session, Time = Time };
+        layout.AddChild(_eclipses);
 
         Session.Changed += SyncWithWorld;
         Session.SelectionChanged += SyncWithWorld;
@@ -395,6 +399,12 @@ public partial class SystemPanel : CanvasLayer
         }
 
         _calendar?.Refresh();
+        if (_eclipses is not null)
+        {
+            _eclipses.Visible = !isStar;  // Stars have no eclipses of their own.
+            _eclipses.Refresh();
+        }
+
         _syncing = false;
     }
 
