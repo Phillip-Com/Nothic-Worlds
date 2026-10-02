@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 6: Eclipses** · In Progress (owner's choice, 2026-10-01)
+**Milestone 6: Eclipses** · Complete (PR #22 merged 2026-10-02; owner's choice, 2026-10-01)
 Eclipses found from where the bodies are (`EVT-01`). Owner's decisions:
 - **The selected body's eclipses:** solar eclipses seen from it (its moons passing in front of
   the star), and lunar eclipses of its moons. A selected moon has the same ones its planet sees
