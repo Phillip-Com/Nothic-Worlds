@@ -19,6 +19,7 @@
 [ext_resource type="Script" path="res://UI/BodyMarkers.cs" id="17_markers"]
 [ext_resource type="Script" path="res://UI/SystemPanel.cs" id="18_system_panel"]
 [ext_resource type="Script" path="res://UI/EclipseMarkers.cs" id="19_eclipse_markers"]
+[ext_resource type="Script" path="res://UI/JournalPanel.cs" id="20_journal"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -70,11 +71,12 @@ script = ExtResource("4_overlay")
 script = ExtResource("5_indicator")
 Camera = NodePath("../PlanetCamera")
 
-[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Calibration", "Pieces", "SystemPanel")]
+[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Calibration", "Pieces", "SystemPanel", "Journal")]
 script = ExtResource("7_toolbar")
 Session = NodePath("../WorldSession")
 Calibration = NodePath("../CalibrationWorkspace")
 Pieces = NodePath("../PiecesPanel")
+Journal = NodePath("../JournalPanel")
 SystemPanel = NodePath("../SystemPanel")
 
 [node name="FileMenu" type="Node" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
@@ -91,6 +93,11 @@ Toolbar = NodePath("../MapToolbar")
 script = ExtResource("11_calibration")
 Session = NodePath("../WorldSession")
 Camera = NodePath("../PlanetCamera")
+Toolbar = NodePath("../MapToolbar")
+
+[node name="JournalPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
+script = ExtResource("20_journal")
+Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 
 [node name="PiecesPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Cutter", "Toolbar")]

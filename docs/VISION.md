@@ -121,8 +121,12 @@ Writing the world's history and lore (`LORE-02`, `LORE-03`). Owner's decisions:
   scrolling, zooming, a "now" line, and clicking to jump.
 - **Event dates:** a moment, with an optional end for things that last (drawn as bars). Stored
   as world time and shown in the selected body's calendar.
-- **Four PRs:** Core (model, links, places, format v7) (PR #23); the journal panel; the
-  timeline strip; pins on the globe.
+- **Four PRs:** Core (model, links, places, format v7) (PR #23); the journal panel (PR #24);
+  the timeline strip; pins on the globe.
+- **Deleting a body** keeps the entries and events placed on it, with their place cleared, in
+  the same undo step (owner's choice, 2026-10-02).
+- **The Journal panel shares the right side with the Pieces panel**, one at a time (owner's
+  choice, 2026-10-02).
 
 **Milestone 6: Eclipses** · Complete (PR #22 merged 2026-10-02; owner's choice, 2026-10-01)
 Eclipses found from where the bodies are (`EVT-01`). Owner's decisions:
@@ -954,7 +958,7 @@ the world.
 **Intent:** Draw outlines around specific regions or locations on the world, with optional notes.
 **Implementation:** —
 
-**LORE-02 — Journal system** · In Progress (Core done, PR #23) · Base
+**LORE-02 — Journal system** · In Progress (Core and panel done, PRs #23–#24) · Base
 **Intent:** Start with a simple journal. Entries are sortable and can be linked to locations.
 Clicking a location can pop up its journal entries to read. The exact interaction is to be worked
 out later.
@@ -970,6 +974,24 @@ out later.
   on events only). The app must keep these true when it deletes things (e.g. a body).
 - World file **format version 7** (optional `journal`, `timelines`, `events`). Loading checks
   everything; saving reads the new file back, so a broken link can never be written (tested).
+
+**Implementation (panel, PR #24):**
+- `godot/UI/JournalPanel.cs`, opened by **Journal…** in the toolbar, on the right (one at a
+  time with the Pieces panel; `MapToolbar` unpresses the other button). A search box (titles
+  and text), a sort menu (recently edited, title, date written, place), the list, **New
+  Entry** and **Delete** (no confirmation; Ctrl+Z brings it back). Below: the selected entry's
+  title, place (any body, or nowhere), text, the timeline events that link to it, and when it
+  was written and edited. An existing pin is shown; setting pins comes with the globe pins.
+  The panel is nearly opaque, for reading, and scrolls on short windows.
+- Edits apply as they're typed through `WorldSession.UpdateJournalEntry` (merged into one undo
+  step per entry), `AddJournalEntry`, and `DeleteJournalEntry` (also removes the entry's
+  links from events), in `godot/Session/WorldSession.Lore.cs`.
+- **Undo and saved state cover the lore:** `godot/Session/LoreState.cs` copies the three lists
+  (their items are immutable, so the copies share them) into every undo snapshot and the
+  saved-file comparison. Undoing back to the saved journal counts as saved again.
+- **Deleting a body** clears the places on it in the same undo step (owner's choice).
+- Journal writing no longer makes the seasons and eclipses work themselves out again:
+  `WorldSession` keeps a separate system version for those caches.
 
 **LORE-03 — Timelines** · In Progress (Core done, PR #23) · Base
 **Intent:** Timelines of events. They become relevant once orbiting bodies are introduced, and
