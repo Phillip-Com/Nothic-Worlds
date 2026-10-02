@@ -122,7 +122,8 @@ public static class Seasons
             double slope = value - previous;
             if ((previous < 0) != (value < 0))
             {
-                double crossing = Bisect(declination, previousTime, time, previous < 0);
+                double crossing =
+                    TimeSearch.Crossing(declination, previousTime, time, previous < 0);
                 events.Add(new SeasonEvent(previous < 0
                     ? SeasonEventKind.NorthernSpringEquinox
                     : SeasonEventKind.NorthernAutumnEquinox, crossing));
@@ -131,7 +132,7 @@ public static class Seasons
             if ((previousSlope > 0) != (slope > 0) && previousSlope != 0)
             {
                 bool peak = previousSlope > 0;
-                double extreme = Extreme(declination, previousTime - step, time, peak);
+                double extreme = TimeSearch.Extreme(declination, previousTime - step, time, peak);
                 events.Add(new SeasonEvent(peak
                     ? SeasonEventKind.NorthernSummerSolstice
                     : SeasonEventKind.NorthernWinterSolstice, extreme));
@@ -190,8 +191,7 @@ public static class Seasons
     }
 
     // The star's declination over time, made quick to evaluate thousands of times: it works out
-    // the two chains of orbits once (instead of every body's position at every step), and adds
-    // up just their offsets.
+    // the two chains of orbits once (instead of every body's position at every step).
     private static Func<double, double> DeclinationFunction(
         IReadOnlyList<Body> bodies, Body body, Body star)
     {
@@ -201,89 +201,14 @@ public static class Seasons
         }
 
         var byId = bodies.ToDictionary(b => b.Id);
-        List<Orbit> bodyChain = OrbitsFromCenter(body, byId);
-        List<Orbit> starChain = OrbitsFromCenter(star, byId);
+        OrbitChain bodyChain = OrbitChain.Of(body, byId);
+        OrbitChain starChain = OrbitChain.Of(star, byId);
         Vector3D pole = BodyOrientation.NorthPole(body);
         return timeDays =>
         {
-            Vector3D toStar =
-                PositionAlong(starChain, timeDays) - PositionAlong(bodyChain, timeDays);
+            Vector3D toStar = starChain.PositionAt(timeDays) - bodyChain.PositionAt(timeDays);
             double sine = toStar.Dot(pole) / toStar.Length;
             return double.RadiansToDegrees(Math.Asin(Math.Clamp(sine, -1, 1)));
         };
-    }
-
-    // The orbits linking a body to the system's center (the hierarchy has no loops).
-    private static List<Orbit> OrbitsFromCenter(Body body, Dictionary<Guid, Body> byId)
-    {
-        var chain = new List<Orbit>();
-        for (Body current = body; current.Orbit is Orbit orbit; current = byId[orbit.ParentId])
-        {
-            chain.Add(orbit);
-        }
-
-        return chain;
-    }
-
-    private static Vector3D PositionAlong(List<Orbit> chain, double timeDays)
-    {
-        Vector3D position = Vector3D.Zero;
-        foreach (Orbit orbit in chain)
-        {
-            position += OrbitMath.OffsetFromParent(orbit, timeDays);
-        }
-
-        return position;
-    }
-
-    // Narrows down where a smooth function crosses zero between two times.
-    private static double Bisect(Func<double, double> f, double low, double high, bool rising)
-    {
-        for (int i = 0; i < 60; i++)
-        {
-            double middle = (low + high) / 2;
-            if ((f(middle) < 0) == rising)
-            {
-                low = middle;
-            }
-            else
-            {
-                high = middle;
-            }
-        }
-
-        return (low + high) / 2;
-    }
-
-    // Narrows down where a smooth function peaks (or bottoms out) between two times
-    // (golden-section search).
-    private static double Extreme(Func<double, double> f, double low, double high, bool peak)
-    {
-        double ratio = (Math.Sqrt(5) - 1) / 2;
-        double a = high - ratio * (high - low);
-        double b = low + ratio * (high - low);
-        double fa = f(a);
-        double fb = f(b);
-        for (int i = 0; i < 80; i++)
-        {
-            if ((fa > fb) == peak)
-            {
-                high = b;
-                b = a;
-                fb = fa;
-                a = high - ratio * (high - low);
-                fa = f(a);
-            }
-            else
-            {
-                low = a;
-                a = b;
-                fa = fb;
-                b = low + ratio * (high - low);
-                fb = f(b);
-            }
-        }
-
-        return (low + high) / 2;
     }
 }
