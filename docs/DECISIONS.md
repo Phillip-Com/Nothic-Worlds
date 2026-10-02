@@ -8,8 +8,8 @@ A record of key project decisions made by the owner. Newest first.
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
 | 2026-10-02 | Eclipses are worked out **in the background**, only when the panel or markers ask | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | ~7 ms each on the baseline laptop; keeps edits smooth. VISION.md `EVT-01` |
-| 2026-10-02 | Deleting a body **keeps entries and events placed on it, clearing their place** (same undo step) | In PR | [#24](https://github.com/Phillip-Com/Nothic-Worlds/pull/24) | VISION.md `LORE-02` |
-| 2026-10-02 | The **Journal panel shares the right side with the Pieces panel, one at a time** | In PR | [#24](https://github.com/Phillip-Com/Nothic-Worlds/pull/24) | VISION.md `LORE-02` |
+| 2026-10-02 | Deleting a body **keeps entries and events placed on it, clearing their place** (same undo step) | Merged | [#24](https://github.com/Phillip-Com/Nothic-Worlds/pull/24) · `9528b5d` | VISION.md `LORE-02` |
+| 2026-10-02 | The **Journal panel shares the right side with the Pieces panel, one at a time** | Merged | [#24](https://github.com/Phillip-Com/Nothic-Worlds/pull/24) · `9528b5d` | VISION.md `LORE-02` |
 | 2026-10-02 | Milestone 7: **journals and timelines** (`LORE-02`, `LORE-03`) | Merged | [#23](https://github.com/Phillip-Com/Nothic-Worlds/pull/23) · `d722896` | VISION.md §3 |
 | 2026-10-02 | Journal entries and timeline events are **separate**, linked **many to many** (links stored on events) | Merged | [#23](https://github.com/Phillip-Com/Nothic-Worlds/pull/23) · `d722896` | VISION.md `LORE-02`, `LORE-03` |
 | 2026-10-02 | Entries and events can be **placed on a body, optionally pinned** to a spot; pins pop up what's there | Merged | [#23](https://github.com/Phillip-Com/Nothic-Worlds/pull/23) · `d722896` | Pins built in PR 4 of M7 |
