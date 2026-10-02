@@ -59,6 +59,9 @@ public partial class MapToolbar : CanvasLayer
     /// </summary>
     [Export] public JournalPanel? Journal { get; set; }
 
+    /// <summary>The timeline strip, shown and hidden by the Timeline… button.</summary>
+    [Export] public TimelineStrip? Timeline { get; set; }
+
     /// <summary>Space at the start of the toolbar row, where the File menu goes.</summary>
     public HBoxContainer MenuArea { get; } = new();
 
@@ -137,6 +140,18 @@ public partial class MapToolbar : CanvasLayer
         };
         controls.AddChild(piecesButton);
         controls.AddChild(journalButton);
+
+        var timelineButton = CreateButton(
+            "Timeline…", "The timeline strip: your world's history, as lanes of events");
+        timelineButton.ToggleMode = true;
+        timelineButton.Toggled += open =>
+        {
+            if (Timeline is not null)
+            {
+                Timeline.IsStripOpen = open;
+            }
+        };
+        controls.AddChild(timelineButton);
 
         controls.AddChild(CreateLabel("  Map type:"));
         _mapType = CreateMapTypeDropdown();
