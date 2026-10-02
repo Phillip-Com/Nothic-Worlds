@@ -66,13 +66,12 @@ The goal is to get the rough idea and the movement system in place. Nothing fanc
 - Import an image and wrap it onto the planet (`MAP-01`, in its simplest form)
 - Camera: zoom in and out, pan, and move around the planet (`REN-02`, basic form)
 
-**Milestone 2: Maps + Saving** · In Progress (owner's choice, 2026-09-30)
+**Milestone 2: Maps + Saving** · Complete (PR #8 merged 2026-09-30; owner's choice, 2026-09-30)
 - **Part 1:** `MAP-03`, better wrapping for hand-drawn maps (Flat map mode) (PR #5). This grew
   into `MAP-04`, atlas and circular map types (PR #6).
 - **Part 2:** the **world save format** (`SAV-01`, `SAV-02`), so work persists between sessions.
   It's foundational, because every later feature adds data to it. Split into two PRs: the Core
   format (PR #7), then the app side (File menu, unsaved changes, recovery copies) (PR #8).
-- **Complete** (PR #8 merged 2026-09-30).
 
 **Milestone 3: Map Fitting** · Complete (PR #15 merged 2026-09-30)
 - **Part 1:** `MAP-05` grid calibration. Core first (PR #9), then the Calibrate… workspace (PR #10).
@@ -96,7 +95,7 @@ on it. Owner's decisions:
   brings it all back). The system tree and properties live in a **left panel**, opened by a
   **System…** toolbar button.
 
-**Milestone 5: Calendars and Seasons** · In Progress (owner's choice, 2026-10-01)
+**Milestone 5: Calendars and Seasons** · Complete (PR #20 merged 2026-10-01; owner's choice, 2026-10-01)
 Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the simulation
 (`CAL-03`). The accuracy toggle (`CAL-02`) comes later. Owner's decisions:
 - **Calendars belong to bodies:** any planet or moon can have its own. The time bar shows the
@@ -108,6 +107,20 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
   the orbit** where each solstice and equinox happens.
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
+
+**Milestone 6: Eclipses** · In Progress (owner's choice, 2026-10-01)
+Eclipses found from where the bodies are (`EVT-01`). Owner's decisions:
+- **The selected body's eclipses:** solar eclipses seen from it (its moons passing in front of
+  the star), and lunar eclipses of its moons (or of itself, for a moon). Not the whole system,
+  and no transits of planets across the star.
+- **Shown** as a list in the System panel (the coming year, with dates and Go to buttons) and
+  **as markers on the moon's orbit**. Not in the time bar.
+- **Detail:** the type (total, annular, partial, or penumbral), start, peak, and end, and how
+  much is covered.
+- **Two PRs:** Core (eclipse search and tests) (PR #21), then the app.
+- Not included for now: where on the surface an eclipse is seen (its path across the map), and
+  drawing the shadow in 3D. Eclipses are worked out, never saved, so the file format is
+  unchanged.
 
 ---
 
@@ -843,9 +856,36 @@ system's parameters (e.g. orbital periods, rotation speed) so the user's calenda
 
 ### 4.7 Events (`EVT`)
 
-**EVT-01 — Eclipses** · Idea · Base
+**EVT-01 — Eclipses** · In Progress (Core done, PR #21) · Base
 **Intent:** Simulated from body positions.
-**Implementation:** —
+**Implementation (Core, PR #21):**
+- `Simulation/Eclipses.cs`: every eclipse is a body passing through another's shadow. The
+  star's light past the blocker makes the **umbra** (star fully hidden; past its point, the
+  **antumbra**, where a ring of light stays) and the wider **penumbra** (star partly hidden).
+  `Between(bodies, body, from, to)` steps through time measuring how far the shadowed body is
+  from the shadow's center (60 points per moon orbit), finds each close pass, and refines it:
+  roughly first, since most passes miss, then exactly (`TimeSearch`). Each `Eclipse` has its
+  kind (`Solar`/`Lunar`, from the selected body's view), type (`Total`, `Annular`, `Partial`,
+  `Penumbral`), the blocker and shadowed body, start/peak/end (the penumbra's first and last
+  touch), and coverage (solar: share of the star hidden at the best spot; lunar: share of the
+  moon's width in the umbra). A solar eclipse counts if the shadow touches the body anywhere,
+  as on Earth.
+- `Simulation/EclipseTimeline.cs`: the eclipses from half a year before a time to a year and a
+  half after, with `Covers` and `Upcoming` (not yet over, up to a year ahead), like
+  `SeasonTimeline`.
+- Shared with the season search: `Simulation/OrbitChain.cs` (a body's position from just its
+  chain of orbits) and `Simulation/TimeSearch.cs` (refining a moment; now stops at ~0.1 ms of
+  precision instead of a fixed number of steps).
+- Speed: a two-year timeline for an Earth-and-Moon system takes ~7 ms on the baseline laptop
+  (almost all of it working out orbit positions). The app should work it out off the rendering
+  path or only when needed.
+- Tested with the real Sun, Earth, and Moon: with the Moon's orbit flat, a solar and a lunar
+  eclipse every synodic month (29.53 days), half a month apart; annular solar eclipses at the
+  Moon's average distance (~94% covered), total when it's closer; a central lunar eclipse is
+  total and lasts 5–6.5 hours, symmetric about its peak; with the real 5.1° tilt, 2–5 of each a
+  year; shallow passes are partial or penumbral; grazing passes are found and near misses
+  aren't; a moon sees its own lunar eclipses; the same after Make Center; none for stars or
+  moonless planets; deterministic.
 
 **EVT-02 — Meteor showers and asteroid events** · Idea · —
 **Intent:** Simulated celestial events.
