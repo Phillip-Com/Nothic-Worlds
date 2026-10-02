@@ -108,6 +108,22 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 7: Journals and Timelines** · In Progress (owner's choice, 2026-10-02)
+Writing the world's history and lore (`LORE-02`, `LORE-03`). Owner's decisions:
+- **Journal entries and timeline events are separate things**, linked **many to many**: an
+  event can link to any number of entries and the other way round, and each side shows its
+  links.
+- **Places:** entries and events can both be placed on a body, optionally pinned to a spot on
+  its surface. Pins show on the globe; clicking one pops up what's there.
+- **Several named timelines**, shown as colored **lanes**, each of which can be hidden; every
+  event belongs to one.
+- **The timeline is a strip along the bottom** (above the time bar), toggled on and off, with
+  scrolling, zooming, a "now" line, and clicking to jump.
+- **Event dates:** a moment, with an optional end for things that last (drawn as bars). Stored
+  as world time and shown in the selected body's calendar.
+- **Four PRs:** Core (model, links, places, format v7) (PR #23); the journal panel; the
+  timeline strip; pins on the globe.
+
 **Milestone 6: Eclipses** · Complete (PR #22 merged 2026-10-02; owner's choice, 2026-10-01)
 Eclipses found from where the bodies are (`EVT-01`). Owner's decisions:
 - **The selected body's eclipses:** solar eclipses seen from it (its moons passing in front of
@@ -938,16 +954,34 @@ the world.
 **Intent:** Draw outlines around specific regions or locations on the world, with optional notes.
 **Implementation:** —
 
-**LORE-02 — Journal system** · Idea · Base
+**LORE-02 — Journal system** · In Progress (Core done, PR #23) · Base
 **Intent:** Start with a simple journal. Entries are sortable and can be linked to locations.
 Clicking a location can pop up its journal entries to read. The exact interaction is to be worked
 out later.
-**Implementation:** —
+**Implementation (Core, PR #23):**
+- `Model/JournalEntry.cs`: an immutable record (ID, title, plain text, optional
+  `LoreLocation`, created and edited times for sorting) in `World.Journal`. `Problem()` checks
+  the title and length limits.
+- `Model/LoreLocation.cs`: a body, plus an optional `GeoCoordinate` pin on its surface. Shared
+  with timeline events.
+- `Model/LoreRules.cs`: `Problem(world)` checks the whole lore together (limits, unique IDs,
+  every event on an existing timeline, every link to an existing entry, every place on an
+  existing body); `EventsLinkedTo(world, entryId)` gives an entry's events (links are stored
+  on events only). The app must keep these true when it deletes things (e.g. a body).
+- World file **format version 7** (optional `journal`, `timelines`, `events`). Loading checks
+  everything; saving reads the new file back, so a broken link can never be written (tested).
 
-**LORE-03 — Timelines** · Idea · Base
+**LORE-03 — Timelines** · In Progress (Core done, PR #23) · Base
 **Intent:** Timelines of events. They become relevant once orbiting bodies are introduced, and
 they're key helpers for the calendar features (`CAL-01`–`CAL-03`, `SIM-02`).
-**Implementation:** —
+**Implementation (Core, PR #23):**
+- `Model/Timeline.cs`: a named timeline (ID, name, color, hidden) in `World.Timelines`, in
+  lane order.
+- `Model/TimelineEvent.cs`: an immutable record in `World.Events`: its timeline, title,
+  description, start (world time, standard days), optional end (not before the start), optional
+  place, and the journal entries it links to (`EntryIds`, each once). Equality compares the
+  links too.
+- Validation, file format, and tests: see `LORE-02`.
 
 **LORE-04 — Lore relationship diagrams** · Deferred · —
 **Intent:** Diagrams of connections between characters, factions, and nations (e.g. family trees,

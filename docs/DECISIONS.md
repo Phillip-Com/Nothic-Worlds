@@ -8,6 +8,13 @@ A record of key project decisions made by the owner. Newest first.
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
 | 2026-10-02 | Eclipses are worked out **in the background**, only when the panel or markers ask | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | ~7 ms each on the baseline laptop; keeps edits smooth. VISION.md `EVT-01` |
+| 2026-10-02 | Milestone 7: **journals and timelines** (`LORE-02`, `LORE-03`) | In PR | [#23](https://github.com/Phillip-Com/Nothic-Worlds/pull/23) | VISION.md §3 |
+| 2026-10-02 | Journal entries and timeline events are **separate**, linked **many to many** (links stored on events) | In PR | [#23](https://github.com/Phillip-Com/Nothic-Worlds/pull/23) | VISION.md `LORE-02`, `LORE-03` |
+| 2026-10-02 | Entries and events can be **placed on a body, optionally pinned** to a spot; pins pop up what's there | In PR | [#23](https://github.com/Phillip-Com/Nothic-Worlds/pull/23) | Pins built in PR 4 of M7 |
+| 2026-10-02 | **Several named timelines as lanes**, each with a color and hideable; every event on one | In PR | [#23](https://github.com/Phillip-Com/Nothic-Worlds/pull/23) | VISION.md `LORE-03` |
+| 2026-10-02 | The timeline is a **strip along the bottom**; events are a **moment with an optional end** | In PR | [#23](https://github.com/Phillip-Com/Nothic-Worlds/pull/23) | Strip built in PR 3 of M7 |
+| 2026-10-02 | Milestone 7 in **four PRs**: Core, journal panel, timeline strip, pins | In PR | [#23](https://github.com/Phillip-Com/Nothic-Worlds/pull/23) | |
+| 2026-10-02 | World file **format version 7**: optional journal, timelines, and events | In PR | [#23](https://github.com/Phillip-Com/Nothic-Worlds/pull/23) | docs/world-format.md version history |
 | 2026-10-02 | The **Go to… dialog** always offers the next solar and next lunar eclipse | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | Owner's request. VISION.md `EVT-01` |
 | 2026-10-02 | A selected moon also gets the **solar eclipses it causes** (seen from its planet), not just its lunar ones | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | Owner's request; widens the #21 scope for moons. VISION.md `EVT-01` |
 | 2026-10-02 | Orbit markers show only each moon's **previous and next eclipse**, and only **within one orbit** of now | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | Owner's request: marking every eclipse of the year made a ring. VISION.md `EVT-01` |
