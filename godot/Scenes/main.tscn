@@ -18,6 +18,7 @@
 [ext_resource type="Script" path="res://UI/TimeControls.cs" id="16_time"]
 [ext_resource type="Script" path="res://UI/BodyMarkers.cs" id="17_markers"]
 [ext_resource type="Script" path="res://UI/SystemPanel.cs" id="18_system_panel"]
+[ext_resource type="Script" path="res://UI/EclipseMarkers.cs" id="19_eclipse_markers"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -122,6 +123,13 @@ Toolbar = NodePath("../MapToolbar")
 
 [node name="BodyMarkers" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar")]
 script = ExtResource("17_markers")
+Session = NodePath("../WorldSession")
+System = NodePath("../SystemView")
+Camera = NodePath("../PlanetCamera")
+Toolbar = NodePath("../MapToolbar")
+
+[node name="EclipseMarkers" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar")]
+script = ExtResource("19_eclipse_markers")
 Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 Camera = NodePath("../PlanetCamera")
