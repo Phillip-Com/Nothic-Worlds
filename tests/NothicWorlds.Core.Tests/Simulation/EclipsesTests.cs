@@ -132,16 +132,18 @@ public class EclipsesTests
     }
 
     [Fact]
-    public void Moon_SeesItsOwnLunarEclipses()
+    public void Moon_HasTheSameEclipsesAsItsPlanet()
     {
+        // Lunar: the Moon in Earth's shadow. Solar: the Moon in front of the Sun, seen from
+        // Earth (owner's request: the selected moon shows both).
         (List<Body> bodies, Body earth, Body moon) = EarthAndMoon(moonTiltDegrees: 5.145);
 
-        List<Eclipse> fromEarth = Eclipses.Between(bodies, earth, 0, 365.25)
-            .Where(e => e.Kind == EclipseKind.Lunar).ToList();
+        List<Eclipse> fromEarth = Eclipses.Between(bodies, earth, 0, 365.25);
         List<Eclipse> fromMoon = Eclipses.Between(bodies, moon, 0, 365.25);
 
         Assert.Equal(fromEarth, fromMoon);
-        Assert.All(fromMoon, e => Assert.Equal(moon.Id, e.ShadowedId));
+        Assert.Contains(fromMoon, e => e.Kind == EclipseKind.Solar);
+        Assert.Contains(fromMoon, e => e.Kind == EclipseKind.Lunar);
     }
 
     [Fact]

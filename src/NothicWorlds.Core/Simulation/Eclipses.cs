@@ -9,7 +9,9 @@ namespace NothicWorlds.Core.Simulation;
 /// <list type="bullet">
 /// <item>solar: one of its moons passes in front of the star, as seen from the body;</item>
 /// <item>lunar: one of its moons passes through the body's shadow;</item>
-/// <item>lunar, for a moon: the moon itself passes through its planet's shadow.</item>
+/// <item>for a moon, the same eclipses its planet sees with it: lunar when the moon itself
+/// passes through the planet's shadow, solar when it passes in front of the star as seen from
+/// the planet (owner's request).</item>
 /// </list>
 /// Deterministic, like everything in the simulation.
 /// </summary>
@@ -94,6 +96,7 @@ public static class Eclipses
             && byId[orbit.ParentId] is { Kind: not BodyKind.Star } parent)
         {
             yield return (parent, body, EclipseKind.Lunar);
+            yield return (body, parent, EclipseKind.Solar);
         }
     }
 
