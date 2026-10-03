@@ -133,7 +133,11 @@ and season, and a chart of the whole year (temperatures and daylight by month, w
 marked) that follows the clock. Temperatures are estimates from the sunlight, around the
 planet's **Avg. temperature**, set in the System panel (Earth: about 15 °C), adjusted for the
 painted terrain: water within about 500 km makes the seasons and the day/night swing milder,
-deserts swing hardest, and ice and mountains are colder. A line in the window says how.
+deserts swing hardest, and ice and mountains are colder. Rain is estimated too: a tropical rain
+belt that follows the sun (wet and dry seasons), storms in the middle latitudes, and more rain
+near the sea, less inland and in deserts. The chart shows each month's rain, and the window
+gives the year's total and this month's (wet or dry season). A line in the window says how the
+terrain changes things.
 
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers

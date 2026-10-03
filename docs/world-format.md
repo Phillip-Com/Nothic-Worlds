@@ -383,7 +383,9 @@ of the light facing the star, times (mean 1/r² over the year) ÷ (1/r² today) 
 r. Temperatures are an estimate around `averageTemperature`; the constants are in the code.
 Painted terrain adjusts them (`TerrainSurroundings` in Core): the climate at the spot, and the
 share of water among the spot and 64 points on four rings out to 500 km (or 0.3 of the body's
-radius, if less); unpainted ground and unknown codes count as not water.
+radius, if less); unpainted ground and unknown codes count as not water. Rain is estimated the
+same way (from the latitude, the star's lagged latitude, the temperature, and the terrain); it
+isn't stored either.
 
 ## Safe saving
 

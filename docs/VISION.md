@@ -113,7 +113,7 @@ Weather pins take the painted terrain around them into account (new feature `WTH
 decisions:
 - **A climate kind per terrain type**, from a short list (Water, Open land, Forest, Desert,
   Wetland, Mountains, Ice), picked in the Terrain panel; the 12 defaults come pre-set.
-- **Temperature and rainfall.** **Two PRs:** temperature (PR #39), then rainfall.
+- **Temperature and rainfall.** **Two PRs:** temperature (PR #39), then rainfall (PR #40).
 - **The area around counts** for water (about 500 km; smaller on small bodies); the other
   kinds count where the pin stands. Unpainted ground changes nothing.
 - **One line** in the weather window explains the terrain's effect.
@@ -1259,7 +1259,7 @@ season, etc. This is the lightweight version that works on any system.
   `DeleteWeatherPin`; weather pins are in undo snapshots and the saved-state check, and go
   with their body when it's deleted.
 
-**WTH-03 — Terrain-aware weather** · In Progress (temperature done, PR #39) · Base
+**WTH-03 — Terrain-aware weather** · Implemented (M14: PR #39, PR #40) · Base
 **Intent:** Weather pins take the painted terrain around them into account (owner's choice,
 2026-10-03).
 **Implementation (temperature, PR #39):**
@@ -1288,6 +1288,27 @@ season, etc. This is the lightweight version that works on any system.
   day/night swing from 18–24 °C to 15–31 °C, undone with Ctrl+Z. Found and fixed there: in a
   short window the Climate list opened over its own button, and the end of the click picked
   the item under the mouse; it now opens when the click ends.
+**Implementation (rainfall, PR #40):**
+- `ClimateDay.RainMm` (mm per standard day) from `ClimateYear`: a **tropical rain belt** (9 mm
+  a day at its peak, 11° wide) sitting at 0.6 of the star's latitude felt a month late, so wet
+  seasons follow the sun with dry belts beside them; a **storm belt** (2.6 mm, centred at 48°,
+  moving 0.35 of the star's latitude poleward in summer); and **drizzle** (0.25 mm) anywhere.
+  It's scaled by the **cold** (full at 10 °C, fading to 15% at −25 °C) and by the terrain's
+  **moisture** (`ClimateYear.Moisture`: 0.4 + 0.9 × the maritime share, about 1 for Earth's
+  mix, times desert 0.15, ice 0.5, forest 1.2, wetland and mountains 1.3; 1 without painted
+  terrain). An Earth-like planet gets about 1,750 mm a year at the equator, 250 at 30°, 1,000
+  at 50°, and under 50 at the poles.
+- **App:** the weather chart has a strip of monthly rain bars (mm, own scale) under the
+  temperatures; the window gives the year's total in its heading, this month's rain with "wet
+  season" (over 1.6× the average month) or "dry season" (under 0.4×), and the terrain line says
+  how much wetter or drier it is. The window now scrolls when the screen is too short (it
+  didn't fit at 1152 × 648 with the rain added), and temperatures never read "-0".
+- **Tests:** `RainfallTests` (16: Earth-like totals by latitude, the wet season following the
+  sun in both hemispheres, moisture from the sea and each kind of ground, a desert far drier,
+  monthly averages, determinism).
+- **Verified in the running app**, maximized and at 1152 × 648: a monsoon pin at 15° N (dry
+  winters, wet June to September, 1,215 mm a year), a forest pin by the sea at 48° N (643 mm),
+  and the same pin as desert (84 mm); the window fits and scrolls at the small size.
 
 **WTH-02 — Live weather simulation** · Idea · Advanced
 **Intent:** As detailed as possible. Ideally the user can watch clouds and weather move across

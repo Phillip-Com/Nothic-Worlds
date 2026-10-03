@@ -14,6 +14,10 @@ namespace NothicWorlds.Core.Simulation;
 /// The day's sunlight compared with the body's yearly average over its whole surface (1 is
 /// average; Earth's equator gets about 1.2, its poles about 0.5 over a year).
 /// </param>
+/// <param name="RainMm">
+/// The rain (or snow, as water) expected on an average such day, in mm per standard day
+/// (VISION.md WTH-03).
+/// </param>
 public readonly record struct ClimateDay(
     double TimeDays,
     double MeanC,
@@ -21,4 +25,5 @@ public readonly record struct ClimateDay(
     double HighC,
     double DaylightHours,
     double NoonSunDegrees,
-    double Sunlight);
+    double Sunlight,
+    double RainMm);

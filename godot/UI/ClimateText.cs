@@ -24,14 +24,27 @@ public static class ClimateText
     /// <summary>What a climate kind does to the weather, for its tooltip.</summary>
     public static string Effect(ClimateKind kind) => kind switch
     {
-        ClimateKind.Water => "Seas and lakes: milder, later seasons and a smaller day/night " +
-            "swing nearby (within about 500 km)",
-        ClimateKind.Forest => "A slightly smaller day/night swing",
-        ClimateKind.Desert => "A much bigger day/night swing, and a little warmer",
-        ClimateKind.Wetland => "A smaller day/night swing",
-        ClimateKind.Mountains => "About 6 °C colder, with a bigger day/night swing",
-        ClimateKind.Ice => "About 8 °C colder (ice reflects most sunlight)",
+        ClimateKind.Water => "Seas and lakes: milder, later seasons, a smaller day/night " +
+            "swing, and more rain nearby (within about 500 km)",
+        ClimateKind.Forest => "A slightly smaller day/night swing, and a little wetter",
+        ClimateKind.Desert => "A much bigger day/night swing, a little warmer, and very dry",
+        ClimateKind.Wetland => "A smaller day/night swing, and wetter",
+        ClimateKind.Mountains => "About 6 °C colder, with a bigger day/night swing and more " +
+            "rain",
+        ClimateKind.Ice => "About 8 °C colder (ice reflects most sunlight), and drier",
         _ => "No special effect on the weather",
+    };
+
+    // What the ground at a spot does to its temperatures, for the weather window's line (rain
+    // is said separately there).
+    private static string TemperatureEffect(ClimateKind kind) => kind switch
+    {
+        ClimateKind.Forest => "a slightly smaller day/night swing",
+        ClimateKind.Desert => "a much bigger day/night swing, a little warmer",
+        ClimateKind.Wetland => "a smaller day/night swing",
+        ClimateKind.Mountains => "about 6 °C colder, a bigger day/night swing",
+        ClimateKind.Ice => "about 8 °C colder",
+        _ => "",
     };
 
     /// <summary>
@@ -57,8 +70,14 @@ public static class ClimateText
         if (terrain.Here is ClimateKind ground and not ClimateKind.Water
             and not ClimateKind.OpenLand)
         {
-            string effect = Effect(ground);
-            effects.Add(char.ToLowerInvariant(effect[0]) + effect[1..]);  // Keeps "°C"
+            effects.Add(TemperatureEffect(ground));
+        }
+
+        double moisture = ClimateYear.Moisture(terrain);
+        if (moisture >= 1.15 || moisture <= 0.85)
+        {
+            effects.Add($"{(moisture > 1 ? "wetter" : "drier")} than average " +
+                $"({moisture:0.#}× the rain)");
         }
 
         return effects.Count == 0
