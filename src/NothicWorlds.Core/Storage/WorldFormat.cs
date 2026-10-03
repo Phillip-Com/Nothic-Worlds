@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 10;
+    public const int CurrentVersion = 11;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -45,6 +45,12 @@ internal static partial class WorldFormat
         [BodyKind.Planet] = "planet",
         [BodyKind.Star] = "star",
         [BodyKind.Moon] = "moon",
+    };
+
+    private static readonly Dictionary<CalendarFit, string> _calendarFitNames = new()
+    {
+        [CalendarFit.YearLength] = "year-length",
+        [CalendarFit.DayLength] = "day-length",
     };
 
     // Upgrades older documents one version at a time: entry 0 turns version 1 into version 2,
@@ -88,6 +94,10 @@ internal static partial class WorldFormat
         // image (terrain painting, M11). Older worlds get the version 10 default types and no
         // painting.
         AddDefaultTerrainTypes,
+
+        // 10 → 11: calendars gained an optional "fit" and "monthMoon" (calendar fitting, M12).
+        // Older calendars aren't fitted, so nothing changes.
+        document => document,
     ];
 
     // The terrain types worlds got when version 10 arrived. Deliberately a copy, not
@@ -157,6 +167,14 @@ internal static partial class WorldFormat
     public static string BodyKindName(BodyKind kind) => _bodyKindNames[kind];
 
     public static BodyKind ParseBodyKind(string? name) => Parse(_bodyKindNames, name, "body kind");
+
+    /// <summary>The name written for a calendar fit, or null for none (left out).</summary>
+    public static string? CalendarFitName(CalendarFit fit) =>
+        fit == CalendarFit.None ? null : _calendarFitNames[fit];
+
+    /// <summary>Reads a calendar fit's name; a missing one means not fitted.</summary>
+    public static CalendarFit ParseCalendarFit(string? name) =>
+        name is null ? CalendarFit.None : Parse(_calendarFitNames, name, "calendar fit");
 
     /// <summary>
     /// Creates a new, unique asset name for an image with the given file extension.

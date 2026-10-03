@@ -40,6 +40,18 @@ public sealed record Calendar
     /// <summary>The weekday at time 0 (0 is the first weekday).</summary>
     public int StartWeekday { get; init; }
 
+    /// <summary>
+    /// Whether the world is kept fitted to this calendar, and how (VISION.md CAL-02). See
+    /// <c>Simulation.CalendarFitting</c>.
+    /// </summary>
+    public CalendarFit Fit { get; init; } = CalendarFit.None;
+
+    /// <summary>
+    /// A moon of this body whose orbit is kept so it goes from new moon to new moon once per
+    /// (average) month of this calendar, or null for none (VISION.md CAL-02).
+    /// </summary>
+    public Guid? MonthMoonId { get; init; }
+
     /// <summary>How many days a year of this calendar has.</summary>
     public long DaysPerYear => Months.Sum(month => (long)month.Days);
 
@@ -84,13 +96,15 @@ public sealed record Calendar
             && Era == other.Era
             && StartMonth == other.StartMonth
             && StartDay == other.StartDay
-            && StartWeekday == other.StartWeekday;
+            && StartWeekday == other.StartWeekday
+            && Fit == other.Fit
+            && MonthMoonId == other.MonthMoonId;
     }
 
     /// <inheritdoc/>
     public override int GetHashCode()
     {
         return HashCode.Combine(Months.Count, Weekdays.Count, FirstYear, Era, StartMonth,
-            StartDay, StartWeekday);
+            StartDay, StartWeekday, Fit);
     }
 }

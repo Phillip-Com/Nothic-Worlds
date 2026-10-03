@@ -108,6 +108,8 @@ internal sealed class CalendarDocument
     public required long FirstYear { get; init; }
     public string? Era { get; init; }
     public required CalendarStartDocument Start { get; init; }
+    public string? Fit { get; init; }  // Added in format version 11; omitted when not fitted
+    public Guid? MonthMoon { get; init; }  // Added in format version 11
 }
 
 internal sealed class MonthDocument

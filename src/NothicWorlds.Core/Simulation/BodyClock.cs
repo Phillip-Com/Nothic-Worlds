@@ -28,6 +28,16 @@ public static class BodyClock
     /// </summary>
     public static double YearDays(IReadOnlyList<Body> bodies, Body body)
     {
+        return YearOrbitOf(bodies, body)?.Orbit!.PeriodDays ?? 365.25;
+    }
+
+    /// <summary>
+    /// The body whose orbit makes <paramref name="body"/>'s year (see <see cref="YearDays"/>):
+    /// the body itself or its planet, circling a star, or (in a planet-centered system) the
+    /// star circling them. Null if there's no star in either place.
+    /// </summary>
+    public static Body? YearOrbitOf(IReadOnlyList<Body> bodies, Body body)
+    {
         var byId = bodies.ToDictionary(b => b.Id);
         var seen = new HashSet<Guid>();
         for (Body current = body; seen.Add(current.Id);)
@@ -37,7 +47,7 @@ public static class BodyClock
                 b.Kind == BodyKind.Star && b.Orbit?.ParentId == current.Id);
             if (circlingStar is not null)
             {
-                return circlingStar.Orbit!.PeriodDays;
+                return circlingStar;
             }
 
             if (current.Orbit is not Orbit orbit
@@ -48,13 +58,13 @@ public static class BodyClock
 
             if (parent.Kind == BodyKind.Star)
             {
-                return orbit.PeriodDays;
+                return current;
             }
 
             current = parent;
         }
 
-        return 365.25;
+        return null;
     }
 
     /// <summary>

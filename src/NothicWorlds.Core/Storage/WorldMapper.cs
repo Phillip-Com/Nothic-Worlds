@@ -54,6 +54,9 @@ internal static class WorldMapper
         };
         world.Bodies.AddRange(document.Bodies.Select(body => ToBody(body, readTerrain)));
         RequireNoProblem(Simulation.SystemHierarchy.Problem(world.Bodies));
+        Require(world.Bodies.All(body => body.Calendar?.MonthMoonId is not Guid moon
+                || world.Bodies.Any(other => other.Id == moon)),
+            "a calendar's month moon doesn't exist");
         world.TerrainTypes.AddRange((document.TerrainTypes ?? []).Select(ToTerrainType));
         RequireNoProblem(TerrainType.Problem(world.TerrainTypes));
         world.Regions.AddRange((document.Regions ?? []).Select(ToRegion));
@@ -407,6 +410,8 @@ internal static class WorldMapper
                 Day = calendar.StartDay,
                 Weekday = calendar.StartWeekday,
             },
+            Fit = WorldFormat.CalendarFitName(calendar.Fit),
+            MonthMoon = calendar.MonthMoonId,
         };
     }
 
@@ -425,6 +430,8 @@ internal static class WorldMapper
             StartMonth = document.Start!.Month,
             StartDay = document.Start.Day,
             StartWeekday = document.Start.Weekday,
+            Fit = WorldFormat.ParseCalendarFit(document.Fit),
+            MonthMoonId = document.MonthMoon,
         };
     }
 
