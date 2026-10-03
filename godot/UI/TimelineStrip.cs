@@ -129,7 +129,8 @@ public partial class TimelineStrip : CanvasLayer
         _eventDialog.Edit(timelineEvent);
     }
 
-    private void AddEvent()
+    /// <summary>Adds an event at the current time and opens its editor.</summary>
+    public void AddEvent()
     {
         TimelineEvent timelineEvent = Session!.AddEvent(Session.TimeDays);
         _canvas.HighlightedEventId = timelineEvent.Id;

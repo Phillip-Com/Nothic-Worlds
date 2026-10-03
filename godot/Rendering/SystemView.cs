@@ -128,17 +128,27 @@ public partial class SystemView : Node3D
     {
         if (@event.IsActionPressed(InputActions.ToggleGrid))
         {
-            // One switch for every globe, following the selected one.
-            bool show = !(Session?.Surface?.ShowGrid ?? false);
+            ShowGrid = !ShowGrid;
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    /// <summary>
+    /// Whether the latitude/longitude grid shows on the globes (the G key and View ▸ Grid): one
+    /// switch for every globe, following the selected one.
+    /// </summary>
+    public bool ShowGrid
+    {
+        get => Session?.Surface?.ShowGrid ?? false;
+        set
+        {
             foreach (BodyVisual visual in _visuals.Values)
             {
                 if (visual.Surface is PlanetSurface surface)
                 {
-                    surface.ShowGrid = show;
+                    surface.ShowGrid = value;
                 }
             }
-
-            GetViewport().SetInputAsHandled();
         }
     }
 
