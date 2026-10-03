@@ -8,12 +8,12 @@ A record of key project decisions made by the owner. Newest first.
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
 | 2026-10-02 | Eclipses are worked out **in the background**, only when the panel or markers ask | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | ~7 ms each on the baseline laptop; keeps edits smooth. VISION.md `EVT-01` |
-| 2026-10-02 | Milestone 10: **layout tidy-up** (`UI-01`) | In PR | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) | VISION.md §3 |
-| 2026-10-02 | Top of the screen: **menus (File, Edit, View, Add) plus one row of panel buttons** | In PR | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) | The Add menu is Claude's addition. VISION.md `UI-01` |
-| 2026-10-02 | Show/hide switches move to a **View menu**, including **True Scale** (from the time bar); weather pins get their own item | In PR | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) | Supersedes "weather pins hidden with the Pins toggle" |
-| 2026-10-02 | Map tools merge into **one Map panel**, replacing the Pieces panel | In PR | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) | Built in the next PR |
-| 2026-10-02 | The app window **starts maximized** | In PR | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) | |
-| 2026-10-02 | Milestone 10 in **two PRs**: menus and panel row, then the Map panel | In PR | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) | |
+| 2026-10-02 | Milestone 10: **layout tidy-up** (`UI-01`) | Merged | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) · `3335993` | VISION.md §3 |
+| 2026-10-02 | Top of the screen: **menus (File, Edit, View, Add) plus one row of panel buttons** | Merged | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) · `3335993` | The Add menu is Claude's addition. VISION.md `UI-01` |
+| 2026-10-02 | Show/hide switches move to a **View menu**, including **True Scale** (from the time bar); weather pins get their own item | Merged | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) · `3335993` | Supersedes "weather pins hidden with the Pins toggle" |
+| 2026-10-02 | Map tools merge into **one Map panel**, replacing the Pieces panel | Merged | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) · `3335993` | Built in the next PR |
+| 2026-10-02 | The app window **starts maximized** | Merged | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) · `3335993` | |
+| 2026-10-02 | Milestone 10 in **two PRs**: menus and panel row, then the Map panel | Merged | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) · `3335993` | |
 | 2026-10-02 | Weather pins are **hidden with the Pins toggle** (no separate toggle) and **go with their body** when it's deleted | Merged | [#30](https://github.com/Phillip-Com/Nothic-Worlds/pull/30) · `07bfdc8` | Claude's choices, matching pins and regions. VISION.md `WTH-01` |
 | 2026-10-02 | Milestone 9: **weather pin** (`WTH-01`) | Merged | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) · `3fac945` | VISION.md §3 |
 | 2026-10-02 | Weather shows **sun and temperature** (no rain or climate types yet); temperatures spread a **user-set average per body** | Merged | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) · `3fac945` | The temperature model is Claude's, tuned Earth-like. VISION.md `WTH-01` |
