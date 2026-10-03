@@ -204,6 +204,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…calendar.start` | yes | The date at time 0: `month` (0 is the first), `day` (1 is the first, within that month), `weekday` (0 is the first; 0 when there are no weekdays) |
 | `…calendar.fit` | no | Keeps the world fitted to the calendar (`CAL-02`, see **Calendar fitting** below): `"year-length"` (the year's orbit changes) or `"day-length"` (the body's spin changes). Omitted when not fitted. |
 | `…calendar.monthMoon` | no | The `id` of a body (it must exist) whose orbit is kept so new moon to new moon lasts one average month. It only takes effect while that body is a moon circling this one. |
+| `…calendar.leap` | no | Leap years (`CAL-04`). Omitted for none. `every` (years, 1 to 1,000,000): a year whose number divides by it is a leap year; `except` (optional, a larger multiple of `every`): unless it divides by this; `exceptAgain` (optional, only with `except`, a larger multiple of it): unless it divides by this too. `month` (0 is the first) gains `days` (1 to 1,000) in leap years; that month's days plus `days` stay within 100,000. |
 | `bodies[].orbit` | no | The body's designed orbit around another body. Omitted for a body at the system's center. Every chain of parents must end at a body without an orbit (no missing parents, no loops). |
 | `…orbit.parent` | yes | The `id` of the body it circles |
 | `…orbit.distanceKm` | yes | The orbit's size (semi-major axis), center to center. Above 0, at most 10¹³. |
@@ -359,11 +360,14 @@ and leans by *i* toward direction *θ*, measured like orbit angles.
 **Calendars** count the body's own days (`CalendarMath` in Core). Day 0 is the day at time 0
 (each day lasts `dayLengthHours`), which is the calendar's `start` date. Day *n* is *n* days on
 through the months in order, wrapping into the next year after the last month, and back into
-earlier years for negative *n*. Weekdays cycle the same way from `start.weekday`.
+earlier years for negative *n*. Weekdays cycle the same way from `start.weekday`. In a leap
+year (by its year number, see `leap`) the leap month has `leap.days` more days. The **average
+year** is the months' days plus `days` · (1/`every` − 1/`except` + 1/`exceptAgain`), leaving out
+the terms that are missing.
 
 **Calendar fitting** (`CalendarFitting` in Core). The values a fit sets are saved like any
 other (the file holds the fitted periods and day lengths); the app re-applies the fits after
-every change to the system. With *N* = the calendar's days per year and *h* = the body's
+every change to the system. With *N* = the calendar's average year in days and *h* = the body's
 `dayLengthHours`: the **year's orbit** is the body's own orbit if it circles a star, else its
 planet's (and so on up), or the orbit of a star circling them. `"year-length"` sets that
 orbit's `periodDays` to *N* · *h* / 24; `"day-length"` sets *h* to (that orbit's `periodDays`)
@@ -412,6 +416,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 14 | Leap years (M17): calendars gain optional `leap` | Nothing to change: version 13 calendars have no leap years |
 | 13 | Body appearance (M16): bodies gain `appearance` | Stars get `starType` `yellow`; moons `color` `#8A8A8A` and `pattern` `rocky`; planets `color` `#214573` and `pattern` `plain` (the look they always had) |
 | 12 | Terrain-aware weather (M14): terrain types gain `climate` | Types named (ignoring case) Ocean or Shallow Water get `water`, Forest or Jungle `forest`, Mountains `mountains`, Desert `desert`, Swamp `wetland`, Ice `ice`; all others `open-land` |
 | 11 | Calendar fitting (M12): calendars gain optional `fit` and `monthMoon` | Nothing to change: version 10 calendars aren't fitted |

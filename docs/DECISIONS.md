@@ -7,6 +7,10 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-03 | Milestone 17: **leap years** (new `CAL-04`), one PR, format version 14 | In PR | [#43](https://github.com/Phillip-Com/Nothic-Worlds/pull/43) | VISION.md §3 |
+| 2026-10-03 | Leap rule: **every N years, except every M, but every K** (up to three tiers); leap days go to a **chosen month** | In PR | [#43](https://github.com/Phillip-Com/Nothic-Worlds/pull/43) | VISION.md `CAL-04` |
+| 2026-10-03 | A **Suggest** button finds the simplest rule that drifts less than a day per 2,000 years | In PR | [#43](https://github.com/Phillip-Com/Nothic-Worlds/pull/43) | Claude's threshold. VISION.md `CAL-04` |
+| 2026-10-03 | Calendar fitting and month moons use the calendar's **average year** | In PR | [#43](https://github.com/Phillip-Com/Nothic-Worlds/pull/43) | Claude's choice: otherwise fitting would undo the leap rule. VISION.md `CAL-04` |
 | 2026-10-03 | Milestone 16: **body appearance** (`BOD-06`) in **one PR**; no visual styles yet | Merged | [#42](https://github.com/Phillip-Com/Nothic-Worlds/pull/42) · `e4aab76` | VISION.md §3 |
 | 2026-10-03 | Planets and moons get a **color and pattern** (Plain, Rocky, Banded, Icy, Cloudy); stars a **star type** that colors their light | Merged | [#42](https://github.com/Phillip-Com/Nothic-Worlds/pull/42) · `e4aab76` | Format version 13 |
 | 2026-10-03 | Defaults: planets **ocean blue**, moons **grey and rocky**, stars **yellow**; older worlds' moons change | Merged | [#42](https://github.com/Phillip-Com/Nothic-Worlds/pull/42) · `e4aab76` | Owner's choice |
