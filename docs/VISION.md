@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 11: Terrain Painting** · In Progress (owner's choice, 2026-10-03)
+**Milestone 11: Terrain Painting** · Complete (PR #35 merged 2026-10-03; owner's choice, 2026-10-03)
 Paint terrain types onto planets and moons with a brush (`BOD-05`). Owner's decisions:
 - **Terrain types:** an editable list per world. New worlds start with 12 defaults (Ocean,
   Shallow Water, Plains, Fields, Forest, Jungle, Hills, Mountains, Desert, Swamp, Tundra, Ice)

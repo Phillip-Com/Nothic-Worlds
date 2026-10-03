@@ -7,8 +7,8 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-10-03 | Unpainted ground on a painted planet without a map is **neutral grey** | In PR | [#35](https://github.com/Phillip-Com/Nothic-Worlds/pull/35) | Owner's choice. VISION.md `BOD-05` |
-| 2026-10-03 | Terrain edges are drawn as **smooth curves** from the four nearest cells, plus an **averaged far-away copy** against flicker | In PR | [#35](https://github.com/Phillip-Com/Nothic-Worlds/pull/35) | Claude's choices; about 5% slower close up, 2 MB more per painted body |
+| 2026-10-03 | Unpainted ground on a painted planet without a map is **neutral grey** | Merged | [#35](https://github.com/Phillip-Com/Nothic-Worlds/pull/35) · `900a1c0` | Owner's choice. VISION.md `BOD-05` |
+| 2026-10-03 | Terrain edges are drawn as **smooth curves** from the four nearest cells, plus an **averaged far-away copy** against flicker | Merged | [#35](https://github.com/Phillip-Com/Nothic-Worlds/pull/35) · `900a1c0` | Claude's choices; about 5% slower close up, 2 MB more per painted body |
 | 2026-10-03 | Terrain over a map is mixed in at **60%**; without a map or pieces it's the surface | Merged | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) · `c32ca3d` | Claude's choice. VISION.md `BOD-05` |
 | 2026-10-03 | The brush paints only the **selected** body; dragging **off the globe turns the view** while painting | Merged | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) · `c32ca3d` | Claude's choice, like region drawing |
 | 2026-10-03 | Brush radius spans **0.05° to 45°**, shown in km for the selected body | Merged | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) · `c32ca3d` | Claude's choice |
