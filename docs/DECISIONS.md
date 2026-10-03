@@ -7,10 +7,10 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-10-03 | Terrain over a map is mixed in at **60%**; without a map or pieces it's the surface | In PR | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) | Claude's choice. VISION.md `BOD-05` |
-| 2026-10-03 | The brush paints only the **selected** body; dragging **off the globe turns the view** while painting | In PR | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) | Claude's choice, like region drawing |
-| 2026-10-03 | Brush radius spans **0.05° to 45°**, shown in km for the selected body | In PR | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) | Claude's choice |
-| 2026-10-03 | Deleting a terrain type needs **no confirmation** (it's one undo step) | In PR | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) | Matches pieces and regions |
+| 2026-10-03 | Terrain over a map is mixed in at **60%**; without a map or pieces it's the surface | Merged | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) · `c32ca3d` | Claude's choice. VISION.md `BOD-05` |
+| 2026-10-03 | The brush paints only the **selected** body; dragging **off the globe turns the view** while painting | Merged | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) · `c32ca3d` | Claude's choice, like region drawing |
+| 2026-10-03 | Brush radius spans **0.05° to 45°**, shown in km for the selected body | Merged | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) · `c32ca3d` | Claude's choice |
+| 2026-10-03 | Deleting a terrain type needs **no confirmation** (it's one undo step) | Merged | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) · `c32ca3d` | Matches pieces and regions |
 | 2026-10-03 | Milestone 11: **terrain painting** (`BOD-05`) | Merged | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) · `2c4caa4` | VISION.md §3 |
 | 2026-10-03 | Terrain types are an **editable list per world**, starting from 12 defaults | Merged | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) · `2c4caa4` | Older worlds get the defaults on upgrade. VISION.md `BOD-05` |
 | 2026-10-03 | Terrain is the surface without a map, and a **see-through overlay over a map**, with View ▸ Terrain | Merged | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) · `2c4caa4` | Built in the next PR |
