@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 15;
+    public const int CurrentVersion = 16;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -63,6 +63,12 @@ internal static partial class WorldFormat
         [ClimateKind.Wetland] = "wetland",
         [ClimateKind.Mountains] = "mountains",
         [ClimateKind.Ice] = "ice",
+    };
+
+    private static readonly Dictionary<BodyShape, string> _shapeNames = new()
+    {
+        [BodyShape.Sphere] = "sphere",
+        [BodyShape.FlatDisc] = "flat-disc",
     };
 
     private static readonly Dictionary<SurfacePattern, string> _patternNames = new()
@@ -143,6 +149,10 @@ internal static partial class WorldFormat
         document => document,
 
         // 14 → 15: bodies can be comets (kind "comet", M18). Older worlds have none.
+        document => document,
+
+        // 15 → 16: planets and moons gained an optional "shape" (flat worlds, M19). Older bodies
+        // are all spheres, which is what a missing shape means.
         document => document,
     ];
 
@@ -265,6 +275,10 @@ internal static partial class WorldFormat
     public static BodyKind ParseBodyKind(string? name) => Parse(_bodyKindNames, name, "body kind");
 
     public static string ClimateName(ClimateKind kind) => _climateNames[kind];
+
+    public static string ShapeName(BodyShape shape) => _shapeNames[shape];
+
+    public static BodyShape ParseShape(string? name) => Parse(_shapeNames, name, "body shape");
 
     public static string PatternName(SurfacePattern pattern) => _patternNames[pattern];
 
