@@ -7,9 +7,10 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The calendar editor for a planet or moon (VISION.md CAL-01): its months (any number, any
-/// lengths), weekdays, year numbering with an optional era, the date the world's clock starts
-/// on, and whether the world is kept fitted to it (CAL-02), with a preview of what that
-/// changes. Changes apply together when the user presses Save, as one undo step.
+/// lengths), leap years (CAL-04), weekdays, year numbering with an optional era, the date the
+/// world's clock starts on, and whether the world is kept fitted to it (CAL-02), with a
+/// preview of what that changes. Changes apply together when the user presses Save, as one
+/// undo step.
 /// </summary>
 /// <remarks>
 /// A body without a calendar starts from a simple one that fits its year: twelve months sharing
@@ -29,6 +30,7 @@ public partial class CalendarDialog : ConfirmationDialog
     private SpinBox _startDay = null!;
     private OptionButton _startWeekday = null!;
     private Label _summary = null!;
+    private LeapYearSection _leap = null!;
     private CheckBox _fitYear = null!;
     private OptionButton _fitBy = null!;
     private OptionButton _monthMoon = null!;
@@ -76,6 +78,11 @@ public partial class CalendarDialog : ConfirmationDialog
             AddRow(_months, _monthRows, $"Month {_months.Count + 1}", 30)));
         _summary = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         layout.AddChild(_summary);
+
+        layout.AddChild(Heading("Leap Years"));
+        _leap = new LeapYearSection();
+        _leap.Changed += RefreshFit;
+        layout.AddChild(_leap);
 
         // Right under the year comparison, so its preview shows without scrolling.
         layout.AddChild(Heading("Fit the World"));
@@ -145,6 +152,7 @@ public partial class CalendarDialog : ConfirmationDialog
         RefreshStartDay();
         _startDay.Value = calendar.StartDay;
         _startWeekday.Select(calendar.Weekdays.Count == 0 ? 0 : calendar.StartWeekday);
+        _leap.Show(calendar.Leap, _months.Select(row => row.Name.Text));
     }
 
     private void Save()
@@ -180,6 +188,7 @@ public partial class CalendarDialog : ConfirmationDialog
             MonthMoonId = _monthMoon.GetSelectedMetadata().AsString() is { Length: > 0 } moon
                 ? Guid.Parse(moon)
                 : null,
+            Leap = _leap.Rule,
         };
     }
 
@@ -434,6 +443,7 @@ public partial class CalendarDialog : ConfirmationDialog
         }
 
         Refill(_startMonth, _months.Select(row => row.Name.Text), "(no months)");
+        _leap?.SetMonths(_months.Select(row => row.Name.Text));
         Refill(_startWeekday, _weekdays.Select(row => row.Name.Text), "(no weekdays)");
         RefreshStartDay();
         RefreshSummary();
@@ -468,8 +478,9 @@ public partial class CalendarDialog : ConfirmationDialog
     private void RefreshSummary()
     {
         double days = _months.Sum(row => row.Days!.Value);
-        _summary.Text = $"A calendar year has {days:N0} days. One trip around the star takes " +
-            $"{_bodyYearDays:N2} of this body's days.";
+        _summary.Text = $"A calendar year has {days:N0} days (leap years aside). One trip " +
+            $"around the star takes {_bodyYearDays:N2} of this body's days.";
+        _leap?.SetYears(days, _bodyYearDays);
         RefreshFit();
     }
 
