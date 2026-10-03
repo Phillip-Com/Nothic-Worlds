@@ -99,7 +99,16 @@ internal sealed class BodyDocument
     public required double AverageTemperature { get; init; }  // Added in format version 9
     public OrbitDocument? Orbit { get; init; }  // Added in format version 5
     public CalendarDocument? Calendar { get; init; }  // Added in format version 6
+    public required AppearanceDocument Appearance { get; init; }  // Added in format version 13
     public required SurfaceDocument Surface { get; init; }
+}
+
+// Planets and moons have a color and pattern; stars a star type.
+internal sealed class AppearanceDocument
+{
+    public string? Color { get; init; }
+    public string? Pattern { get; init; }
+    public string? StarType { get; init; }
 }
 
 internal sealed class CalendarDocument

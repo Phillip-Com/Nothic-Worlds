@@ -26,6 +26,12 @@ public sealed class Body
     /// <summary>The hottest average temperature a body can have, in °C.</summary>
     public const double MaxAverageTemperatureC = 2000;
 
+    /// <summary>
+    /// How the body looks (VISION.md BOD-06): its color and pattern, or a star's type. Defaults
+    /// to a planet's look; <see cref="BodyAppearance.DefaultFor"/> gives each kind's.
+    /// </summary>
+    public BodyAppearance Appearance { get; set; } = BodyAppearance.DefaultFor(BodyKind.Planet);
+
     /// <summary>What's drawn on the body's surface.</summary>
     public SurfaceSettings Surface { get; } = new();
 
@@ -101,8 +107,8 @@ public sealed class Body
 
     /// <summary>
     /// True if <paramref name="other"/> would save exactly the same body: the same name, kind,
-    /// size, day, tilt, orbit, and surface. Used to tell whether the world still matches its
-    /// saved file.
+    /// size, day, tilt, orbit, appearance, and surface. Used to tell whether the world still
+    /// matches its saved file.
     /// </summary>
     public bool HasSameContent(Body other)
     {
@@ -112,6 +118,7 @@ public sealed class Body
             && AxialTiltDirectionDegrees == other.AxialTiltDirectionDegrees
             && AverageTemperatureC == other.AverageTemperatureC
             && Orbit == other.Orbit && Calendar == other.Calendar
+            && Appearance == other.Appearance
             && Surface.HasSameContent(other.Surface);
     }
 
@@ -130,6 +137,7 @@ public sealed class Body
             AverageTemperatureC = AverageTemperatureC,
             Orbit = Orbit,  // Immutable, safe to share.
             Calendar = Calendar,  // Immutable, safe to share.
+            Appearance = Appearance,  // Immutable, safe to share.
         };
         copy.Surface.RestoreFrom(Surface);
         return copy;

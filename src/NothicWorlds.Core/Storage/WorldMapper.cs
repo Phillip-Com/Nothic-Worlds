@@ -298,6 +298,16 @@ internal static class WorldMapper
             AverageTemperature = body.AverageTemperatureC,
             Orbit = body.Orbit is Orbit orbit ? ToDocument(orbit) : null,
             Calendar = body.Calendar is Calendar calendar ? ToDocument(calendar) : null,
+            Appearance = body.Kind == BodyKind.Star
+                ? new AppearanceDocument
+                {
+                    StarType = WorldFormat.StarTypeName(body.Appearance.StarType),
+                }
+                : new AppearanceDocument
+                {
+                    Color = body.Appearance.Color.ToHex(),
+                    Pattern = WorldFormat.PatternName(body.Appearance.Pattern),
+                },
             Surface = new SurfaceDocument
             {
                 Map = map is null ? null : new MapDocument
@@ -526,6 +536,7 @@ internal static class WorldMapper
                 : null,
         };
         RequireNoProblem(body.Problem());
+        body.Appearance = ToAppearance(document.Appearance, body.Kind);
         body.Surface.FillColor = fillColor;
         if (document.Surface.Terrain is string terrain)
         {
@@ -552,6 +563,26 @@ internal static class WorldMapper
         }
 
         return body;
+    }
+
+    // A star needs its type; a planet or moon its color and pattern. What the other kinds use
+    // keeps the defaults.
+    private static BodyAppearance ToAppearance(AppearanceDocument? document, BodyKind kind)
+    {
+        Require(document is not null, "a body has no appearance");
+        BodyAppearance appearance = BodyAppearance.DefaultFor(kind);
+        if (kind == BodyKind.Star)
+        {
+            return appearance with { StarType = WorldFormat.ParseStarType(document!.StarType) };
+        }
+
+        Require(RgbColor.TryParseHex(document!.Color, out RgbColor color),
+            $"invalid body color '{document.Color}'");
+        return appearance with
+        {
+            Color = color,
+            Pattern = WorldFormat.ParsePattern(document.Pattern),
+        };
     }
 
     private static MapCalibration ToCalibration(CalibrationDocument document)

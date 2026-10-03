@@ -47,6 +47,7 @@ public static class NewBodies
         {
             Name = NextName(bodies, "Moon"),
             Kind = BodyKind.Moon,
+            Appearance = BodyAppearance.DefaultFor(BodyKind.Moon),
             RadiusKm = 1737.4,
             DayLengthHours = period * 24,
             Orbit = OrbitAround(bodies, parent, distance, period),
