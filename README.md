@@ -48,7 +48,9 @@ a readable view and **True Scale**. **Add** adds anything, opening the panel it 
 
 Zoom in close and the view becomes the **local view**: looking straight down at the ground
 with north up, like a map. It stays over the same ground while time passes (the sunlight moves
-instead), and dragging moves the map. Zoom out to get the globe back.
+instead), and dragging moves the map. A north arrow, a scale bar, and the coordinates (and
+region) under the mouse show at the bottom left. **Zoom to** glides straight down to a region
+(in the Regions panel) or a pin (in its pop-up or weather window). Zoom out to get the globe back.
 
 A new world is a small star system: a sun with one planet orbiting it. Zoom out to see the whole
 system, and click any body to fly to it. The map tools work on the selected body; stars have no
