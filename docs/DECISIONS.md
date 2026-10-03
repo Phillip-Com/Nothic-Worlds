@@ -7,6 +7,8 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-03 | A flat world's close-up looks **straight down at its face with the center (north pole) up**, rides with the tumbling disc, and starts only from above the face | In PR | [#47](https://github.com/Phillip-Com/Nothic-Worlds/pull/47) | Claude's design within the approved plan. VISION.md `BOD-02` |
+| 2026-10-03 | On a flat world, **distances are measured across the disc** (its real ground), e.g. the scale bar | In PR | [#47](https://github.com/Phillip-Com/Nothic-Worlds/pull/47) | Claude's choice. Brush size and weather surroundings follow in the next PR. VISION.md `BOD-02` |
 | 2026-10-03 | Milestone 19: **non-standard bodies** (`BOD-02`), starting with **flat worlds**, in **three PRs** (make/see/edit, close-up, sky) | Merged | [#46](https://github.com/Phillip-Com/Nothic-Worlds/pull/46) · `18356bb` | VISION.md §3 |
 | 2026-10-03 | Planets and moons get a **Shape** field (Globe / Flat world), changeable any time; maps and terrain are kept | Merged | [#46](https://github.com/Phillip-Com/Nothic-Worlds/pull/46) · `18356bb` | Format version 16. VISION.md `BOD-02` |
 | 2026-10-03 | Flat worlds hold **the whole world on top**: north pole at the center, the far south at the rim; bare rock beneath | Merged | [#46](https://github.com/Phillip-Com/Nothic-Worlds/pull/46) · `18356bb` | Disc radius π × the globe's, so distances from the center are true (Claude's choice). VISION.md `BOD-02` |
