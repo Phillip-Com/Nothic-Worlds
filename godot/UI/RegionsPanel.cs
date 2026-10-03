@@ -115,11 +115,10 @@ public partial class RegionsPanel : CanvasLayer
         layout.AddChild(_heading);
         _noRegions = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         layout.AddChild(_noRegions);
+        // A fixed height, so New Region sits right under it rather than at the bottom.
         _list = new ItemList
         {
-            CustomMinimumSize = new Vector2(0, 90),
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
-            SizeFlagsStretchRatio = 0.5f,
+            CustomMinimumSize = new Vector2(0, 120),
             FocusMode = Control.FocusModeEnum.None,
         };
         _list.ItemSelected += index =>
@@ -399,7 +398,7 @@ public partial class RegionsPanel : CanvasLayer
         foreach (JournalEntry entry in entryList)
         {
             Guid id = entry.Id;
-            _placed.AddChild(CreateButton($"Journal: {entry.Title}", () =>
+            _placed.AddChild(CreateListButton($"Journal: {entry.Title}", () =>
             {
                 Toolbar?.ShowJournal();
                 Journal?.SelectEntry(id);
@@ -410,7 +409,7 @@ public partial class RegionsPanel : CanvasLayer
         {
             TimelineEvent opened = timelineEvent;
             string when = BodyClock.Describe(body, timelineEvent.StartDays);
-            _placed.AddChild(CreateButton($"Event: {timelineEvent.Title}, {when}",
+            _placed.AddChild(CreateListButton($"Event: {timelineEvent.Title}, {when}",
                 () => Timeline?.EditEvent(opened), "Open its editor"));
         }
     }
@@ -435,10 +434,20 @@ public partial class RegionsPanel : CanvasLayer
             Text = text,
             TooltipText = tooltip,
             FocusMode = Control.FocusModeEnum.None,
-            Alignment = HorizontalAlignment.Left,
-            ClipText = true,
         };
         button.Pressed += pressed;
+        return button;
+    }
+
+    // A full-width button for the "placed in this region" list. Long titles are cut off rather
+    // than widening the panel. (Clipped text gives a button no width of its own, so it must
+    // stretch: a clipped button in a row would shrink to nothing.)
+    private static Button CreateListButton(string text, Action pressed, string tooltip)
+    {
+        Button button = CreateButton(text, pressed, tooltip);
+        button.Alignment = HorizontalAlignment.Left;
+        button.ClipText = true;
+        button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         return button;
     }
 }
