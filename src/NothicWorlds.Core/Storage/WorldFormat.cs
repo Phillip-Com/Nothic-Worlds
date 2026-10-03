@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 7;
+    public const int CurrentVersion = 8;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -74,6 +74,10 @@ internal static partial class WorldFormat
 
         // 6 → 7: the world gained optional "journal", "timelines", and "events" lists
         // (journals and timelines, M7). Older worlds simply have none.
+        document => document,
+
+        // 7 → 8: the world gained an optional "regions" list, and places an optional "region"
+        // (region outlines, M8). Older worlds have none.
         document => document,
     ];
 

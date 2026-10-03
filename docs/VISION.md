@@ -108,7 +108,20 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 7: Journals and Timelines** · In Progress (owner's choice, 2026-10-02)
+**Milestone 8: Region Outlines** · In Progress (owner's choice, 2026-10-02)
+Named areas outlined on planets and moons (`LORE-01`). Owner's decisions:
+- **Drawing:** click points around the region on the globe, then drag points to adjust, add
+  points on an edge, or delete them (like map pieces' Edit Points).
+- **Look:** a colored outline with a light fill, and the region's name in the middle when close
+  enough.
+- **Regions are places:** besides their own notes, journal entries and events can be placed in
+  a region; clicking a region pops up its notes and everything placed in it.
+- **Two PRs:** Core (regions on the sphere, format v8) (PR #27), then the app.
+- Working assumptions (Claude's, stated in the plan): regions belong to a planet or moon,
+  overlap freely, and have a name, color, and notes; a Regions panel shares the right side
+  with the Journal and Pieces panels.
+
+**Milestone 7: Journals and Timelines** · Complete (PR #26 merged 2026-10-02; owner's choice, 2026-10-02)
 Writing the world's history and lore (`LORE-02`, `LORE-03`). Owner's decisions:
 - **Journal entries and timeline events are separate things**, linked **many to many**: an
   event can link to any number of entries and the other way round, and each side shows its
@@ -960,9 +973,26 @@ the world.
 
 ### 4.9 Lore & Journal (`LORE`)
 
-**LORE-01 — Region outlines** · Idea · Base
+**LORE-01 — Region outlines** · In Progress (Core done, PR #27) · Base
 **Intent:** Draw outlines around specific regions or locations on the world, with optional notes.
-**Implementation:** —
+**Implementation (Core, PR #27):**
+- `Model/Region.cs`: an immutable record in `World.Regions` (drawing order): the body (a
+  planet or moon), name, notes, color, and corners (3 to 1,000 `GeoCoordinate`s). `Problem()`
+  checks the name, notes, corner count, and that it fits within about half the globe;
+  `Contains(spot)`.
+- `Geometry/SphericalPolygon.cs`: double-precision outlines on a sphere. `Contains` projects
+  the outline and the spot onto the plane touching the sphere at the outline's center
+  (gnomonic: great-circle edges stay straight, so the test is exact) and counts crossings
+  (even-odd). `FitsInHemisphere` (every corner within 85° of the center), `Center`, and
+  `EdgePath` (points along the great-circle edges, for drawing).
+- `LoreLocation` gains an optional `RegionId` (a region on its body): regions are places.
+  `LoreRules` checks regions (on a planet or moon that exists, unique IDs, limit 5,000) and
+  that a place's region is on its body; `RegionsAt(world, body, spot)` and `PlacedIn(world,
+  region)` answer the pop-up's questions.
+- World file **format version 8** (optional `regions`; places' optional `region`).
+- Tested: inside/outside, either winding, across the date line, around a pole, the far side,
+  great-circle edges, too-large outlines, the rules above, and a golden version 8 file plus
+  damaged-file cases.
 
 **LORE-02 — Journal system** · Implemented (M7) · Base
 **Intent:** Start with a simple journal. Entries are sortable and can be linked to locations.

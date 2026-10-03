@@ -8,8 +8,13 @@ A record of key project decisions made by the owner. Newest first.
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
 | 2026-10-02 | Eclipses are worked out **in the background**, only when the panel or markers ask | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | ~7 ms each on the baseline laptop; keeps edits smooth. VISION.md `EVT-01` |
-| 2026-10-02 | Pins are **placed by clicking on the globe** (coordinates shown, not typed) | In PR | [#26](https://github.com/Phillip-Com/Nothic-Worlds/pull/26) | VISION.md `LORE-02` |
-| 2026-10-02 | Pins **always show, with a Pins toggle**; pins close together on screen merge with a count | In PR | [#26](https://github.com/Phillip-Com/Nothic-Worlds/pull/26) | Merging is Claude's choice |
+| 2026-10-02 | Milestone 8: **region outlines** (`LORE-01`) | In PR | [#27](https://github.com/Phillip-Com/Nothic-Worlds/pull/27) | VISION.md §3 |
+| 2026-10-02 | Regions are drawn by **clicking points, then adjusting** them; shown as **outline + light fill** with the name | In PR | [#27](https://github.com/Phillip-Com/Nothic-Worlds/pull/27) | Built in the next PR |
+| 2026-10-02 | **Regions are places** for journal entries and events; clicking one pops up its notes and what's in it | In PR | [#27](https://github.com/Phillip-Com/Nothic-Worlds/pull/27) | VISION.md `LORE-01` |
+| 2026-10-02 | Milestone 8 in **two PRs**: Core, then the app | In PR | [#27](https://github.com/Phillip-Com/Nothic-Worlds/pull/27) | |
+| 2026-10-02 | World file **format version 8**: optional regions, and a region on places | In PR | [#27](https://github.com/Phillip-Com/Nothic-Worlds/pull/27) | Regions must fit within about half the globe (exact inside test). docs/world-format.md |
+| 2026-10-02 | Pins are **placed by clicking on the globe** (coordinates shown, not typed) | Merged | [#26](https://github.com/Phillip-Com/Nothic-Worlds/pull/26) · `bef428e` | VISION.md `LORE-02` |
+| 2026-10-02 | Pins **always show, with a Pins toggle**; pins close together on screen merge with a count | Merged | [#26](https://github.com/Phillip-Com/Nothic-Worlds/pull/26) · `bef428e` | Merging is Claude's choice |
 | 2026-10-02 | On the strip, **clicking an event jumps the clock there; double-clicking edits it** | Merged | [#25](https://github.com/Phillip-Com/Nothic-Worlds/pull/25) · `bb5156a` | VISION.md `LORE-03` |
 | 2026-10-02 | Deleting a timeline **deletes its events too** (one undo step) | Merged | [#25](https://github.com/Phillip-Com/Nothic-Worlds/pull/25) · `bb5156a` | VISION.md `LORE-03` |
 | 2026-10-02 | Events **aren't dragged** to new dates yet; the strip shows **only the user's events** | Merged | [#25](https://github.com/Phillip-Com/Nothic-Worlds/pull/25) · `bb5156a` | Dragging could come later |
