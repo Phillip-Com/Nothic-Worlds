@@ -252,10 +252,13 @@ public partial class WorldSession
         MarkChanged(systemChanged: false);
     }
 
-    // Owner's choice: when bodies are deleted, entries and events placed on them stay, with
-    // their place cleared. Part of the deletion's undo step, so Ctrl+Z brings the places back.
-    private void ClearPlacesOn(HashSet<Guid> removedBodies)
+    // Owner's choices: when bodies are deleted, their regions go too, and entries and events
+    // placed on them stay, with their place cleared. Part of the deletion's undo step, so
+    // Ctrl+Z brings it all back.
+    private void ClearLoreOn(HashSet<Guid> removedBodies)
     {
+        World.Regions.RemoveAll(r => removedBodies.Contains(r.BodyId));
+
         bool IsOnRemoved(LoreLocation? place) =>
             place is not null && removedBodies.Contains(place.BodyId);
 
