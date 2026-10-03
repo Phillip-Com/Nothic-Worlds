@@ -17,7 +17,8 @@ namespace NothicWorlds.UI;
 public partial class SystemPanel : CanvasLayer
 {
     private const int ScreenMargin = 12;
-    private const float PanelWidth = 330.0f;
+    /// <summary>The panel's width, for laying things out beside it.</summary>
+    public const float PanelWidth = 330.0f;
 
     // Below the toolbar and its message line, above the camera mode text.
     private const int TopOffset = 104;

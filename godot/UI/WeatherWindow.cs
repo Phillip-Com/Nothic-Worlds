@@ -1,4 +1,5 @@
 using Godot;
+using NothicWorlds.Controls;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 using NothicWorlds.Session;
@@ -15,6 +16,7 @@ namespace NothicWorlds.UI;
 public partial class WeatherWindow : AcceptDialog
 {
     private const string DeleteAction = "delete";
+    private const string ZoomAction = "zoom";
     private const float ContentWidth = 480;
 
     private LineEdit _name = null!;
@@ -34,18 +36,28 @@ public partial class WeatherWindow : AcceptDialog
     /// <summary>The open world. Set it before adding the window to the tree.</summary>
     public WorldSession Session { get; init; } = null!;
 
+    /// <summary>The camera, for Zoom to (VISION.md REN-04).</summary>
+    public PlanetCamera? Camera { get; init; }
+
     public override void _Ready()
     {
         Exclusive = false;
         OkButtonText = "Close";
         AddButton("Delete Pin", right: false, action: DeleteAction).TooltipText =
             "Delete this weather pin (Ctrl+Z brings it back)";
+        AddButton("Zoom to", right: false, action: ZoomAction).TooltipText =
+            "Glide down to look at this spot from close up";
         CustomAction += action =>
         {
             if (action == DeleteAction && _pinId is Guid id)
             {
                 Hide();
                 Session.DeleteWeatherPin(id);
+            }
+            else if (action == ZoomAction && Pin is WeatherPin pin && Camera is not null)
+            {
+                Hide();
+                _ = ZoomTo.PinAsync(Session, Camera, pin.BodyId, pin.Spot);
             }
         };
 

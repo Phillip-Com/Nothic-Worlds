@@ -271,7 +271,11 @@ public partial class SystemView : Node3D
             : (1 + _flightFromAltitude) * _flightFromRadius / toRadius - 1;
         _focusId = bodyId;
         _flightProgress = 0.0;
-        Camera?.ClearFocusOffset();
+        if (Camera is not null)
+        {
+            Camera.ClearFocusOffset();
+            Camera.AllowLocalView = false;  // Straight away: the bodies are turned differently.
+        }
     }
 
     /// <summary>

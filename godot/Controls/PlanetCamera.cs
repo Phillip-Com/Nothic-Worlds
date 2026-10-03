@@ -115,6 +115,9 @@ public partial class PlanetCamera : Camera3D
     private bool _local;
     private Vector3 _currentUp = Vector3.Up;
 
+    // A spot to glide to in the local view once it's allowed (e.g. after flying to the body).
+    private (GeoCoordinate Spot, float Altitude)? _pendingSurfaceTarget;
+
     // The mouse button that started the current drag, if any.
     private MouseButton _dragButton = MouseButton.None;
     private bool _keyboardPanning;
@@ -201,8 +204,30 @@ public partial class PlanetCamera : Camera3D
         }
 
         SetLocal(AllowLocalView && _targetAltitude < LocalViewMaxAltitude);
+        if (_pendingSurfaceTarget is var (spot, altitude) && AllowLocalView)
+        {
+            _pendingSurfaceTarget = null;
+            GlideToSurface(spot, altitude);
+        }
+
         EaseTowardTarget((float)delta);
         UpdateTransform();
+    }
+
+    /// <summary>
+    /// Glides down into the local view over a spot on the planet, close enough that
+    /// <paramref name="spanDegrees"/> of arc fits on screen top to bottom (VISION.md REN-04:
+    /// Zoom to). Waits until the local view is allowed, e.g. while flying to the body.
+    /// </summary>
+    public void FlyToSurface(GeoCoordinate spot, double spanDegrees)
+    {
+        // Seen from a low altitude a, the screen's half-height spans about a·tan(fov/2) radians
+        // of the ground; leave a little margin around the span.
+        double halfSpan = double.DegreesToRadians(spanDegrees) / 2 * 1.25;
+        float altitude = Mathf.Clamp(
+            (float)(halfSpan / Math.Tan(double.DegreesToRadians(Fov) / 2)),
+            MinAltitude, LocalViewMaxAltitude * 0.9f);
+        _pendingSurfaceTarget = (spot, altitude);
     }
 
     /// <summary>
@@ -432,6 +457,16 @@ public partial class PlanetCamera : Camera3D
         _currentFocusOffset = _targetFocusOffset;
         _currentUp = Frame * Vector3.Up;
         UpdateTransform();
+    }
+
+    private void GlideToSurface(GeoCoordinate spot, float altitude)
+    {
+        _targetAltitude = altitude;
+        SetLocal(true);
+        _targetFocusOffset = Vector3.Zero;
+        _targetLatitude = Math.Clamp(spot.LatitudeDegrees, -MaxLatitude, MaxLatitude);
+        _targetLongitude = _currentLongitude
+            + SphericalCoordinates.LongitudeDelta(_currentLongitude, spot.LongitudeDegrees);
     }
 
     // The frame latitude and longitude are measured in: the planet's in the local view.
