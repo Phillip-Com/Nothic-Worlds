@@ -30,7 +30,7 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 |--------|-------|----------|
 | Orbit | Left-drag | — |
 | Pan (slides the view when zoomed out, the surface when close) | Right-drag | WASD / arrow keys |
-| Zoom | Scroll wheel | E / Q or + / - |
+| Zoom (right down to about 10 km above the ground) | Scroll wheel | E / Q or + / - |
 | Reset view | — | Home |
 | Toggle lat/long grid | **View** menu | G |
 | Performance overlay | — | F3 |
@@ -45,6 +45,10 @@ then a button for each panel: **System** (left), **Map**, **Terrain**, **Journal
 **Regions** (right, one at a time), and **Timeline** (bottom). **View** shows or hides pins,
 weather pins, regions, terrain, the season and eclipse markers, and the grid, and switches between
 a readable view and **True Scale**. **Add** adds anything, opening the panel it belongs to.
+
+Zoom in close and the view becomes the **local view**: looking straight down at the ground
+with north up, like a map. It stays over the same ground while time passes (the sunlight moves
+instead), and dragging moves the map. Zoom out to get the globe back.
 
 A new world is a small star system: a sun with one planet orbiting it. Zoom out to see the whole
 system, and click any body to fly to it. The map tools work on the selected body; stars have no

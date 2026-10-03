@@ -91,7 +91,9 @@ public partial class EclipseMarkers : CanvasLayer
 
     private void DrawMarkers()
     {
-        if (!Visible || !_shown || Session?.SelectedEclipses is not EclipseTimeline timeline)
+        // Hidden in the local view, like the other markers out in space (VISION.md REN-04).
+        if (!Visible || !_shown || Camera!.IsLocalView
+            || Session?.SelectedEclipses is not EclipseTimeline timeline)
         {
             return;
         }

@@ -24,6 +24,14 @@ public partial class SystemView : Node3D
 {
     private const double FlightSeconds = 1.2;
 
+    // How close the camera can get to the ground, in km (owner's choice: about 10 km on an
+    // Earth-sized planet), and never closer than this fraction of a radius (for huge stars).
+    private const double ClosestApproachKm = 10.0;
+    private const double MinRelativeAltitude = 1e-5;
+
+    // The most the far clipping distance may exceed the near one by.
+    private const double MaxDepthRange = 1e6;
+
     // Close to a body, its own orbit line would run straight through it; it appears once the
     // camera is this many of the body's radii away.
     private const float OwnOrbitLineAltitude = 30.0f;
@@ -331,6 +339,8 @@ public partial class SystemView : Node3D
             }
         }
 
+        FollowFocusedSurface(world);
+
         if (FallbackLight is not null)
         {
             FallbackLight.Visible = !anyStar;
@@ -382,13 +392,38 @@ public partial class SystemView : Node3D
         return tilt == 0 ? spin : new Basis(axis.Normalized(), (float)tilt) * spin;
     }
 
+    // The local view (VISION.md REN-04) rides with the focused body's spin and tilt. While
+    // flying to another body it's off, since the two bodies are turned differently.
+    private void FollowFocusedSurface(World world)
+    {
+        if (Camera is null)
+        {
+            return;
+        }
+
+        bool flying = _flightProgress < 1.0;
+        Camera.AllowLocalView = !flying;
+        if (!flying && world.Bodies.Find(b => b.Id == _focusId) is Body focusBody)
+        {
+            Camera.SurfaceFrame = Orientation(focusBody, world.TimeDays);
+            Camera.FollowSurface();
+        }
+    }
+
     // Scales the camera to the focused body and lets it zoom out far enough to see the whole
-    // system, with a far clipping distance to match.
+    // system, with a far clipping distance to match. Close up it can get within about 10 km of
+    // the ground (the local view, VISION.md REN-04).
     private void FitCamera(double focusRadius)
     {
         if (Camera is null)
         {
             return;
+        }
+
+        if (Session?.World.Bodies.Find(b => b.Id == _focusId) is Body focused)
+        {
+            Camera.MinAltitude = (float)Math.Clamp(
+                ClosestApproachKm / focused.RadiusKm, MinRelativeAltitude, 0.05);
         }
 
         double extent = 0;
@@ -399,8 +434,14 @@ public partial class SystemView : Node3D
 
         Camera.PlanetRadius = (float)focusRadius;
         Camera.MaxAltitude = (float)Math.Max(8.0, 2.5 * extent / focusRadius);
-        Camera.Near = (float)Math.Max(focusRadius * 0.001, NearestSurfaceDistance() * 0.02);
-        Camera.Far = (float)Math.Max(100.0 * focusRadius, 6.0 * extent);
+        double near = Math.Max(focusRadius * 1e-6, NearestSurfaceDistance() * 0.02);
+        Camera.Near = (float)near;
+
+        // Right down at the ground the near distance is tiny, and the engine can't build a
+        // view that also reaches across the whole system (it reports frustum errors). Nothing
+        // that far shows when looking straight down anyway.
+        double far = Math.Max(100.0 * focusRadius, 6.0 * extent);
+        Camera.Far = (float)Math.Min(far, near * MaxDepthRange);
     }
 
     // How far the camera is from the closest body's surface. The near clipping distance follows

@@ -261,7 +261,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…events[].location` | no | Where it happens (see **Locations**) |
 | `…events[].entries` | no | The `id`s of journal entries it links to, each once (every one must exist). Links are many to many and stored only here; an entry's events are the ones listing it. Omitted when none. |
 | `view` | no | Camera when saved. Omitted means the default view. |
-| `view.latitude`, `longitude` | yes | Degrees; camera direction from the focus point |
+| `view.latitude`, `longitude` | yes | Degrees; camera direction from the focus point. Below an altitude of 0.25 (the local view, `REN-04`) they're the focused body's own coordinates, since the camera rides with its spin; otherwise they're fixed in space. |
 | `view.altitude` | yes | In planet radii above the surface |
 | `view.focusOffset` | no | `[x, y, z]` view-pan offset from the planet's center; default `[0, 0, 0]` |
 
