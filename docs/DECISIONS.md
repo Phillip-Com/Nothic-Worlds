@@ -7,6 +7,9 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-03 | Meteor showers come from comet dust **within 0.1 × the planet's orbit size** of the comet's orbit; peak **10 meteors an hour per km** of the comet's radius, less with distance | In PR | [#45](https://github.com/Phillip-Com/Nothic-Worlds/pull/45) | Claude's numbers. VISION.md `EVT-02` |
+| 2026-10-03 | Showers are worked out **in the background**, like eclipses | In PR | [#45](https://github.com/Phillip-Com/Nothic-Worlds/pull/45) | Claude's choice: 35 ms in debug builds. VISION.md `EVT-02` |
+| 2026-10-03 | Shower orbit markers get their own **View ▸ Meteor Shower Markers** switch | In PR | [#45](https://github.com/Phillip-Com/Nothic-Worlds/pull/45) | Claude's choice, like eclipse markers |
 | 2026-10-03 | Milestone 18: **meteor showers** (`EVT-02`) **from comets**, in **two PRs** (comets, then showers); asteroid events later | Merged | [#44](https://github.com/Phillip-Com/Nothic-Worlds/pull/44) · `126eb10` | VISION.md §3 |
 | 2026-10-03 | **Comets** are a new kind of body: they circle only stars, nothing circles them, and they have no surface or calendar | Merged | [#44](https://github.com/Phillip-Com/Nothic-Worlds/pull/44) · `126eb10` | Format version 15. VISION.md `EVT-02` |
 | 2026-10-03 | Comets have a **color and pattern** and a **glowing tail** away from the star, longer near it | Merged | [#44](https://github.com/Phillip-Com/Nothic-Worlds/pull/44) · `126eb10` | Tail: 20 million km at 1 AU, inverse square, gone past 5 AU (Claude's numbers) |

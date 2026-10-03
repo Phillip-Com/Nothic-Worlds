@@ -117,7 +117,7 @@ Meteor showers (`EVT-02`), simulated from comets. Owner's decisions:
   of the year every year. Their strength comes from the **comet's size**.
 - Shown as a **list in the System panel**, a **line in the time bar** while one is under way,
   and **markers on the orbit**. Asteroid events come later (with `BOD-03`).
-- **Two PRs:** comets (PR #44), then meteor showers.
+- **Two PRs:** comets (PR #44), then meteor showers (PR #45).
 
 **Milestone 17: Leap Years** · Complete (PR #43 merged 2026-10-03; owner's choice, 2026-10-03)
 Calendars can add leap days on a rule (new feature `CAL-04`). Owner's decisions:
@@ -1285,7 +1285,7 @@ without the world being changed to fit.
   "working it out…" otherwise; hidden for stars.
 - Wording in one place: `godot/UI/EclipseText.cs`.
 
-**EVT-02 — Meteor showers and asteroid events** · In progress (M18) · Base
+**EVT-02 — Meteor showers and asteroid events** · Implemented (M18; asteroid events later) · Base
 **Intent:** Simulated celestial events.
 **Implementation (comets, PR #44):**
 - **Model:** `BodyKind.Comet`. `Body.HasSurface` (planets and moons) now gates everything that
@@ -1308,6 +1308,36 @@ without the world being changed to fit.
 - **Verified in the running app** with real clicks, maximized and at 1152 × 648: Add Comet,
   the panel's fields, the tail at the start and at closest approach, and save/reopen. The
   benchmark showed no change (195–196 fps against 179–192 on `main`).
+
+**Implementation (meteor showers, PR #45):**
+- `Simulation/MeteorShowerTimeline.cs` (Core): a comet's dust lies all along its orbit, so a
+  planet meets it wherever its own orbit passes within **0.1 × its orbit's size** of the
+  comet's. The planet's year is sampled 720 times against the comet's orbit as 2,048 straight
+  pieces (only those near the planet's distance from the star are kept); each close pass is
+  refined (`TimeSearch`) to its peak, start, and end. Orbits never change on their own, so each
+  shower repeats exactly once a year: they're found once, and every year's dates follow.
+  `Between`, `ActiveAt`. A moon sees its planet's showers; planet-centered systems work too.
+- **Strength** (owner's choice: from the comet's size): **10 meteors an hour per km** of the
+  comet's radius at the peak, less the farther apart the orbits pass (none at the dust's edge).
+  `MeteorShower.PerHourAt` rises steadily to the peak and falls to the end.
+- **Speed:** about 2 ms per planet in a release build, 35 ms in a debug build, so the session
+  works it out **in the background** like eclipses (`WorldSession.SelectedMeteorShowers`,
+  `MeteorShowersReady`), after an edit or a new selection. While a new result is worked out the
+  body's last one stays, so nothing flickers during a drag.
+- **System panel** (`godot/UI/MeteorShowerSection.cs`, under Eclipses): the coming year's
+  showers with their comet, peak date, strength, and length in the body's days ("Up to 50
+  meteors an hour · 20 days"), start and end in the tooltip, and **Go to**.
+- **Time bar:** a third line while a shower is under way: "Meteor shower from Comet 1: about 50
+  an hour, peaking today".
+- **Orbit markers** (`BodyMarkers`): a small streak where each shower peaks, on the orbit that
+  shows the body's year, labelled "Comet 1 meteors". They have their own switch, **View ▸
+  Meteor Shower Markers** (like eclipse markers).
+- Wording in one place: `godot/UI/MeteorText.cs`.
+- Tested: two showers a year from a crossing comet, at full strength; the same day every year;
+  the peak where the orbits meet; a near miss at half strength; none from a far comet; moons
+  see their planet's; the same after Make Center; none for stars and comets; deterministic.
+  Verified in the running app with real clicks, maximized and at 1152 × 648: the list, Go to,
+  the time bar line, the markers, and the View menu switch. Benchmark: no change.
 
 ### 4.8 Weather & Climate (`WTH`)
 
