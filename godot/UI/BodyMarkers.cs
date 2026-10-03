@@ -3,6 +3,7 @@ using NothicWorlds.Controls;
 using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
+using NothicWorlds.Interop;
 using NothicWorlds.Rendering;
 using NothicWorlds.Session;
 
@@ -34,7 +35,6 @@ public partial class BodyMarkers : CanvasLayer
     // reach in).
     private const float OffScreenMarginPixels = 200.0f;
 
-    private static readonly Color _starColor = new(1.0f, 0.85f, 0.45f);
     private static readonly Color _planetColor = new(0.55f, 0.75f, 1.0f);
     private static readonly Color _moonColor = new(0.8f, 0.8f, 0.85f);
     private static readonly Color _labelColor = new(0.92f, 0.94f, 0.98f);
@@ -180,7 +180,7 @@ public partial class BodyMarkers : CanvasLayer
         {
             Color color = body.Kind switch
             {
-                BodyKind.Star => _starColor,
+                BodyKind.Star => BodyAppearance.StarColor(body.Appearance.StarType).ToGodot(),
                 BodyKind.Moon => _moonColor,
                 _ => _planetColor,
             };

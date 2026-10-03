@@ -1,6 +1,7 @@
 using Godot;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
+using NothicWorlds.Interop;
 using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
@@ -40,6 +41,11 @@ public partial class SystemPanel : CanvasLayer
     private SpinBox _axialTilt = null!;
     private SpinBox _axisDirection = null!;
     private SpinBox _temperature = null!;
+    private ColorPickerButton _color = null!;
+    private OptionButton _pattern = null!;
+    private OptionButton _starType = null!;
+    private Control[] _surfaceLook = [];
+    private Control[] _starLook = [];
     private Control _orbitFields = null!;
     private Label _noOrbit = null!;
     private OptionButton _parent = null!;
@@ -205,6 +211,7 @@ public partial class SystemPanel : CanvasLayer
             Body.MaxAverageTemperatureC, 0.5, "°C", CommitTemperature);
         _temperature.TooltipText = "The body's average surface temperature over a year " +
             "(Earth: about 15 °C). Weather pins spread it by latitude and season";
+        AddAppearanceFields(grid);
         layout.AddChild(grid);
 
         layout.AddChild(new Label { Text = "Orbit" });
@@ -402,6 +409,7 @@ public partial class SystemPanel : CanvasLayer
         _axialTilt.ShowValue(body.AxialTiltDegrees);
         _axisDirection.ShowValue(body.AxialTiltDirectionDegrees);
         _temperature.ShowValue(body.AverageTemperatureC);
+        ShowAppearance(body);
 
         // Stars have no surface weather.
         _temperature.Visible = !isStar;
@@ -498,6 +506,86 @@ public partial class SystemPanel : CanvasLayer
         string? problem = Session.SetBodyPhysical(Session.SelectedBodyId,
             _radius.Value, _dayLength.Value, _axialTilt.Value, _axisDirection.Value);
         ReportProblem(problem);
+    }
+
+    // How the body looks (VISION.md BOD-06): a planet's or moon's color and pattern, or a
+    // star's type. Only the rows for the selected kind show.
+    private void AddAppearanceFields(GridContainer grid)
+    {
+        var colorLabel = new Label { Text = "Color" };
+        _color = new ColorPickerButton
+        {
+            EditAlpha = false,
+            CustomMinimumSize = new Vector2(0, 28),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "The surface's color where there's no map",
+        };
+        _color.ColorChanged += _ => CommitAppearance();
+        var patternLabel = new Label { Text = "Pattern" };
+        _pattern = new Dropdown
+        {
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "How the surface looks where there's no map",
+        };
+        _pattern.AddItem("Plain", (int)SurfacePattern.Plain);
+        _pattern.AddItem("Rocky", (int)SurfacePattern.Rocky);
+        _pattern.AddItem("Banded (gas giant)", (int)SurfacePattern.Banded);
+        _pattern.AddItem("Icy", (int)SurfacePattern.Icy);
+        _pattern.AddItem("Cloudy", (int)SurfacePattern.Cloudy);
+        _pattern.ItemSelected += _ => CommitAppearance();
+        var starLabel = new Label { Text = "Star type" };
+        _starType = new Dropdown
+        {
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Sets the star's color and the color of its light",
+        };
+        _starType.AddItem("Red dwarf", (int)StarType.RedDwarf);
+        _starType.AddItem("Orange", (int)StarType.Orange);
+        _starType.AddItem("Yellow (Sun-like)", (int)StarType.Yellow);
+        _starType.AddItem("White", (int)StarType.White);
+        _starType.AddItem("Blue", (int)StarType.Blue);
+        _starType.ItemSelected += _ => CommitAppearance();
+        foreach (Control control in new Control[]
+            { colorLabel, _color, patternLabel, _pattern, starLabel, _starType })
+        {
+            grid.AddChild(control);
+        }
+
+        _surfaceLook = [colorLabel, _color, patternLabel, _pattern];
+        _starLook = [starLabel, _starType];
+    }
+
+    private void ShowAppearance(Body body)
+    {
+        bool isStar = body.Kind == BodyKind.Star;
+        foreach (Control control in _surfaceLook)
+        {
+            control.Visible = !isStar;
+        }
+
+        foreach (Control control in _starLook)
+        {
+            control.Visible = isStar;
+        }
+
+        _color.Color = body.Appearance.Color.ToGodot();
+        _pattern.Select(_pattern.GetItemIndex((int)body.Appearance.Pattern));
+        _starType.Select(_starType.GetItemIndex((int)body.Appearance.StarType));
+    }
+
+    private void CommitAppearance()
+    {
+        if (_syncing || Session is null)
+        {
+            return;
+        }
+
+        Session.SetAppearance(Session.SelectedBodyId, Session.SelectedBody.Appearance with
+        {
+            Color = _color.Color.ToRgbColor(),
+            Pattern = (SurfacePattern)_pattern.GetSelectedId(),
+            StarType = (StarType)_starType.GetSelectedId(),
+        });
     }
 
     private void CommitTemperature()

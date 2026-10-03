@@ -541,6 +541,23 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
+    /// Changes how a body looks (VISION.md BOD-06): a planet's or moon's color and pattern, or
+    /// a star's type. Rapid changes (dragging through colors) are one undo step.
+    /// </summary>
+    public void SetAppearance(Guid bodyId, BodyAppearance appearance)
+    {
+        if (FindBody(bodyId) is not Body body || body.Appearance == appearance)
+        {
+            return;
+        }
+
+        RecordUndo($"Change {body.Name}'s Look", mergeKey: ("appearance", bodyId));
+        body.Appearance = appearance;
+        ShowSurfaceSettings(body);
+        MarkChanged(systemChanged: false);
+    }
+
+    /// <summary>
     /// Replaces a body's calendar (VISION.md CAL-01), or removes it with null. Stars don't
     /// have calendars. A calendar that fits the world (CAL-02) adjusts it straight away, in the
     /// same undo step, and keeps it fitted after later edits.
@@ -1373,6 +1390,7 @@ public partial class WorldSession : Node
         surface.Projection = body.Surface.Map?.Projection
             ?? (body.Id == SelectedBodyId ? _projectionWithoutMap : MapProjection.Mercator);
         surface.FillColor = body.Surface.FillColor.ToGodot();
+        surface.SetAppearance(body.Appearance.Color.ToGodot(), body.Appearance.Pattern, body.Id);
         surface.SetCalibration(body.Surface.Map?.Calibration);
     }
 

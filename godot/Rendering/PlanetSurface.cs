@@ -279,6 +279,22 @@ public partial class PlanetSurface : MeshInstance3D
         }
     }
 
+    /// <summary>
+    /// How the surface looks where there's no map (VISION.md BOD-06): its color and pattern.
+    /// </summary>
+    /// <param name="color">The base color.</param>
+    /// <param name="pattern">The pattern drawn over it.</param>
+    /// <param name="bodyId">Gives the body its own version of the pattern.</param>
+    public void SetAppearance(Color color, SurfacePattern pattern, Guid bodyId)
+    {
+        SurfaceMaterial.SetShaderParameter("base_color", color);
+        SurfaceMaterial.SetShaderParameter("surface_pattern", (int)pattern);
+        SurfaceMaterial.SetShaderParameter("pattern_noise", PatternNoise.Texture);
+        byte[] seed = bodyId.ToByteArray();
+        SurfaceMaterial.SetShaderParameter("pattern_offset",
+            new Vector3(seed[0], seed[1], seed[2]) * 0.37f);
+    }
+
     /// <summary>Wraps a map texture onto the planet and hides the grid.</summary>
     public void SetMap(Texture2D texture)
     {
