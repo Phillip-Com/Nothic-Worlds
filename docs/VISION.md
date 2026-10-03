@@ -108,6 +108,19 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 13: Local Region View** · In Progress (owner's choice, 2026-10-03)
+Zoom down to a local region of a planet and see it as a top-down map (`REN-04`). Owner's
+decisions:
+- **A seamless deeper zoom** on the same globe and camera (not a separate 2D view), down to
+  about 10 km above the ground of an Earth-sized planet, top-down below a threshold.
+- **Detail from map pieces** for now: a detailed local map imported as a piece shows sharply.
+- **Getting there:** by zooming, plus **Zoom to** buttons for regions and pins.
+- **On screen in the local view:** a scale bar, a north arrow, and the coordinates (and region)
+  under the mouse. Day and night stay as they are.
+- Claude's plan: in the local view the camera rides with the planet (the same ground stays in
+  view as time passes, north up). **Two PRs:** the camera (PR #37), then the on-screen aids and
+  Zoom to buttons.
+
 **Milestone 12: Calendar Fitting** · Complete (PR #36 merged 2026-10-03; owner's choice, 2026-10-03)
 Keep the world fitted to a calendar, so its dates never drift against the seasons (`CAL-02`).
 Owner's decisions:
@@ -332,9 +345,33 @@ visible. Heavier features go in an opt-in **Advanced** section.
   ~155 fps, **137 MB video memory** (S3TC), 45 MB app memory. The slowest frames sit around
   60–70 fps in every build.
 
-**REN-04 — Top-down local region view** · Idea · Base
+**REN-04 — Top-down local region view** · In Progress (camera done, PR #37) · Base
 **Intent:** Zoom down to a local region and see it as a top-down terrain view.
-**Implementation:** —
+**Implementation (camera, PR #37):**
+- `godot/Controls/PlanetCamera.cs`: below `LocalViewMaxAltitude` (0.25 radii, a view about
+  2,500 km across on an Earth-sized planet) the camera is in the **local view**. Its latitude and
+  longitude are then measured in the planet's own frame (`SurfaceFrame`, the spin and tilt), so
+  it stays over the same ground as time passes and the planet's north is up on screen. Crossing
+  the threshold re-expresses where the camera is in the other frame (`SetLocal`), so nothing
+  moves; only "up" eases round (by up to the axial tilt). In the local view a left-drag pans the
+  map instead of orbiting (`IsLocalView`; the action indicator says Panning).
+- `godot/Rendering/SystemView.cs`: gives the camera the focused body's orientation every frame
+  and has it follow straight away (`FollowSurface`), so it never lags the spinning ground. The
+  local view is off while flying between bodies. The camera may come within **10 km** of the
+  ground (`ClosestApproachKm`; at least 1e-5 radii for huge stars). The near clipping distance
+  can now be tiny, and the far one is capped at a million times it (`MaxDepthRange`): beyond that
+  the engine couldn't build the view (frustum errors), and nothing that far shows when looking
+  straight down.
+- Season and eclipse markers and the other bodies' dots and labels are hidden in the local view
+  (they mark places out in space, which only clutter the map).
+- The camera text reads "Local view: the ground, north up (zoom out for the globe)".
+- Saved views: below the threshold, the latitude and longitude are the body's own (see
+  world-format.md, `view`).
+- **Verified in the running app** with real scroll and drag input: zooming in switches to the
+  local view (north exactly up), time passing leaves the ground under the camera still (0.0 km),
+  left-drag moves the map with the mouse, the closest approach is 10 km with the ground still
+  drawn, zooming back out crosses over without a jump, save/reopen keeps the view, and flying to
+  the Sun and back from close up works without errors. Benchmark unchanged (~195 fps both).
 
 **REN-05 — Visual styles** · Idea · Base
 **Intent:** Painterly is the default style. The goal is to let users choose other styles, such
