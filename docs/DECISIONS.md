@@ -7,10 +7,10 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-10-03 | Milestone 14: **terrain-aware weather** (new `WTH-03`), temperature and rainfall in **two PRs** | In PR | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) | VISION.md §3 |
-| 2026-10-03 | Each terrain type gets a **climate kind** from a fixed list, picked in the Terrain panel | In PR | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) | Format version 12; older types get theirs by name |
-| 2026-10-03 | **Water counts across ~500 km** around a weather pin; other kinds where it stands; one explanation line in the window | In PR | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) | VISION.md `WTH-03` |
-| 2026-10-03 | The terrain's effects on temperature (sea softens and delays seasons; desert ×2 swing; ice −8 °C, mountains −6 °C…) | In PR | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) | Claude's numbers, shown to the owner in the plan |
+| 2026-10-03 | Milestone 14: **terrain-aware weather** (new `WTH-03`), temperature and rainfall in **two PRs** | Merged | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) · `823d2ea` | VISION.md §3 |
+| 2026-10-03 | Each terrain type gets a **climate kind** from a fixed list, picked in the Terrain panel | Merged | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) · `823d2ea` | Format version 12; older types get theirs by name |
+| 2026-10-03 | **Water counts across ~500 km** around a weather pin; other kinds where it stands; one explanation line in the window | Merged | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) · `823d2ea` | VISION.md `WTH-03` |
+| 2026-10-03 | The terrain's effects on temperature (sea softens and delays seasons; desert ×2 swing; ice −8 °C, mountains −6 °C…) | Merged | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) · `823d2ea` | Claude's numbers, shown to the owner in the plan |
 | 2026-10-03 | Local view aids sit at the **bottom left** (beside the System panel when open); Zoom to shows a **region whole** and a **pin with 300 km** around it | Merged | [#38](https://github.com/Phillip-Com/Nothic-Worlds/pull/38) · `6dae2c4` | Claude's choices. VISION.md `REN-04` |
 | 2026-10-03 | Milestone 13: **local region view** (`REN-04`) as a **seamless deeper zoom**, detail from map pieces | Merged | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) · `bf6a4c1` | VISION.md §3 |
 | 2026-10-03 | Local view reached by **zooming and Zoom to buttons**; shows a **scale bar, north arrow, and coordinates** | Merged | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) · `bf6a4c1` | Built in the next PR |
