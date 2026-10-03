@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 11;
+    public const int CurrentVersion = 12;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -51,6 +51,17 @@ internal static partial class WorldFormat
     {
         [CalendarFit.YearLength] = "year-length",
         [CalendarFit.DayLength] = "day-length",
+    };
+
+    private static readonly Dictionary<ClimateKind, string> _climateNames = new()
+    {
+        [ClimateKind.OpenLand] = "open-land",
+        [ClimateKind.Water] = "water",
+        [ClimateKind.Forest] = "forest",
+        [ClimateKind.Desert] = "desert",
+        [ClimateKind.Wetland] = "wetland",
+        [ClimateKind.Mountains] = "mountains",
+        [ClimateKind.Ice] = "ice",
     };
 
     // Upgrades older documents one version at a time: entry 0 turns version 1 into version 2,
@@ -98,7 +109,26 @@ internal static partial class WorldFormat
         // 10 → 11: calendars gained an optional "fit" and "monthMoon" (calendar fitting, M12).
         // Older calendars aren't fitted, so nothing changes.
         document => document,
+
+        // 11 → 12: terrain types gained a "climate" (terrain-aware weather, M14). Types still
+        // named like a default get its climate; the rest are open land.
+        AddTerrainClimates,
     ];
+
+    // The climates the version 12 upgrade gives types by name. Deliberately a copy, like
+    // _version10TerrainTypes, so later changes to the defaults can't change old upgrades.
+    private static readonly Dictionary<string, string> _version12Climates =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Ocean"] = "water",
+            ["Shallow Water"] = "water",
+            ["Forest"] = "forest",
+            ["Jungle"] = "forest",
+            ["Mountains"] = "mountains",
+            ["Desert"] = "desert",
+            ["Swamp"] = "wetland",
+            ["Ice"] = "ice",
+        };
 
     // The terrain types worlds got when version 10 arrived. Deliberately a copy, not
     // TerrainType.Defaults: if the defaults for new worlds change later, upgrading an old
@@ -128,6 +158,23 @@ internal static partial class WorldFormat
             foreach (JsonObject body in bodies.OfType<JsonObject>())
             {
                 body[name] ??= value;
+            }
+        }
+
+        return document;
+    }
+
+    private static JsonObject AddTerrainClimates(JsonObject document)
+    {
+        if (document["terrainTypes"] is JsonArray types)
+        {
+            foreach (JsonObject type in types.OfType<JsonObject>())
+            {
+                string? name = type["name"]?.GetValue<string>()?.Trim();
+                type["climate"] ??= name is not null
+                    && _version12Climates.TryGetValue(name, out string? climate)
+                        ? climate
+                        : "open-land";
             }
         }
 
@@ -167,6 +214,11 @@ internal static partial class WorldFormat
     public static string BodyKindName(BodyKind kind) => _bodyKindNames[kind];
 
     public static BodyKind ParseBodyKind(string? name) => Parse(_bodyKindNames, name, "body kind");
+
+    public static string ClimateName(ClimateKind kind) => _climateNames[kind];
+
+    public static ClimateKind ParseClimate(string? name) =>
+        Parse(_climateNames, name, "terrain climate");
 
     /// <summary>The name written for a calendar fit, or null for none (left out).</summary>
     public static string? CalendarFitName(CalendarFit fit) =>

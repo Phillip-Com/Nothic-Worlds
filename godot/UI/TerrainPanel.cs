@@ -34,6 +34,7 @@ public partial class TerrainPanel : CanvasLayer
     private Button _deleteButton = null!;
     private LineEdit _name = null!;
     private ColorPickerButton _color = null!;
+    private OptionButton _climate = null!;
     private Label _problem = null!;
     private readonly Dictionary<RgbColor, ImageTexture> _swatches = [];
     private byte? _selectedCode;
@@ -226,6 +227,27 @@ public partial class TerrainPanel : CanvasLayer
         _color.ColorChanged += _ => Commit();
         row.AddChild(_color);
         box.AddChild(row);
+
+        var climateRow = new HBoxContainer();
+        climateRow.AddChild(new Label { Text = "Climate" });
+        _climate = new OptionButton
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "How this terrain affects the weather at weather pins",
+
+            // Opens when the click ends: in a short window the list can open over the button,
+            // and the end of the same click would otherwise pick whatever's under the mouse.
+            ActionMode = BaseButton.ActionModeEnum.Release,
+        };
+        foreach (ClimateKind kind in Enum.GetValues<ClimateKind>())
+        {
+            _climate.AddItem(ClimateText.Name(kind), (int)kind);
+            _climate.SetItemTooltip(_climate.ItemCount - 1, ClimateText.Effect(kind));
+        }
+
+        _climate.ItemSelected += _ => Commit();
+        climateRow.AddChild(_climate);
+        box.AddChild(climateRow);
         _problem = new Label
         {
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
@@ -270,8 +292,12 @@ public partial class TerrainPanel : CanvasLayer
             return;
         }
 
-        string? problem = Session.UpdateTerrainType(
-            type with { Name = _name.Text, Color = _color.Color.ToRgbColor() });
+        string? problem = Session.UpdateTerrainType(type with
+        {
+            Name = _name.Text,
+            Color = _color.Color.ToRgbColor(),
+            Climate = (ClimateKind)_climate.GetSelectedId(),
+        });
         _problem.Text = problem is null ? "" : $"Not saved yet: {problem}.";
     }
 
@@ -330,6 +356,7 @@ public partial class TerrainPanel : CanvasLayer
         _deleteButton.Disabled = type is null;
         _name.Editable = type is not null;
         _color.Disabled = type is null;
+        _climate.Disabled = type is null;
         if (type is null)
         {
             return;
@@ -342,6 +369,7 @@ public partial class TerrainPanel : CanvasLayer
         }
 
         _color.Color = type.Color.ToGodot();
+        _climate.Select(_climate.GetItemIndex((int)type.Climate));
         _syncing = false;
     }
 

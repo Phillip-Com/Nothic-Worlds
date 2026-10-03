@@ -19,6 +19,11 @@ namespace NothicWorlds.Core.Simulation;
 /// seasons follow the day's sunlight, delayed and softened by about a month, the way land and
 /// sea hold heat; and the day/night swing grows with the length of the day. The constants are
 /// tuned so an Earth-like planet gives Earth-like numbers.</para>
+/// <para><b>Painted terrain</b> (VISION.md WTH-03) adjusts the estimate when it's given:
+/// water nearby softens the seasons (and delays them) and the day/night swing, the way coasts
+/// are milder than inland; the kind of ground at the spot widens or narrows the day/night swing
+/// (deserts swing most) and makes ice and mountains colder. Without terrain, nothing
+/// changes.</para>
 /// <para>The year repeats: times outside the year worked out are wrapped into it (exact for a
 /// planet circling its star; close for a moon).</para>
 /// </remarks>
@@ -39,14 +44,25 @@ public sealed class ClimateYear
     private const double DayNightSwingC = 10.0;
     private const double MaxDayNightSwingC = 60.0;
 
+    // How much fully maritime spots (on or surrounded by water) soften the seasons and the
+    // day/night swing, and how much longer their heat lag is.
+    private const double MaritimeSeasonSoftening = 0.6;
+    private const double MaritimeSwingSoftening = 0.7;
+    private const double MaritimeExtraLag = 1.0;
+
     private readonly ClimateDay[] _days;
 
-    private ClimateYear(ClimateDay[] days, double fromDays, double yearDays)
+    private ClimateYear(
+        ClimateDay[] days, double fromDays, double yearDays, TerrainSurroundings? terrain)
     {
         _days = days;
         FromDays = fromDays;
         YearDays = yearDays;
+        Terrain = terrain;
     }
+
+    /// <summary>The painted terrain the weather allowed for, or null if none was given.</summary>
+    public TerrainSurroundings? Terrain { get; }
 
     /// <summary>When the year worked out starts, in standard days.</summary>
     public double FromDays { get; }
@@ -59,11 +75,12 @@ public sealed class ClimateYear
 
     /// <summary>
     /// Works out the year starting at <paramref name="fromDays"/> at a spot on a body, or null
-    /// if the body has no star (or is one).
+    /// if the body has no star (or is one). <paramref name="terrain"/>, if given, is the painted
+    /// terrain around the spot (see the class notes).
     /// </summary>
     /// <exception cref="ArgumentException">The bodies' orbits are invalid.</exception>
-    public static ClimateYear? At(
-        IReadOnlyList<Body> bodies, Body body, GeoCoordinate spot, double fromDays)
+    public static ClimateYear? At(IReadOnlyList<Body> bodies, Body body, GeoCoordinate spot,
+        double fromDays, TerrainSurroundings? terrain = null)
     {
         if (body.Kind == BodyKind.Star || Seasons.StarFor(bodies, body) is not Body star)
         {
@@ -107,24 +124,28 @@ public sealed class ClimateYear
             sunlight[i] = dailyMean * distanceFactor / 0.25;
         }
 
+        double maritime = terrain?.Maritime ?? 0;
+        ClimateKind? ground = terrain?.Here;
         double spotAverage = sunlight.Average();
-        double[] felt = Lagged(sunlight, step);
+        double[] felt = Lagged(sunlight, step, HeatLagDays * (1 + MaritimeExtraLag * maritime));
         double swing = Math.Min(MaxDayNightSwingC,
-            DayNightSwingC * Math.Sqrt(body.DayLengthHours / 24.0));
+            DayNightSwingC * Math.Sqrt(body.DayLengthHours / 24.0)
+                * (1 - MaritimeSwingSoftening * maritime) * SwingFactor(ground));
         double baseline = body.AverageTemperatureC
-            + LatitudeDegreesPerSunlight * (spotAverage - 1);
+            + LatitudeDegreesPerSunlight * (spotAverage - 1) + Offset(ground);
+        double seasons = SeasonDegreesPerSunlight * (1 - MaritimeSeasonSoftening * maritime);
 
         var days = new ClimateDay[SamplesPerYear];
         for (int i = 0; i < SamplesPerYear; i++)
         {
-            double mean = baseline + SeasonDegreesPerSunlight * (felt[i] - spotAverage);
+            double mean = baseline + seasons * (felt[i] - spotAverage);
             double noon = 90 - Math.Abs(spot.LatitudeDegrees
                 - double.RadiansToDegrees(declinations[i]));
             days[i] = new ClimateDay(fromDays + (i + 0.5) * step, mean, mean - swing / 2,
                 mean + swing / 2, daylight[i], Math.Max(-90, noon), sunlight[i]);
         }
 
-        return new ClimateYear(days, fromDays, year);
+        return new ClimateYear(days, fromDays, year, terrain);
     }
 
     /// <summary>The weather on the day containing a time (wrapped into the year).</summary>
@@ -177,12 +198,33 @@ public sealed class ClimateYear
         return (hourAngle / Math.PI, Math.Max(0, dailyMean));
     }
 
+    // How the kind of ground widens or narrows the day/night swing: dry air lets deserts heat
+    // and cool most; plants and wet ground hold heat.
+    private static double SwingFactor(ClimateKind? ground) => ground switch
+    {
+        ClimateKind.Desert => 2.0,
+        ClimateKind.Mountains => 1.2,
+        ClimateKind.Forest => 0.8,
+        ClimateKind.Wetland => 0.7,
+        _ => 1.0,
+    };
+
+    // How much colder (or warmer) the kind of ground is than the latitude alone gives, in °C:
+    // ice reflects most sunlight, mountains stand high in thinner air, deserts have clear skies.
+    private static double Offset(ClimateKind? ground) => ground switch
+    {
+        ClimateKind.Ice => -8.0,
+        ClimateKind.Mountains => -6.0,
+        ClimateKind.Desert => 2.0,
+        _ => 0.0,
+    };
+
     // Sunlight as the ground feels it: each day moves part of the way toward the day's light
     // (an exponential average with the heat lag), run round the year twice so the start
     // doesn't matter.
-    private static double[] Lagged(double[] sunlight, double step)
+    private static double[] Lagged(double[] sunlight, double step, double lagDays)
     {
-        double keep = Math.Exp(-step / HeatLagDays);
+        double keep = Math.Exp(-step / lagDays);
         double felt = sunlight.Average();
         var result = new double[sunlight.Length];
         for (int pass = 0; pass < 2; pass++)

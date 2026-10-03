@@ -24,6 +24,7 @@ public partial class WeatherWindow : AcceptDialog
     private Label _today = null!;
     private Label _yearLabel = null!;
     private WeatherChart _chart = null!;
+    private Label _terrain = null!;
     private Label _note = null!;
     private Guid? _pinId;
 
@@ -74,6 +75,8 @@ public partial class WeatherWindow : AcceptDialog
         layout.AddChild(_yearLabel);
         _chart = new WeatherChart();
         layout.AddChild(_chart);
+        _terrain = WrappingLabel();
+        layout.AddChild(_terrain);
         _note = WrappingLabel();
         _note.Modulate = new Color(1, 1, 1, 0.6f);
         layout.AddChild(_note);
@@ -145,7 +148,8 @@ public partial class WeatherWindow : AcceptDialog
         if (_climate is null || _year != (from, to))
         {
             _year = (from, to);
-            _climate = ClimateYear.At(Session.World.Bodies, body, pin.Spot, from);
+            _climate = ClimateYear.At(Session.World.Bodies, body, pin.Spot, from,
+                TerrainSurroundings.At(body, Session.TerrainTypes, pin.Spot));
         }
 
         if (_climate is not ClimateYear climate)
@@ -153,6 +157,7 @@ public partial class WeatherWindow : AcceptDialog
             _today.Text = $"{body.Name} has no star, so there's no weather to work out.";
             _yearLabel.Text = "";
             _chart.Show([], null);
+            _terrain.Text = "";
             _note.Text = "";
             return;
         }
@@ -165,9 +170,10 @@ public partial class WeatherWindow : AcceptDialog
             return new WeatherChart.Month(m.Label, average.LowC, average.MeanC, average.HighC,
                 average.DaylightHours);
         })], (float)((now - from) / (to - from)));
+        _terrain.Text = ClimateText.Describe(climate.Terrain);
         _note.Text = $"Estimated from the sunlight here, around {body.Name}'s average of " +
-            $"{body.AverageTemperatureC:0.#} °C (set in the System panel). Air, oceans, height, " +
-            "and terrain aren't modeled.";
+            $"{body.AverageTemperatureC:0.#} °C (set in the System panel), adjusted for the " +
+            "painted terrain. Air and winds aren't modeled.";
     }
 
     private void ShowToday(Body body, WeatherPin pin, ClimateYear climate, double now)

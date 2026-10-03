@@ -27,6 +27,7 @@ internal sealed class TerrainTypeDocument
     public required int Code { get; init; }
     public required string Name { get; init; }
     public required string Color { get; init; }
+    public required string Climate { get; init; }  // Added in format version 12
 }
 
 internal sealed class JournalEntryDocument
