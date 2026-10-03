@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 14: Terrain-Aware Weather** · In Progress (owner's choice, 2026-10-03)
+**Milestone 14: Terrain-Aware Weather** · Complete (PR #40 merged 2026-10-03; owner's choice, 2026-10-03)
 Weather pins take the painted terrain around them into account (new feature `WTH-03`). Owner's
 decisions:
 - **A climate kind per terrain type**, from a short list (Water, Open land, Forest, Desert,
