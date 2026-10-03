@@ -49,6 +49,12 @@ public sealed class World
     /// </summary>
     public List<WeatherPin> WeatherPins { get; } = [];
 
+    /// <summary>
+    /// The kinds of terrain that can be painted onto the world's bodies (VISION.md BOD-05), in
+    /// the order they're listed. New worlds start with <see cref="TerrainType.Defaults"/>.
+    /// </summary>
+    public List<TerrainType> TerrainTypes { get; } = [];
+
     /// <summary>The world's named timelines (VISION.md LORE-03), in lane order.</summary>
     public List<Timeline> Timelines { get; } = [];
 
@@ -80,8 +86,9 @@ public sealed class World
         };
         copy.Bodies.AddRange(Bodies.Select(body => body.Clone()));
 
-        // Regions, weather pins, entries, timelines, and events are immutable records, safe to
-        // share.
+        // Terrain types, regions, weather pins, entries, timelines, and events are immutable
+        // records, safe to share.
+        copy.TerrainTypes.AddRange(TerrainTypes);
         copy.Regions.AddRange(Regions);
         copy.WeatherPins.AddRange(WeatherPins);
         copy.Journal.AddRange(Journal);
@@ -92,11 +99,13 @@ public sealed class World
 
     /// <summary>
     /// Creates a new world: a Sun-like star with one unmapped, Earth-like planet circling it once
-    /// a year (VISION.md BOD-01). The planet comes first, as the body most users start with.
+    /// a year (VISION.md BOD-01), and the default terrain types (BOD-05). The planet comes first,
+    /// as the body most users start with.
     /// </summary>
     public static World CreateNew(string name = "Untitled World")
     {
         var world = new World { Name = name };
+        world.TerrainTypes.AddRange(TerrainType.Defaults);
         var sun = new Body
         {
             Name = "Sun",
