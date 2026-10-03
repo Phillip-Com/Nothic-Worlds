@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 10** (see **Version history** at the end)
+**Current format version: 11** (see **Version history** at the end)
 
 ## Container
 
@@ -23,11 +23,11 @@ A `.nworld` file is a standard **zip archive** containing:
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB, each terrain image
   up to 16 MB.
 
-## `world.json` (version 10)
+## `world.json` (version 11)
 
 ```json
 {
-  "formatVersion": 10,
+  "formatVersion": 11,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -80,7 +80,9 @@ A `.nworld` file is a standard **zip archive** containing:
         "weekdays": [ "Moonday", "Starday" ],
         "firstYear": 1203,
         "era": "of the Third Age",
-        "start": { "month": 1, "day": 5, "weekday": 1 }
+        "start": { "month": 1, "day": 5, "weekday": 1 },
+        "fit": "year-length",
+        "monthMoon": "70707070-7070-7070-7070-707070707070"
       },
       "surface": {
         "map": {
@@ -196,6 +198,8 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…calendar.firstYear` | yes | The year number at time 0 |
 | `…calendar.era` | no | Words shown after the year number, e.g. "of the Third Age" |
 | `…calendar.start` | yes | The date at time 0: `month` (0 is the first), `day` (1 is the first, within that month), `weekday` (0 is the first; 0 when there are no weekdays) |
+| `…calendar.fit` | no | Keeps the world fitted to the calendar (`CAL-02`, see **Calendar fitting** below): `"year-length"` (the year's orbit changes) or `"day-length"` (the body's spin changes). Omitted when not fitted. |
+| `…calendar.monthMoon` | no | The `id` of a body (it must exist) whose orbit is kept so new moon to new moon lasts one average month. It only takes effect while that body is a moon circling this one. |
 | `bodies[].orbit` | no | The body's designed orbit around another body. Omitted for a body at the system's center. Every chain of parents must end at a body without an orbit (no missing parents, no loops). |
 | `…orbit.parent` | yes | The `id` of the body it circles |
 | `…orbit.distanceKm` | yes | The orbit's size (semi-major axis), center to center. Above 0, at most 10¹³. |
@@ -352,6 +356,19 @@ and leans by *i* toward direction *θ*, measured like orbit angles.
 through the months in order, wrapping into the next year after the last month, and back into
 earlier years for negative *n*. Weekdays cycle the same way from `start.weekday`.
 
+**Calendar fitting** (`CalendarFitting` in Core). The values a fit sets are saved like any
+other (the file holds the fitted periods and day lengths); the app re-applies the fits after
+every change to the system. With *N* = the calendar's days per year and *h* = the body's
+`dayLengthHours`: the **year's orbit** is the body's own orbit if it circles a star, else its
+planet's (and so on up), or the orbit of a star circling them. `"year-length"` sets that
+orbit's `periodDays` to *N* · *h* / 24; `"day-length"` sets *h* to (that orbit's `periodDays`)
+· 24 / *N*. Year fits are applied first, then day fits, then month moons, each in body order;
+two calendars can't fit the same orbit. A **month moon** of period *T* (standard days) makes the
+star drift once around the sky per year *Y* (the year orbit's period), so new moon to new moon
+lasts *S* = 1 / (1/*T* − 1/*Y*) when the moon circles the same way round as the year (both
+orbits' `tilt` at most 90°, or both over), else 1 / (1/*T* + 1/*Y*). It's set so *S* equals
+the average month, *N* / (number of months) · *h* / 24.
+
 **Seasons** aren't stored; they're worked out (`Seasons` in Core). The body's star is the
 nearest star up its chain of parents, or a star orbiting it or its planet. The star's
 declination is the angle between the direction to the star and the body's equatorial plane.
@@ -385,4 +402,5 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 11 | Calendar fitting (M12): calendars gain optional `fit` and `monthMoon` | Nothing to change: version 10 calendars aren't fitted |
 | 10 | Terrain painting (M11): `terrainTypes`; surfaces gain an optional `terrain` image | The world gets the 12 default terrain types (codes 1–12: Ocean, Shallow Water, Plains, Fields, Forest, Jungle, Hills, Mountains, Desert, Swamp, Tundra, Ice); nothing is painted |

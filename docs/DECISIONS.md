@@ -7,6 +7,11 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-03 | Milestone 12: **calendar fitting** (`CAL-02`), in **one PR** | In PR | [#36](https://github.com/Phillip-Com/Nothic-Worlds/pull/36) | VISION.md §3 |
+| 2026-10-03 | Fitting is a **lasting switch** per calendar; fitted fields are locked in the System panel | In PR | [#36](https://github.com/Phillip-Com/Nothic-Worlds/pull/36) | Format version 11 |
+| 2026-10-03 | The user picks **year length or day length**; defaults: planets the orbit, moons the day | In PR | [#36](https://github.com/Phillip-Com/Nothic-Worlds/pull/36) | VISION.md `CAL-02` |
+| 2026-10-03 | A calendar can keep a **month moon**: new moon to new moon is one **average** month | In PR | [#36](https://github.com/Phillip-Com/Nothic-Worlds/pull/36) | Owner's choice; "average" is Claude's, so any calendar works |
+| 2026-10-03 | Fits are re-applied after **every system edit**, in the same undo step; two calendars can't fit the same orbit | In PR | [#36](https://github.com/Phillip-Com/Nothic-Worlds/pull/36) | Claude's choices |
 | 2026-10-03 | Unpainted ground on a painted planet without a map is **neutral grey** | Merged | [#35](https://github.com/Phillip-Com/Nothic-Worlds/pull/35) · `900a1c0` | Owner's choice. VISION.md `BOD-05` |
 | 2026-10-03 | Terrain edges are drawn as **smooth curves** from the four nearest cells, plus an **averaged far-away copy** against flicker | Merged | [#35](https://github.com/Phillip-Com/Nothic-Worlds/pull/35) · `900a1c0` | Claude's choices; about 5% slower close up, 2 MB more per painted body |
 | 2026-10-03 | Terrain over a map is mixed in at **60%**; without a map or pieces it's the surface | Merged | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) · `c32ca3d` | Claude's choice. VISION.md `BOD-05` |

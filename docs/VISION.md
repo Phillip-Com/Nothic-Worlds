@@ -108,6 +108,17 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 12: Calendar Fitting** · In Progress (owner's choice, 2026-10-03)
+Keep the world fitted to a calendar, so its dates never drift against the seasons (`CAL-02`).
+Owner's decisions:
+- **A lasting switch** per calendar: while it's on, the world stays fitted, and the fitted
+  fields are locked in the System panel. Format version 11 (older worlds: off).
+- **The user picks what changes:** the year's length (the orbit) or the day's length.
+  Defaults: planets change their orbit; moons their day (a moon's year is its planet's orbit).
+- **Moon months, optionally:** a chosen moon's orbit is kept so new moon to new moon is one
+  month (Claude: the average month, so any calendar works).
+- **One PR** (PR #36).
+
 **Milestone 11: Terrain Painting** · Complete (PR #35 merged 2026-10-03; owner's choice, 2026-10-03)
 Paint terrain types onto planets and moons with a brush (`BOD-05`). Owner's decisions:
 - **Terrain types:** an editable list per world. New worlds start with 12 defaults (Ocean,
@@ -998,10 +1009,37 @@ astronomically accurate. Some users won't care about the calendar at all, so it 
 - The date and season lines sit in their own small panel above the time bar's buttons, so long
   calendar dates never push the buttons into the camera text.
 
-**CAL-02 — Calendar accuracy mode (toggle)** · Idea · Base
+**CAL-02 — Calendar accuracy mode (toggle)** · Implemented (M12, PR #36) · Base
 **Intent:** An optional toggle that makes the world fit the calendar. The tool adjusts the
 system's parameters (e.g. orbital periods, rotation speed) so the user's calendar becomes accurate.
-**Implementation:** —
+**Implementation (PR #36):**
+- **Model:** `Calendar.Fit` (`CalendarFit`: `None`, `YearLength`, `DayLength`) and
+  `Calendar.MonthMoonId`. Format **version 11** (`fit`, `monthMoon`); see world-format.md,
+  **Calendar fitting**, for the exact math.
+- `Simulation/CalendarFitting.cs` (Core): `Apply` sets every fitted value (years, then days,
+  then month moons, in body order: deterministic) and skips any that can't be met; `Problem`
+  explains why a calendar's fit can't be met (no star, another calendar already sets that
+  orbit, the month moon isn't a moon of the body, no moon cycle can last that long, or a value
+  out of range); `Preview` lists what a calendar would change; `FittedBy` says which calendar
+  sets a body's day length and orbit period. `BodyClock.YearOrbitOf` names the body whose orbit
+  makes a year (`YearDays` uses it).
+- **Month moons** use the synodic month: seen from the planet the star drifts once around the
+  sky a year, so the moon's orbit is set to 1 / (1/month + 1/year), or 1 / (1/month − 1/year)
+  if it circles the other way round. Tested geometrically: the moon's phase comes back exactly
+  after a month, and is opposite halfway.
+- **Session:** after every change to the system (`MarkChanged`), the fits are applied again, in
+  the same edit and undo step, so the world stays fitted (e.g. changing a fitted planet's day
+  length re-fits its orbit and its month moon). `SetCalendar` refuses a fit that can't be met,
+  with the reason. Deleting a month moon clears it from the calendar.
+- **App:** the calendar editor's **Fit the World** section (under the months and their year
+  comparison): **Keep each year exactly one calendar year**, **By** (the orbit or the day), and
+  **Month moon** (the body's moons), with a live preview ("Planet's orbit: 365.25 → 365 days")
+  or the reason it can't fit. In the System panel, fitted **Day length** and **Period** fields
+  are locked, and their tooltips name the calendar that sets them.
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: turning it on
+  and picking a month moon (preview shown), Save (one undo step: the orbit becomes 365 days and
+  Luna's 28.077), the locked fields and their tooltips, a day-length change re-fitting the
+  orbit and moon live, undo, switching to the day length, deleting the moon, and save/reopen.
 
 **CAL-03 — Solstices, equinoxes, and seasons** · Implemented (M5) · Base
 **Intent:** Derived from the system's configuration.
