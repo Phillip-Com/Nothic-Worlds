@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 8;
+    public const int CurrentVersion = 9;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -79,6 +79,10 @@ internal static partial class WorldFormat
         // 7 → 8: the world gained an optional "regions" list, and places an optional "region"
         // (region outlines, M8). Older worlds have none.
         document => document,
+
+        // 8 → 9: bodies gained an average temperature, and the world an optional "weatherPins"
+        // list (weather pins, M9). Older bodies get Earth's 15 °C, and worlds have no pins.
+        document => SetOnEveryBody(document, "averageTemperature", 15.0),
     ];
 
     public static string ProjectionName(MapProjection projection) => _projectionNames[projection];

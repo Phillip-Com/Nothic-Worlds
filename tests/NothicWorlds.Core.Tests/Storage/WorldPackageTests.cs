@@ -1136,6 +1136,302 @@ public sealed class WorldPackageTests : IDisposable
         }
         """;
 
+    // A version 9 world file: the version 8 world with average temperatures and a weather
+    // pin. Never edit this.
+    private const string GoldenV9Json = """
+        {
+          "formatVersion": 9,
+          "id": "11111111-2222-3333-4444-555555555555",
+          "name": "Aerth",
+          "createdUtc": "2026-09-30T12:00:00+00:00",
+          "modifiedUtc": "2026-09-30T13:30:00+00:00",
+          "timeDays": 400.5,
+          "bodies": [
+            {
+              "id": "51515151-5151-5151-5151-515151515151",
+              "name": "Sol",
+              "kind": "star",
+              "radiusKm": 696000,
+              "dayLengthHours": 609.5,
+              "axialTilt": 0,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aerth",
+              "kind": "planet",
+              "radiusKm": 6000,
+              "dayLengthHours": 26.5,
+              "axialTilt": 23.5,
+              "axialTiltDirection": 45,
+              "averageTemperature": 12.5,
+              "orbit": {
+                "parent": "51515151-5151-5151-5151-515151515151",
+                "distanceKm": 149600000,
+                "periodDays": 365.25,
+                "startAngle": 90
+              },
+              "calendar": {
+                "months": [
+                  {
+                    "name": "Frost",
+                    "days": 30
+                  },
+                  {
+                    "name": "Highsun",
+                    "days": 31
+                  }
+                ],
+                "weekdays": [
+                  "Moonday",
+                  "Starday"
+                ],
+                "firstYear": 1203,
+                "era": "of the Third Age",
+                "start": {
+                  "month": 1,
+                  "day": 5,
+                  "weekday": 1
+                }
+              },
+              "surface": {
+                "map": {
+                  "asset": "assets/0123456789abcdef0123456789abcdef.png",
+                  "projection": "winkel-tripel",
+                  "calibration": {
+                    "latitudes": [
+                      {
+                        "latitude": 30,
+                        "drawnAs": 33.5
+                      }
+                    ],
+                    "longitudes": [
+                      {
+                        "longitude": -180,
+                        "drawnAs": -185
+                      },
+                      {
+                        "longitude": 0,
+                        "drawnAs": 2
+                      }
+                    ]
+                  }
+                },
+                "pieces": [
+                  {
+                    "id": "99999999-8888-7777-6666-555555555555",
+                    "name": "Northern Isles",
+                    "asset": "assets/fedcba9876543210fedcba9876543210.png",
+                    "outline": {
+                      "sourceAspectRatio": 1.5,
+                      "points": [
+                        [
+                          0.25,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.5
+                        ],
+                        [
+                          0.25,
+                          0.5
+                        ]
+                      ]
+                    },
+                    "latitude": 55,
+                    "longitude": -20.5,
+                    "rotation": 15,
+                    "width": 12.5,
+                    "warp": [
+                      [
+                        0,
+                        0
+                      ],
+                      [
+                        1.25,
+                        -0.125
+                      ],
+                      [
+                        1,
+                        1
+                      ],
+                      [
+                        0,
+                        1
+                      ]
+                    ]
+                  }
+                ],
+                "fillColor": "#112233"
+              }
+            },
+            {
+              "id": "70707070-7070-7070-7070-707070707070",
+              "name": "Luna",
+              "kind": "moon",
+              "radiusKm": 1737.5,
+              "dayLengthHours": 660,
+              "axialTilt": 1.5,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "orbit": {
+                "parent": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "distanceKm": 384400,
+                "periodDays": 27.5,
+                "startAngle": 0,
+                "eccentricity": 0.25,
+                "closestApproach": 45,
+                "tilt": 5.25,
+                "tiltDirection": 120
+              },
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            }
+          ],
+          "regions": [
+            {
+              "id": "4e4e4e4e-4e4e-4e4e-4e4e-4e4e4e4e4e4e",
+              "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "The Western Coast",
+              "notes": "Fishing towns.",
+              "color": "#5090D0",
+              "corners": [
+                [
+                  10,
+                  -35
+                ],
+                [
+                  10,
+                  -25
+                ],
+                [
+                  16,
+                  -25
+                ],
+                [
+                  16.5,
+                  -35
+                ]
+              ]
+            },
+            {
+              "id": "4f4f4f4f-4f4f-4f4f-4f4f-4f4f4f4f4f4f",
+              "body": "70707070-7070-7070-7070-707070707070",
+              "name": "Sea of Rain",
+              "color": "#E6C878",
+              "corners": [
+                [
+                  20,
+                  10
+                ],
+                [
+                  25,
+                  30
+                ],
+                [
+                  35,
+                  15
+                ]
+              ]
+            }
+          ],
+          "weatherPins": [
+            {
+              "id": "3c3c3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c",
+              "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aster Bay",
+              "latitude": 42.5,
+              "longitude": -71.25
+            }
+          ],
+          "journal": [
+            {
+              "id": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+              "title": "The Founding",
+              "text": "First line.\nSecond line.",
+              "location": {
+                "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "region": "4e4e4e4e-4e4e-4e4e-4e4e-4e4e4e4e4e4e",
+                "latitude": 12.5,
+                "longitude": -30.25
+              },
+              "createdUtc": "2026-10-02T09:00:00+00:00",
+              "editedUtc": "2026-10-02T10:15:00+00:00"
+            },
+            {
+              "id": "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2",
+              "title": "Notes on Luna",
+              "location": {
+                "body": "70707070-7070-7070-7070-707070707070"
+              },
+              "createdUtc": "2026-10-02T11:00:00+00:00",
+              "editedUtc": "2026-10-02T11:00:00+00:00"
+            }
+          ],
+          "timelines": [
+            {
+              "id": "7e7e7e7e-7e7e-7e7e-7e7e-7e7e7e7e7e7e",
+              "name": "The Empire",
+              "color": "#C04040"
+            },
+            {
+              "id": "7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f",
+              "name": "House Vael",
+              "color": "#40A060",
+              "hidden": true
+            }
+          ],
+          "events": [
+            {
+              "id": "0e0e0e0e-0e0e-0e0e-0e0e-0e0e0e0e0e0e",
+              "timeline": "7e7e7e7e-7e7e-7e7e-7e7e-7e7e7e7e7e7e",
+              "title": "Coronation",
+              "start": 120.5,
+              "location": {
+                "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "latitude": 12.5,
+                "longitude": -30.25
+              },
+              "entries": [
+                "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1"
+              ]
+            },
+            {
+              "id": "0f0f0f0f-0f0f-0f0f-0f0f-0f0f0f0f0f0f",
+              "timeline": "7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f",
+              "title": "The Long War",
+              "description": "Twelve years of war.",
+              "start": 400,
+              "end": 4783.25,
+              "entries": [
+                "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+                "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2"
+              ]
+            }
+          ],
+          "view": {
+            "latitude": 20,
+            "longitude": -45.5,
+            "altitude": 1.25,
+            "focusOffset": [
+              0.5,
+              0,
+              -0.25
+            ]
+          }
+        }
+        """;
+
     private static readonly byte[] _imageBytes = Encoding.ASCII.GetBytes("pretend PNG bytes");
     private static readonly byte[] _pieceBytes = Encoding.ASCII.GetBytes("pretend piece PNG");
 
@@ -1219,13 +1515,50 @@ public sealed class WorldPackageTests : IDisposable
     // ----- The file format itself -----
 
     [Fact]
-    public void WrittenJson_MatchesTheGoldenVersion8File()
+    public void WrittenJson_MatchesTheGoldenVersion9File()
     {
         string path = PathFor("golden.nworld");
 
-        WorldPackage.Save(path, RegionGoldenWorld(), AssetsWithPiece());
+        WorldPackage.Save(path, WeatherGoldenWorld(), AssetsWithPiece());
 
-        Assert.Equal(Normalize(GoldenV8Json), Normalize(ReadEntry(path, "world.json")));
+        Assert.Equal(Normalize(GoldenV9Json), Normalize(ReadEntry(path, "world.json")));
+    }
+
+    [Fact]
+    public void GoldenVersion9File_LoadsAsExpected()
+    {
+        string path = WriteRawPackage("golden-v9.nworld", GoldenV9Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        AssertSameWorld(WeatherGoldenWorld(), WorldPackage.Load(path).World);
+    }
+
+    [Fact]
+    public void Version8Files_GetEarthsTemperatureAndNoWeatherPins()
+    {
+        string path = WriteRawPackage("golden-v8-upgrade.nworld", GoldenV8Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        World world = WorldPackage.Load(path).World;
+
+        Assert.All(world.Bodies, body => Assert.Equal(15, body.AverageTemperatureC));
+        Assert.Empty(world.WeatherPins);
+    }
+
+    [Theory]
+    [InlineData("\"name\": \"Aster Bay\"", "\"name\": \" \"")]                   // Unnamed
+    [InlineData("\"latitude\": 42.5", "\"latitude\": 142.5")]                     // Off the globe
+    [InlineData("\"averageTemperature\": 12.5", "\"averageTemperature\": -300")]  // Too cold
+    [InlineData("\"body\": \"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\",\n      \"name\": \"Aster",
+        "\"body\": \"51515151-5151-5151-5151-515151515151\",\n      \"name\": \"Aster")]  // Star
+    public void Load_DamagedWeather_IsRejected(string find, string replace)
+    {
+        string json = Normalize(GoldenV9Json).Replace(find, replace);
+        Assert.NotEqual(Normalize(GoldenV9Json), json);  // The edit really applied.
+        string path = WriteRawPackage("damaged-v9.nworld", json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes));
+
+        Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
     }
 
     [Fact]
@@ -1454,7 +1787,7 @@ public sealed class WorldPackageTests : IDisposable
 
         WorldPackage.Save(newPath, loaded.World, loaded.Assets);
 
-        Assert.Contains("\"formatVersion\": 8", ReadEntry(newPath, "world.json"));
+        Assert.Contains("\"formatVersion\": 9", ReadEntry(newPath, "world.json"));
         AssertSameWorld(GoldenWorld(), WorldPackage.Load(newPath).World);
     }
 
@@ -1559,7 +1892,7 @@ public sealed class WorldPackageTests : IDisposable
     public void Load_NewerFormatVersion_IsRefusedWithAClearMessage()
     {
         string path = WriteRawPackage(
-            "future.nworld", GoldenV8Json.Replace("\"formatVersion\": 8", "\"formatVersion\": 9"),
+            "future.nworld", GoldenV9Json.Replace("\"formatVersion\": 9", "\"formatVersion\": 10"),
             (AssetName, _imageBytes));
 
         WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
@@ -1831,6 +2164,22 @@ public sealed class WorldPackageTests : IDisposable
         };
     }
 
+    // A version 9 world: the version 8 world with the planet's average temperature set to
+    // 12.5 °C (the others keep the default 15) and one weather pin on it.
+    private static World WeatherGoldenWorld()
+    {
+        World world = RegionGoldenWorld();
+        world.Bodies[1].AverageTemperatureC = 12.5;
+        world.WeatherPins.Add(new WeatherPin
+        {
+            Id = Guid.Parse("3c3c3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c"),
+            BodyId = world.Bodies[1].Id,
+            Name = "Aster Bay",
+            Spot = new GeoCoordinate(42.5, -71.25),
+        });
+        return world;
+    }
+
     // A version 8 world: the version 7 world with two regions (one with notes, on the planet;
     // one without, on the moon), and the founding entry placed in the planet's region.
     private static World RegionGoldenWorld()
@@ -2010,6 +2359,7 @@ public sealed class WorldPackageTests : IDisposable
         Assert.Equal(expected.ModifiedUtc, actual.ModifiedUtc);
         Assert.Equal(expected.View, actual.View);
         Assert.Equal(expected.Regions, actual.Regions);
+        Assert.Equal(expected.WeatherPins, actual.WeatherPins);
         Assert.Equal(expected.Journal, actual.Journal);
         Assert.Equal(expected.Timelines, actual.Timelines);
         Assert.Equal(expected.Events, actual.Events);
@@ -2025,6 +2375,7 @@ public sealed class WorldPackageTests : IDisposable
             Assert.Equal(e.DayLengthHours, a.DayLengthHours);
             Assert.Equal(e.AxialTiltDegrees, a.AxialTiltDegrees);
             Assert.Equal(e.AxialTiltDirectionDegrees, a.AxialTiltDirectionDegrees);
+            Assert.Equal(e.AverageTemperatureC, a.AverageTemperatureC);
             Assert.Equal(e.Calendar, a.Calendar);
             Assert.Equal(e.Orbit, a.Orbit);
             Assert.Equal(e.Surface.FillColor, a.Surface.FillColor);

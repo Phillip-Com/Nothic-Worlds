@@ -23,6 +23,7 @@ internal static class WorldMapper
             TimeDays = world.TimeDays,
             Bodies = world.Bodies.Select(ToDocument).ToList(),
             Regions = NullIfEmpty(world.Regions.Select(ToDocument)),
+            WeatherPins = NullIfEmpty(world.WeatherPins.Select(ToDocument)),
             Journal = NullIfEmpty(world.Journal.Select(ToDocument)),
             Timelines = NullIfEmpty(world.Timelines.Select(ToDocument)),
             Events = NullIfEmpty(world.Events.Select(ToDocument)),
@@ -49,6 +50,8 @@ internal static class WorldMapper
         world.Bodies.AddRange(document.Bodies.Select(ToBody));
         RequireNoProblem(Simulation.SystemHierarchy.Problem(world.Bodies));
         world.Regions.AddRange((document.Regions ?? []).Select(ToRegion));
+        world.WeatherPins.AddRange((document.WeatherPins ?? []).Select(ToWeatherPin));
+        RequireNoProblem(WeatherPin.Problem(world));
         world.Journal.AddRange((document.Journal ?? []).Select(ToEntry));
         world.Timelines.AddRange((document.Timelines ?? []).Select(ToTimeline));
         world.Events.AddRange((document.Events ?? []).Select(ToEvent));
@@ -61,6 +64,35 @@ internal static class WorldMapper
     {
         List<T> list = [.. items];
         return list.Count == 0 ? null : list;
+    }
+
+    private static WeatherPinDocument ToDocument(WeatherPin pin)
+    {
+        return new WeatherPinDocument
+        {
+            Id = pin.Id,
+            Body = pin.BodyId,
+            Name = pin.Name,
+            Latitude = pin.Spot.LatitudeDegrees,
+            Longitude = pin.Spot.LongitudeDegrees,
+        };
+    }
+
+    // Checked fully afterwards by WeatherPin.Problem.
+    private static WeatherPin ToWeatherPin(WeatherPinDocument document)
+    {
+        Require(document is not null, "a weather pin is empty");
+        Require(double.IsFinite(document!.Latitude) && document.Latitude is >= -90 and <= 90
+                && double.IsFinite(document.Longitude)
+                && document.Longitude is >= -180 and <= 180,
+            "a weather pin's spot is invalid");
+        return new WeatherPin
+        {
+            Id = document.Id,
+            BodyId = document.Body,
+            Name = document.Name ?? "",
+            Spot = new GeoCoordinate(document.Latitude, document.Longitude),
+        };
     }
 
     private static RegionDocument ToDocument(Region region)
@@ -230,6 +262,7 @@ internal static class WorldMapper
             DayLengthHours = body.DayLengthHours,
             AxialTilt = body.AxialTiltDegrees,
             AxialTiltDirection = body.AxialTiltDirectionDegrees,
+            AverageTemperature = body.AverageTemperatureC,
             Orbit = body.Orbit is Orbit orbit ? ToDocument(orbit) : null,
             Calendar = body.Calendar is Calendar calendar ? ToDocument(calendar) : null,
             Surface = new SurfaceDocument
@@ -446,6 +479,7 @@ internal static class WorldMapper
             DayLengthHours = document.DayLengthHours,
             AxialTiltDegrees = document.AxialTilt,
             AxialTiltDirectionDegrees = document.AxialTiltDirection,
+            AverageTemperatureC = document.AverageTemperature,
             Orbit = document.Orbit is OrbitDocument orbit ? ToOrbit(orbit) : null,
             Calendar = document.Calendar is CalendarDocument calendar
                 ? ToCalendar(calendar)
