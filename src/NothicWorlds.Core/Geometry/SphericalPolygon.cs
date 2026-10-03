@@ -137,6 +137,149 @@ public static class SphericalPolygon
         return path;
     }
 
+    /// <summary>
+    /// The outline's inside as triangles on the unit sphere (three unit vectors each, wound the
+    /// same way), each edge at most <paramref name="maxEdgeDegrees"/> long so the fill hugs the
+    /// surface when drawn. Null if the outline crosses itself or doesn't fit in a hemisphere.
+    /// </summary>
+    public static List<Vector3D>? FillTriangles(
+        IReadOnlyList<GeoCoordinate> corners, double maxEdgeDegrees)
+    {
+        if (corners.Count < 3 || !FitsInHemisphere(corners)
+            || Center(corners) is not GeoCoordinate center)
+        {
+            return null;
+        }
+
+        var plane = new TangentPlane(ToUnit(center));
+        List<(double X, double Y)> flat = [.. corners.Select(c => plane.Project(ToUnit(c))!.Value)];
+        if (EarClip(flat) is not List<(int A, int B, int C)> triangles)
+        {
+            return null;
+        }
+
+        double maxEdge = double.DegreesToRadians(Math.Max(maxEdgeDegrees, 0.1));
+        var result = new List<Vector3D>();
+        foreach ((int a, int b, int c) in triangles)
+        {
+            Subdivide(plane.Lift(flat[a]), plane.Lift(flat[b]), plane.Lift(flat[c]), maxEdge,
+                depth: 0, result);
+        }
+
+        return result;
+    }
+
+    // Cuts a simple polygon (in the plane) into triangles by ear clipping; null if it isn't
+    // simple (it crosses itself), since then no ear is found.
+    private static List<(int A, int B, int C)>? EarClip(List<(double X, double Y)> points)
+    {
+        List<int> remaining = [.. Enumerable.Range(0, points.Count)];
+        if (SignedArea(points) < 0)
+        {
+            remaining.Reverse();  // Work counterclockwise.
+        }
+
+        var triangles = new List<(int, int, int)>();
+        while (remaining.Count > 3)
+        {
+            bool clipped = false;
+            for (int i = 0; i < remaining.Count; i++)
+            {
+                int previous = remaining[(i + remaining.Count - 1) % remaining.Count];
+                int current = remaining[i];
+                int next = remaining[(i + 1) % remaining.Count];
+                if (IsEar(points, remaining, previous, current, next))
+                {
+                    triangles.Add((previous, current, next));
+                    remaining.RemoveAt(i);
+                    clipped = true;
+                    break;
+                }
+            }
+
+            if (!clipped)
+            {
+                return null;
+            }
+        }
+
+        triangles.Add((remaining[0], remaining[1], remaining[2]));
+        return triangles;
+    }
+
+    // A corner is an ear if it turns left (convex) and no other remaining point lies inside
+    // the triangle it makes with its neighbors.
+    private static bool IsEar(List<(double X, double Y)> points, List<int> remaining,
+        int previous, int current, int next)
+    {
+        (double X, double Y) a = points[previous];
+        (double X, double Y) b = points[current];
+        (double X, double Y) c = points[next];
+        if (Turn(a, b, c) <= 1e-15)
+        {
+            return false;
+        }
+
+        foreach (int other in remaining)
+        {
+            if (other != previous && other != current && other != next
+                && Turn(a, b, points[other]) >= 0 && Turn(b, c, points[other]) >= 0
+                && Turn(c, a, points[other]) >= 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // Positive when a → b → c turns left (counterclockwise).
+    private static double Turn((double X, double Y) a, (double X, double Y) b,
+        (double X, double Y) c)
+    {
+        return (b.X - a.X) * (c.Y - a.Y) - (b.Y - a.Y) * (c.X - a.X);
+    }
+
+    private static double SignedArea(List<(double X, double Y)> points)
+    {
+        double sum = 0;
+        for (int i = 0; i < points.Count; i++)
+        {
+            (double X, double Y) a = points[i];
+            (double X, double Y) b = points[(i + 1) % points.Count];
+            sum += a.X * b.Y - b.X * a.Y;
+        }
+
+        return sum / 2;
+    }
+
+    // Splits a spherical triangle into four until its edges are short enough, adding the
+    // pieces to `result`.
+    private static void Subdivide(Vector3D a, Vector3D b, Vector3D c, double maxEdge, int depth,
+        List<Vector3D> result)
+    {
+        double longest = Math.Max(Angle(a, b), Math.Max(Angle(b, c), Angle(c, a)));
+        if (longest <= maxEdge || depth >= 8)
+        {
+            result.Add(a);
+            result.Add(b);
+            result.Add(c);
+            return;
+        }
+
+        Vector3D ab = Unit(a + b);
+        Vector3D bc = Unit(b + c);
+        Vector3D ca = Unit(c + a);
+        Subdivide(a, ab, ca, maxEdge, depth + 1, result);
+        Subdivide(ab, b, bc, maxEdge, depth + 1, result);
+        Subdivide(ca, bc, c, maxEdge, depth + 1, result);
+        Subdivide(ab, bc, ca, maxEdge, depth + 1, result);
+    }
+
+    private static double Angle(Vector3D a, Vector3D b) => Math.Acos(Math.Clamp(a.Dot(b), -1, 1));
+
+    private static Vector3D Unit(Vector3D v) => v * (1 / v.Length);
+
     // The point a fraction of the way along the great circle from one unit vector to another.
     private static Vector3D Slerp(Vector3D from, Vector3D to, double angle, double fraction)
     {
@@ -164,6 +307,13 @@ public static class SphericalPolygon
             Vector3D helper = Math.Abs(normal.Y) < 0.9 ? new Vector3D(0, 1, 0) : new(1, 0, 0);
             _east = Normalize(Cross(helper, normal));
             _north = Cross(normal, _east);
+        }
+
+        // The unit direction through a point of the plane (the inverse of Project).
+        public Vector3D Lift((double X, double Y) point)
+        {
+            Vector3D onPlane = _normal + _east * point.X + _north * point.Y;
+            return onPlane * (1 / onPlane.Length);
         }
 
         // Where a direction meets the plane, in plane coordinates; null if it points away.

@@ -81,6 +81,55 @@ public class SphericalPolygonTests
     }
 
     [Fact]
+    public void TheFill_CoversTheInside_WithSmallTriangles()
+    {
+        // An L shape (concave), so the cutting has to go round the inner corner.
+        GeoCoordinate[] shape =
+            [new(0, 0), new(0, 20), new(8, 20), new(8, 8), new(20, 8), new(20, 0)];
+
+        List<Vector3D> triangles = SphericalPolygon.FillTriangles(shape, maxEdgeDegrees: 3)!;
+
+        Assert.NotNull(triangles);
+        Assert.Equal(0, triangles.Count % 3);
+        for (int i = 0; i < triangles.Count; i += 3)
+        {
+            Vector3D a = triangles[i], b = triangles[i + 1], c = triangles[i + 2];
+            foreach ((Vector3D p, Vector3D q) in new[] { (a, b), (b, c), (c, a) })
+            {
+                Assert.InRange(double.RadiansToDegrees(Math.Acos(Math.Clamp(p.Dot(q), -1, 1))),
+                    0, 3.0001);
+            }
+
+            // Every piece lies inside (its middle is in the shape), none in the notch.
+            GeoCoordinate middle = SphericalPolygon.FromUnit(a + b + c);
+            Assert.True(SphericalPolygon.Contains(shape, middle), $"{middle} is outside");
+        }
+
+        Assert.DoesNotContain(Enumerable.Range(0, triangles.Count / 3), i =>
+            SphericalPolygon.FromUnit(triangles[3 * i] + triangles[3 * i + 1]
+                + triangles[3 * i + 2]) is { LatitudeDegrees: > 9, LongitudeDegrees: > 9 });
+    }
+
+    [Fact]
+    public void TheFill_AroundAPole_Works()
+    {
+        GeoCoordinate[] cap = [new(80, 0), new(80, 90), new(80, 180), new(80, -90)];
+
+        List<Vector3D>? triangles = SphericalPolygon.FillTriangles(cap, maxEdgeDegrees: 2);
+
+        Assert.NotNull(triangles);
+        Assert.NotEmpty(triangles);
+    }
+
+    [Fact]
+    public void AnOutlineTooBigToFill_GivesNoFill()
+    {
+        GeoCoordinate[] huge = [new(-60, -100), new(-60, 100), new(60, 100), new(60, -100)];
+
+        Assert.Null(SphericalPolygon.FillTriangles(huge, maxEdgeDegrees: 2));
+    }
+
+    [Fact]
     public void DirectionsAndCoordinates_RoundTrip()
     {
         var spot = new GeoCoordinate(-33.25, 151.5);
