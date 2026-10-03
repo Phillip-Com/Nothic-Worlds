@@ -103,9 +103,10 @@ public partial class WeatherMarkers : CanvasLayer
     /// </summary>
     public void StartAdding()
     {
-        if (Session?.SelectedBody is not { Kind: not BodyKind.Star } body || Placer is null)
+        if (Session?.SelectedBody is not { HasSurface: true } body || Placer is null)
         {
-            Toolbar?.ShowWarning("Select a planet or moon first: stars have no weather.");
+            Toolbar?.ShowWarning(
+                "Select a planet or moon first: stars and comets have no weather.");
             return;
         }
 

@@ -216,7 +216,7 @@ public partial class EventDialog : ConfirmationDialog
             ? $"Pinned at {PlaceText.Describe(pin)}"
             : body is null ? "" : "No pin";
         _pinButton.Visible = Placer is not null && body is not null;
-        _pinButton.Disabled = body?.Kind == BodyKind.Star;
+        _pinButton.Disabled = body is { HasSurface: false };
         _unpinButton.Visible = _location?.Pin is not null;
     }
 

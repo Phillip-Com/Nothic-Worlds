@@ -130,7 +130,7 @@ public partial class WorldSession : Node
     public Body SelectedBody => FindBody(SelectedBodyId) ?? World.Bodies[0];
 
     /// <summary>True if the selected body can have a map (planets and moons; not stars).</summary>
-    public bool SelectedBodyHasSurface => SelectedBody.Kind != BodyKind.Star;
+    public bool SelectedBodyHasSurface => SelectedBody.HasSurface;
 
     /// <summary>The selected body's surface, or null for a star.</summary>
     public PlanetSurface? Surface => System?.SurfaceFor(SelectedBodyId);
@@ -328,9 +328,14 @@ public partial class WorldSession : Node
     /// <item>A planet orbits the selected star, or the star the selected body belongs to.</item>
     /// <item>A moon orbits the selected planet or moon (not a star).</item>
     /// <item>A star becomes a far-out companion of the system's central star.</item>
+    /// <item>A comet circles the selected body's star (or the first star), crossing the
+    /// innermost planet's orbit.</item>
     /// </list>
     /// </summary>
-    /// <returns>The new body, or null if it can't be added here (a moon of a star).</returns>
+    /// <returns>
+    /// The new body, or null if it can't be added here (a moon of a star or comet, or a comet
+    /// with no star in the system).
+    /// </returns>
     public async Task<Body?> AddBodyAsync(BodyKind kind)
     {
         if (!IsIdleForHistory)
@@ -342,9 +347,10 @@ public partial class WorldSession : Node
         Body? body = kind switch
         {
             BodyKind.Planet => NewBodies.Planet(World.Bodies, StarOf(selected) ?? Root(selected)),
-            BodyKind.Moon when selected.Kind != BodyKind.Star =>
-                NewBodies.Moon(World.Bodies, selected),
+            BodyKind.Moon when selected.HasSurface => NewBodies.Moon(World.Bodies, selected),
             BodyKind.Star => NewBodies.Star(World.Bodies, Root(selected)),
+            BodyKind.Comet when (StarOf(selected) ?? World.Bodies.Find(IsStar)) is Body star =>
+                NewBodies.Comet(World.Bodies, star),
             _ => null,
         };
         if (body is null)
@@ -420,11 +426,13 @@ public partial class WorldSession : Node
         }
     }
 
-    /// <summary>Switches a body between planet and moon (stars stay stars).</summary>
+    /// <summary>
+    /// Switches a body between planet and moon (stars and comets stay as they are).
+    /// </summary>
     public void SetBodyKind(Guid bodyId, BodyKind kind)
     {
         if (FindBody(bodyId) is not Body body || body.Kind == kind
-            || body.Kind == BodyKind.Star || kind == BodyKind.Star)
+            || !body.HasSurface || kind is not (BodyKind.Planet or BodyKind.Moon))
         {
             return;
         }
@@ -565,7 +573,7 @@ public partial class WorldSession : Node
     /// <returns>What's wrong with the calendar (nothing is changed then), or null.</returns>
     public string? SetCalendar(Guid bodyId, Calendar? calendar)
     {
-        if (FindBody(bodyId) is not Body body || body.Kind == BodyKind.Star)
+        if (FindBody(bodyId) is not Body body || !body.HasSurface)
         {
             return null;
         }
@@ -647,7 +655,9 @@ public partial class WorldSession : Node
     {
         var excluded = new HashSet<Guid>(
             SystemHierarchy.DescendantsOf(World.Bodies, bodyId).Select(b => b.Id)) { bodyId };
-        return World.Bodies.Where(b => !excluded.Contains(b.Id));
+        Body body = FindBody(bodyId)!;
+        return World.Bodies.Where(b => !excluded.Contains(b.Id)
+            && SystemHierarchy.CanOrbit(body, b));
     }
 
     // ----- Maps -----
@@ -656,7 +666,9 @@ public partial class WorldSession : Node
     /// Imports a map image and wraps it onto the selected body with the current map type.
     /// </summary>
     /// <exception cref="MapLoadException">The image couldn't be used.</exception>
-    /// <exception cref="InvalidOperationException">The selected body is a star.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The selected body is a star or comet.
+    /// </exception>
     public async Task<LoadedMap> ImportMapAsync(string imagePath)
     {
         RequireIdle();
@@ -1420,7 +1432,7 @@ public partial class WorldSession : Node
         for (Body? current = body; current is not null;
             current = current.Orbit is Orbit orbit ? FindBody(orbit.ParentId) : null)
         {
-            if (current.Kind == BodyKind.Star)
+            if (IsStar(current))
             {
                 return current;
             }
@@ -1428,6 +1440,8 @@ public partial class WorldSession : Node
 
         return null;
     }
+
+    private static bool IsStar(Body body) => body.Kind == BodyKind.Star;
 
     // The body at the top of a body's chain of parents.
     private Body Root(Body body)
@@ -1456,7 +1470,7 @@ public partial class WorldSession : Node
     // ready to use; a star only if there's nothing else.
     private static Guid DefaultSelection(World world)
     {
-        return (world.Bodies.FirstOrDefault(body => body.Kind != BodyKind.Star)
+        return (world.Bodies.FirstOrDefault(body => body.HasSurface)
             ?? world.Bodies[0]).Id;
     }
 
@@ -1654,7 +1668,7 @@ public partial class WorldSession : Node
         if (!SelectedBodyHasSurface)
         {
             throw new InvalidOperationException(
-                "Stars don't have maps. Select a planet or moon first.");
+                "Stars and comets don't have maps. Select a planet or moon first.");
         }
     }
 

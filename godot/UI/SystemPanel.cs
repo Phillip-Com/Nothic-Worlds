@@ -166,6 +166,9 @@ public partial class SystemPanel : CanvasLayer
         buttons.AddChild(_addMoonButton);
         buttons.AddChild(CreateButton("Add Star", () => _ = AddAsync(BodyKind.Star),
             "A companion star, far out around the system's central star"));
+        buttons.AddChild(CreateButton("Add Comet", () => _ = AddAsync(BodyKind.Comet),
+            "A comet on a long, elongated orbit around the selected body's star, crossing the " +
+            "innermost planet's orbit"));
         _deleteButton = CreateButton("Delete", () => _ = DeleteAsync(),
             "Delete the selected body and everything orbiting it (Ctrl+Z brings them back)");
         buttons.AddChild(_deleteButton);
@@ -306,10 +309,10 @@ public partial class SystemPanel : CanvasLayer
         SelectInTree(Session.SelectedBodyId);
         HighlightPath();
         Body selected = Session.SelectedBody;
-        _addMoonButton.Disabled = selected.Kind == BodyKind.Star;
+        _addMoonButton.Disabled = !selected.HasSurface;
         _deleteButton.Disabled = SystemHierarchy.DescendantsOf(bodies, selected.Id).Count + 1
             >= bodies.Count;
-        _centerButton.Disabled = selected.Orbit is null;
+        _centerButton.Disabled = selected.Orbit is null || selected.Kind == BodyKind.Comet;
         ShowSelected();
     }
 
@@ -333,6 +336,7 @@ public partial class SystemPanel : CanvasLayer
         {
             BodyKind.Star => "star",
             BodyKind.Moon => "moon",
+            BodyKind.Comet => "comet",
             _ => "planet",
         };
         item.SetText(0, $"{body.Name}  ({kind})");
@@ -395,9 +399,10 @@ public partial class SystemPanel : CanvasLayer
         }
 
         bool isStar = body.Kind == BodyKind.Star;
-        _kind.Visible = !isStar;
-        _kindLabel.Visible = isStar;
-        if (!isStar)
+        _kind.Visible = body.HasSurface;
+        _kindLabel.Visible = !body.HasSurface;
+        _kindLabel.Text = isStar ? "Star" : "Comet";
+        if (body.HasSurface)
         {
             _kind.Select(_kind.GetItemIndex((int)body.Kind));
         }
@@ -411,9 +416,10 @@ public partial class SystemPanel : CanvasLayer
         _temperature.ShowValue(body.AverageTemperatureC);
         ShowAppearance(body);
 
-        // Stars have no surface weather.
-        _temperature.Visible = !isStar;
-        _temperature.GetParent().GetChild<Control>(_temperature.GetIndex() - 1).Visible = !isStar;
+        // Stars and comets have no surface weather.
+        _temperature.Visible = body.HasSurface;
+        _temperature.GetParent().GetChild<Control>(_temperature.GetIndex() - 1).Visible =
+            body.HasSurface;
 
         _orbitFields.Visible = body.Orbit is not null;
         _noOrbit.Visible = body.Orbit is null;
@@ -428,7 +434,7 @@ public partial class SystemPanel : CanvasLayer
         _calendar?.Refresh();
         if (_eclipses is not null)
         {
-            _eclipses.Visible = !isStar;  // Stars have no eclipses of their own.
+            _eclipses.Visible = body.HasSurface;  // Stars and comets have no eclipses.
             _eclipses.Refresh();
         }
 

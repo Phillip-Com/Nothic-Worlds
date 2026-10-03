@@ -41,6 +41,7 @@ public partial class AddMenu : Node
         Planet,
         Moon,
         Star,
+        Comet,
         Region,
         JournalEntry,
         TimelineEvent,
@@ -65,6 +66,7 @@ public partial class AddMenu : Node
         menu.AddItem("Planet", (int)MenuItem.Planet);
         menu.AddItem("Moon", (int)MenuItem.Moon);
         menu.AddItem("Star", (int)MenuItem.Star);
+        menu.AddItem("Comet", (int)MenuItem.Comet);
         menu.AddSeparator();
         menu.AddItem("Region", (int)MenuItem.Region);
         menu.AddItem("Weather Pin", (int)MenuItem.WeatherPin);
@@ -76,15 +78,16 @@ public partial class AddMenu : Node
         Toolbar.MenuArea.AddChild(_button);
     }
 
-    // Things that go on a surface or circle a planet can't be added while a star is selected.
+    // Things that go on a surface or circle a planet can't be added while a star or comet is
+    // selected.
     private void UpdateItems(PopupMenu menu)
     {
-        bool star = Session!.SelectedBody.Kind == BodyKind.Star;
+        bool noSurface = !Session!.SelectedBody.HasSurface;
         foreach (MenuItem item in new[] { MenuItem.Moon, MenuItem.Region, MenuItem.WeatherPin })
         {
             int index = menu.GetItemIndex((int)item);
-            menu.SetItemDisabled(index, star);
-            menu.SetItemTooltip(index, star ? "Select a planet or moon first" : "");
+            menu.SetItemDisabled(index, noSurface);
+            menu.SetItemTooltip(index, noSurface ? "Select a planet or moon first" : "");
         }
     }
 
@@ -92,7 +95,7 @@ public partial class AddMenu : Node
     {
         switch (item)
         {
-            case MenuItem.Planet or MenuItem.Moon or MenuItem.Star:
+            case MenuItem.Planet or MenuItem.Moon or MenuItem.Star or MenuItem.Comet:
                 Toolbar!.ShowSystem();
                 if (SystemPanel is not null)
                 {
@@ -100,6 +103,7 @@ public partial class AddMenu : Node
                     {
                         MenuItem.Planet => BodyKind.Planet,
                         MenuItem.Moon => BodyKind.Moon,
+                        MenuItem.Comet => BodyKind.Comet,
                         _ => BodyKind.Star,
                     });
                 }

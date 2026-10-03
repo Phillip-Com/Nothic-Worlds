@@ -298,10 +298,10 @@ public partial class RegionsPanel : CanvasLayer
         }
 
         Body body = Session.SelectedBody;
-        bool canHaveRegions = body.Kind != BodyKind.Star;
+        bool canHaveRegions = body.HasSurface;
         List<Region> regions = [.. Session.World.Regions.Where(r => r.BodyId == body.Id)];
         _heading.Text = $"Regions on {body.Name}";
-        _noRegions.Text = !canHaveRegions ? "Stars have no regions."
+        _noRegions.Text = !canHaveRegions ? "Stars and comets have no regions."
             : regions.Count == 0 ? "No regions yet: New Region draws one." : "";
         _noRegions.Visible = _noRegions.Text != "";
         _newButton.Disabled = !canHaveRegions;

@@ -481,9 +481,9 @@ public partial class JournalPanel : CanvasLayer
             ? $"Pinned at {PlaceText.Describe(pin)}"
             : placeBody is null ? "" : "No pin";
         _pinButton.Visible = placeBody is not null;
-        _pinButton.Disabled = placeBody?.Kind == BodyKind.Star;
+        _pinButton.Disabled = placeBody is { HasSurface: false };
         _pinButton.TooltipText = _pinButton.Disabled
-            ? "Stars have no surface to pin"
+            ? "Stars and comets have no surface to pin"
             : "Click the spot on the place's globe (Esc cancels)";
         _unpinButton.Visible = entry.Location?.Pin is not null;
         _links.Text = LinksText(entry);

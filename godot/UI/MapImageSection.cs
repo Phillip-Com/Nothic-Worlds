@@ -43,7 +43,7 @@ public partial class MapImageSection : VBoxContainer
         AddChild(new Label { Text = "Map Image" });
         _noMap = new Label
         {
-            Text = "Stars have no map. Select a planet or moon.",
+            Text = "Stars and comets have no map. Select a planet or moon.",
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
         };
         AddChild(_noMap);
@@ -140,7 +140,7 @@ public partial class MapImageSection : VBoxContainer
     {
         _mapType.Select(_mapType.GetItemIndex((int)Session.Projection));
         _fillColor.Color = Session.FillColor.ToGodot();
-        bool hasSurface = Session.SelectedBodyHasSurface;  // Stars have no map.
+        bool hasSurface = Session.SelectedBodyHasSurface;  // Stars and comets have no map.
         _noMap.Visible = !hasSurface;
         bool showFill = hasSurface && !MapProjections.CoversWholeGlobe(Session.Projection);
         _fillColorLabel.Visible = showFill;

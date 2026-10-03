@@ -64,7 +64,7 @@ public partial class CalendarSection : VBoxContainer
         }
 
         Body body = Session.SelectedBody;
-        _calendarRow.Visible = body.Kind != BodyKind.Star;
+        _calendarRow.Visible = body.HasSurface;
         _calendarSummary.Text = body.Calendar is Calendar calendar
             ? Summarize(calendar)
             : "None (counting days)";
