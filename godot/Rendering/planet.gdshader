@@ -77,11 +77,21 @@ const int WARP_TILES_ACROSS = 8;
 uniform bool has_terrain = false;
 uniform bool show_terrain = true;
 uniform sampler2DArray terrain_cells : filter_nearest, repeat_disable;
-uniform sampler2D terrain_palette : filter_nearest, repeat_disable;
+uniform sampler2D terrain_palette : source_color, filter_nearest, repeat_disable;
+// Seen from far away, cells get smaller than a pixel and would flicker. This copy holds each
+// face's colors averaged over 4 x 4 cells (alpha = how much is painted, colors multiplied by
+// it), with mipmaps, and takes over as cells shrink.
+uniform sampler2DArray terrain_far : source_color, filter_linear_mipmap, repeat_disable;
 // How strongly terrain covers a map (and its pieces), so the map shows through for tracing.
-// Without a map, terrain is the surface itself.
+// Without a map, terrain is the surface itself, and what's not painted is drawn in
+// `unpainted_color` (owner's choice), so it's easy to tell from painted Ocean.
 uniform float terrain_over_map = 0.6;
+uniform vec3 unpainted_color : source_color = vec3(0.55, 0.56, 0.58);
 const int TERRAIN_FACE_SIZE = 1024;
+const int TERRAIN_FAR_SIZE = 256;
+// The softest edge between terrains up close, in cells (edges sharpen to about a pixel as
+// cells get bigger on screen, and never go softer than this).
+const float TERRAIN_EDGE_CELLS = 0.15;
 uniform vec3 base_color : source_color = vec3(0.13, 0.27, 0.45);
 uniform vec3 grid_color : source_color = vec3(0.75, 0.8, 0.9);
 uniform vec3 highlight_color : source_color = vec3(1.0, 0.8, 0.35);
@@ -362,34 +372,138 @@ vec3 draw_pieces(vec3 color, vec3 direction, float pixel_angle) {
 	return color;
 }
 
-// The terrain cell a direction points into: (column, row, face). See CubeSphere.CellAt, whose
-// face axes are written out here as plain components (indexing arrays per pixel is slow on
-// some graphics cards). `on_face` is the point on the cube face: (along "right", along "up").
-ivec3 terrain_cell(vec3 d) {
+// Where a direction meets the cube: (across, down, face), with across and down from 0 to 1 over
+// the face (left to right, top to bottom). See CubeSphere.CellAt, whose face axes are written
+// out here as plain components (indexing arrays per pixel is slow on some graphics cards).
+// `on_face` is the point on the flat cube face: (along "right", along "up").
+vec3 terrain_face_position(vec3 d) {
 	vec3 size = abs(d);
-	int face;
+	float face;
 	vec2 on_face;
 	if (size.x >= size.y && size.x >= size.z) {
-		face = d.x >= 0.0 ? 0 : 1;
+		face = d.x >= 0.0 ? 0.0 : 1.0;
 		on_face = vec2(-d.z, d.y) / d.x * vec2(1.0, sign(d.x));
 	} else if (size.y >= size.z) {
-		face = d.y >= 0.0 ? 2 : 3;
+		face = d.y >= 0.0 ? 2.0 : 3.0;
 		on_face = vec2(d.x, -d.z) / d.y * vec2(sign(d.y), 1.0);
 	} else {
-		face = d.z >= 0.0 ? 4 : 5;
+		face = d.z >= 0.0 ? 4.0 : 5.0;
 		on_face = vec2(d.x, d.y) / d.z * vec2(1.0, sign(d.z));
 	}
 
 	vec2 spread = atan(on_face) * (4.0 / PI);  // Equal-angle spacing, -1 to 1
-	vec2 position = vec2(spread.x, -spread.y);  // Rows run down from the top
-	ivec2 cell = ivec2(floor((position + 1.0) * 0.5 * float(TERRAIN_FACE_SIZE)));
-	return ivec3(clamp(cell, ivec2(0), ivec2(TERRAIN_FACE_SIZE - 1)), face);
+	return vec3((spread.x + 1.0) * 0.5, (1.0 - spread.y) * 0.5, face);
 }
 
-// The painted terrain's color here (alpha 0 where nothing is painted).
-vec4 terrain_color(vec3 direction) {
-	float code = texelFetch(terrain_cells, terrain_cell(direction), 0).r;
-	return texelFetch(terrain_palette, ivec2(int(round(code * 255.0)), 0), 0);
+// The reverse: the direction to a position on a face (positions a little past the edge give
+// directions over the next face, which terrain_face_position then finds).
+vec3 terrain_direction(int face, vec2 position) {
+	vec2 flat_cube = tan((vec2(position.x, 1.0 - position.y) * 2.0 - 1.0) * (PI / 4.0));
+	float a = flat_cube.x;  // Along the face's "right"
+	float b = flat_cube.y;  // Along its "up"
+	if (face == 0) { return vec3(1.0, b, -a); }
+	if (face == 1) { return vec3(-1.0, b, a); }
+	if (face == 2) { return vec3(a, 1.0, -b); }
+	if (face == 3) { return vec3(a, -1.0, b); }
+	if (face == 4) { return vec3(a, b, 1.0); }
+	return vec3(-a, b, -1.0);
+}
+
+// A cell's terrain code, and its color with alpha (0 where nothing is painted).
+int terrain_code(ivec3 cell) {
+	return int(round(texelFetch(terrain_cells, cell, 0).r * 255.0));
+}
+
+vec4 terrain_code_color(int code) {
+	return texelFetch(terrain_palette, ivec2(code, 0), 0);
+}
+
+// Up close: the four cells around this point, with smooth, softly anti-aliased edges between
+// terrains instead of square cells. Each terrain's share of the four (by distance) decides; the
+// edge runs where the two biggest shares are equal, which gives rounded coastlines.
+vec4 terrain_near(vec3 position, float cells_per_pixel) {
+	int face = int(position.z);
+	vec2 cells = position.xy * float(TERRAIN_FACE_SIZE) - 0.5;
+	ivec2 base = ivec2(floor(cells));
+	vec2 f = cells - vec2(base);
+	bool inside_face = base.x >= 0 && base.y >= 0
+		&& base.x < TERRAIN_FACE_SIZE - 1 && base.y < TERRAIN_FACE_SIZE - 1;
+
+	int codes[4];
+	float weights[4];
+	for (int i = 0; i < 4; i++) {
+		ivec2 corner = base + ivec2(i % 2, i / 2);
+		ivec3 cell;
+		if (inside_face) {
+			cell = ivec3(corner, face);
+		} else {
+			// Along a face edge, a neighbor may lie on the next face: find it by direction.
+			vec2 at = (vec2(corner) + 0.5) / float(TERRAIN_FACE_SIZE);
+			vec3 next = terrain_face_position(terrain_direction(face, at));
+			ivec2 index = ivec2(floor(next.xy * float(TERRAIN_FACE_SIZE)));
+			cell = ivec3(clamp(index, ivec2(0), ivec2(TERRAIN_FACE_SIZE - 1)), int(next.z));
+		}
+		codes[i] = terrain_code(cell);
+		weights[i] = (i % 2 == 0 ? 1.0 - f.x : f.x) * (i / 2 == 0 ? 1.0 - f.y : f.y);
+	}
+
+	// Inside one terrain (most of the globe), there's no edge to draw.
+	if (codes[0] == codes[1] && codes[0] == codes[2] && codes[0] == codes[3]) {
+		vec4 color = terrain_code_color(codes[0]);
+		return vec4(color.rgb * color.a, color.a);
+	}
+
+	// Each corner's terrain's total share; keep the biggest and the biggest other one.
+	int best = codes[0];
+	float best_share = -1.0;
+	int second = codes[0];
+	float second_share = 0.0;
+	for (int i = 0; i < 4; i++) {
+		float share = 0.0;
+		for (int j = 0; j < 4; j++) {
+			share += codes[j] == codes[i] ? weights[j] : 0.0;
+		}
+		if (share > best_share) {
+			if (codes[i] != best) {
+				second = best;
+				second_share = best_share;
+			}
+			best = codes[i];
+			best_share = share;
+		} else if (codes[i] != best && share > second_share) {
+			second = codes[i];
+			second_share = share;
+		}
+	}
+
+	float edge = max(cells_per_pixel, TERRAIN_EDGE_CELLS);
+	float blend = second == best ? 1.0 : smoothstep(-edge, edge, best_share - second_share);
+	vec4 best_color = terrain_code_color(best);
+	vec4 second_color = terrain_code_color(second);
+	// Blended with alpha, so an edge against unpainted ground fades rather than darkens.
+	vec4 near = mix(vec4(second_color.rgb * second_color.a, second_color.a),
+		vec4(best_color.rgb * best_color.a, best_color.a), blend);
+	return near;
+}
+
+// The painted terrain's color here, with its colors multiplied by alpha (alpha 0 where nothing
+// is painted). `pixel_angle` is how much of the globe one screen pixel covers (radians).
+vec4 terrain_color(vec3 direction, float pixel_angle) {
+	vec3 position = terrain_face_position(direction);
+	float cells_per_pixel = pixel_angle / (HALF_PI / float(TERRAIN_FACE_SIZE));
+
+	// Cells bigger than about a pixel: draw them; smaller: the averaged copy; blend between.
+	float far_share = smoothstep(0.6, 1.5, cells_per_pixel);
+	vec4 color = vec4(0.0);
+	if (far_share < 1.0) {
+		color = terrain_near(position, cells_per_pixel);
+	}
+	if (far_share > 0.0) {
+		float far_texels = cells_per_pixel * float(TERRAIN_FAR_SIZE) / float(TERRAIN_FACE_SIZE);
+		float lod = max(log2(max(far_texels, 1e-6)), 0.0);
+		color = mix(color, textureLod(terrain_far, position, lod), far_share);
+	}
+	return color;
 }
 
 void fragment() {
@@ -397,12 +511,17 @@ void fragment() {
 	float latitude = degrees(asin(clamp(direction.y, -1.0, 1.0)));
 	float longitude = degrees(atan(direction.x, direction.z));
 
-	vec3 color = has_map ? sample_map(radians(latitude), radians(longitude)) : base_color;
-	color = draw_pieces(color, direction, length(fwidth(direction)));
-	if (has_terrain && show_terrain) {
-		vec4 terrain = terrain_color(direction);
-		float strength = has_map || piece_count > 0 ? terrain_over_map : 1.0;
-		color = mix(color, terrain.rgb, terrain.a * strength);
+	bool terrain_shown = has_terrain && show_terrain;
+	bool over_map = has_map || piece_count > 0;
+	vec3 color = has_map ? sample_map(radians(latitude), radians(longitude))
+		: terrain_shown ? unpainted_color : base_color;
+	float pixel_angle = length(fwidth(direction));
+	color = draw_pieces(color, direction, pixel_angle);
+	if (terrain_shown) {
+		// Colors come multiplied by alpha: "over" blending, weakened over a map.
+		vec4 terrain = terrain_color(direction, pixel_angle);
+		float strength = over_map ? terrain_over_map : 1.0;
+		color = color * (1.0 - terrain.a * strength) + terrain.rgb * strength;
 	}
 
 	if (show_grid) {
