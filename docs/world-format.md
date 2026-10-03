@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 12** (see **Version history** at the end)
+**Current format version: 13** (see **Version history** at the end)
 
 ## Container
 
@@ -23,11 +23,11 @@ A `.nworld` file is a standard **zip archive** containing:
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB, each terrain image
   up to 16 MB.
 
-## `world.json` (version 12)
+## `world.json` (version 13)
 
 ```json
 {
-  "formatVersion": 12,
+  "formatVersion": 13,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -42,6 +42,7 @@ A `.nworld` file is a standard **zip archive** containing:
       "dayLengthHours": 609.5,
       "axialTilt": 0,
       "axialTiltDirection": 0,
+      "appearance": { "starType": "yellow" },
       "surface": { "fillColor": "#E6EDF5" }
     },
     {
@@ -62,6 +63,7 @@ A `.nworld` file is a standard **zip archive** containing:
         "tilt": 5.25,
         "tiltDirection": 120
       },
+      "appearance": { "color": "#8A8A8A", "pattern": "rocky" },
       "surface": { "fillColor": "#E6EDF5" }
     },
     {
@@ -84,6 +86,7 @@ A `.nworld` file is a standard **zip archive** containing:
         "fit": "year-length",
         "monthMoon": "70707070-7070-7070-7070-707070707070"
       },
+      "appearance": { "color": "#336699", "pattern": "banded" },
       "surface": {
         "map": {
           "asset": "assets/0123456789abcdef0123456789abcdef.png",
@@ -191,6 +194,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `bodies[].dayLengthHours` | yes | Time for one spin, in standard hours. Above 0, at most 10⁷. |
 | `bodies[].axialTilt` | yes | Degrees the spin axis leans, 0 to 180 |
 | `bodies[].axialTiltDirection` | yes | Degrees: which way the north pole leans (see the axis rule below) |
+| `bodies[].appearance` | yes | How the body looks (`BOD-06`). Stars: `starType`, one of `"red-dwarf"`, `"orange"`, `"yellow"`, `"white"`, `"blue"` (it sets the star's color and its light's). Planets and moons: `color` (`#RRGGBB`) and `pattern`, one of `"plain"`, `"rocky"`, `"banded"`, `"icy"`, `"cloudy"`, shown where there's no map. |
 | `bodies[].averageTemperature` | yes | °C, −270 to 2,000: the body's average surface temperature over a year (`WTH-01`; Earth about 15). Weather pins spread it by latitude and season. |
 | `bodies[].calendar` | no | The body's own calendar (`CAL-01`). Omitted to count plain days. |
 | `…calendar.months` | yes | 1 to 100 `{ "name", "days" }`, in order; each name not empty, days 1 to 100,000 |
@@ -408,6 +412,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 13 | Body appearance (M16): bodies gain `appearance` | Stars get `starType` `yellow`; moons `color` `#8A8A8A` and `pattern` `rocky`; planets `color` `#214573` and `pattern` `plain` (the look they always had) |
 | 12 | Terrain-aware weather (M14): terrain types gain `climate` | Types named (ignoring case) Ocean or Shallow Water get `water`, Forest or Jungle `forest`, Mountains `mountains`, Desert `desert`, Swamp `wetland`, Ice `ice`; all others `open-land` |
 | 11 | Calendar fitting (M12): calendars gain optional `fit` and `monthMoon` | Nothing to change: version 10 calendars aren't fitted |
 | 10 | Terrain painting (M11): `terrainTypes`; surfaces gain an optional `terrain` image | The world gets the 12 default terrain types (codes 1–12: Ocean, Shallow Water, Plains, Fields, Forest, Jungle, Hills, Mountains, Desert, Swamp, Tundra, Ice); nothing is painted |
