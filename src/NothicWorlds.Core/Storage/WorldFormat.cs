@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 14;
+    public const int CurrentVersion = 15;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -45,6 +45,7 @@ internal static partial class WorldFormat
         [BodyKind.Planet] = "planet",
         [BodyKind.Star] = "star",
         [BodyKind.Moon] = "moon",
+        [BodyKind.Comet] = "comet",
     };
 
     private static readonly Dictionary<CalendarFit, string> _calendarFitNames = new()
@@ -139,6 +140,9 @@ internal static partial class WorldFormat
 
         // 13 → 14: calendars gained an optional "leap" rule (leap years, M17). Older calendars
         // have no leap years, so nothing changes.
+        document => document,
+
+        // 14 → 15: bodies can be comets (kind "comet", M18). Older worlds have none.
         document => document,
     ];
 

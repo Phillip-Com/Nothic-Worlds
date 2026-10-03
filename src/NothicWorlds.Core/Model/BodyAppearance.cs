@@ -15,13 +15,17 @@ public sealed record BodyAppearance(RgbColor Color, SurfacePattern Pattern, Star
     /// <summary>The grey moons start with.</summary>
     public static readonly RgbColor MoonGrey = new(0x8A, 0x8A, 0x8A);
 
+    /// <summary>The pale, dusty grey comets start with.</summary>
+    public static readonly RgbColor CometGrey = new(0xC8, 0xC4, 0xBC);
+
     /// <summary>
     /// The look a new body of a kind starts with (owner's choice): planets ocean blue and
-    /// plain, moons grey and rocky, stars yellow.
+    /// plain, moons grey and rocky, comets pale grey and rocky, stars yellow.
     /// </summary>
     public static BodyAppearance DefaultFor(BodyKind kind) => kind switch
     {
         BodyKind.Moon => new BodyAppearance(MoonGrey, SurfacePattern.Rocky, StarType.Yellow),
+        BodyKind.Comet => new BodyAppearance(CometGrey, SurfacePattern.Rocky, StarType.Yellow),
         _ => new BodyAppearance(PlanetBlue, SurfacePattern.Plain, StarType.Yellow),
     };
 

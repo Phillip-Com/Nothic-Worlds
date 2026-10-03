@@ -57,7 +57,7 @@ public sealed record WeatherPin
             return "two weather pins share an ID";
         }
 
-        var surfaces = world.Bodies.Where(b => b.Kind != BodyKind.Star)
+        var surfaces = world.Bodies.Where(b => b.HasSurface)
             .Select(b => b.Id).ToHashSet();
         return world.WeatherPins.Any(p => !surfaces.Contains(p.BodyId))
             ? "a weather pin is on a body that doesn't exist (or a star)"

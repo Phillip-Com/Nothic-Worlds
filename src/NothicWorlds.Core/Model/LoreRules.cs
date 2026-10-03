@@ -52,11 +52,11 @@ public static class LoreRules
         var entries = world.Journal.Select(e => e.Id).ToHashSet();
         var timelines = world.Timelines.Select(t => t.Id).ToHashSet();
         var bodies = world.Bodies.Select(b => b.Id).ToHashSet();
-        var surfaces = world.Bodies.Where(b => b.Kind != BodyKind.Star)
+        var surfaces = world.Bodies.Where(b => b.HasSurface)
             .Select(b => b.Id).ToHashSet();
         if (world.Regions.Any(r => !surfaces.Contains(r.BodyId)))
         {
-            return "a region is on a body that doesn't exist (or a star)";
+            return "a region is on a body that doesn't exist (or a star or comet)";
         }
 
         var regionBodies = world.Regions.ToDictionary(r => r.Id, r => r.BodyId);
