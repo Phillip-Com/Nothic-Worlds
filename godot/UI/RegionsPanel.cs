@@ -92,14 +92,7 @@ public partial class RegionsPanel : CanvasLayer
         panel.OffsetTop = TopOffset;
         panel.OffsetBottom = -BottomOffset;
         panel.GrowHorizontal = Control.GrowDirection.Begin;
-        panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            BgColor = new Color(0.09f, 0.09f, 0.11f, 0.96f),
-            ContentMarginLeft = 8,
-            ContentMarginRight = 8,
-            ContentMarginTop = 8,
-            ContentMarginBottom = 8,
-        });
+        panel.AddThemeStyleboxOverride("panel", PanelStyle.SidePanel());
         AddChild(panel);
 
         var scroll = new ScrollContainer

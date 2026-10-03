@@ -64,9 +64,9 @@ public partial class EventDialog : ConfirmationDialog
         var grid = new GridContainer { Columns = 2 };
         _title = new LineEdit { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         AddLabelled(grid, "Title", _title);
-        _timeline = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _timeline = new Dropdown { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         AddLabelled(grid, "Timeline", _timeline);
-        _place = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _place = new Dropdown { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _place.ItemSelected += _ =>
         {
             _location = ChosenPlace(_location);

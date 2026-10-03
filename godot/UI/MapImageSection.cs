@@ -227,7 +227,7 @@ public partial class MapImageSection : VBoxContainer
 
     private OptionButton CreateMapTypeDropdown()
     {
-        var dropdown = new OptionButton
+        var dropdown = new Dropdown
         {
             FocusMode = FocusModeEnum.None,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,

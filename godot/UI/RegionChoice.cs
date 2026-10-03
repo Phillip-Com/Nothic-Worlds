@@ -19,7 +19,7 @@ public partial class RegionChoice : HBoxContainer
     public override void _Ready()
     {
         AddChild(new Label { Text = "Region" });
-        _choice = new OptionButton
+        _choice = new Dropdown
         {
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             FocusMode = FocusModeEnum.None,

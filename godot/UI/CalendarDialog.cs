@@ -201,12 +201,12 @@ public partial class CalendarDialog : ConfirmationDialog
         box.AddChild(_fitYear);
 
         var grid = new GridContainer { Columns = 2 };
-        _fitBy = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _fitBy = new Dropdown { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _fitBy.AddItem("Changing the year's length (the orbit)", (int)CalendarFit.YearLength);
         _fitBy.AddItem("Changing the day's length (the spin)", (int)CalendarFit.DayLength);
         _fitBy.ItemSelected += _ => RefreshFit();
         AddLabelled(grid, "By", _fitBy);
-        _monthMoon = new OptionButton
+        _monthMoon = new Dropdown
         {
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             TooltipText = "Sets this moon's orbit so it goes from new moon to new moon once " +
@@ -321,13 +321,13 @@ public partial class CalendarDialog : ConfirmationDialog
             TooltipText = "Words shown after the year number",
         };
         AddLabelled(grid, "Era", _era);
-        _startMonth = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _startMonth = new Dropdown { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         _startMonth.ItemSelected += _ => RefreshStartDay();
         AddLabelled(grid, "Start month", _startMonth);
         _startDay = new SpinBox { MinValue = 1, Step = 1, UpdateOnTextChanged = true }
             .WithArrowKeys();
         AddLabelled(grid, "Start day", _startDay);
-        _startWeekday = new OptionButton();
+        _startWeekday = new Dropdown();
         AddLabelled(grid, "Start weekday", _startWeekday);
         grid.TooltipText = "The date at the world's day 1 (time 0)";
         return grid;

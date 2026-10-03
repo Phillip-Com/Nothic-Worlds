@@ -74,14 +74,7 @@ public partial class TerrainPanel : CanvasLayer
         panel.OffsetTop = TopOffset;
         panel.OffsetBottom = -BottomOffset;
         panel.GrowHorizontal = Control.GrowDirection.Begin;
-        panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            BgColor = new Color(0.09f, 0.09f, 0.11f, 0.96f),
-            ContentMarginLeft = 8,
-            ContentMarginRight = 8,
-            ContentMarginTop = 8,
-            ContentMarginBottom = 8,
-        });
+        panel.AddThemeStyleboxOverride("panel", PanelStyle.SidePanel());
         AddChild(panel);
 
         var scroll = new ScrollContainer
@@ -230,14 +223,10 @@ public partial class TerrainPanel : CanvasLayer
 
         var climateRow = new HBoxContainer();
         climateRow.AddChild(new Label { Text = "Climate" });
-        _climate = new OptionButton
+        _climate = new Dropdown
         {
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             TooltipText = "How this terrain affects the weather at weather pins",
-
-            // Opens when the click ends: in a short window the list can open over the button,
-            // and the end of the same click would otherwise pick whatever's under the mouse.
-            ActionMode = BaseButton.ActionModeEnum.Release,
         };
         foreach (ClimateKind kind in Enum.GetValues<ClimateKind>())
         {

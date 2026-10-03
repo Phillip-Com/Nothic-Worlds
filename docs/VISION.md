@@ -108,7 +108,11 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 14: Terrain-Aware Weather** · In Progress (owner's choice, 2026-10-03)
+**Milestone 15: Small Fixes** · In Progress (owner's choice, 2026-10-03)
+One tidy-up PR for issues found along the way (PR #41): dropdowns that could pick an item by
+accident in short windows, and markers showing through the side panels (see `UI-01`).
+
+**Milestone 14: Terrain-Aware Weather** · Complete (PR #40 merged 2026-10-03; owner's choice, 2026-10-03)
 Weather pins take the painted terrain around them into account (new feature `WTH-03`). Owner's
 decisions:
 - **A climate kind per terrain type**, from a short list (Water, Open land, Forest, Desert,
@@ -453,6 +457,15 @@ screen hold tools, journals, and similar content.
   the Map type list opens and Robinson hides Fill color; Clear Map clears and disables
   Calibrate…; with a piece selected at the small size the panel scrolls and Delete works; a
   star shows the note and disables the buttons; clicking Journal closes the Map panel.
+
+**Fixes (M15, PR #41):**
+- **Dropdowns** (`godot/UI/Dropdown.cs`, used for every dropdown): open when the click ends.
+  In a short window a list can open over its own button, and the end of the same click picked
+  the item under the mouse: at 1152 × 648 one click on the time bar's speed set it to "1 year /
+  second" (found with realistic 150 ms clicks, and confirmed on `main`).
+- **Side panels** (`godot/UI/PanelStyle.cs`): one solid background for System, Map, Terrain,
+  Journal, and Regions. The markers and labels drawn over the globe sit beneath the panels, but
+  showed through their slightly see-through backgrounds.
 
 **UI-02 — System tree panel** · Implemented (PR #18) · Base
 **Intent:** A compact tree view of the star system's hierarchy (e.g. Sun ▸ Planet ▸ Moon) showing

@@ -87,14 +87,7 @@ public partial class JournalPanel : CanvasLayer
 
         // Nearly opaque: this panel is for reading and writing, so the view mustn't show
         // through the text.
-        panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            BgColor = new Color(0.09f, 0.09f, 0.11f, 0.96f),
-            ContentMarginLeft = 8,
-            ContentMarginRight = 8,
-            ContentMarginTop = 8,
-            ContentMarginBottom = 8,
-        });
+        panel.AddThemeStyleboxOverride("panel", PanelStyle.SidePanel());
         AddChild(panel);
 
         // Scrolls when the window is too short for everything, so the panel never runs into
@@ -157,7 +150,7 @@ public partial class JournalPanel : CanvasLayer
         rows.AddChild(_search);
         var row = new HBoxContainer();
         row.AddChild(new Label { Text = "Sort by" });
-        _sort = new OptionButton
+        _sort = new Dropdown
         {
             FocusMode = Control.FocusModeEnum.None,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
@@ -199,7 +192,7 @@ public partial class JournalPanel : CanvasLayer
 
         var placeRow = new HBoxContainer();
         placeRow.AddChild(new Label { Text = "Place" });
-        _place = new OptionButton
+        _place = new Dropdown
         {
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             FocusMode = Control.FocusModeEnum.None,
