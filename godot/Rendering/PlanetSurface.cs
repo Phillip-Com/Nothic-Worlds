@@ -19,6 +19,11 @@ public partial class PlanetSurface : MeshInstance3D
     // apart, blended smoothly by the GPU in between.
     private const int TableSamples = 2048;
 
+    // The far-away copy of the terrain: each face averaged over FarBlock × FarBlock cells.
+    // Must match TERRAIN_FAR_SIZE in planet.gdshader.
+    private const int FarSize = 256;
+    private const int FarBlock = TerrainGrid.FaceSize / FarSize;
+
     // The warp lookup atlas: one WarpLookup tile per piece slot, 8 across and 4 down.
     private const int WarpTilesAcross = 8;
     private const int WarpTilesDown = SurfaceSettings.MaxPieces / WarpTilesAcross;
@@ -35,8 +40,11 @@ public partial class PlanetSurface : MeshInstance3D
     private ImageTexture? _warpTexture;
 
     // Painted terrain: the six faces as layers of one texture (only while something is
-    // painted, about 6 MB), the grid they show, and the colors of the terrain codes.
+    // painted, about 6 MB), its averaged far-away copy (about 2 MB), the grid they show, and
+    // the colors of the terrain codes.
     private Texture2DArray? _terrainTexture;
+    private Texture2DArray? _farTexture;
+    private readonly byte[] _faceCells = new byte[TerrainGrid.CellsPerFace];
     private TerrainGrid _shownTerrain = TerrainGrid.Empty;
     private ImageTexture? _terrainPalette;
     private byte[] _paletteBytes = [];
@@ -194,22 +202,29 @@ public partial class PlanetSurface : MeshInstance3D
 
         if (terrain.IsEmpty)
         {
-            // Nothing painted: free the texture's memory.
+            // Nothing painted: free the textures' memory.
             SurfaceMaterial.SetShaderParameter("has_terrain", false);
             SurfaceMaterial.SetShaderParameter("terrain_cells", default);
+            SurfaceMaterial.SetShaderParameter("terrain_far", default);
             _terrainTexture = null;
+            _farTexture = null;
         }
-        else if (_terrainTexture is null)
+        else if (_terrainTexture is null || _farTexture is null)
         {
             var faces = new Godot.Collections.Array<Image>();
+            var farFaces = new Godot.Collections.Array<Image>();
             for (int face = 0; face < CubeSphere.FaceCount; face++)
             {
                 faces.Add(FaceImage(terrain, face));
+                farFaces.Add(FarFaceImage());
             }
 
             _terrainTexture = new Texture2DArray();
             _terrainTexture.CreateFromImages(faces);
+            _farTexture = new Texture2DArray();
+            _farTexture.CreateFromImages(farFaces);
             SurfaceMaterial.SetShaderParameter("terrain_cells", _terrainTexture);
+            SurfaceMaterial.SetShaderParameter("terrain_far", _farTexture);
             SurfaceMaterial.SetShaderParameter("has_terrain", true);
         }
         else
@@ -217,6 +232,7 @@ public partial class PlanetSurface : MeshInstance3D
             foreach (int face in terrain.FacesChangedFrom(_shownTerrain))
             {
                 _terrainTexture.UpdateLayer(FaceImage(terrain, face), face);
+                _farTexture.UpdateLayer(FarFaceImage(), face);
             }
         }
 
@@ -241,6 +257,16 @@ public partial class PlanetSurface : MeshInstance3D
         }
 
         _paletteBytes = bytes;
+        if (_farTexture is not null)
+        {
+            // The averaged copy holds colors, so it's redone in the new ones.
+            for (int face = 0; face < CubeSphere.FaceCount; face++)
+            {
+                _shownTerrain.CopyFace(face, _faceCells);
+                _farTexture.UpdateLayer(FarFaceImage(), face);
+            }
+        }
+
         Image image = Image.CreateFromData(byte.MaxValue + 1, 1, false, Image.Format.Rgba8, bytes);
         if (_terrainPalette is null)
         {
@@ -276,13 +302,53 @@ public partial class PlanetSurface : MeshInstance3D
         ShowGrid = true;
     }
 
-    // One face of a terrain grid as a one-byte-per-cell image.
-    private static Image FaceImage(TerrainGrid terrain, int face)
+    // One face of a terrain grid as a one-byte-per-cell image. Leaves the face's cells in
+    // _faceCells, for FarFaceImage.
+    private Image FaceImage(TerrainGrid terrain, int face)
     {
-        var cells = new byte[TerrainGrid.CellsPerFace];
-        terrain.CopyFace(face, cells);
+        terrain.CopyFace(face, _faceCells);
         return Image.CreateFromData(
-            TerrainGrid.FaceSize, TerrainGrid.FaceSize, false, Image.Format.R8, cells);
+            TerrainGrid.FaceSize, TerrainGrid.FaceSize, false, Image.Format.R8, _faceCells);
+    }
+
+    // The face in _faceCells, averaged over blocks of cells into colors (multiplied by how
+    // much of the block is painted), with mipmaps for ever farther views.
+    private Image FarFaceImage()
+    {
+        var colors = new byte[FarSize * FarSize * 4];
+        bool hasPalette = _paletteBytes.Length > 0;
+        for (int farRow = 0; farRow < FarSize; farRow++)
+        {
+            for (int farColumn = 0; farColumn < FarSize; farColumn++)
+            {
+                int red = 0, green = 0, blue = 0, alpha = 0;
+                for (int row = 0; row < FarBlock && hasPalette; row++)
+                {
+                    int start = (farRow * FarBlock + row) * TerrainGrid.FaceSize
+                        + farColumn * FarBlock;
+                    for (int column = 0; column < FarBlock; column++)
+                    {
+                        int at = _faceCells[start + column] * 4;
+                        int cellAlpha = _paletteBytes[at + 3];
+                        red += _paletteBytes[at] * cellAlpha / 255;
+                        green += _paletteBytes[at + 1] * cellAlpha / 255;
+                        blue += _paletteBytes[at + 2] * cellAlpha / 255;
+                        alpha += cellAlpha;
+                    }
+                }
+
+                const int count = FarBlock * FarBlock;
+                int texel = (farRow * FarSize + farColumn) * 4;
+                colors[texel] = (byte)(red / count);
+                colors[texel + 1] = (byte)(green / count);
+                colors[texel + 2] = (byte)(blue / count);
+                colors[texel + 3] = (byte)(alpha / count);
+            }
+        }
+
+        Image image = Image.CreateFromData(FarSize, FarSize, false, Image.Format.Rgba8, colors);
+        image.GenerateMipmaps();
+        return image;
     }
 
     // Copies a lookup into its tile of the atlas, unless that tile already holds it.

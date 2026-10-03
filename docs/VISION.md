@@ -122,6 +122,8 @@ Paint terrain types onto planets and moons with a brush (`BOD-05`). Owner's deci
 - **Three PRs:** Core (grid, brush, types, saving; PR #33), then drawing and the Terrain panel,
   then polish (soft edges) and the benchmark.
 - Not in this milestone: sculpting heights (`BOD-04`), a fill bucket, terrain-aware weather.
+- **Unpainted ground** (owner's choice, PR #35): once a planet without a map has any terrain,
+  what's not painted is drawn neutral grey, so it's easy to tell from painted Ocean.
 
 **Milestone 10: Layout Tidy-Up** · Complete (PR #32 merged 2026-10-03; owner's choice, 2026-10-02)
 Settle the main screen before adding more (`UI-01`): the top bar had overflowed small windows and
@@ -844,7 +846,7 @@ place).
 architecture implications. This needs a design review before any related data format is fixed.
 **Implementation:** —
 
-**BOD-05 — Terrain/biome painting** · In Progress (painting done, PR #34) · Base
+**BOD-05 — Terrain/biome painting** · Implemented (M11: PR #33, #34, #35) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.
 **Implementation (Core, PR #33):**
 - `Geometry/CubeSphere.cs`: divides a sphere into six square faces of cells (an "equal-angle"
@@ -901,6 +903,25 @@ architecture implications. This needs a design review before any related data fo
 - **Benchmark** (fullscreen, back to back with `main`): the default world is unchanged (about
   190 fps both); a world with a painted planet on screen drops from about 189 to 177 fps (6%,
   0.35 ms a frame), and uses 6 MB more video memory.
+**Implementation (polish, PR #35):**
+- **Smooth edges up close** (`terrain_near` in `planet.gdshader`): each pixel looks at the four
+  cells around it. Each terrain's share of them (by distance) decides, and the edge runs where
+  the two biggest shares are equal, so coastlines come out as rounded curves (slightly wavy at
+  the scale of a cell) instead of square steps. They're anti-aliased to about a pixel, never
+  softer than 0.15 of a cell. Pixels among four cells of one terrain take a shortcut. Along a
+  cube-face edge, neighbors on the next face are found by direction, so there are no seams.
+- **No flicker far away**: `PlanetSurface` keeps a second copy of each face, averaged over
+  4 × 4 cells into colors (256 × 256, with mipmaps, about 2 MB per painted body), rebuilt for
+  the faces a stroke touches and whenever the colors change. As cells shrink below about a pixel
+  the shader blends over to it.
+- **Unpainted grey** (`unpainted_color`): used instead of the default blue when a planet has
+  terrain and no map or pieces.
+- **Colors**: the palette is now read as sRGB, like map images, so painted colors match the
+  swatches in the Terrain panel (before, they came out paler).
+- **Checks** on the baseline laptop (Radeon Vega 10), back to back with `main`: the default world
+  is unchanged; a painted planet at the usual distance 177 → 170 fps; filling the screen close
+  up, about 5% slower (e.g. 160 → 152 fps); 3 MB more video memory. The six-face check still
+  agrees at 99%.
 
 **BOD-06 — Custom surface appearance** · Idea · Base
 **Intent:** Custom textures/appearance for bodies beyond defaults (see also `MAP-01`).

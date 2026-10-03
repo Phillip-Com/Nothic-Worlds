@@ -111,8 +111,9 @@ brush's radius with the slider or in km. To turn the view while painting, drag o
 use the arrow keys. Each stroke is one undo step. Every world starts with 12 terrain types
 (Ocean, Forest, Mountains, and more); **New Type** adds one, and the name and color below the list
 edit the selected one. Deleting a type clears it wherever it's painted (Ctrl+Z brings it back).
-Without a map, painted terrain is the planet's surface; over a map it's see-through, so you can
-trace the map. **View ▸ Terrain** hides it.
+Without a map, painted terrain is the planet's surface, and what's not painted yet shows grey;
+over a map it's see-through, so you can trace the map. Edges between terrains are drawn as smooth
+curves. **View ▸ Terrain** hides it.
 
 **Add ▸ Weather Pin** adds a weather pin: click the spot on the planet, then name it. Weather pins
 show as small suns; click one to see that spot's weather: today's temperature, daylight, noon sun,
