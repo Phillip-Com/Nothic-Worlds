@@ -8,8 +8,8 @@ A record of key project decisions made by the owner. Newest first.
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
 | 2026-10-02 | Eclipses are worked out **in the background**, only when the panel or markers ask | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | ~7 ms each on the baseline laptop; keeps edits smooth. VISION.md `EVT-01` |
-| 2026-10-02 | Pins are **placed by clicking on the globe** (coordinates shown, not typed) | In PR | [#26](https://github.com/Phillip-Com/Nothic-Worlds/pull/26) | VISION.md `LORE-02` |
-| 2026-10-02 | Pins **always show, with a Pins toggle**; pins close together on screen merge with a count | In PR | [#26](https://github.com/Phillip-Com/Nothic-Worlds/pull/26) | Merging is Claude's choice |
+| 2026-10-02 | Pins are **placed by clicking on the globe** (coordinates shown, not typed) | Merged | [#26](https://github.com/Phillip-Com/Nothic-Worlds/pull/26) · `bef428e` | VISION.md `LORE-02` |
+| 2026-10-02 | Pins **always show, with a Pins toggle**; pins close together on screen merge with a count | Merged | [#26](https://github.com/Phillip-Com/Nothic-Worlds/pull/26) · `bef428e` | Merging is Claude's choice |
 | 2026-10-02 | On the strip, **clicking an event jumps the clock there; double-clicking edits it** | Merged | [#25](https://github.com/Phillip-Com/Nothic-Worlds/pull/25) · `bb5156a` | VISION.md `LORE-03` |
 | 2026-10-02 | Deleting a timeline **deletes its events too** (one undo step) | Merged | [#25](https://github.com/Phillip-Com/Nothic-Worlds/pull/25) · `bb5156a` | VISION.md `LORE-03` |
 | 2026-10-02 | Events **aren't dragged** to new dates yet; the strip shows **only the user's events** | Merged | [#25](https://github.com/Phillip-Com/Nothic-Worlds/pull/25) · `bb5156a` | Dragging could come later |

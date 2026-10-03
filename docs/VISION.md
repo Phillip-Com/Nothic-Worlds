@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 7: Journals and Timelines** · In Progress (owner's choice, 2026-10-02)
+**Milestone 7: Journals and Timelines** · Complete (PR #26 merged 2026-10-02; owner's choice, 2026-10-02)
 Writing the world's history and lore (`LORE-02`, `LORE-03`). Owner's decisions:
 - **Journal entries and timeline events are separate things**, linked **many to many**: an
   event can link to any number of entries and the other way round, and each side shows its
