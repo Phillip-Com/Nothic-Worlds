@@ -22,6 +22,7 @@ internal static class WorldMapper
             ModifiedUtc = world.ModifiedUtc,
             TimeDays = world.TimeDays,
             Bodies = world.Bodies.Select(ToDocument).ToList(),
+            TerrainTypes = NullIfEmpty(world.TerrainTypes.Select(ToDocument)),
             Regions = NullIfEmpty(world.Regions.Select(ToDocument)),
             WeatherPins = NullIfEmpty(world.WeatherPins.Select(ToDocument)),
             Journal = NullIfEmpty(world.Journal.Select(ToDocument)),
@@ -31,8 +32,12 @@ internal static class WorldMapper
         };
     }
 
+    /// <param name="document">The world data read from the file.</param>
+    /// <param name="readTerrain">
+    /// Reads a body's terrain image from the file, given its (already validated) name.
+    /// </param>
     /// <exception cref="WorldFileException">The document has missing or invalid data.</exception>
-    public static World ToWorld(WorldDocument document)
+    public static World ToWorld(WorldDocument document, Func<string, TerrainGrid> readTerrain)
     {
         Require(document.Bodies is { Count: > 0 }, "it has no bodies");
         Require(document.TimeDays is null || double.IsFinite(document.TimeDays.Value),
@@ -47,8 +52,10 @@ internal static class WorldMapper
             View = document.View is null ? null : ToView(document.View),
             TimeDays = document.TimeDays ?? 0,
         };
-        world.Bodies.AddRange(document.Bodies.Select(ToBody));
+        world.Bodies.AddRange(document.Bodies.Select(body => ToBody(body, readTerrain)));
         RequireNoProblem(Simulation.SystemHierarchy.Problem(world.Bodies));
+        world.TerrainTypes.AddRange((document.TerrainTypes ?? []).Select(ToTerrainType));
+        RequireNoProblem(TerrainType.Problem(world.TerrainTypes));
         world.Regions.AddRange((document.Regions ?? []).Select(ToRegion));
         world.WeatherPins.AddRange((document.WeatherPins ?? []).Select(ToWeatherPin));
         RequireNoProblem(WeatherPin.Problem(world));
@@ -64,6 +71,27 @@ internal static class WorldMapper
     {
         List<T> list = [.. items];
         return list.Count == 0 ? null : list;
+    }
+
+    private static TerrainTypeDocument ToDocument(TerrainType type)
+    {
+        return new TerrainTypeDocument
+        {
+            Code = type.Code,
+            Name = type.Name,
+            Color = type.Color.ToHex(),
+        };
+    }
+
+    // Checked fully afterwards by TerrainType.Problem.
+    private static TerrainType ToTerrainType(TerrainTypeDocument document)
+    {
+        Require(document is not null, "a terrain type is empty");
+        Require(document!.Code is >= 1 and <= byte.MaxValue,
+            $"a terrain type's code ({document.Code}) isn't 1 to 255");
+        Require(RgbColor.TryParseHex(document.Color, out RgbColor color),
+            $"invalid terrain color '{document.Color}'");
+        return new TerrainType((byte)document.Code, document.Name ?? "", color);
     }
 
     private static WeatherPinDocument ToDocument(WeatherPin pin)
@@ -277,6 +305,9 @@ internal static class WorldMapper
                     ? null
                     : body.Surface.Pieces.Select(ToDocument).ToList(),
                 FillColor = body.Surface.FillColor.ToHex(),
+                Terrain = body.Surface.Terrain.IsEmpty
+                    ? null
+                    : WorldFormat.TerrainEntryName(body.Id),
             },
         };
     }
@@ -462,7 +493,7 @@ internal static class WorldMapper
         };
     }
 
-    private static Body ToBody(BodyDocument document)
+    private static Body ToBody(BodyDocument document, Func<string, TerrainGrid> readTerrain)
     {
         Require(document is not null, "a planet entry is empty");
         Require(document!.Surface is not null, "a planet has no surface data");
@@ -487,6 +518,13 @@ internal static class WorldMapper
         };
         RequireNoProblem(body.Problem());
         body.Surface.FillColor = fillColor;
+        if (document.Surface.Terrain is string terrain)
+        {
+            Require(WorldFormat.IsValidTerrainName(terrain),
+                $"invalid terrain image name '{terrain}'");
+            body.Surface.Terrain = readTerrain(terrain);
+        }
+
         if (document.Surface.Pieces is List<PieceDocument> pieces)
         {
             body.Surface.Pieces.AddRange(pieces.Select(ToPiece));
