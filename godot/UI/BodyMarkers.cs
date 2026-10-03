@@ -46,6 +46,7 @@ public partial class BodyMarkers : CanvasLayer
     private static readonly Color _winterColor = new(0.6f, 0.8f, 1.0f);
 
     private Control _overlay = null!;
+    private bool _showSeasons = true;
     private Vector2? _pressedAt;
     private Guid? _pressedBody;
 
@@ -74,6 +75,17 @@ public partial class BodyMarkers : CanvasLayer
 
     /// <summary>The system view, for where each body is drawn.</summary>
     [Export] public SystemView? System { get; set; }
+
+    /// <summary>Whether the solstice and equinox markers show (View ▸ Season Markers).</summary>
+    public bool ShowSeasonMarkers
+    {
+        get => _showSeasons;
+        set
+        {
+            _showSeasons = value;
+            _overlay.QueueRedraw();
+        }
+    }
 
     /// <summary>The camera, for projecting bodies onto the screen.</summary>
     [Export] public PlanetCamera? Camera { get; set; }
@@ -184,7 +196,10 @@ public partial class BodyMarkers : CanvasLayer
             }
         }
 
-        DrawSeasonMarkers(font);
+        if (_showSeasons)
+        {
+            DrawSeasonMarkers(font);
+        }
     }
 
     // The selected body's year of solstices and equinoxes, on the orbit that shows its year.

@@ -108,7 +108,17 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 9: Weather Pin** · In Progress (owner's choice, 2026-10-02)
+**Milestone 10: Layout Tidy-Up** · In Progress (owner's choice, 2026-10-02)
+Settle the main screen before adding more (`UI-01`): the top bar had overflowed small windows and
+had look-alike controls (Regions vs Regions…). Owner's decisions:
+- **A menu bar plus one row of panel buttons** (System, Map, Journal, Regions, Timeline).
+- **Map tools in one Map panel** on the right (image, type, fill color, Calibrate…, pieces),
+  replacing the Pieces panel.
+- **A View menu** for the show/hide switches, each clearly named.
+- **The window starts maximized**; the layout still has to work in small windows.
+- **Two PRs:** the menus and panel row (PR #31), then the Map panel.
+
+**Milestone 9: Weather Pin** · Complete (PR #30 merged 2026-10-02; owner's choice, 2026-10-02)
 The weather at named spots on a planet or moon (`WTH-01`). Owner's decisions:
 - **Content:** sun and temperature: daylight hours, how high the sun gets, and a temperature
   range through the year, with the season. No rain or climate types yet.
@@ -309,7 +319,7 @@ as realistic or simple.
 
 ### 4.2 Interface Layout (`UI`)
 
-**UI-01 — Main screen layout** · Idea · Base
+**UI-01 — Main screen layout** · In Progress (menus done, PR #31) · Base
 **Keyboard and number fields (owner's request, PR #18):** while a text or number field is being
 edited, the camera ignores WASD and the arrow keys. In number fields, Up/Down change the value
 by one step (ten with Shift; `godot/UI/NumberFields.cs`). Clicking the view (not a panel)
@@ -318,7 +328,20 @@ finishes editing, so the keys move the camera again.
 screen hold tools, journals, and similar content.
 **Notes:** Views that need a lot of space, like large diagrams, may need their own tab or page
 (see `LORE-04`).
-**Implementation:** —
+**Implementation (menus, PR #31):**
+- The top bar (`godot/UI/MapToolbar.cs`): the **File**, **Edit**, **View**, and **Add** menus,
+  then the panel buttons **System**, **Pieces**, **Journal**, **Regions**, **Timeline** (no "…":
+  they open panels), then, until the Map panel arrives, the map tools. Pieces, Journal, and
+  Regions share the right side, one at a time.
+- `godot/UI/ViewMenu.cs`: checkable **Pins**, **Weather Pins**, **Regions**, **Season Markers**,
+  **Eclipse Markers**, **Grid (G)**, and **True Scale** (moved here from the time bar). The checks
+  are refreshed each time it opens. Behind it: `SystemView.ShowGrid` (shared with the G key),
+  `BodyMarkers.ShowSeasonMarkers`, `EclipseMarkers.ShowMarkers`, and the existing switches.
+- `godot/UI/AddMenu.cs` (Claude's addition): **Planet**, **Moon**, **Star**, **Region**,
+  **Weather Pin**, **Journal Entry**, **Timeline Event**, each opening its panel and starting
+  there (Moon, Region, and Weather Pin are greyed out while a star is selected). It replaces
+  the Weather Pin button.
+- `godot/project.godot`: the window starts maximized (`window/size/mode=2`).
 
 **UI-02 — System tree panel** · Implemented (PR #18) · Base
 **Intent:** A compact tree view of the star system's hierarchy (e.g. Sun ▸ Planet ▸ Moon) showing

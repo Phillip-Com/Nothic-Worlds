@@ -281,7 +281,8 @@ public partial class JournalPanel : CanvasLayer
         ShowEntry(force: true);
     }
 
-    private void AddEntry()
+    /// <summary>Adds an entry and selects it, ready to type its title.</summary>
+    public void AddEntry()
     {
         if (Session is null)
         {

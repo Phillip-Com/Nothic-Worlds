@@ -32,10 +32,22 @@ public partial class EclipseMarkers : CanvasLayer
     private static readonly Color _labelColor = new(0.92f, 0.94f, 0.98f);
 
     private Control _overlay = null!;
+    private bool _shown = true;
     private MarkerPlan? _plan;
 
     /// <summary>The open world.</summary>
     [Export] public WorldSession? Session { get; set; }
+
+    /// <summary>Whether the eclipse markers show (View ▸ Eclipse Markers).</summary>
+    public bool ShowMarkers
+    {
+        get => _shown;
+        set
+        {
+            _shown = value;
+            _overlay.QueueRedraw();
+        }
+    }
 
     /// <summary>The system view, for where each body is drawn.</summary>
     [Export] public SystemView? System { get; set; }
@@ -79,7 +91,7 @@ public partial class EclipseMarkers : CanvasLayer
 
     private void DrawMarkers()
     {
-        if (!Visible || Session?.SelectedEclipses is not EclipseTimeline timeline)
+        if (!Visible || !_shown || Session?.SelectedEclipses is not EclipseTimeline timeline)
         {
             return;
         }

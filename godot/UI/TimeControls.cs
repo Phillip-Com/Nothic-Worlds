@@ -1,7 +1,6 @@
 using Godot;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
-using NothicWorlds.Rendering;
 using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
@@ -10,7 +9,7 @@ namespace NothicWorlds.UI;
 /// The time bar in the bottom-right corner (VISION.md SIM-02, REN-02, CAL-01, CAL-03): play or
 /// pause the world clock, pick how fast it runs, step it back or forward by a chosen amount, see
 /// the date on the selected body (in its calendar, or "Day 1,204, 14:30" in its own days
-/// without one), jump to a date, and switch the system view between readable and true scale.
+/// without one), and jump to a date. (True scale is in the View menu.)
 /// A second line shows the body's seasons and its next solstice or equinox.
 /// </summary>
 /// <remarks>
@@ -51,9 +50,6 @@ public partial class TimeControls : CanvasLayer
 
     /// <summary>The open world, whose clock this runs.</summary>
     [Export] public WorldSession? Session { get; set; }
-
-    /// <summary>The system view, for the true-scale switch.</summary>
-    [Export] public SystemView? System { get; set; }
 
     /// <summary>The toolbar: the time bar hides whenever it does (calibrating, cutting).</summary>
     [Export] public MapToolbar? Toolbar { get; set; }
@@ -123,22 +119,6 @@ public partial class TimeControls : CanvasLayer
             "Step the clock forward (the bodies glide into place)"));
 
         row.AddChild(CreateButton("Go to…", AskForDate, "Jump to a date and hour"));
-
-        var trueScale = new CheckButton
-        {
-            Text = "True scale",
-            FocusMode = Control.FocusModeEnum.None,
-            TooltipText = "Show real sizes and distances (most bodies become tiny dots). " +
-                "Off: a readable view with distances compressed and small bodies enlarged.",
-        };
-        trueScale.Toggled += on =>
-        {
-            if (System is not null)
-            {
-                System.DisplayScale = on ? SystemScale.True : SystemScale.Readable;
-            }
-        };
-        row.AddChild(trueScale);
 
         BuildGoToDialog();
 

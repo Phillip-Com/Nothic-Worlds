@@ -527,7 +527,11 @@ public partial class SystemPanel : CanvasLayer
         }
     }
 
-    private async Task AddAsync(BodyKind kind)
+    /// <summary>
+    /// Adds a body with starting values (see <see cref="WorldSession.AddBodyAsync"/>) and shows
+    /// it here.
+    /// </summary>
+    public async Task AddAsync(BodyKind kind)
     {
         if (Session is null || await Session.AddBodyAsync(kind) is not Body body)
         {

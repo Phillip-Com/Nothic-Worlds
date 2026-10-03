@@ -32,25 +32,33 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 | Pan (slides the view when zoomed out, the surface when close) | Right-drag | WASD / arrow keys |
 | Zoom | Scroll wheel | E / Q or + / - |
 | Reset view | — | Home |
-| Toggle lat/long grid | — | G |
+| Toggle lat/long grid | **View** menu | G |
 | Performance overlay | — | F3 |
 | New world / Open / Save / Save As | **File** menu | Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S |
 | Undo / Redo | **Edit** menu | Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) |
+| Show or hide pins, regions, markers, the grid; true scale | **View** menu | — |
+| Add a planet, moon, star, region, weather pin, journal entry, or event | **Add** menu | — |
 | Fly to another body (sun, planet, moon) | Click it, its dot, or its name | — |
+
+The app opens maximized. Along the top are the **File**, **Edit**, **View**, and **Add** menus,
+then a button for each panel: **System** (left), **Pieces**, **Journal**, and **Regions** (right,
+one at a time), and **Timeline** (bottom). **View** shows or hides pins, weather pins, regions,
+the season and eclipse markers, and the grid, and switches between a readable view and **True
+Scale**. **Add** adds anything, opening the panel it belongs to.
 
 A new world is a small star system: a sun with one planet orbiting it. Zoom out to see the whole
 system, and click any body to fly to it. The map tools work on the selected body; stars have no
 map. The time bar (bottom right) plays the world clock at the chosen speed, steps it back or forward
 with **−** / **+** (by an hour, day, week, 30 days, or year of the selected body), shows the date
-on the selected body (in its calendar, or in its own days without one), jumps to a date with
-**Go to…**, and switches between a readable view and **True scale**. Steps and jumps glide
-smoothly, so you can watch the bodies move into place. Above the buttons, a second line shows the
-body's seasons in each hemisphere and when the next solstice or equinox comes.
+on the selected body (in its calendar, or in its own days without one), and jumps to a date with
+**Go to…**. Steps and jumps glide smoothly, so you can watch the bodies move into place. Above
+the buttons, a second line shows the body's seasons in each hemisphere and when the next solstice
+or equinox comes.
 
 In number fields, Up/Down change the value (Shift for bigger steps). Click the view to give the
 arrow keys back to the camera.
 
-**System…** opens the system panel on the left. It shows the tree of bodies (click one to fly
+**System** opens the system panel on the left. It shows the tree of bodies (click one to fly
 there), lets you **Add Planet**, **Add Moon**, or **Add Star**, and **Delete** the selected body
 along with everything orbiting it (Ctrl+Z brings it back). **Make Center** puts the selected
 body at the center of its system, with the bodies it orbited now circling it on the same paths
@@ -73,12 +81,12 @@ time bar's **Go to…** dialog always offers a jump to the next solar and the ne
 eclipse. Each moon's previous and next eclipse are also marked on its orbit (when they're within
 one orbit of now): gold-ringed dark disks for solar eclipses, dark red disks for lunar ones.
 
-**Journal…** opens the journal on the right (in place of the Pieces panel). Search and sort your
+**Journal** opens the journal on the right (in place of the Pieces panel). Search and sort your
 entries, add one with **New Entry**, and write: each entry has a title, an optional place (a
 planet, moon, or star), and text. Changes go into the world as you type, and Ctrl+Z undoes them.
 Deleting a body keeps the entries about it, just without their place.
 
-**Timeline…** shows your world's history in a strip above the time bar: a lane for each timeline,
+**Timeline** shows your world's history in a strip above the time bar: a lane for each timeline,
 with events as dots (a moment) or bars (something that lasts). Scroll the wheel to zoom from
 hours to millennia, drag to move through time, click an event to go there, and double-click to
 edit it: title, timeline, dates, place, description, and the journal entries it links to.
@@ -87,17 +95,17 @@ reorders, and deletes timelines (deleting one deletes its events; Ctrl+Z brings 
 
 Entries and events placed on a planet or moon can also be pinned to a spot: **Pin on Globe…** in
 their editor flies there, and you click the spot (Esc cancels). Pins show on the globe; click
-one to see what's there and open it. The **Pins** toggle in the toolbar hides them.
+one to see what's there and open it. **View ▸ Pins** hides them.
 
-**Regions…** opens the regions panel (in place of the Journal and Pieces panels). **New Region**
+**Regions** opens the regions panel (in place of the Journal and Pieces panels). **New Region**
 lets you click corners around an area on the planet; press Enter or click the first corner to
 finish. Name it, pick its color, and write notes; **Edit Points** lets you drag corners, drag the
 small middle handles to add corners, and right-click a corner to delete it. Regions show as a
 colored outline and light fill with their name, and clicking one shows its notes and everything
 placed in it. Journal entries and events can be placed in a region with the **Region** choice in
-their editor. The **Regions** toggle hides them all.
+their editor. **View ▸ Regions** hides them all.
 
-**Weather Pin** adds a weather pin: click the spot on the planet, then name it. Weather pins
+**Add ▸ Weather Pin** adds a weather pin: click the spot on the planet, then name it. Weather pins
 show as small suns; click one to see that spot's weather: today's temperature, daylight, noon sun,
 and season, and a chart of the whole year (temperatures and daylight by month, with today
 marked) that follows the clock. Temperatures are estimates from the sunlight, around the
@@ -126,7 +134,7 @@ latitude/longitude line to where it really is on your map while watching the glo
 **Done** (Enter) or **Cancel** (Esc). Right-click a line to remove it. Calibration is saved with
 the world.
 
-To place parts of a map by hand, open **Pieces…**. **Cut from Map…** or **Cut from Image…** opens
+To place parts of a map by hand, open **Pieces**. **Cut from Map…** or **Cut from Image…** opens
 the Cut editor: drag a box (**Rectangle**), or click points around a region and click the first
 point again (**Freeform**). Scroll to zoom and right-drag to pan. **Add Piece** puts it on the
 globe: a cut from the main map starts exactly where it already shows, and one from another image
