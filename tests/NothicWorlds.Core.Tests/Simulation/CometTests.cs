@@ -23,6 +23,9 @@ public sealed class CometTests
         Assert.Null(comet.Problem());
         Assert.False(comet.HasSurface);
         Assert.Equal(BodyAppearance.CometGrey, comet.Appearance.Color);
+
+        // It starts near enough to the star to show its tail.
+        Assert.True(CometTail.LengthKm(OrbitMath.OffsetFromParent(orbit, 0).Length) > 0);
     }
 
     [Fact]

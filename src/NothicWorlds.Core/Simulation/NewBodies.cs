@@ -86,7 +86,8 @@ public static class NewBodies
     /// <summary>
     /// A new comet circling <paramref name="star"/>: a few km across, on a flat, elongated orbit
     /// that dips inside its innermost planet's orbit (or the Earth's distance, with no planets),
-    /// so it crosses that orbit on the way in and out. It starts on its way in.
+    /// so it crosses that orbit on the way in and out. It starts on its way in, a little before
+    /// its closest approach, near enough to the star to have a tail.
     /// </summary>
     public static Body Comet(IReadOnlyList<Body> bodies, Body star)
     {
@@ -109,7 +110,7 @@ public static class NewBodies
             {
                 Eccentricity = CometEccentricity,
                 ClosestApproachDegrees = closestApproach,
-                StartAngleDegrees = (closestApproach + 150) % 360,
+                StartAngleDegrees = (closestApproach + 330) % 360,
             },
         };
     }
