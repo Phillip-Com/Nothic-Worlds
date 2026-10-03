@@ -5,13 +5,15 @@ namespace NothicWorlds.Core.Simulation;
 /// <summary>
 /// The rules for which body orbits which (VISION.md BOD-01, SIM-01). Any body can circle any
 /// other (a moon around a planet, a second sun around the first), as long as every chain of
-/// parents ends at a body without an orbit, which sits at the system's center.
+/// parents ends at a body without an orbit, which sits at the system's center. Comets are the
+/// exception (EVT-02): a comet always circles a star, and nothing circles a comet.
 /// </summary>
 public static class SystemHierarchy
 {
     /// <summary>
     /// What's wrong with how the bodies orbit each other, or null if it's usable: an orbit
-    /// around a body that isn't there, a body orbiting itself, or a loop (A around B around A).
+    /// around a body that isn't there, a body orbiting itself, a loop (A around B around A), or
+    /// a comet that breaks <see cref="CanOrbit"/>.
     /// </summary>
     public static string? Problem(IReadOnlyList<Body> bodies)
     {
@@ -43,7 +45,37 @@ public static class SystemHierarchy
             }
         }
 
-        return null;
+        return bodies.Select(body => CometProblem(body, byId)).FirstOrDefault(p => p is not null);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="child"/> may circle <paramref name="parent"/>: a comet circles
+    /// only a star, and nothing circles a comet.
+    /// </summary>
+    public static bool CanOrbit(Body child, Body parent)
+    {
+        return parent.Kind != BodyKind.Comet
+            && (child.Kind != BodyKind.Comet || parent.Kind == BodyKind.Star);
+    }
+
+    private static string? CometProblem(Body body, Dictionary<Guid, Body> byId)
+    {
+        if (body.Orbit is not Orbit orbit)
+        {
+            return body.Kind == BodyKind.Comet
+                ? $"the comet “{body.Name}” must circle a star"
+                : null;
+        }
+
+        Body parent = byId[orbit.ParentId];
+        if (CanOrbit(body, parent))
+        {
+            return null;
+        }
+
+        return body.Kind == BodyKind.Comet
+            ? $"the comet “{body.Name}” must circle a star"
+            : $"“{body.Name}” can't circle the comet “{parent.Name}”";
     }
 
     /// <summary>
@@ -78,13 +110,14 @@ public static class SystemHierarchy
     /// </summary>
     /// <returns>
     /// The new orbit (or null for none) of each body that changes. Empty if the body is already
-    /// at the center.
+    /// at the center, or is a comet (which must always circle a star).
     /// </returns>
     public static Dictionary<Guid, Orbit?> MakeCenter(IReadOnlyList<Body> bodies, Guid centerId)
     {
         var byId = bodies.ToDictionary(body => body.Id);
         var changes = new Dictionary<Guid, Orbit?>();
-        if (!byId.TryGetValue(centerId, out Body? center) || center.Orbit is null)
+        if (!byId.TryGetValue(centerId, out Body? center) || center.Orbit is null
+            || center.Kind == BodyKind.Comet)
         {
             return changes;
         }

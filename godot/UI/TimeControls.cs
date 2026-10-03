@@ -256,7 +256,7 @@ public partial class TimeControls : CanvasLayer
 
         Body body = Session.SelectedBody;
         _goToDate.ShowTime(body, Session.TimeDays);
-        _eclipseJumps.Visible = body.Kind != BodyKind.Star;
+        _eclipseJumps.Visible = body.HasSurface;
         _eclipseJumps.Refresh();
         _goToDialog.Title = $"Go to a Date on {body.Name}";
         _goToDialog.ResetSize();

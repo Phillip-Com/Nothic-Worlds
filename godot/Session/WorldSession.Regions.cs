@@ -26,7 +26,7 @@ public partial class WorldSession
     public (Region? Region, string? Problem) AddRegion(
         Guid bodyId, IReadOnlyList<GeoCoordinate> corners)
     {
-        if (FindBody(bodyId) is not Body body || body.Kind == BodyKind.Star)
+        if (FindBody(bodyId) is not Body body || !body.HasSurface)
         {
             return (null, "regions go on planets and moons");
         }

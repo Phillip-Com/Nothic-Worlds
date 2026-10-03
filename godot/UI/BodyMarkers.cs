@@ -37,6 +37,7 @@ public partial class BodyMarkers : CanvasLayer
 
     private static readonly Color _planetColor = new(0.55f, 0.75f, 1.0f);
     private static readonly Color _moonColor = new(0.8f, 0.8f, 0.85f);
+    private static readonly Color _cometColor = new(0.7f, 0.95f, 0.95f);
     private static readonly Color _labelColor = new(0.92f, 0.94f, 0.98f);
 
     // Each event's marker takes the color of the northern season it begins.
@@ -182,6 +183,7 @@ public partial class BodyMarkers : CanvasLayer
             {
                 BodyKind.Star => BodyAppearance.StarColor(body.Appearance.StarType).ToGodot(),
                 BodyKind.Moon => _moonColor,
+                BodyKind.Comet => _cometColor,
                 _ => _planetColor,
             };
             if (radius < DotBelowPixels)

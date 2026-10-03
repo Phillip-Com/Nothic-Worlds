@@ -106,7 +106,7 @@ public sealed class ClimateYear
     public static ClimateYear? At(IReadOnlyList<Body> bodies, Body body, GeoCoordinate spot,
         double fromDays, TerrainSurroundings? terrain = null)
     {
-        if (body.Kind == BodyKind.Star || Seasons.StarFor(bodies, body) is not Body star)
+        if (!body.HasSurface || Seasons.StarFor(bodies, body) is not Body star)
         {
             return null;
         }

@@ -6,6 +6,12 @@ public sealed class Body
     /// <summary>Stable identity, kept across saves.</summary>
     public Guid Id { get; init; } = Guid.NewGuid();
 
+    /// <summary>
+    /// True for planets and moons, which have a surface for maps, terrain, regions, and pins;
+    /// false for stars and comets.
+    /// </summary>
+    public bool HasSurface => Kind is BodyKind.Planet or BodyKind.Moon;
+
     /// <summary>The body's display name.</summary>
     public string Name { get; set; } = "Planet";
 
@@ -100,6 +106,11 @@ public sealed class Body
         {
             return $"a body's average temperature must be {MinAverageTemperatureC} °C to " +
                 $"{MaxAverageTemperatureC} °C";
+        }
+
+        if (Kind == BodyKind.Comet && Calendar is not null)
+        {
+            return "a comet can't have a calendar";
         }
 
         return Orbit?.Problem() ?? Calendar?.Problem();

@@ -44,7 +44,7 @@ public partial class PinPlacer : Node
     {
         Cancel();
         if (Session?.World.Bodies.FirstOrDefault(b => b.Id == bodyId) is not Body body
-            || body.Kind == BodyKind.Star)
+            || !body.HasSurface)
         {
             cancelled?.Invoke();
             return;

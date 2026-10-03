@@ -104,7 +104,7 @@ public partial class RegionEditor : CanvasLayer
     public void StartDrawing()
     {
         Stop();
-        if (Session?.SelectedBody is not { Kind: not BodyKind.Star } body)
+        if (Session?.SelectedBody is not { HasSurface: true } body)
         {
             return;
         }

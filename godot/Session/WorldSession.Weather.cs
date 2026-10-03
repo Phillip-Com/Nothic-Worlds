@@ -12,7 +12,7 @@ public partial class WorldSession
     public (WeatherPin? Pin, string? Problem) AddWeatherPin(
         Guid bodyId, GeoCoordinate spot, string name)
     {
-        if (FindBody(bodyId) is not Body body || body.Kind == BodyKind.Star)
+        if (FindBody(bodyId) is not Body body || !body.HasSurface)
         {
             return (null, "weather pins go on planets and moons");
         }

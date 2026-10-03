@@ -15,6 +15,11 @@ public static class NewBodies
     private const double MoonPeriodDays = 27.3;
     private const double CompanionStarOrbitKm = 5e9;
 
+    // A new comet comes in to this share of its star's innermost planet's distance, on an orbit
+    // this elongated (it goes out 9 times as far), so it crosses that planet's orbit twice.
+    private const double CometClosestShare = 0.6;
+    private const double CometEccentricity = 0.8;
+
     // Each new orbit is this much wider than the widest one around the same parent.
     private const double SpacingFactor = 1.6;
 
@@ -76,6 +81,38 @@ public static class NewBodies
         }
 
         return star;
+    }
+
+    /// <summary>
+    /// A new comet circling <paramref name="star"/>: a few km across, on a flat, elongated orbit
+    /// that dips inside its innermost planet's orbit (or the Earth's distance, with no planets),
+    /// so it crosses that orbit on the way in and out. It starts on its way in, a little before
+    /// its closest approach, near enough to the star to have a tail.
+    /// </summary>
+    public static Body Comet(IReadOnlyList<Body> bodies, Body star)
+    {
+        double innermost = SystemHierarchy.ChildrenOf(bodies, star.Id)
+            .Where(body => body.Kind == BodyKind.Planet)
+            .Select(body => body.Orbit!.DistanceKm)
+            .DefaultIfEmpty(EarthOrbitKm)
+            .Min();
+        double distance = innermost * CometClosestShare / (1 - CometEccentricity);
+        Orbit orbit = OrbitAround(bodies, star, distance, StartingPeriod(distance, star));
+        double closestApproach = orbit.StartAngleDegrees;
+        return new Body
+        {
+            Name = NextName(bodies, "Comet"),
+            Kind = BodyKind.Comet,
+            Appearance = BodyAppearance.DefaultFor(BodyKind.Comet),
+            RadiusKm = 5,
+            DayLengthHours = 12,
+            Orbit = orbit with
+            {
+                Eccentricity = CometEccentricity,
+                ClosestApproachDegrees = closestApproach,
+                StartAngleDegrees = (closestApproach + 330) % 360,
+            },
+        };
     }
 
     // "Planet 2", "Moon 1", ...: the first number not already used.

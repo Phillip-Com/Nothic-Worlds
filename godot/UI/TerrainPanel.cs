@@ -303,9 +303,9 @@ public partial class TerrainPanel : CanvasLayer
         }
 
         Body body = Session.SelectedBody;
-        bool canPaint = body.Kind != BodyKind.Star;
+        bool canPaint = body.HasSurface;
         _heading.Text = $"Terrain on {body.Name}";
-        _note.Text = canPaint ? "" : "Stars can't be painted. Select a planet or moon.";
+        _note.Text = canPaint ? "" : "Stars and comets can't be painted. Select a planet or moon.";
         _note.Visible = !canPaint;
         _tools.Visible = canPaint;
         ShowList();

@@ -108,7 +108,18 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 17: Leap Years** · In progress (owner's choice, 2026-10-03)
+**Milestone 18: Comets and Meteor Showers** · In progress (owner's choice, 2026-10-03)
+Meteor showers (`EVT-02`), simulated from comets. Owner's decisions:
+- **Comets** are a new kind of body: they circle a star on an elongated orbit, have a color and
+  pattern like moons, and are drawn with a **glowing tail** pointing away from the star, longer
+  near it.
+- **Showers** happen where a planet's orbit passes close to a comet's orbit, at the same point
+  of the year every year. Their strength comes from the **comet's size**.
+- Shown as a **list in the System panel**, a **line in the time bar** while one is under way,
+  and **markers on the orbit**. Asteroid events come later (with `BOD-03`).
+- **Two PRs:** comets (PR #44), then meteor showers.
+
+**Milestone 17: Leap Years** · Complete (PR #43 merged 2026-10-03; owner's choice, 2026-10-03)
 Calendars can add leap days on a rule (new feature `CAL-04`). Owner's decisions:
 - **Rule:** "every N years, except every M, but every K" (up to three tiers, like ours).
 - **Leap days** are added to a chosen month.
@@ -1274,9 +1285,29 @@ without the world being changed to fit.
   "working it out…" otherwise; hidden for stars.
 - Wording in one place: `godot/UI/EclipseText.cs`.
 
-**EVT-02 — Meteor showers and asteroid events** · Idea · —
+**EVT-02 — Meteor showers and asteroid events** · In progress (M18) · Base
 **Intent:** Simulated celestial events.
-**Implementation:** —
+**Implementation (comets, PR #44):**
+- **Model:** `BodyKind.Comet`. `Body.HasSurface` (planets and moons) now gates everything that
+  needs a surface: maps, terrain, regions, pins, weather, calendars, and eclipses. Rules in
+  `SystemHierarchy`: a comet circles only a star, nothing circles a comet (`CanOrbit`), and a
+  comet can't be made the center. Format **version 15** (kind `"comet"`).
+- `Simulation/NewBodies.Comet`: 5 km across, on a flat orbit with elongation 0.8 that comes in
+  to 60% of the innermost planet's distance, so it crosses that orbit twice. It starts a little
+  before its closest approach, so its tail shows.
+- **Tail rule** (`Simulation/CometTail.cs`): 20 million km long at 1 AU from the star, growing
+  with the inverse square of the distance (capped at 150 million km); full brightness within
+  3 AU, fading to nothing at 5 AU. It ignores the star's type for now.
+- **App:** **Add Comet** in the System panel and the Add menu. For a comet, the panel shows
+  "Comet" as its kind and hides the temperature, calendar, and eclipses; **Make Center** and
+  **Add Moon** are disabled, and **Orbits** lists only stars. The grid never shows on comets.
+- **Drawing** (`godot/Rendering/CometTailVisual.cs`, `comet_tail.gdshader`): one cone per
+  comet, from the comet's head away from its star, compressed like every other distance in the
+  view. It's added on top of what's behind it (no sorting, never hides anything) and fades
+  along its length and toward its edges.
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: Add Comet,
+  the panel's fields, the tail at the start and at closest approach, and save/reopen. The
+  benchmark showed no change (195–196 fps against 179–192 on `main`).
 
 ### 4.8 Weather & Climate (`WTH`)
 

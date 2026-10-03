@@ -144,16 +144,17 @@ public partial class SystemView : Node3D
 
     /// <summary>
     /// Whether the latitude/longitude grid shows on the globes (the G key and View ▸ Grid): one
-    /// switch for every globe, following the selected one.
+    /// switch for every planet and moon. Comets never show it: they have no map to line up.
     /// </summary>
     public bool ShowGrid
     {
-        get => Session?.Surface?.ShowGrid ?? false;
+        get => _visuals.Values.FirstOrDefault(visual => visual.Surface is not null
+            && visual.Tail is null)?.Surface!.ShowGrid ?? false;
         set
         {
             foreach (BodyVisual visual in _visuals.Values)
             {
-                if (visual.Surface is PlanetSurface surface)
+                if (visual.Surface is PlanetSurface surface && visual.Tail is null)
                 {
                     surface.ShowGrid = value;
                 }
@@ -383,6 +384,14 @@ public partial class SystemView : Node3D
             }
         }
 
+        if (visual.Tail is CometTailVisual tail && body.Orbit is Orbit cometOrbit
+            && _layout.TryGetValue(cometOrbit.ParentId, out DisplayBody star))
+        {
+            Vector3D away = place.Position - star.Position;
+            tail.Place(ToScene(place.Position), new Vector3((float)away.X, (float)away.Y,
+                (float)away.Z), OrbitMath.OffsetFromParent(cometOrbit, timeDays).Length, _scale);
+        }
+
         if (visual.OrbitLine is MeshInstance3D line && body.Orbit is Orbit orbit
             && _layout.TryGetValue(orbit.ParentId, out DisplayBody parent))
         {
@@ -513,6 +522,10 @@ public partial class SystemView : Node3D
                 MaterialOverride = (ShaderMaterial)PlanetMaterial!.Duplicate(),
             };
             surface.ShowTerrain = _showTerrain;
+            if (body.Kind == BodyKind.Comet)
+            {
+                surface.ShowGrid = false;
+            }
             root.AddChild(surface);
         }
 
@@ -520,6 +533,7 @@ public partial class SystemView : Node3D
         {
             Light = light,
             StarMaterial = starMaterial,
+            Tail = body.Kind == BodyKind.Comet ? new CometTailVisual(this) : null,
         };
     }
 
@@ -586,11 +600,14 @@ public partial class SystemView : Node3D
 
         public StandardMaterial3D? StarMaterial { get; init; }
 
+        public CometTailVisual? Tail { get; init; }
+
         public void Free()
         {
             Root.QueueFree();
             OrbitLine?.QueueFree();
             Light?.QueueFree();
+            Tail?.Mesh.QueueFree();
         }
     }
 }

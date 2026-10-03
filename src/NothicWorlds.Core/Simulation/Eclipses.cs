@@ -53,7 +53,7 @@ public static class Eclipses
         IReadOnlyList<Body> bodies, Body body, double fromDays, double toDays)
     {
         var eclipses = new List<Eclipse>();
-        if (body.Kind == BodyKind.Star || !(toDays > fromDays)
+        if (!body.HasSurface || !(toDays > fromDays)
             || Seasons.StarFor(bodies, body) is not Body star)
         {
             return eclipses;
