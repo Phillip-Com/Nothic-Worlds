@@ -30,6 +30,7 @@ public partial class MapToolbar : CanvasLayer
     private Button _clearButton = null!;
     private Button _calibrateButton = null!;
     private Button _journalButton = null!;
+    private Button _regionsButton = null!;
     private OptionButton _mapType = null!;
     private ColorPickerButton _fillColor = null!;
     private Control _fillColorControls = null!;
@@ -65,6 +66,12 @@ public partial class MapToolbar : CanvasLayer
 
     /// <summary>The pins on the globes, shown and hidden by the Pins toggle.</summary>
     [Export] public PinMarkers? Pins { get; set; }
+
+    /// <summary>The Regions panel, shown and hidden by the Regions… button.</summary>
+    [Export] public RegionsPanel? RegionsPanel { get; set; }
+
+    /// <summary>The regions drawn on the globes, shown and hidden by the Regions toggle.</summary>
+    [Export] public Rendering.RegionRenderer? Regions { get; set; }
 
     /// <summary>Space at the start of the toolbar row, where the File menu goes.</summary>
     public HBoxContainer MenuArea { get; } = new();
@@ -112,22 +119,36 @@ public partial class MapToolbar : CanvasLayer
         _calibrateButton.Pressed += () => Calibration?.Open();
         controls.AddChild(_calibrateButton);
 
+        // The panels on the right share it, one at a time (owner's choices): opening one
+        // closes the others.
         var piecesButton = CreateButton(
             "Pieces…", "Cut pieces from the map or other images and place them on the globe");
         _journalButton = CreateButton(
             "Journal…", "The world's journal: write entries about places and history");
-        piecesButton.ToggleMode = true;
-        _journalButton.ToggleMode = true;
+        _regionsButton = CreateButton(
+            "Regions…", "Outline and name regions on the planet: countries, forests, seas");
+        Button[] rightPanels = [piecesButton, _journalButton, _regionsButton];
+        foreach (Button button in rightPanels)
+        {
+            button.ToggleMode = true;
+            button.Toggled += open =>
+            {
+                if (open)
+                {
+                    foreach (Button other in rightPanels.Where(b => b != button))
+                    {
+                        other.ButtonPressed = false;
+                    }
+                }
+            };
+            controls.AddChild(button);
+        }
+
         piecesButton.Toggled += open =>
         {
             if (Pieces is not null)
             {
                 Pieces.IsPanelOpen = open;
-            }
-
-            if (open)
-            {
-                _journalButton.ButtonPressed = false;  // One panel on the right at a time.
             }
         };
         _journalButton.Toggled += open =>
@@ -136,14 +157,14 @@ public partial class MapToolbar : CanvasLayer
             {
                 Journal.IsPanelOpen = open;
             }
-
-            if (open)
+        };
+        _regionsButton.Toggled += open =>
+        {
+            if (RegionsPanel is not null)
             {
-                piecesButton.ButtonPressed = false;
+                RegionsPanel.IsPanelOpen = open;
             }
         };
-        controls.AddChild(piecesButton);
-        controls.AddChild(_journalButton);
 
         var timelineButton = CreateButton(
             "Timeline…", "The timeline strip: your world's history, as lanes of events");
@@ -172,6 +193,22 @@ public partial class MapToolbar : CanvasLayer
             }
         };
         controls.AddChild(pinsToggle);
+
+        var regionsToggle = new CheckButton
+        {
+            Text = "Regions",
+            ButtonPressed = true,
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Show the regions outlined on the globes",
+        };
+        regionsToggle.Toggled += on =>
+        {
+            if (Regions is not null)
+            {
+                Regions.ShowRegions = on;
+            }
+        };
+        controls.AddChild(regionsToggle);
 
         controls.AddChild(CreateLabel("  Map type:"));
         _mapType = CreateMapTypeDropdown();
@@ -219,6 +256,12 @@ public partial class MapToolbar : CanvasLayer
     public void ShowJournal()
     {
         _journalButton.ButtonPressed = true;
+    }
+
+    /// <summary>Opens the Regions panel (closing the others on the right).</summary>
+    public void ShowRegions()
+    {
+        _regionsButton.ButtonPressed = true;
     }
 
     /// <summary>Shows an informational message that fades after a few seconds.</summary>
