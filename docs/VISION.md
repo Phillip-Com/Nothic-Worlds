@@ -108,6 +108,21 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 11: Terrain Painting** · In Progress (owner's choice, 2026-10-03)
+Paint terrain types onto planets and moons with a brush (`BOD-05`). Owner's decisions:
+- **Terrain types:** an editable list per world. New worlds start with 12 defaults (Ocean,
+  Shallow Water, Plains, Fields, Forest, Jungle, Hills, Mountains, Desert, Swamp, Tundra, Ice)
+  that can be renamed, recolored, added to, and deleted.
+- **With a map:** without a map, the terrain is the planet's surface. Over a map it's a
+  see-through overlay, so a map can be traced; **View ▸ Terrain** turns it on and off.
+- **Tools:** an own **Terrain** panel (panel row button, right side, one at a time with Map,
+  Journal, and Regions). Painting is on while it's open.
+- **Detail:** a cube-sphere grid of 1,024 × 1,024 cells per face (about 10 km across on an
+  Earth-sized planet; 6 MB per fully painted body).
+- **Three PRs:** Core (grid, brush, types, saving; PR #33), then drawing and the Terrain panel,
+  then polish (soft edges) and the benchmark.
+- Not in this milestone: sculpting heights (`BOD-04`), a fill bucket, terrain-aware weather.
+
 **Milestone 10: Layout Tidy-Up** · Complete (PR #32 merged 2026-10-03; owner's choice, 2026-10-02)
 Settle the main screen before adding more (`UI-01`): the top bar had overflowed small windows and
 had look-alike controls (Regions vs Regions…). Owner's decisions:
@@ -829,9 +844,33 @@ place).
 architecture implications. This needs a design review before any related data format is fixed.
 **Implementation:** —
 
-**BOD-05 — Terrain/biome painting** · Idea · Base
+**BOD-05 — Terrain/biome painting** · In Progress (Core done, PR #33) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.
-**Implementation:** —
+**Implementation (Core, PR #33):**
+- `Geometry/CubeSphere.cs`: divides a sphere into six square faces of cells (an "equal-angle"
+  cube, so cells stay within about 1.5× of the same size, with no crowding at the poles).
+  `CellAt(direction)` and `CellCenter(cell)`. The shader in the next PR must repeat its math
+  (spelled out in world-format.md, **Terrain**).
+- `Model/TerrainGrid.cs`: one terrain code per cell, 1,024 × 1,024 per face (0 = unpainted).
+  **Immutable**, stored in 64 × 64 tiles: painting returns a new grid that shares untouched
+  tiles, so undo snapshots and world copies stay cheap; unpainted tiles take no memory.
+  `Paint` (a round stamp, radius in degrees of arc, 0.01° to 90°), `PaintStroke` (stamps a
+  quarter radius apart along the shortest path), `Replace` (e.g. clear a deleted type),
+  `CodeAt`, `FacesChangedFrom` (which faces to re-upload to the graphics card), `CopyFace` /
+  `FromCells`. Tiles wholly inside a stamp are filled at once. In a release build, a normal
+  brush stamp takes well under a millisecond; the largest (a hemisphere) about 0.1 s.
+- `Model/TerrainType.cs`: `(Code, Name, Color)`, the 12 `Defaults`, `Problem` (codes 1–255
+  and unique, names 1–60 characters), and `FreeCode`. `World.TerrainTypes` holds the list
+  (`World.CreateNew` adds the defaults); `SurfaceSettings.Terrain` holds each body's grid and
+  counts in "matches the saved file".
+- **Saving:** format **version 10**. Each painted body's grid is a standard 8-bit greyscale PNG
+  (`terrain/<body id>.png`, faces stacked) written and read by `Storage/TerrainImage.cs`, a
+  small self-contained PNG codec (Core has no image library). It reads every PNG row filter, so
+  an image re-saved by a paint program still loads. Older worlds get the 12 defaults (a frozen
+  copy in the migration, so changing the defaults later can't change old upgrades).
+- **Tests:** `CubeSphereTests`, `TerrainGridTests`, `TerrainTypeTests`, and golden-file and
+  damaged-file tests for version 10 in `WorldPackageTests` (with `TestPng`, an independent PNG
+  writer, to check images the app didn't write).
 
 **BOD-06 — Custom surface appearance** · Idea · Base
 **Intent:** Custom textures/appearance for bodies beyond defaults (see also `MAP-01`).
