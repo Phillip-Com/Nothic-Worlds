@@ -69,6 +69,18 @@ public class SphericalPolygonTests
     }
 
     [Fact]
+    public void AnOpenPath_StopsAtTheLastCorner()
+    {
+        GeoCoordinate[] corners = [new(0, 0), new(0, 10), new(10, 10)];
+
+        List<GeoCoordinate> path = SphericalPolygon.EdgePath(corners, 1, closed: false);
+
+        Assert.Equal(corners[0], path[0]);
+        Assert.Equal(corners[^1], path[^1]);
+        Assert.InRange(path.Count, 21, 23);  // Two 10° edges in ~1° steps, plus the end
+    }
+
+    [Fact]
     public void OutlinesSpreadRoundTheGlobe_DontFitInAHemisphere()
     {
         GeoCoordinate[] belt = [new(0, 0), new(0, 120), new(0, -120)];

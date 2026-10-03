@@ -109,14 +109,16 @@ public static class SphericalPolygon
     }
 
     /// <summary>
-    /// The closed outline as points along its great-circle edges, no more than
-    /// <paramref name="maxStepDegrees"/> apart (for drawing it). Ends back at the first corner.
+    /// The outline as points along its great-circle edges, no more than
+    /// <paramref name="maxStepDegrees"/> apart (for drawing it). Closed, it ends back at the
+    /// first corner; open (an outline still being drawn), it ends at the last.
     /// </summary>
     public static List<GeoCoordinate> EdgePath(
-        IReadOnlyList<GeoCoordinate> corners, double maxStepDegrees)
+        IReadOnlyList<GeoCoordinate> corners, double maxStepDegrees, bool closed = true)
     {
         var path = new List<GeoCoordinate>();
-        for (int i = 0; i < corners.Count; i++)
+        int edges = closed ? corners.Count : corners.Count - 1;
+        for (int i = 0; i < edges; i++)
         {
             Vector3D from = ToUnit(corners[i]);
             Vector3D to = ToUnit(corners[(i + 1) % corners.Count]);
@@ -131,7 +133,7 @@ public static class SphericalPolygon
 
         if (corners.Count > 0)
         {
-            path.Add(corners[0]);
+            path.Add(closed ? corners[0] : corners[^1]);
         }
 
         return path;
