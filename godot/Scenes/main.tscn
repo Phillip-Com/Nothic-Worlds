@@ -11,7 +11,7 @@
 [ext_resource type="Script" path="res://UI/FileMenu.cs" id="9_filemenu"]
 [ext_resource type="Script" path="res://Session/RecoveryService.cs" id="10_recovery"]
 [ext_resource type="Script" path="res://UI/CalibrationWorkspace.cs" id="11_calibration"]
-[ext_resource type="Script" path="res://UI/PiecesPanel.cs" id="12_pieces"]
+[ext_resource type="Script" path="res://UI/MapPanel.cs" id="12_map"]
 [ext_resource type="Script" path="res://UI/CutEditor.cs" id="13_cut"]
 [ext_resource type="Script" path="res://Controls/PieceHandles.cs" id="14_handles"]
 [ext_resource type="Script" path="res://UI/EditMenu.cs" id="15_edit"]
@@ -81,11 +81,9 @@ script = ExtResource("4_overlay")
 script = ExtResource("5_indicator")
 Camera = NodePath("../PlanetCamera")
 
-[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Calibration", "Pieces", "SystemPanel", "Journal", "Timeline", "RegionsPanel")]
+[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("MapPanel", "SystemPanel", "Journal", "Timeline", "RegionsPanel")]
 script = ExtResource("7_toolbar")
-Session = NodePath("../WorldSession")
-Calibration = NodePath("../CalibrationWorkspace")
-Pieces = NodePath("../PiecesPanel")
+MapPanel = NodePath("../MapPanel")
 Journal = NodePath("../JournalPanel")
 Timeline = NodePath("../TimelineStrip")
 RegionsPanel = NodePath("../RegionsPanel")
@@ -129,9 +127,10 @@ Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 Placer = NodePath("../PinPlacer")
 
-[node name="PiecesPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Cutter", "Toolbar")]
-script = ExtResource("12_pieces")
+[node name="MapPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Calibration", "Cutter", "Toolbar")]
+script = ExtResource("12_map")
 Session = NodePath("../WorldSession")
+Calibration = NodePath("../CalibrationWorkspace")
 Cutter = NodePath("../CutEditor")
 Toolbar = NodePath("../MapToolbar")
 
@@ -144,7 +143,7 @@ Toolbar = NodePath("../MapToolbar")
 script = ExtResource("14_handles")
 Session = NodePath("../WorldSession")
 Camera = NodePath("../PlanetCamera")
-Panel = NodePath("../PiecesPanel")
+Panel = NodePath("../MapPanel")
 
 [node name="EditMenu" type="Node" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
 script = ExtResource("15_edit")
@@ -195,7 +194,7 @@ script = ExtResource("24_region_renderer")
 Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 
-[node name="RegionMarkers" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar", "Renderer", "Editor", "Placer", "Pieces", "Panel", "Journal", "Timeline")]
+[node name="RegionMarkers" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar", "Renderer", "Editor", "Placer", "Map", "Panel", "Journal", "Timeline")]
 script = ExtResource("25_region_markers")
 Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
@@ -204,7 +203,7 @@ Toolbar = NodePath("../MapToolbar")
 Renderer = NodePath("../RegionRenderer")
 Editor = NodePath("../RegionEditor")
 Placer = NodePath("../PinPlacer")
-Pieces = NodePath("../PiecesPanel")
+Map = NodePath("../MapPanel")
 Panel = NodePath("../RegionsPanel")
 Journal = NodePath("../JournalPanel")
 Timeline = NodePath("../TimelineStrip")

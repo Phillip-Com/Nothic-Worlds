@@ -45,7 +45,7 @@ public partial class Main : Node3D
         if (ArgumentValue(arguments, MapArgumentPrefix) is string mapPath)
         {
             // ImportAsync never throws; problems are shown in the toolbar's message line.
-            await GetNode<MapToolbar>("MapToolbar").ImportAsync(mapPath);
+            await GetNode<MapPanel>("MapPanel").ImportAsync(mapPath);
         }
 
         if (arguments.Contains(Benchmark.CommandLineFlag))

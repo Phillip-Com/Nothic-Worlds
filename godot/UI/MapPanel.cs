@@ -9,21 +9,25 @@ using NothicWorlds.Session;
 namespace NothicWorlds.UI;
 
 /// <summary>
-/// The Pieces panel (VISION.md MAP-02), on the right of the screen: lists the planet's map
-/// pieces (the top of the list is drawn on top), starts new cuts, and edits the selected
-/// piece's name, position, rotation, and size with exact numbers. The Delete key removes the
-/// selected piece (Ctrl+Z brings it back).
+/// The Map panel (VISION.md MAP-01 to MAP-05, UI-01), on the right of the screen. At the top,
+/// the planet's main map image (<see cref="MapImageSection"/>). Below it, the map pieces (the
+/// top of the list is drawn on top): new cuts, and the selected piece's name, position,
+/// rotation, and size with exact numbers. The Delete key removes the selected piece (Ctrl+Z
+/// brings it back).
 /// </summary>
 /// <remarks>
 /// All edits go through <see cref="WorldSession"/>, so unsaved changes are tracked.
 /// </remarks>
-public partial class PiecesPanel : CanvasLayer
+public partial class MapPanel : CanvasLayer
 {
     private const int ScreenMargin = 12;
 
-    // Starts below the toolbar row, which can reach this far right on narrow windows.
+    // Below the toolbar row, and above the time bar (like the Journal and Regions panels).
     private const int TopOffset = 56;
-    private const float PanelWidth = 300.0f;
+    private const int BottomOffset = 130;
+    private const float PanelWidth = 320.0f;
+
+    private MapImageSection _mapImage = null!;
 
     private Label _heading = null!;
     private Button _cutMapButton = null!;
@@ -52,6 +56,9 @@ public partial class PiecesPanel : CanvasLayer
 
     /// <summary>The open world whose pieces are shown.</summary>
     [Export] public WorldSession? Session { get; set; }
+
+    /// <summary>The Calibrate workspace, opened by the Calibrate… button.</summary>
+    [Export] public CalibrationWorkspace? Calibration { get; set; }
 
     /// <summary>The Cut editor, opened to cut new pieces.</summary>
     [Export] public CutEditor? Cutter { get; set; }
@@ -84,22 +91,53 @@ public partial class PiecesPanel : CanvasLayer
 
     public override void _Ready()
     {
-        var panel = new PanelContainer { CustomMinimumSize = new Vector2(PanelWidth, 0) };
-        panel.SetAnchorsAndOffsetsPreset(
-            Control.LayoutPreset.TopRight, Control.LayoutPresetMode.Minsize, ScreenMargin);
-        panel.GrowHorizontal = Control.GrowDirection.Begin;  // Wider content grows leftward.
-        panel.OffsetTop = TopOffset;
-        AddChild(panel);
-
-        var margin = new MarginContainer();
-        foreach (string side in new[] { "left", "top", "right", "bottom" })
+        if (Session is null)
         {
-            margin.AddThemeConstantOverride($"margin_{side}", 8);
+            GD.PushError("MapPanel has no world session assigned.");
+            return;
         }
 
-        panel.AddChild(margin);
-        var layout = new VBoxContainer();
-        margin.AddChild(layout);
+        var panel = new PanelContainer { CustomMinimumSize = new Vector2(PanelWidth, 0) };
+        panel.AnchorLeft = 1;
+        panel.AnchorRight = 1;
+        panel.AnchorTop = 0;
+        panel.AnchorBottom = 1;
+        panel.OffsetLeft = -ScreenMargin - PanelWidth;
+        panel.OffsetRight = -ScreenMargin;
+        panel.OffsetTop = TopOffset;
+        panel.OffsetBottom = -BottomOffset;
+        panel.GrowHorizontal = Control.GrowDirection.Begin;
+        panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = new Color(0.09f, 0.09f, 0.11f, 0.96f),
+            ContentMarginLeft = 8,
+            ContentMarginRight = 8,
+            ContentMarginTop = 8,
+            ContentMarginBottom = 8,
+        });
+        AddChild(panel);
+
+        // Scrolls when the window is too short for everything (owner: must work small).
+        var scroll = new ScrollContainer
+        {
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        panel.AddChild(scroll);
+        var layout = new VBoxContainer
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+        };
+        scroll.AddChild(layout);
+
+        _mapImage = new MapImageSection
+        {
+            Session = Session,
+            Calibration = Calibration,
+            Toolbar = Toolbar,
+        };
+        layout.AddChild(_mapImage);
+        layout.AddChild(new HSeparator());
 
         _heading = new Label();
         layout.AddChild(_heading);
@@ -113,7 +151,11 @@ public partial class PiecesPanel : CanvasLayer
         cutButtons.AddChild(_cutImageButton);
         layout.AddChild(cutButtons);
 
-        _list = new ItemList { CustomMinimumSize = new Vector2(0, 150) };
+        _list = new ItemList
+        {
+            CustomMinimumSize = new Vector2(0, 120),
+            FocusMode = Control.FocusModeEnum.None,
+        };
         _list.ItemSelected += index => Select(_listed[(int)index].Id);
         layout.AddChild(_list);
 
@@ -131,7 +173,6 @@ public partial class PiecesPanel : CanvasLayer
         _fileDialog.FileSelected += path => _ = CutFromFileAsync(path);
         AddChild(_fileDialog);
 
-
         if (Toolbar is not null)
         {
             Toolbar.VisibilityChanged += UpdateVisibility;
@@ -140,12 +181,6 @@ public partial class PiecesPanel : CanvasLayer
         if (Cutter is not null)
         {
             Cutter.PieceAdded += piece => Select(piece.Id);
-        }
-
-        if (Session is null)
-        {
-            GD.PushError("PiecesPanel has no world session assigned.");
-            return;
         }
 
         Session.Changed += SyncWithWorld;
@@ -314,6 +349,12 @@ public partial class PiecesPanel : CanvasLayer
         IsEditingPoints = editing && _selectedId is not null;
         ShowSelected();
     }
+
+    /// <summary>
+    /// Imports the map at <paramref name="path"/> onto the selected planet (see
+    /// <see cref="MapImageSection.ImportAsync"/>). Never throws.
+    /// </summary>
+    public Task ImportAsync(string path) => _mapImage.ImportAsync(path);
 
     /// <summary>Selects a piece (null for none), in the list and on the globe.</summary>
     public void Select(Guid? id)

@@ -168,7 +168,7 @@ public partial class CutEditor : CanvasLayer
             MapPiece piece = await Session.AddPieceAsync(_assetName, outline, center, width);
             Close();
             Toolbar?.ShowInfo(
-                $"Added {piece.Name}. Adjust it in the Pieces panel, and save (Ctrl+S) to " +
+                $"Added {piece.Name}. Adjust it in the Map panel, and save (Ctrl+S) to " +
                 "keep it.");
             PieceAdded?.Invoke(piece);
         }

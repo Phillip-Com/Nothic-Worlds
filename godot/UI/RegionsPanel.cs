@@ -10,7 +10,7 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The Regions panel (VISION.md LORE-01), on the right of the screen (one at a time with the
-/// Journal and Pieces panels): the selected body's regions, a button to draw a new one, and an
+/// Journal and Map panels): the selected body's regions, a button to draw a new one, and an
 /// editor for the selected region's name, color, notes, and outline (Edit Points), listing the
 /// journal entries and events placed in it. Every change applies straight away and can be
 /// undone.
