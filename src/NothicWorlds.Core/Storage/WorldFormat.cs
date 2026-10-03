@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 13;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -62,6 +62,24 @@ internal static partial class WorldFormat
         [ClimateKind.Wetland] = "wetland",
         [ClimateKind.Mountains] = "mountains",
         [ClimateKind.Ice] = "ice",
+    };
+
+    private static readonly Dictionary<SurfacePattern, string> _patternNames = new()
+    {
+        [SurfacePattern.Plain] = "plain",
+        [SurfacePattern.Rocky] = "rocky",
+        [SurfacePattern.Banded] = "banded",
+        [SurfacePattern.Icy] = "icy",
+        [SurfacePattern.Cloudy] = "cloudy",
+    };
+
+    private static readonly Dictionary<StarType, string> _starTypeNames = new()
+    {
+        [StarType.RedDwarf] = "red-dwarf",
+        [StarType.Orange] = "orange",
+        [StarType.Yellow] = "yellow",
+        [StarType.White] = "white",
+        [StarType.Blue] = "blue",
     };
 
     // Upgrades older documents one version at a time: entry 0 turns version 1 into version 2,
@@ -113,6 +131,11 @@ internal static partial class WorldFormat
         // 11 → 12: terrain types gained a "climate" (terrain-aware weather, M14). Types still
         // named like a default get its climate; the rest are open land.
         AddTerrainClimates,
+
+        // 12 → 13: bodies gained an "appearance" (body appearance, M16). Planets keep the
+        // ocean blue they always had, moons become grey and rocky (owner's choice), and stars
+        // are yellow, as they always were.
+        AddAppearances,
     ];
 
     // The climates the version 12 upgrade gives types by name. Deliberately a copy, like
@@ -158,6 +181,24 @@ internal static partial class WorldFormat
             foreach (JsonObject body in bodies.OfType<JsonObject>())
             {
                 body[name] ??= value;
+            }
+        }
+
+        return document;
+    }
+
+    private static JsonObject AddAppearances(JsonObject document)
+    {
+        if (document["bodies"] is JsonArray bodies)
+        {
+            foreach (JsonObject body in bodies.OfType<JsonObject>())
+            {
+                body["appearance"] ??= body["kind"]?.GetValue<string>() switch
+                {
+                    "star" => new JsonObject { ["starType"] = "yellow" },
+                    "moon" => new JsonObject { ["color"] = "#8A8A8A", ["pattern"] = "rocky" },
+                    _ => new JsonObject { ["color"] = "#214573", ["pattern"] = "plain" },
+                };
             }
         }
 
@@ -216,6 +257,15 @@ internal static partial class WorldFormat
     public static BodyKind ParseBodyKind(string? name) => Parse(_bodyKindNames, name, "body kind");
 
     public static string ClimateName(ClimateKind kind) => _climateNames[kind];
+
+    public static string PatternName(SurfacePattern pattern) => _patternNames[pattern];
+
+    public static SurfacePattern ParsePattern(string? name) =>
+        Parse(_patternNames, name, "surface pattern");
+
+    public static string StarTypeName(StarType type) => _starTypeNames[type];
+
+    public static StarType ParseStarType(string? name) => Parse(_starTypeNames, name, "star type");
 
     public static ClimateKind ParseClimate(string? name) =>
         Parse(_climateNames, name, "terrain climate");

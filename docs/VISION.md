@@ -108,7 +108,15 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 15: Small Fixes** · In Progress (owner's choice, 2026-10-03)
+**Milestone 16: Body Appearance** · In Progress (owner's choice, 2026-10-03)
+Give bodies their own look (`BOD-06`). Owner's decisions:
+- **Planets and moons:** a color and a surface pattern (Plain, Rocky, Banded, Icy, Cloudy),
+  shown where there's no map; terrain and maps still draw on top.
+- **Stars:** picked by type (Red dwarf, Orange, Yellow, White, Blue), which sets their light too.
+- **Defaults:** planets keep today's ocean blue; moons become grey and rocky; stars yellow.
+- **No visual styles yet** (`REN-05` stays for later). One PR (PR #42).
+
+**Milestone 15: Small Fixes** · Complete (PR #41 merged 2026-10-03; owner's choice, 2026-10-03)
 One tidy-up PR for issues found along the way (PR #41): dropdowns that could pick an item by
 accident in short windows, and markers showing through the side panels (see `UI-01`).
 
@@ -1012,9 +1020,29 @@ architecture implications. This needs a design review before any related data fo
   up, about 5% slower (e.g. 160 → 152 fps); 3 MB more video memory. The six-face check still
   agrees at 99%.
 
-**BOD-06 — Custom surface appearance** · Idea · Base
+**BOD-06 — Custom surface appearance** · Implemented (M16, PR #42) · Base
 **Intent:** Custom textures/appearance for bodies beyond defaults (see also `MAP-01`).
-**Implementation:** —
+**Implementation (PR #42):**
+- `Model/BodyAppearance.cs` on `Body.Appearance` (immutable): `Color` and `Pattern`
+  (`SurfacePattern`) for planets and moons, `StarType` for stars; `DefaultFor(kind)` and
+  `StarColor(type)`. New moons (`NewBodies.Moon`) start grey and rocky; switching a body between
+  planet and moon keeps its look. Format **version 13** (`appearance`; older worlds get the
+  defaults, so only moons change).
+- **Drawing** (`planet.gdshader`, `surface_look`): Rocky (mottled, with craters at two sizes),
+  Banded (bands along the body's own latitudes, wobbling), Icy (pale with dark cracks), Cloudy
+  (swirls toward white). The noise is read from a small repeating 3D texture
+  (`godot/Rendering/PatternNoise.cs`, 32³, built once from a fixed seed) rather than worked out
+  per pixel: the first version cost about 20% with a patterned planet filling the screen; this
+  one about 3%. Each body's pattern is offset by its ID, so two rocky moons differ. Craters
+  each fit inside one cell, so only one cell is checked.
+- **Stars:** `SystemView` colors each star and its light from its type, updating only when it
+  changes; `BodyMarkers` uses the same color for star dots.
+- **App:** the System panel's **Color** and **Pattern** (planets and moons) or **Star type**
+  (stars), through `WorldSession.SetAppearance` (rapid changes are one undo step).
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: every pattern
+  through the dropdown, a color change and its undo, a new moon grey and rocky, the Sun as a red
+  dwarf (its color and light), and save/reopen. Benchmark (baseline laptop): the default world
+  unchanged against `main` (~194 fps); the same world plain ~179 fps against patterned ~174.
 
 ### 4.5 Orbits & Simulation (`SIM`)
 

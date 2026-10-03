@@ -52,6 +52,10 @@ instead), and dragging moves the map. A north arrow, a scale bar, and the coordi
 region) under the mouse show at the bottom left. **Zoom to** glides straight down to a region
 (in the Regions panel) or a pin (in its pop-up or weather window). Zoom out to get the globe back.
 
+In the System panel each body also has a look: a planet or moon has a **Color** and a
+**Pattern** (Plain, Rocky, Banded, Icy, or Cloudy) shown where it has no map, and a star has a
+**Star type** (Red dwarf to Blue) that colors it and its light. New moons start grey and rocky.
+
 A new world is a small star system: a sun with one planet orbiting it. Zoom out to see the whole
 system, and click any body to fly to it. The map tools work on the selected body; stars have no
 map. The time bar (bottom right) plays the world clock at the chosen speed, steps it back or forward

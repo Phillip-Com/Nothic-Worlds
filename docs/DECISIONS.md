@@ -7,8 +7,12 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-10-03 | Milestone 15: **small fixes**, one PR | In PR | [#41](https://github.com/Phillip-Com/Nothic-Worlds/pull/41) | VISION.md §3 |
-| 2026-10-03 | Every dropdown **opens when the click ends**; side panels get a **solid background** | In PR | [#41](https://github.com/Phillip-Com/Nothic-Worlds/pull/41) | Claude's fixes. VISION.md `UI-01` |
+| 2026-10-03 | Milestone 16: **body appearance** (`BOD-06`) in **one PR**; no visual styles yet | In PR | [#42](https://github.com/Phillip-Com/Nothic-Worlds/pull/42) | VISION.md §3 |
+| 2026-10-03 | Planets and moons get a **color and pattern** (Plain, Rocky, Banded, Icy, Cloudy); stars a **star type** that colors their light | In PR | [#42](https://github.com/Phillip-Com/Nothic-Worlds/pull/42) | Format version 13 |
+| 2026-10-03 | Defaults: planets **ocean blue**, moons **grey and rocky**, stars **yellow**; older worlds' moons change | In PR | [#42](https://github.com/Phillip-Com/Nothic-Worlds/pull/42) | Owner's choice |
+| 2026-10-03 | Patterns read noise from a **small 3D texture**, offset per body | In PR | [#42](https://github.com/Phillip-Com/Nothic-Worlds/pull/42) | Claude's choice: ~3% cost instead of ~20% |
+| 2026-10-03 | Milestone 15: **small fixes**, one PR | Merged | [#41](https://github.com/Phillip-Com/Nothic-Worlds/pull/41) · `341ace3` | VISION.md §3 |
+| 2026-10-03 | Every dropdown **opens when the click ends**; side panels get a **solid background** | Merged | [#41](https://github.com/Phillip-Com/Nothic-Worlds/pull/41) · `341ace3` | Claude's fixes. VISION.md `UI-01` |
 | 2026-10-03 | Rain is estimated from a **tropical rain belt following the sun**, a **mid-latitude storm belt**, drizzle, the cold, and the terrain's **moisture** | Merged | [#40](https://github.com/Phillip-Com/Nothic-Worlds/pull/40) · `5de1ff0` | Claude's model, tuned to Earth-like totals. VISION.md `WTH-03` |
 | 2026-10-03 | The weather window **scrolls** when the screen is too short | Merged | [#40](https://github.com/Phillip-Com/Nothic-Worlds/pull/40) · `5de1ff0` | Claude's fix (it no longer fit at 1152 × 648) |
 | 2026-10-03 | Milestone 14: **terrain-aware weather** (new `WTH-03`), temperature and rainfall in **two PRs** | Merged | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) · `823d2ea` | VISION.md §3 |

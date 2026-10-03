@@ -3,6 +3,7 @@ using NothicWorlds.Controls;
 using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
+using NothicWorlds.Interop;
 using NothicWorlds.Session;
 
 namespace NothicWorlds.Rendering;
@@ -42,7 +43,6 @@ public partial class SystemView : Node3D
     private const float CloseUpAltitude = 10.0f;
     private const int OrbitLineSamples = 256;
 
-    private static readonly Color _starColor = new(1.0f, 0.86f, 0.55f);
     private static readonly Color _orbitColor = new(0.6f, 0.7f, 0.9f, 0.35f);
 
     private readonly Dictionary<Guid, BodyVisual> _visuals = [];
@@ -372,6 +372,17 @@ public partial class SystemView : Node3D
             light.Position = ToScene(place.Position);
         }
 
+        // A star's type can change at any time (VISION.md BOD-06); only touched when it does.
+        if (visual.StarMaterial is StandardMaterial3D starMaterial && visual.Light is not null)
+        {
+            Color color = BodyAppearance.StarColor(body.Appearance.StarType).ToGodot();
+            if (starMaterial.AlbedoColor != color)
+            {
+                starMaterial.AlbedoColor = color;
+                visual.Light.LightColor = color.Lightened(0.6f);
+            }
+        }
+
         if (visual.OrbitLine is MeshInstance3D line && body.Orbit is Orbit orbit
             && _layout.TryGetValue(orbit.ParentId, out DisplayBody parent))
         {
@@ -472,17 +483,16 @@ public partial class SystemView : Node3D
         AddChild(root);
         PlanetSurface? surface = null;
         OmniLight3D? light = null;
+        StandardMaterial3D? starMaterial = null;
         if (body.Kind == BodyKind.Star)
         {
-            root.AddChild(new MeshInstance3D
+            Color starColor = BodyAppearance.StarColor(body.Appearance.StarType).ToGodot();
+            starMaterial = new StandardMaterial3D
             {
-                Mesh = _sphere,
-                MaterialOverride = new StandardMaterial3D
-                {
-                    ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-                    AlbedoColor = _starColor,
-                },
-            });
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                AlbedoColor = starColor,
+            };
+            root.AddChild(new MeshInstance3D { Mesh = _sphere, MaterialOverride = starMaterial });
 
             // Lights everything around it, with no fall-off, like sunlight across a system. It's
             // kept apart from the scaled star, so the star's size doesn't change its reach.
@@ -491,7 +501,7 @@ public partial class SystemView : Node3D
                 Name = $"Light {body.Name}",
                 OmniRange = 1e7f,
                 OmniAttenuation = 0.0f,
-                LightColor = _starColor.Lightened(0.6f),
+                LightColor = starColor.Lightened(0.6f),
             };
             AddChild(light);
         }
@@ -506,7 +516,11 @@ public partial class SystemView : Node3D
             root.AddChild(surface);
         }
 
-        return new BodyVisual(body.Id, root, surface) { Light = light };
+        return new BodyVisual(body.Id, root, surface)
+        {
+            Light = light,
+            StarMaterial = starMaterial,
+        };
     }
 
     private void RebuildOrbitLines()
@@ -569,6 +583,8 @@ public partial class SystemView : Node3D
         public MeshInstance3D? OrbitLine { get; set; }
 
         public OmniLight3D? Light { get; init; }
+
+        public StandardMaterial3D? StarMaterial { get; init; }
 
         public void Free()
         {

@@ -92,7 +92,17 @@ const int TERRAIN_FAR_SIZE = 256;
 // The softest edge between terrains up close, in cells (edges sharpen to about a pixel as
 // cells get bigger on screen, and never go softer than this).
 const float TERRAIN_EDGE_CELLS = 0.15;
+// How a body without a map looks (VISION.md BOD-06): its color and a pattern drawn over it.
+// Patterns must match NothicWorlds.Core.Model.SurfacePattern.
 uniform vec3 base_color : source_color = vec3(0.13, 0.27, 0.45);
+uniform int surface_pattern = 0;
+uniform vec3 pattern_offset = vec3(0.0);
+uniform sampler3D pattern_noise : filter_linear, repeat_enable;
+const int PATTERN_NOISE_SIZE = 32;
+const int PATTERN_ROCKY = 1;
+const int PATTERN_BANDED = 2;
+const int PATTERN_ICY = 3;
+const int PATTERN_CLOUDY = 4;
 uniform vec3 grid_color : source_color = vec3(0.75, 0.8, 0.9);
 uniform vec3 highlight_color : source_color = vec3(1.0, 0.8, 0.35);
 uniform float grid_spacing_degrees = 15.0;
@@ -506,6 +516,78 @@ vec4 terrain_color(vec3 direction, float pixel_angle) {
 	return color;
 }
 
+// ----- Surface patterns: noise on the globe's directions, so there are no seams -----
+// The noise comes from a small repeating 3D texture of random values (PatternNoise.cs), read
+// with smooth filtering: one texture read per layer of detail, which integrated graphics
+// handle far better than working the noise out in every pixel.
+
+float hash(vec3 p) {
+	p = fract(p * 0.1031);
+	p += dot(p, p.zyx + 31.32);
+	return fract((p.x + p.y) * p.z);
+}
+
+// Smooth noise from 0 to 1, varying over about one unit.
+float value_noise(vec3 p) {
+	return texture(pattern_noise, p / float(PATTERN_NOISE_SIZE)).r;
+}
+
+// Noise with finer detail layered on, from about 0 to 1.
+float fbm(vec3 p) {
+	float total = 0.0;
+	float amplitude = 0.5;
+	for (int i = 0; i < 4; i++) {
+		total += amplitude * value_noise(p);
+		p = p * 2.03 + vec3(1.7, 9.2, 3.1);
+		amplitude *= 0.5;
+	}
+	return total / 0.9375;
+}
+
+// How deep into a crater a point is: 1 in the middle of a crater's floor, a negative dip just
+// inside its rim, and 0 outside. Some cells of a 3D grid hold one crater, small enough to sit
+// wholly inside its cell, so only the point's own cell needs checking.
+float craters(vec3 p) {
+	vec3 cell = floor(p);
+	float size = hash(cell + 7.0);
+	if (size < 0.45) {
+		return 0.0;
+	}
+	vec3 centre = cell + 0.35 + 0.3 * vec3(hash(cell), hash(cell + 3.0), hash(cell + 5.0));
+	float radius = 0.12 + 0.2 * (size - 0.45);
+	float d = length(p - centre) / radius;
+	float floor_depth = 1.0 - smoothstep(0.6, 0.9, d);
+	float rim = smoothstep(0.8, 0.95, d) * (1.0 - smoothstep(0.95, 1.15, d));
+	return floor_depth - rim * 0.8;
+}
+
+// The surface's own look where there's no map: the color with its pattern. Each body's
+// pattern is shifted by its own offset, so two rocky moons don't look the same.
+vec3 surface_look(vec3 unit_direction) {
+	vec3 direction = unit_direction + pattern_offset;
+	vec3 color = base_color;
+	if (surface_pattern == PATTERN_ROCKY) {
+		color *= 0.75 + 0.45 * fbm(direction * 6.0);
+		float crater = min(craters(direction * 9.0), 1.0) + craters(direction * 17.0 + 40.0);
+		color *= 1.0 - 0.25 * crater + 0.3 * max(-crater, 0.0);
+	} else if (surface_pattern == PATTERN_BANDED) {
+		float wobble = fbm(direction * 3.0) * 1.6;
+		float bands = sin(direction.y * 18.0 + wobble) * 0.6
+			+ sin(direction.y * 41.0 + wobble * 2.0) * 0.4;
+		color *= 0.85 + 0.3 * bands;
+	} else if (surface_pattern == PATTERN_ICY) {
+		color = mix(color, vec3(0.95, 0.97, 1.0), 0.45);
+		float crack = 1.0 - smoothstep(0.0, 0.035, abs(fbm(direction * 5.0) - 0.5));
+		color *= 1.0 - 0.45 * crack;
+	} else if (surface_pattern == PATTERN_CLOUDY) {
+		vec3 swirl = direction * 3.0 + vec3(fbm(direction * 2.0), value_noise(direction * 2.0 + 4.0),
+			0.0) * 1.5;
+		float clouds = smoothstep(0.45, 0.72, fbm(swirl));
+		color = mix(color, vec3(0.93, 0.94, 0.96), clouds);
+	}
+	return color;
+}
+
 void fragment() {
 	vec3 direction = normalize(local_direction);
 	float latitude = degrees(asin(clamp(direction.y, -1.0, 1.0)));
@@ -514,7 +596,7 @@ void fragment() {
 	bool terrain_shown = has_terrain && show_terrain;
 	bool over_map = has_map || piece_count > 0;
 	vec3 color = has_map ? sample_map(radians(latitude), radians(longitude))
-		: terrain_shown ? unpainted_color : base_color;
+		: terrain_shown ? unpainted_color : surface_look(direction);
 	float pixel_angle = length(fwidth(direction));
 	color = draw_pieces(color, direction, pixel_angle);
 	if (terrain_shown) {
