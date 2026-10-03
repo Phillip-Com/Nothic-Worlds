@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 8: Region Outlines** · In Progress (owner's choice, 2026-10-02)
+**Milestone 8: Region Outlines** · Complete (PR #28 merged 2026-10-02; owner's choice, 2026-10-02)
 Named areas outlined on planets and moons (`LORE-01`). Owner's decisions:
 - **Drawing:** click points around the region on the globe, then drag points to adjust, add
   points on an edge, or delete them (like map pieces' Edit Points).

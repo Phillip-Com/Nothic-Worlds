@@ -8,8 +8,8 @@ A record of key project decisions made by the owner. Newest first.
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
 | 2026-10-02 | Eclipses are worked out **in the background**, only when the panel or markers ask | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | ~7 ms each on the baseline laptop; keeps edits smooth. VISION.md `EVT-01` |
-| 2026-10-02 | Deleting a body **deletes its regions** (same undo step) | In PR | [#28](https://github.com/Phillip-Com/Nothic-Worlds/pull/28) | Like its map and pieces. VISION.md `LORE-01` |
-| 2026-10-02 | Regions have **their own Regions toggle** | In PR | [#28](https://github.com/Phillip-Com/Nothic-Worlds/pull/28) | Next to Pins |
+| 2026-10-02 | Deleting a body **deletes its regions** (same undo step) | Merged | [#28](https://github.com/Phillip-Com/Nothic-Worlds/pull/28) · `acdc698` | Like its map and pieces. VISION.md `LORE-01` |
+| 2026-10-02 | Regions have **their own Regions toggle** | Merged | [#28](https://github.com/Phillip-Com/Nothic-Worlds/pull/28) · `acdc698` | Next to Pins |
 | 2026-10-02 | Milestone 8: **region outlines** (`LORE-01`) | Merged | [#27](https://github.com/Phillip-Com/Nothic-Worlds/pull/27) · `26b2ea4` | VISION.md §3 |
 | 2026-10-02 | Regions are drawn by **clicking points, then adjusting** them; shown as **outline + light fill** with the name | Merged | [#27](https://github.com/Phillip-Com/Nothic-Worlds/pull/27) · `26b2ea4` | Built in the next PR |
 | 2026-10-02 | **Regions are places** for journal entries and events; clicking one pops up its notes and what's in it | Merged | [#27](https://github.com/Phillip-Com/Nothic-Worlds/pull/27) · `26b2ea4` | VISION.md `LORE-01` |
