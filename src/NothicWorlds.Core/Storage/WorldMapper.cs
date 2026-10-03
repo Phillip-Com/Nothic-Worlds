@@ -83,6 +83,7 @@ internal static class WorldMapper
             Code = type.Code,
             Name = type.Name,
             Color = type.Color.ToHex(),
+            Climate = WorldFormat.ClimateName(type.Climate),
         };
     }
 
@@ -94,7 +95,8 @@ internal static class WorldMapper
             $"a terrain type's code ({document.Code}) isn't 1 to 255");
         Require(RgbColor.TryParseHex(document.Color, out RgbColor color),
             $"invalid terrain color '{document.Color}'");
-        return new TerrainType((byte)document.Code, document.Name ?? "", color);
+        return new TerrainType((byte)document.Code, document.Name ?? "", color,
+            WorldFormat.ParseClimate(document.Climate));
     }
 
     private static WeatherPinDocument ToDocument(WeatherPin pin)
