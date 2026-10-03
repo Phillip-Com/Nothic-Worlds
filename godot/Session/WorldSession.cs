@@ -386,6 +386,12 @@ public partial class WorldSession : Node
         Guid? parent = body.Orbit?.ParentId;
         World.Bodies.RemoveAll(b => removed.Contains(b.Id));
         ClearLoreOn(removed);
+        foreach (Body other in World.Bodies.Where(b =>
+            b.Calendar?.MonthMoonId is Guid moon && removed.Contains(moon)))
+        {
+            other.Calendar = other.Calendar! with { MonthMoonId = null };
+        }
+
         if (removed.Contains(SelectedBodyId))
         {
             SelectedBodyId = parent is Guid p && FindBody(p) is not null
@@ -536,7 +542,8 @@ public partial class WorldSession : Node
 
     /// <summary>
     /// Replaces a body's calendar (VISION.md CAL-01), or removes it with null. Stars don't
-    /// have calendars.
+    /// have calendars. A calendar that fits the world (CAL-02) adjusts it straight away, in the
+    /// same undo step, and keeps it fitted after later edits.
     /// </summary>
     /// <returns>What's wrong with the calendar (nothing is changed then), or null.</returns>
     public string? SetCalendar(Guid bodyId, Calendar? calendar)
@@ -546,7 +553,9 @@ public partial class WorldSession : Node
             return null;
         }
 
-        if (calendar?.Problem() is string problem)
+        if (calendar is not null
+            && (calendar.Problem() ?? CalendarFitting.Problem(World.Bodies, body, calendar))
+                is string problem)
         {
             return problem;
         }
@@ -1569,16 +1578,24 @@ public partial class WorldSession : Node
     }
 
     // `systemChanged` false: only journal writing changed, so the simulation caches stay.
+    // After any change to the system, calendars that fit the world (VISION.md CAL-02) adjust it
+    // again, as part of the same edit (and undo step).
     private void MarkChanged(bool systemChanged = true)
     {
         _editVersion++;
+        bool refitted = false;
         if (systemChanged)
         {
+            refitted = CalendarFitting.Apply(World.Bodies);
             _systemVersion++;
         }
 
         UpdateUnsavedState();
         Changed?.Invoke();
+        if (refitted)
+        {
+            TimeChanged?.Invoke();  // A fitted day length changes the date shown.
+        }
     }
 
     private void UpdateUnsavedState()
