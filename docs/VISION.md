@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 9: Weather Pin** · In Progress (owner's choice, 2026-10-02)
+**Milestone 9: Weather Pin** · Complete (PR #30 merged 2026-10-02; owner's choice, 2026-10-02)
 The weather at named spots on a planet or moon (`WTH-01`). Owner's decisions:
 - **Content:** sun and temperature: daylight hours, how high the sun gets, and a temperature
   range through the year, with the season. No rain or climate types yet.
