@@ -31,6 +31,12 @@ public sealed class SurfaceSettings
     /// </summary>
     public RgbColor FillColor { get; set; } = DefaultFillColor;
 
+    /// <summary>
+    /// The terrain painted on the surface (VISION.md BOD-05). Immutable, so copies of the world
+    /// and undo snapshots can safely share it.
+    /// </summary>
+    public TerrainGrid Terrain { get; set; } = TerrainGrid.Empty;
+
     /// <summary>Returns an independent copy (e.g. a snapshot for undo).</summary>
     public SurfaceSettings Clone()
     {
@@ -46,6 +52,7 @@ public sealed class SurfaceSettings
     public void RestoreFrom(SurfaceSettings source)
     {
         FillColor = source.FillColor;
+        Terrain = source.Terrain;  // Immutable, safe to share.
         Map = source.Map is SurfaceMap map
             ? new SurfaceMap
             {
@@ -60,12 +67,14 @@ public sealed class SurfaceSettings
 
     /// <summary>
     /// True if <paramref name="other"/> would save exactly the same surface: the same map, map
-    /// type, calibration, fill color, and pieces (in the same order, with the same names, cuts,
-    /// and placement). Used to tell whether the world still matches its saved file.
+    /// type, calibration, fill color, pieces (in the same order, with the same names, cuts,
+    /// and placement), and painted terrain. Used to tell whether the world still matches its
+    /// saved file.
     /// </summary>
     public bool HasSameContent(SurfaceSettings other)
     {
         return FillColor == other.FillColor
+            && Terrain.HasSameCells(other.Terrain)
             && SameMap(Map, other.Map)
             && Pieces.Count == other.Pieces.Count
             && Pieces.Zip(other.Pieces).All(pair => SamePiece(pair.First, pair.Second));

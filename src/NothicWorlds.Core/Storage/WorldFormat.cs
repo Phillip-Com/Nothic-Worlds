@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 9;
+    public const int CurrentVersion = 10;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -83,6 +83,30 @@ internal static partial class WorldFormat
         // 8 → 9: bodies gained an average temperature, and the world an optional "weatherPins"
         // list (weather pins, M9). Older bodies get Earth's 15 °C, and worlds have no pins.
         document => SetOnEveryBody(document, "averageTemperature", 15.0),
+
+        // 9 → 10: the world gained a "terrainTypes" list, and surfaces an optional "terrain"
+        // image (terrain painting, M11). Older worlds get the version 10 default types and no
+        // painting.
+        AddDefaultTerrainTypes,
+    ];
+
+    // The terrain types worlds got when version 10 arrived. Deliberately a copy, not
+    // TerrainType.Defaults: if the defaults for new worlds change later, upgrading an old
+    // file must still give the same result.
+    private static readonly (int Code, string Name, string Color)[] _version10TerrainTypes =
+    [
+        (1, "Ocean", "#1F4E79"),
+        (2, "Shallow Water", "#3A86B8"),
+        (3, "Plains", "#A8C66C"),
+        (4, "Fields", "#D8C878"),
+        (5, "Forest", "#2F6B35"),
+        (6, "Jungle", "#1E5631"),
+        (7, "Hills", "#8C9A5B"),
+        (8, "Mountains", "#7D6E62"),
+        (9, "Desert", "#E3C78F"),
+        (10, "Swamp", "#4F6B4A"),
+        (11, "Tundra", "#A3A88E"),
+        (12, "Ice", "#EEF3F7"),
     ];
 
     public static string ProjectionName(MapProjection projection) => _projectionNames[projection];
@@ -97,6 +121,18 @@ internal static partial class WorldFormat
             }
         }
 
+        return document;
+    }
+
+    private static JsonObject AddDefaultTerrainTypes(JsonObject document)
+    {
+        var types = new JsonArray();
+        foreach ((int code, string name, string color) in _version10TerrainTypes)
+        {
+            types.Add(new JsonObject { ["code"] = code, ["name"] = name, ["color"] = color });
+        }
+
+        document["terrainTypes"] ??= types;
         return document;
     }
 
@@ -144,6 +180,18 @@ internal static partial class WorldFormat
     public static bool IsValidAssetName(string? name)
     {
         return name is not null && AssetNamePattern().IsMatch(name);
+    }
+
+    /// <summary>
+    /// The name of a body's terrain image inside the world file, e.g.
+    /// <c>terrain/1a2b….png</c> (named after the body).
+    /// </summary>
+    public static string TerrainEntryName(Guid bodyId) => $"terrain/{bodyId:N}.png";
+
+    /// <summary>True if a terrain image name has the expected safe form.</summary>
+    public static bool IsValidTerrainName(string? name)
+    {
+        return name is not null && TerrainNamePattern().IsMatch(name);
     }
 
     /// <summary>
@@ -197,4 +245,8 @@ internal static partial class WorldFormat
     // also rules out paths that try to escape the file (e.g. "../").
     [GeneratedRegex(@"^assets/[0-9a-f]{32}\.(png|jpg|jpeg|webp)$")]
     private static partial Regex AssetNamePattern();
+
+    // The same safety rule for terrain images, which are always PNG.
+    [GeneratedRegex(@"^terrain/[0-9a-f]{32}\.png$")]
+    private static partial Regex TerrainNamePattern();
 }

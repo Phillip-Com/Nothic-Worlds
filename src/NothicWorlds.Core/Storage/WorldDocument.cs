@@ -13,12 +13,20 @@ internal sealed class WorldDocument
     public required DateTimeOffset ModifiedUtc { get; init; }
     public double? TimeDays { get; init; }  // Added in format version 5
     public required List<BodyDocument> Bodies { get; init; }
+    public List<TerrainTypeDocument>? TerrainTypes { get; init; }  // Added in format version 10
     public List<RegionDocument>? Regions { get; init; }  // Added in format version 8
     public List<WeatherPinDocument>? WeatherPins { get; init; }  // Added in format version 9
     public List<JournalEntryDocument>? Journal { get; init; }  // Added in format version 7
     public List<TimelineDocument>? Timelines { get; init; }  // Added in format version 7
     public List<EventDocument>? Events { get; init; }  // Added in format version 7
     public ViewDocument? View { get; init; }
+}
+
+internal sealed class TerrainTypeDocument
+{
+    public required int Code { get; init; }
+    public required string Name { get; init; }
+    public required string Color { get; init; }
 }
 
 internal sealed class JournalEntryDocument
@@ -134,6 +142,7 @@ internal sealed class SurfaceDocument
     public MapDocument? Map { get; init; }
     public List<PieceDocument>? Pieces { get; init; }  // Added in format version 3
     public required string FillColor { get; init; }
+    public string? Terrain { get; init; }  // Added in format version 10
 }
 
 internal sealed class PieceDocument

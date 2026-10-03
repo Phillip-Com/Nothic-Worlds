@@ -9,7 +9,8 @@ namespace NothicWorlds.Core.Storage;
 
 /// <summary>
 /// Reads and writes <c>.nworld</c> files (docs/world-format.md): a zip holding
-/// <c>world.json</c> and the world's assets (the user's original map images, unchanged).
+/// <c>world.json</c>, the world's assets (the user's original map images, unchanged), and each
+/// painted body's terrain image.
 /// </summary>
 /// <remarks>
 /// Saving never damages an existing world. The new file is written and read back in full next
@@ -66,7 +67,7 @@ public static class WorldPackage
         try
         {
             TryDelete(tempPath);
-            WriteArchive(tempPath, WorldMapper.ToDocument(world), assetNames, assets);
+            WriteArchive(tempPath, world, assetNames, assets);
             Load(tempPath);  // Proves the new file reads back before it replaces anything.
             Commit(tempPath, fullPath);
         }
@@ -109,7 +110,8 @@ public static class WorldPackage
         try
         {
             using ZipArchive archive = ZipFile.OpenRead(fullPath);
-            World world = WorldMapper.ToWorld(ReadDocument(archive));
+            World world = WorldMapper.ToWorld(
+                ReadDocument(archive), name => ReadTerrain(archive, name));
 
             var assets = new Dictionary<string, IAssetSource>();
             foreach (string name in ReferencedAssetNames(world))
@@ -151,6 +153,34 @@ public static class WorldPackage
         }
     }
 
+    private static TerrainGrid ReadTerrain(ZipArchive archive, string name)
+    {
+        ZipArchiveEntry entry = archive.GetEntry(name) ?? throw new WorldFileException(
+            $"The world file is damaged: its terrain image '{name}' is missing.");
+        if (entry.Length > TerrainImage.MaxFileBytes)
+        {
+            throw new WorldFileException(
+                $"The world file is damaged: the terrain image '{name}' is too large.");
+        }
+
+        var bytes = new byte[entry.Length];
+        try
+        {
+            using (Stream stream = entry.Open())
+            {
+                stream.ReadExactly(bytes);
+            }
+
+            return TerrainImage.Decode(bytes);
+        }
+        catch (Exception error) when (error is InvalidDataException or EndOfStreamException)
+        {
+            throw new WorldFileException(
+                $"The world file is damaged: the terrain image '{name}' can't be read " +
+                $"({error.Message}).", error);
+        }
+    }
+
     private static WorldDocument ReadDocument(ZipArchive archive)
     {
         ZipArchiveEntry entry = archive.GetEntry(WorldFormat.DocumentEntryName)
@@ -175,7 +205,7 @@ public static class WorldPackage
 
     private static void WriteArchive(
         string path,
-        WorldDocument document,
+        World world,
         List<string> assetNames,
         IReadOnlyDictionary<string, IAssetSource> assets)
     {
@@ -186,7 +216,7 @@ public static class WorldPackage
                 archive.CreateEntry(WorldFormat.DocumentEntryName, CompressionLevel.Optimal);
             using (Stream stream = documentEntry.Open())
             {
-                JsonSerializer.Serialize(stream, document, _jsonOptions);
+                JsonSerializer.Serialize(stream, WorldMapper.ToDocument(world), _jsonOptions);
             }
 
             // Images are already compressed, so they're stored as-is (much faster to save).
@@ -196,6 +226,14 @@ public static class WorldPackage
                 using Stream source = assets[name].OpenRead();
                 using Stream target = entry.Open();
                 source.CopyTo(target);
+            }
+
+            foreach (Body body in world.Bodies.Where(body => !body.Surface.Terrain.IsEmpty))
+            {
+                ZipArchiveEntry entry = archive.CreateEntry(
+                    WorldFormat.TerrainEntryName(body.Id), CompressionLevel.NoCompression);
+                using Stream target = entry.Open();
+                target.Write(TerrainImage.Encode(body.Surface.Terrain));
             }
         }
 

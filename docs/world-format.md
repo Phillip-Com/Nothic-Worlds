@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 9** (see **Version history** at the end)
+**Current format version: 10** (see **Version history** at the end)
 
 ## Container
 
@@ -14,17 +14,20 @@ A `.nworld` file is a standard **zip archive** containing:
 |-------|----------|
 | `world.json` | The world data (below), UTF-8 JSON, compressed |
 | `assets/<32 hex chars>.<ext>` | The user's **original** map images, unchanged (`png`, `jpg`, `jpeg`, `webp`), stored uncompressed because images are already compressed |
+| `terrain/<32 hex chars>.png` | A body's **painted terrain** (`BOD-05`, see **Terrain** below), named after the body's `id` without dashes. Only bodies with something painted have one. Stored uncompressed (PNG is already compressed). |
 
 - Only assets the world references are saved. Replaced maps don't pile up.
 - Asset names must match `^assets/[0-9a-f]{32}\.(png|jpg|jpeg|webp)$`. Anything else is rejected,
   which also blocks names that try to escape the archive (`../`).
-- Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB.
+- Terrain image names must match `^terrain/[0-9a-f]{32}\.png$`.
+- Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB, each terrain image
+  up to 16 MB.
 
-## `world.json` (version 9)
+## `world.json` (version 10)
 
 ```json
 {
-  "formatVersion": 9,
+  "formatVersion": 10,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -107,9 +110,15 @@ A `.nworld` file is a standard **zip archive** containing:
             "warp": [[0, 0], [1.25, -0.125], [1, 1], [0, 1]]
           }
         ],
-        "fillColor": "#112233"
+        "fillColor": "#112233",
+        "terrain": "terrain/aaaaaaaabbbbccccddddeeeeeeeeeeee.png"
       }
     }
+  ],
+  "terrainTypes": [
+    { "code": 1, "name": "Ocean", "color": "#1F4E79" },
+    { "code": 5, "name": "Forest", "color": "#2F6B35" },
+    { "code": 13, "name": "Crystal Wastes", "color": "#B0E0E6" }
   ],
   "weatherPins": [
     { "id": "3c3c3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
@@ -212,6 +221,11 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…pieces[].width` | yes | Degrees of arc the bounding box spans left to right (0.1 to 180). The height follows from the box's true shape. |
 | `…pieces[].warp` | no | Edit Points (`MAP-02`): where each outline point has been dragged to, as `[u, v]` in the piece's box (0–1 from its top-left before warping; may go beyond). Exactly one per `outline.points`, in the same order. Omitted when the piece isn't warped. |
 | `bodies[].surface.fillColor` | yes | `#RRGGBB`. Color where the map doesn't cover the globe |
+| `bodies[].surface.terrain` | no | The body's terrain image entry name (see Container and **Terrain**). Omitted when nothing is painted. |
+| `terrainTypes` | no | The kinds of terrain that can be painted (`BOD-05`), in list order. Omitted when there are none. Up to 255. New worlds start with 12 defaults. |
+| `…terrainTypes[].code` | yes | 1 to 255, unique among terrain types: the value painted cells store. 0 means unpainted. |
+| `…terrainTypes[].name` | yes | Not empty, up to 60 characters |
+| `…terrainTypes[].color` | yes | `#RRGGBB`: how the terrain is drawn |
 | `weatherPins` | no | Named spots whose weather is shown (`WTH-01`), in the order added. Omitted when there are none. Up to 1,000. |
 | `…weatherPins[].id`, `name` | yes | GUID, unique among weather pins; name not empty, up to 100 characters |
 | `…weatherPins[].body` | yes | The `id` of the planet or moon it's on (not a star) |
@@ -258,6 +272,30 @@ longitude λ give (cos φ sin λ, sin φ, cos φ cos λ)). A spot is **inside** 
 the corners onto the plane touching the sphere at the center (from the sphere's center, which
 keeps great-circle edges straight), it's inside the projected polygon by the even-odd rule.
 Spots on the far half of the sphere are never inside.
+
+**Terrain** (`CubeSphere`, `TerrainGrid`, and `TerrainImage` in Core). A body's surface is
+divided into cells by blowing a cube up into a sphere: six faces, each 1,024 × 1,024 cells.
+The faces, in order, face +x, −x, +y (north), −y, +z, −z (the body frame's axes, as in
+**Regions**). Each face has an outward direction *n*, a "right" axis *r*, and an "up" axis *u*:
+
+| Face | *n* | *r* | *u* |
+|------|-----|-----|-----|
+| 0 | (1, 0, 0) | (0, 0, −1) | (0, 1, 0) |
+| 1 | (−1, 0, 0) | (0, 0, 1) | (0, 1, 0) |
+| 2 | (0, 1, 0) | (1, 0, 0) | (0, 0, −1) |
+| 3 | (0, −1, 0) | (1, 0, 0) | (0, 0, 1) |
+| 4 | (0, 0, 1) | (1, 0, 0) | (0, 1, 0) |
+| 5 | (0, 0, −1) | (−1, 0, 0) | (0, 1, 0) |
+
+A direction *d* belongs to the face whose *n* is closest (its largest component; ties go to the
+earlier face). On that face, with *a* = (*d*·*r*)/(*d*·*n*) and *b* = (*d*·*u*)/(*d*·*n*), the
+cells are spaced by equal angles: column = ⌊(4/π · atan *a* + 1)/2 × 1024⌋ and
+row = ⌊(1 − 4/π · atan *b*)/2 × 1024⌋, each clamped to 0–1023. Row 0 is the top (toward *u*).
+
+The terrain image is an ordinary **8-bit greyscale PNG**, 1,024 pixels wide and 6,144 tall: the
+six faces stacked top to bottom in face order, each row by row. Each pixel's value is its
+cell's terrain `code`, or 0 for unpainted. Codes not in `terrainTypes` are kept, and drawn as
+unpainted. Readers accept any PNG row filter, but not interlacing, other bit depths, or colors.
 
 Names written for enums (`kind`, `projection`) are fixed strings. They're not the code's enum
 names, so renaming code never changes the format.
@@ -347,3 +385,4 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 10 | Terrain painting (M11): `terrainTypes`; surfaces gain an optional `terrain` image | The world gets the 12 default terrain types (codes 1–12: Ocean, Shallow Water, Plains, Fields, Forest, Jungle, Hills, Mountains, Desert, Swamp, Tundra, Ice); nothing is painted |
