@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 8** (see **Version history** at the end)
+**Current format version: 9** (see **Version history** at the end)
 
 ## Container
 
@@ -20,11 +20,11 @@ A `.nworld` file is a standard **zip archive** containing:
   which also blocks names that try to escape the archive (`../`).
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB.
 
-## `world.json` (version 8)
+## `world.json` (version 9)
 
 ```json
 {
-  "formatVersion": 8,
+  "formatVersion": 9,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -69,6 +69,7 @@ A `.nworld` file is a standard **zip archive** containing:
       "dayLengthHours": 26.5,
       "axialTilt": 23.5,
       "axialTiltDirection": 45,
+      "averageTemperature": 12.5,
       "orbit": { "parent": "51515151-5151-5151-5151-515151515151", "distanceKm": 149600000,
         "periodDays": 365.25, "startAngle": 90 },
       "calendar": {
@@ -109,6 +110,10 @@ A `.nworld` file is a standard **zip archive** containing:
         "fillColor": "#112233"
       }
     }
+  ],
+  "weatherPins": [
+    { "id": "3c3c3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "name": "Aster Bay", "latitude": 42.5, "longitude": -71.25 }
   ],
   "regions": [
     {
@@ -175,6 +180,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `bodies[].dayLengthHours` | yes | Time for one spin, in standard hours. Above 0, at most 10⁷. |
 | `bodies[].axialTilt` | yes | Degrees the spin axis leans, 0 to 180 |
 | `bodies[].axialTiltDirection` | yes | Degrees: which way the north pole leans (see the axis rule below) |
+| `bodies[].averageTemperature` | yes | °C, −270 to 2,000: the body's average surface temperature over a year (`WTH-01`; Earth about 15). Weather pins spread it by latitude and season. |
 | `bodies[].calendar` | no | The body's own calendar (`CAL-01`). Omitted to count plain days. |
 | `…calendar.months` | yes | 1 to 100 `{ "name", "days" }`, in order; each name not empty, days 1 to 100,000 |
 | `…calendar.weekdays` | no | Weekday names, in order (at most 100, none empty). Omitted for a calendar without weeks. |
@@ -206,6 +212,10 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…pieces[].width` | yes | Degrees of arc the bounding box spans left to right (0.1 to 180). The height follows from the box's true shape. |
 | `…pieces[].warp` | no | Edit Points (`MAP-02`): where each outline point has been dragged to, as `[u, v]` in the piece's box (0–1 from its top-left before warping; may go beyond). Exactly one per `outline.points`, in the same order. Omitted when the piece isn't warped. |
 | `bodies[].surface.fillColor` | yes | `#RRGGBB`. Color where the map doesn't cover the globe |
+| `weatherPins` | no | Named spots whose weather is shown (`WTH-01`), in the order added. Omitted when there are none. Up to 1,000. |
+| `…weatherPins[].id`, `name` | yes | GUID, unique among weather pins; name not empty, up to 100 characters |
+| `…weatherPins[].body` | yes | The `id` of the planet or moon it's on (not a star) |
+| `…weatherPins[].latitude`, `longitude` | yes | The spot: −90 to 90, −180 to 180 |
 | `regions` | no | Areas outlined on planets and moons (`LORE-01`), in drawing order (later on top). Omitted when there are none. Up to 5,000. They may overlap. |
 | `…regions[].id` | yes | GUID, unique among regions |
 | `…regions[].body` | yes | The `id` of the planet or moon it's on (not a star) |
@@ -309,6 +319,13 @@ nearest star up its chain of parents, or a star orbiting it or its planet. The s
 declination is the angle between the direction to the star and the body's equatorial plane.
 Northern solstices are where it peaks and bottoms out; equinoxes are where it crosses zero.
 
+**Weather** isn't stored either; it's worked out for each weather pin (`ClimateYear` in Core).
+Daylight and sunlight are exact from the star's declination δ and the spot's latitude φ: the
+star sets at hour angle ω₀ = arccos(−tan φ tan δ) (0 or π beyond the polar circles), the day is
+lit for ω₀/π of the body's day, and a level spot gets (ω₀ sin φ sin δ + cos φ cos δ sin ω₀)/π
+of the light facing the star, times (mean 1/r² over the year) ÷ (1/r² today) for the distance
+r. Temperatures are an estimate around `averageTemperature`; the constants are in the code.
+
 ## Safe saving
 
 1. Write the complete new file next to the target as `<name>.nworld.saving`, and flush it to disk.
@@ -329,3 +346,4 @@ If anything fails, the existing world file is left untouched.
 | 6 | Calendars and seasons (M5): bodies gain `axialTiltDirection` and an optional `calendar` | Each body gets `axialTiltDirection` 0 and no calendar |
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
+| 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
