@@ -9,7 +9,7 @@ namespace NothicWorlds.Controls;
 
 /// <summary>
 /// Moving, resizing, and rotating map pieces directly on the globe (VISION.md MAP-02), like
-/// stamps in other map makers. Works while the Pieces panel is open:
+/// stamps in other map makers. Works while the Map panel is open:
 /// <list type="bullet">
 /// <item>Click a piece to select it; drag it to move it.</item>
 /// <item>Drag a corner square to resize it (it keeps its proportions).</item>
@@ -53,8 +53,8 @@ public partial class PieceHandles : CanvasLayer
     /// <summary>The camera, for turning mouse positions into globe positions.</summary>
     [Export] public PlanetCamera? Camera { get; set; }
 
-    /// <summary>The Pieces panel, which holds the selection. Handles work while it shows.</summary>
-    [Export] public PiecesPanel? Panel { get; set; }
+    /// <summary>The Map panel, which holds the selection. Handles work while it shows.</summary>
+    [Export] public MapPanel? Panel { get; set; }
 
     private enum Part
     {
@@ -65,7 +65,7 @@ public partial class PieceHandles : CanvasLayer
         Point,
     }
 
-    // Handles work only while the Pieces panel shows (it hides during calibration and cutting).
+    // Handles work only while the Map panel shows (it hides during calibration and cutting).
     private bool IsActive => Panel is { Visible: true } && Session is { IsBusy: false };
 
     public override void _Ready()
@@ -79,7 +79,7 @@ public partial class PieceHandles : CanvasLayer
 
         if (Session is null || Camera is null || Panel is null)
         {
-            GD.PushError("PieceHandles needs a world session, camera, and Pieces panel.");
+            GD.PushError("PieceHandles needs a world session, camera, and Map panel.");
             SetProcessUnhandledInput(false);
             SetProcess(false);
         }

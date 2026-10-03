@@ -116,7 +116,7 @@ had look-alike controls (Regions vs Regions…). Owner's decisions:
   replacing the Pieces panel.
 - **A View menu** for the show/hide switches, each clearly named.
 - **The window starts maximized**; the layout still has to work in small windows.
-- **Two PRs:** the menus and panel row (PR #31), then the Map panel.
+- **Two PRs:** the menus and panel row (PR #31), then the Map panel (PR #32).
 
 **Milestone 9: Weather Pin** · Complete (PR #30 merged 2026-10-02; owner's choice, 2026-10-02)
 The weather at named spots on a planet or moon (`WTH-01`). Owner's decisions:
@@ -319,7 +319,7 @@ as realistic or simple.
 
 ### 4.2 Interface Layout (`UI`)
 
-**UI-01 — Main screen layout** · In Progress (menus done, PR #31) · Base
+**UI-01 — Main screen layout** · Implemented (M10: PR #31, PR #32) · Base
 **Keyboard and number fields (owner's request, PR #18):** while a text or number field is being
 edited, the camera ignores WASD and the arrow keys. In number fields, Up/Down change the value
 by one step (ten with Shift; `godot/UI/NumberFields.cs`). Clicking the view (not a panel)
@@ -330,9 +330,10 @@ screen hold tools, journals, and similar content.
 (see `LORE-04`).
 **Implementation (menus, PR #31):**
 - The top bar (`godot/UI/MapToolbar.cs`): the **File**, **Edit**, **View**, and **Add** menus,
-  then the panel buttons **System**, **Pieces**, **Journal**, **Regions**, **Timeline** (no "…":
-  they open panels), then, until the Map panel arrives, the map tools. Pieces, Journal, and
-  Regions share the right side, one at a time.
+  then the panel buttons **System**, **Map**, **Journal**, **Regions**, **Timeline** (no "…":
+  they open panels). Map, Journal, and Regions share the right side, one at a time. The bar
+  also owns the message line other parts of the app use (`ShowInfo`, `ShowWarning`,
+  `ShowError`).
 - `godot/UI/ViewMenu.cs`: checkable **Pins**, **Weather Pins**, **Regions**, **Season Markers**,
   **Eclipse Markers**, **Grid (G)**, and **True Scale** (moved here from the time bar). The checks
   are refreshed each time it opens. Behind it: `SystemView.ShowGrid` (shared with the G key),
@@ -342,6 +343,23 @@ screen hold tools, journals, and similar content.
   there (Moon, Region, and Weather Pin are greyed out while a star is selected). It replaces
   the Weather Pin button.
 - `godot/project.godot`: the window starts maximized (`window/size/mode=2`).
+
+**Implementation (Map panel, PR #32):**
+- `godot/UI/MapPanel.cs` (was `PiecesPanel.cs`): one panel for the planet's map, replacing the
+  Pieces panel. Like the Journal and Regions panels, it runs from below the top bar to above
+  the time bar and scrolls when the window is short, so a selected piece's fields stay
+  reachable at 1152 × 648.
+- `godot/UI/MapImageSection.cs`: its top half, moved out of the top bar: **Import Map…**,
+  **Clear Map**, **Calibrate…**, **Map type**, and **Fill color** (shown only for map types
+  that don't cover the globe), with the messages describing how a map is shown. With a star
+  selected it says stars have no map. `MapPanel.ImportAsync` (used by `--map=`) passes through
+  to it.
+- The lower half is the old pieces list and fields, unchanged apart from a shorter list.
+- **Verified in the running app** with real clicks, maximized (1920 × 991) and at 1152 × 648:
+  every control is on screen and sized; Calibrate… opens (the panel hides) and Esc closes it;
+  the Map type list opens and Robinson hides Fill color; Clear Map clears and disables
+  Calibrate…; with a piece selected at the small size the panel scrolls and Delete works; a
+  star shows the note and disables the buttons; clicking Journal closes the Map panel.
 
 **UI-02 — System tree panel** · Implemented (PR #18) · Base
 **Intent:** A compact tree view of the star system's hierarchy (e.g. Sun ▸ Planet ▸ Moon) showing
@@ -529,9 +547,10 @@ earlier ones.
   `MapCalibration.TrueLatitude` / `TrueLongitude`), so nothing appears to jump. Its width comes
   from the arcs from its center to its left and right edges. Other images, and cuts outside a
   map's outline, start at the middle of the view, 30° wide.
-- **Pieces panel** (`godot/UI/PiecesPanel.cs`, toolbar **Pieces…**): the list (top = drawn on
-  top), Cut from Map… / Cut from Image…, name, exact latitude/longitude/rotation/width fields,
-  Move Up / Move Down, and Delete… (confirmed). It hides whenever the toolbar does.
+- **Pieces panel** (now the lower half of the Map panel, `godot/UI/MapPanel.cs`, since `UI-01`): the
+  list (top = drawn on top), Cut from Map… / Cut from Image…, name, exact
+  latitude/longitude/rotation/width fields, Move Up / Move Down, and Delete… (confirmed). It hides
+  whenever the toolbar does.
 - **Verified in the running app** (simulated mouse input): a rectangle cut from the main map
   landed seamlessly over its source area; moving, rotating, and resizing it, plus a freeform
   triangle cut from a second image, drew correctly with smooth edges and the right layering. Save
@@ -554,7 +573,7 @@ earlier ones.
   orbits as usual otherwise, and clicks that miss every piece still orbit. Shift snaps rotation
   to 15°, Esc deselects, and the cursor shows what a drag will do. The node comes after the
   camera in the scene, so it gets clicks first.
-- **Selection** lives in `PiecesPanel` (`SelectedPieceId`, `Select`, `SelectionChanged`), shared
+- **Selection** lives in `MapPanel` (`SelectedPieceId`, `Select`, `SelectionChanged`), shared
   by the list and the globe. The list is only rebuilt when names or order change, not on every
   drag step.
 - **Verified in the running app** (simulated mouse input through the real input path): a click
@@ -578,7 +597,7 @@ earlier ones.
   `WorldSession.WarpLookupFor`), so what's drawn and what's clickable agree.
 - **UI:** `PieceHandles` shows a handle on every point in Edit Points, and the outline follows
   the stretched shape. The normal frame (corners and rotate handle) wraps the stretched shape.
-  `PiecesPanel` has **Edit Points** (toggle) and **Reset Points**. Each point drag is one undo
+  `MapPanel` has **Edit Points** (toggle) and **Reset Points**. Each point drag is one undo
   step ("Edit Points of Piece 1"), and so is Reset.
 - **Verified in the running app** (real input): double-click entered Edit Points, dragging the
   top-right point stretched the image smoothly, Esc left the mode, clicking the stretched area
