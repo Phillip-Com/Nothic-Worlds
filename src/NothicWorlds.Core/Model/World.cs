@@ -44,6 +44,11 @@ public sealed class World
     /// </summary>
     public List<Region> Regions { get; } = [];
 
+    /// <summary>
+    /// The named spots whose weather is shown (VISION.md WTH-01), in the order they were added.
+    /// </summary>
+    public List<WeatherPin> WeatherPins { get; } = [];
+
     /// <summary>The world's named timelines (VISION.md LORE-03), in lane order.</summary>
     public List<Timeline> Timelines { get; } = [];
 
@@ -75,8 +80,10 @@ public sealed class World
         };
         copy.Bodies.AddRange(Bodies.Select(body => body.Clone()));
 
-        // Regions, entries, timelines, and events are immutable records, safe to share.
+        // Regions, weather pins, entries, timelines, and events are immutable records, safe to
+        // share.
         copy.Regions.AddRange(Regions);
+        copy.WeatherPins.AddRange(WeatherPins);
         copy.Journal.AddRange(Journal);
         copy.Timelines.AddRange(Timelines);
         copy.Events.AddRange(Events);

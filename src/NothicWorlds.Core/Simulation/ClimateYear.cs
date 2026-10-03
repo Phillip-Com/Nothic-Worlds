@@ -1,0 +1,199 @@
+using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Model;
+
+namespace NothicWorlds.Core.Simulation;
+
+/// <summary>
+/// The weather through a year at one spot on a planet or moon (VISION.md WTH-01): daylight,
+/// how high the star climbs, and temperatures. Deterministic, like everything in the
+/// simulation.
+/// </summary>
+/// <remarks>
+/// <para><b>Sunlight is exact.</b> Each day, the star's height over the equator (its
+/// declination, see <see cref="Seasons"/>) and the spot's latitude give how long the star is up
+/// and how high it gets at noon, including polar day and night; the day's total sunlight also
+/// allows for the star's distance changing on an elongated orbit.</para>
+/// <para><b>Temperatures are a lightweight estimate</b> (owner's choice: around the body's
+/// own <see cref="Body.AverageTemperatureC"/>), since air, oceans, height, and terrain aren't
+/// modeled. A spot's yearly average follows its share of sunlight (warmer at the equator); its
+/// seasons follow the day's sunlight, delayed and softened by about a month, the way land and
+/// sea hold heat; and the day/night swing grows with the length of the day. The constants are
+/// tuned so an Earth-like planet gives Earth-like numbers.</para>
+/// <para>The year repeats: times outside the year worked out are wrapped into it (exact for a
+/// planet circling its star; close for a moon).</para>
+/// </remarks>
+public sealed class ClimateYear
+{
+    // Days worked out per year.
+    private const int SamplesPerYear = 360;
+
+    // °C per unit of sunlight (as a share of the body's average) between latitudes, and through
+    // the seasons (smaller: the seasons are softened by stored heat).
+    private const double LatitudeDegreesPerSunlight = 62.5;
+    private const double SeasonDegreesPerSunlight = 20.0;
+
+    // How long land and sea take to warm and cool, in standard days: seasons lag about this.
+    private const double HeatLagDays = 30.0;
+
+    // The day/night swing for a 24-hour day, in °C; longer days swing more (up to the cap).
+    private const double DayNightSwingC = 10.0;
+    private const double MaxDayNightSwingC = 60.0;
+
+    private readonly ClimateDay[] _days;
+
+    private ClimateYear(ClimateDay[] days, double fromDays, double yearDays)
+    {
+        _days = days;
+        FromDays = fromDays;
+        YearDays = yearDays;
+    }
+
+    /// <summary>When the year worked out starts, in standard days.</summary>
+    public double FromDays { get; }
+
+    /// <summary>How long the year is, in standard days (the body's own year).</summary>
+    public double YearDays { get; }
+
+    /// <summary>The days worked out, in order through the year.</summary>
+    public IReadOnlyList<ClimateDay> Days => _days;
+
+    /// <summary>
+    /// Works out the year starting at <paramref name="fromDays"/> at a spot on a body, or null
+    /// if the body has no star (or is one).
+    /// </summary>
+    /// <exception cref="ArgumentException">The bodies' orbits are invalid.</exception>
+    public static ClimateYear? At(
+        IReadOnlyList<Body> bodies, Body body, GeoCoordinate spot, double fromDays)
+    {
+        if (body.Kind == BodyKind.Star || Seasons.StarFor(bodies, body) is not Body star)
+        {
+            return null;
+        }
+
+        if (SystemHierarchy.Problem(bodies) is string problem)
+        {
+            throw new ArgumentException($"The star system is invalid: {problem}.", nameof(bodies));
+        }
+
+        double year = BodyClock.YearDays(bodies, body);
+        double step = year / SamplesPerYear;
+        var byId = bodies.ToDictionary(b => b.Id);
+        OrbitChain bodyChain = OrbitChain.Of(body, byId);
+        OrbitChain starChain = OrbitChain.Of(star, byId);
+        Vector3D pole = BodyOrientation.NorthPole(body);
+        double latitude = double.DegreesToRadians(spot.LatitudeDegrees);
+
+        // The sun first: each day's declination and distance.
+        var declinations = new double[SamplesPerYear];
+        var distances = new double[SamplesPerYear];
+        for (int i = 0; i < SamplesPerYear; i++)
+        {
+            double time = fromDays + (i + 0.5) * step;
+            Vector3D toStar = starChain.PositionAt(time) - bodyChain.PositionAt(time);
+            distances[i] = toStar.Length;
+            declinations[i] = Math.Asin(Math.Clamp(toStar.Dot(pole) / toStar.Length, -1, 1));
+        }
+
+        // Sunlight relative to the body's average: a whole sphere averages a quarter of the
+        // light it intercepts, at the year's mean of 1/distance².
+        double meanInverseSquare = distances.Average(d => 1 / (d * d));
+        var sunlight = new double[SamplesPerYear];
+        var daylight = new double[SamplesPerYear];
+        for (int i = 0; i < SamplesPerYear; i++)
+        {
+            (double dayFraction, double dailyMean) = Sun(latitude, declinations[i]);
+            daylight[i] = dayFraction * body.DayLengthHours;
+            double distanceFactor = 1 / (distances[i] * distances[i]) / meanInverseSquare;
+            sunlight[i] = dailyMean * distanceFactor / 0.25;
+        }
+
+        double spotAverage = sunlight.Average();
+        double[] felt = Lagged(sunlight, step);
+        double swing = Math.Min(MaxDayNightSwingC,
+            DayNightSwingC * Math.Sqrt(body.DayLengthHours / 24.0));
+        double baseline = body.AverageTemperatureC
+            + LatitudeDegreesPerSunlight * (spotAverage - 1);
+
+        var days = new ClimateDay[SamplesPerYear];
+        for (int i = 0; i < SamplesPerYear; i++)
+        {
+            double mean = baseline + SeasonDegreesPerSunlight * (felt[i] - spotAverage);
+            double noon = 90 - Math.Abs(spot.LatitudeDegrees
+                - double.RadiansToDegrees(declinations[i]));
+            days[i] = new ClimateDay(fromDays + (i + 0.5) * step, mean, mean - swing / 2,
+                mean + swing / 2, daylight[i], Math.Max(-90, noon), sunlight[i]);
+        }
+
+        return new ClimateYear(days, fromDays, year);
+    }
+
+    /// <summary>The weather on the day containing a time (wrapped into the year).</summary>
+    public ClimateDay DayAt(double timeDays)
+    {
+        double intoYear = (timeDays - FromDays) % YearDays;
+        if (intoYear < 0)
+        {
+            intoYear += YearDays;
+        }
+
+        int index = Math.Clamp((int)(intoYear / YearDays * _days.Length), 0, _days.Length - 1);
+        return _days[index] with { TimeDays = timeDays };
+    }
+
+    /// <summary>
+    /// The average weather over a stretch of time (e.g. a month), wrapped into the year: the
+    /// mean of the days' lows, highs, means, daylight, noon heights, and sunlight.
+    /// </summary>
+    public ClimateDay Average(double fromDays, double toDays)
+    {
+        double step = YearDays / _days.Length;
+        int count = Math.Max(1, (int)Math.Round((toDays - fromDays) / step));
+        double low = 0, high = 0, mean = 0, light = 0, noon = 0, sun = 0;
+        for (int i = 0; i < count; i++)
+        {
+            ClimateDay day = DayAt(fromDays + (i + 0.5) * (toDays - fromDays) / count);
+            low += day.LowC;
+            high += day.HighC;
+            mean += day.MeanC;
+            light += day.DaylightHours;
+            noon += day.NoonSunDegrees;
+            sun += day.Sunlight;
+        }
+
+        return new ClimateDay((fromDays + toDays) / 2, mean / count, low / count, high / count,
+            light / count, noon / count, sun / count);
+    }
+
+    // The share of the day the star is up, and the day's average of sin(star height) (its
+    // light on level ground, per unit of light facing it), at a latitude and declination.
+    private static (double DayFraction, double DailyMean) Sun(double latitude, double declination)
+    {
+        double cosHourAngle = -Math.Tan(latitude) * Math.Tan(declination);
+        double hourAngle = cosHourAngle >= 1 ? 0          // Polar night
+            : cosHourAngle <= -1 ? Math.PI                 // Polar day
+            : Math.Acos(cosHourAngle);
+        double dailyMean = (hourAngle * Math.Sin(latitude) * Math.Sin(declination)
+            + Math.Cos(latitude) * Math.Cos(declination) * Math.Sin(hourAngle)) / Math.PI;
+        return (hourAngle / Math.PI, Math.Max(0, dailyMean));
+    }
+
+    // Sunlight as the ground feels it: each day moves part of the way toward the day's light
+    // (an exponential average with the heat lag), run round the year twice so the start
+    // doesn't matter.
+    private static double[] Lagged(double[] sunlight, double step)
+    {
+        double keep = Math.Exp(-step / HeatLagDays);
+        double felt = sunlight.Average();
+        var result = new double[sunlight.Length];
+        for (int pass = 0; pass < 2; pass++)
+        {
+            for (int i = 0; i < sunlight.Length; i++)
+            {
+                felt = keep * felt + (1 - keep) * sunlight[i];
+                result[i] = felt;
+            }
+        }
+
+        return result;
+    }
+}
