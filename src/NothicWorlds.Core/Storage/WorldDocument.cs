@@ -13,6 +13,7 @@ internal sealed class WorldDocument
     public required DateTimeOffset ModifiedUtc { get; init; }
     public double? TimeDays { get; init; }  // Added in format version 5
     public required List<BodyDocument> Bodies { get; init; }
+    public List<RegionDocument>? Regions { get; init; }  // Added in format version 8
     public List<JournalEntryDocument>? Journal { get; init; }  // Added in format version 7
     public List<TimelineDocument>? Timelines { get; init; }  // Added in format version 7
     public List<EventDocument>? Events { get; init; }  // Added in format version 7
@@ -32,8 +33,19 @@ internal sealed class JournalEntryDocument
 internal sealed class LocationDocument
 {
     public required Guid Body { get; init; }
+    public Guid? Region { get; init; }  // Added in format version 8
     public double? Latitude { get; init; }  // Both or neither: the pin
     public double? Longitude { get; init; }
+}
+
+internal sealed class RegionDocument
+{
+    public required Guid Id { get; init; }
+    public required Guid Body { get; init; }
+    public required string Name { get; init; }
+    public string? Notes { get; init; }  // Omitted when empty
+    public required string Color { get; init; }
+    public required List<double[]> Corners { get; init; }  // [latitude, longitude] each
 }
 
 internal sealed class TimelineDocument

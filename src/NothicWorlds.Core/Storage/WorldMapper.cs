@@ -22,6 +22,7 @@ internal static class WorldMapper
             ModifiedUtc = world.ModifiedUtc,
             TimeDays = world.TimeDays,
             Bodies = world.Bodies.Select(ToDocument).ToList(),
+            Regions = NullIfEmpty(world.Regions.Select(ToDocument)),
             Journal = NullIfEmpty(world.Journal.Select(ToDocument)),
             Timelines = NullIfEmpty(world.Timelines.Select(ToDocument)),
             Events = NullIfEmpty(world.Events.Select(ToDocument)),
@@ -47,6 +48,7 @@ internal static class WorldMapper
         };
         world.Bodies.AddRange(document.Bodies.Select(ToBody));
         RequireNoProblem(Simulation.SystemHierarchy.Problem(world.Bodies));
+        world.Regions.AddRange((document.Regions ?? []).Select(ToRegion));
         world.Journal.AddRange((document.Journal ?? []).Select(ToEntry));
         world.Timelines.AddRange((document.Timelines ?? []).Select(ToTimeline));
         world.Events.AddRange((document.Events ?? []).Select(ToEvent));
@@ -59,6 +61,41 @@ internal static class WorldMapper
     {
         List<T> list = [.. items];
         return list.Count == 0 ? null : list;
+    }
+
+    private static RegionDocument ToDocument(Region region)
+    {
+        return new RegionDocument
+        {
+            Id = region.Id,
+            Body = region.BodyId,
+            Name = region.Name,
+            Notes = region.Notes.Length == 0 ? null : region.Notes,
+            Color = region.Color.ToHex(),
+            Corners = [.. region.Corners
+                .Select(c => new[] { c.LatitudeDegrees, c.LongitudeDegrees })],
+        };
+    }
+
+    // Checked fully afterwards by LoreRules.Problem (through Region.Problem).
+    private static Region ToRegion(RegionDocument document)
+    {
+        Require(document?.Corners is not null, "a region is incomplete");
+        Require(RgbColor.TryParseHex(document!.Color, out RgbColor color),
+            $"invalid region color '{document.Color}'");
+        Require(document.Corners!.All(c => c is { Length: 2 }
+                && double.IsFinite(c[0]) && c[0] is >= -90 and <= 90
+                && double.IsFinite(c[1]) && c[1] is >= -180 and <= 180),
+            "a region's outline is invalid");
+        return new Region
+        {
+            Id = document.Id,
+            BodyId = document.Body,
+            Name = document.Name ?? "",
+            Notes = document.Notes ?? "",
+            Color = color,
+            Corners = [.. document.Corners.Select(c => new GeoCoordinate(c[0], c[1]))],
+        };
     }
 
     private static JournalEntryDocument ToDocument(JournalEntry entry)
@@ -158,6 +195,7 @@ internal static class WorldMapper
         return new LocationDocument
         {
             Body = location.BodyId,
+            Region = location.RegionId,
             Latitude = location.Pin?.LatitudeDegrees,
             Longitude = location.Pin?.LongitudeDegrees,
         };
@@ -167,7 +205,7 @@ internal static class WorldMapper
     {
         if (document.Latitude is null && document.Longitude is null)
         {
-            return new LoreLocation(document.Body);
+            return new LoreLocation(document.Body, RegionId: document.Region);
         }
 
         Require(document.Latitude is double latitude && double.IsFinite(latitude)
@@ -176,7 +214,8 @@ internal static class WorldMapper
                 && longitude is >= -180 and <= 180,
             "a pinned location is invalid");
         return new LoreLocation(document.Body,
-            new GeoCoordinate(document.Latitude!.Value, document.Longitude!.Value));
+            new GeoCoordinate(document.Latitude!.Value, document.Longitude!.Value),
+            document.Region);
     }
 
     private static BodyDocument ToDocument(Body body)
