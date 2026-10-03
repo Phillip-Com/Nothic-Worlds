@@ -120,7 +120,9 @@ paint with the selected terrain type (a circle shows the brush), or choose **Era
 brush's radius with the slider or in km. To turn the view while painting, drag off the planet or
 use the arrow keys. Each stroke is one undo step. Every world starts with 12 terrain types
 (Ocean, Forest, Mountains, and more); **New Type** adds one, and the name and color below the list
-edit the selected one. Deleting a type clears it wherever it's painted (Ctrl+Z brings it back).
+edit the selected one, including its **Climate** (water, forest, desert, wetland, mountains, ice,
+or open land), which weather pins use. Deleting a type clears it wherever it's painted (Ctrl+Z
+brings it back).
 Without a map, painted terrain is the planet's surface, and what's not painted yet shows grey;
 over a map it's see-through, so you can trace the map. Edges between terrains are drawn as smooth
 curves. **View ▸ Terrain** hides it.
@@ -129,7 +131,9 @@ curves. **View ▸ Terrain** hides it.
 show as small suns; click one to see that spot's weather: today's temperature, daylight, noon sun,
 and season, and a chart of the whole year (temperatures and daylight by month, with today
 marked) that follows the clock. Temperatures are estimates from the sunlight, around the
-planet's **Avg. temperature**, set in the System panel (Earth: about 15 °C).
+planet's **Avg. temperature**, set in the System panel (Earth: about 15 °C), adjusted for the
+painted terrain: water within about 500 km makes the seasons and the day/night swing milder,
+deserts swing hardest, and ice and mountains are colder. A line in the window says how.
 
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers

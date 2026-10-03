@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 11** (see **Version history** at the end)
+**Current format version: 12** (see **Version history** at the end)
 
 ## Container
 
@@ -23,11 +23,11 @@ A `.nworld` file is a standard **zip archive** containing:
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB, each terrain image
   up to 16 MB.
 
-## `world.json` (version 11)
+## `world.json` (version 12)
 
 ```json
 {
-  "formatVersion": 11,
+  "formatVersion": 12,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -118,9 +118,9 @@ A `.nworld` file is a standard **zip archive** containing:
     }
   ],
   "terrainTypes": [
-    { "code": 1, "name": "Ocean", "color": "#1F4E79" },
-    { "code": 5, "name": "Forest", "color": "#2F6B35" },
-    { "code": 13, "name": "Crystal Wastes", "color": "#B0E0E6" }
+    { "code": 1, "name": "Ocean", "color": "#1F4E79", "climate": "water" },
+    { "code": 5, "name": "Forest", "color": "#2F6B35", "climate": "forest" },
+    { "code": 13, "name": "Crystal Wastes", "color": "#B0E0E6", "climate": "desert" }
   ],
   "weatherPins": [
     { "id": "3c3c3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
@@ -230,6 +230,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…terrainTypes[].code` | yes | 1 to 255, unique among terrain types: the value painted cells store. 0 means unpainted. |
 | `…terrainTypes[].name` | yes | Not empty, up to 60 characters |
 | `…terrainTypes[].color` | yes | `#RRGGBB`: how the terrain is drawn |
+| `…terrainTypes[].climate` | yes | How it affects weather pins (`WTH-03`): `"open-land"`, `"water"`, `"forest"`, `"desert"`, `"wetland"`, `"mountains"`, or `"ice"` |
 | `weatherPins` | no | Named spots whose weather is shown (`WTH-01`), in the order added. Omitted when there are none. Up to 1,000. |
 | `…weatherPins[].id`, `name` | yes | GUID, unique among weather pins; name not empty, up to 100 characters |
 | `…weatherPins[].body` | yes | The `id` of the planet or moon it's on (not a star) |
@@ -380,6 +381,9 @@ star sets at hour angle ω₀ = arccos(−tan φ tan δ) (0 or π beyond the pol
 lit for ω₀/π of the body's day, and a level spot gets (ω₀ sin φ sin δ + cos φ cos δ sin ω₀)/π
 of the light facing the star, times (mean 1/r² over the year) ÷ (1/r² today) for the distance
 r. Temperatures are an estimate around `averageTemperature`; the constants are in the code.
+Painted terrain adjusts them (`TerrainSurroundings` in Core): the climate at the spot, and the
+share of water among the spot and 64 points on four rings out to 500 km (or 0.3 of the body's
+radius, if less); unpainted ground and unknown codes count as not water.
 
 ## Safe saving
 
@@ -402,5 +406,6 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 12 | Terrain-aware weather (M14): terrain types gain `climate` | Types named (ignoring case) Ocean or Shallow Water get `water`, Forest or Jungle `forest`, Mountains `mountains`, Desert `desert`, Swamp `wetland`, Ice `ice`; all others `open-land` |
 | 11 | Calendar fitting (M12): calendars gain optional `fit` and `monthMoon` | Nothing to change: version 10 calendars aren't fitted |
 | 10 | Terrain painting (M11): `terrainTypes`; surfaces gain an optional `terrain` image | The world gets the 12 default terrain types (codes 1–12: Ocean, Shallow Water, Plains, Fields, Forest, Jungle, Hills, Mountains, Desert, Swamp, Tundra, Ice); nothing is painted |

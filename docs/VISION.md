@@ -108,6 +108,16 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 14: Terrain-Aware Weather** · In Progress (owner's choice, 2026-10-03)
+Weather pins take the painted terrain around them into account (new feature `WTH-03`). Owner's
+decisions:
+- **A climate kind per terrain type**, from a short list (Water, Open land, Forest, Desert,
+  Wetland, Mountains, Ice), picked in the Terrain panel; the 12 defaults come pre-set.
+- **Temperature and rainfall.** **Two PRs:** temperature (PR #39), then rainfall.
+- **The area around counts** for water (about 500 km; smaller on small bodies); the other
+  kinds count where the pin stands. Unpainted ground changes nothing.
+- **One line** in the weather window explains the terrain's effect.
+
 **Milestone 13: Local Region View** · Complete (PR #38 merged 2026-10-03; owner's choice, 2026-10-03)
 Zoom down to a local region of a planet and see it as a top-down map (`REN-04`). Owner's
 decisions:
@@ -1248,6 +1258,36 @@ season, etc. This is the lightweight version that works on any system.
 - Session (`WorldSession.Weather.cs`): `AddWeatherPin`, `RenameWeatherPin`,
   `DeleteWeatherPin`; weather pins are in undo snapshots and the saved-state check, and go
   with their body when it's deleted.
+
+**WTH-03 — Terrain-aware weather** · In Progress (temperature done, PR #39) · Base
+**Intent:** Weather pins take the painted terrain around them into account (owner's choice,
+2026-10-03).
+**Implementation (temperature, PR #39):**
+- `Model/ClimateKind.cs`: Water, Open land (the default), Forest, Desert, Wetland, Mountains,
+  Ice. `TerrainType.Climate` holds each type's; the defaults: Ocean and Shallow Water are
+  water, Forest and Jungle forest, Mountains, Desert, Swamp (wetland), Ice; the rest open land.
+  Format **version 12** (`climate`; older types get it by name).
+- `Simulation/TerrainSurroundings.cs`: the climate at the spot and the share of water around it
+  (the spot plus 64 points on four rings out to 500 km, or 0.3 of a small body's radius;
+  unpainted ground counts as not water). `Maritime` is 1 on water, else the water share.
+- `ClimateYear.At` takes it (optional): **water** softens the seasons by up to 60% and the
+  day/night swing by up to 70%, and doubles the heat lag (seasons come later); the **ground**
+  scales the swing (desert ×2, mountains ×1.2, forest ×0.8, wetland ×0.7) and shifts the mean
+  (ice −8 °C, mountains −6 °C, desert +2 °C). The yearly average otherwise stays. Without
+  terrain the weather is exactly as before.
+- **App:** a **Climate** choice for the selected type in the Terrain panel (one undo step, like
+  renaming); the weather window allows for the terrain and adds a line such as "Terrain: Forest
+  here, 31% water within 500 km: milder, later seasons and a smaller day/night swing; a
+  slightly smaller day/night swing." (`godot/UI/ClimateText.cs`).
+- **Tests:** `TerrainWeatherTests` (13: sampling on an unpainted planet, open sea, a coast,
+  far inland, a small moon, unknown codes; the weather unchanged without terrain, the sea's
+  softer and later seasons, each ground kind's swing and mean), and golden version 12, upgrade,
+  and damaged-file tests.
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: choosing a
+  type and its Climate, the window's line for a forest pin by the sea, and Desert widening its
+  day/night swing from 18–24 °C to 15–31 °C, undone with Ctrl+Z. Found and fixed there: in a
+  short window the Climate list opened over its own button, and the end of the click picked
+  the item under the mouse; it now opens when the click ends.
 
 **WTH-02 — Live weather simulation** · Idea · Advanced
 **Intent:** As detailed as possible. Ideally the user can watch clouds and weather move across
