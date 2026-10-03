@@ -7,6 +7,10 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-03 | Milestone 19: **non-standard bodies** (`BOD-02`), starting with **flat worlds**, in **three PRs** (make/see/edit, close-up, sky) | In PR | [#46](https://github.com/Phillip-Com/Nothic-Worlds/pull/46) | VISION.md §3 |
+| 2026-10-03 | Planets and moons get a **Shape** field (Globe / Flat world), changeable any time; maps and terrain are kept | In PR | [#46](https://github.com/Phillip-Com/Nothic-Worlds/pull/46) | Format version 16. VISION.md `BOD-02` |
+| 2026-10-03 | Flat worlds hold **the whole world on top**: north pole at the center, the far south at the rim; bare rock beneath | In PR | [#46](https://github.com/Phillip-Com/Nothic-Worlds/pull/46) | Disc radius π × the globe's, so distances from the center are true (Claude's choice). VISION.md `BOD-02` |
+| 2026-10-03 | Flat worlds are **physically lit**: the disc tumbles like a coin, one sun height everywhere, two summers a year | In PR | [#46](https://github.com/Phillip-Com/Nothic-Worlds/pull/46) | Chosen over lighting each spot like its globe. The sky's rules come in the third PR. VISION.md `BOD-02` |
 | 2026-10-03 | Meteor showers come from comet dust **within 0.1 × the planet's orbit size** of the comet's orbit; peak **10 meteors an hour per km** of the comet's radius, less with distance | Merged | [#45](https://github.com/Phillip-Com/Nothic-Worlds/pull/45) · `5901d0e` | Claude's numbers. VISION.md `EVT-02` |
 | 2026-10-03 | Showers are worked out **in the background**, like eclipses | Merged | [#45](https://github.com/Phillip-Com/Nothic-Worlds/pull/45) · `5901d0e` | Claude's choice: 35 ms in debug builds. VISION.md `EVT-02` |
 | 2026-10-03 | Shower orbit markers get their own **View ▸ Meteor Shower Markers** switch | Merged | [#45](https://github.com/Phillip-Com/Nothic-Worlds/pull/45) · `5901d0e` | Claude's choice, like eclipse markers |

@@ -74,7 +74,7 @@ elongated orbit, with a glowing tail that grows near the star), and **Delete** t
 along with everything orbiting it (Ctrl+Z brings it back). **Make Center** puts the selected
 body at the center of its system, with the bodies it orbited now circling it on the same paths
 (for example, a planet-centered system with the sun going around it). It also edits the selected body's
-name, kind, radius, day length, axial tilt, and orbit: what it orbits, distance (km or AU),
+name, kind, shape, radius, day length, axial tilt, and orbit: what it orbits, distance (km or AU),
 period, and starting position. Switch on "Elongated or tilted orbit" for more. While the panel is
 open, the selected body's path is drawn in yellow, and every change shows live as you type.
 **Axis direction** sets which way the tilted axis leans, which decides when in the year the
@@ -97,6 +97,11 @@ deep and how long, and a **Go to** button (a moon shows the same eclipses as its
 time bar's **Go to…** dialog always offers a jump to the next solar and the next lunar
 eclipse. Each moon's previous and next eclipse are also marked on its orbit (when they're within
 one orbit of now): gold-ringed dark disks for solar eclipses, dark red disks for lunar ones.
+
+**Shape** turns a planet or moon into a **flat world**: a disc with the whole map on top (the
+north pole at the center, the far south around the rim) and bare rock underneath. Maps, terrain,
+regions, and pins stay where they are on the map. The disc tumbles like a spinning coin, so its
+whole face turns toward the star and away each day. (Close-up views of flat worlds come next.)
 
 Comets make **meteor showers**: wherever a planet's orbit passes close to a comet's orbit, the
 planet runs into the comet's dust at the same time every year. The panel lists the coming year's

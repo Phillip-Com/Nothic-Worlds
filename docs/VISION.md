@@ -108,6 +108,18 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 19: Flat Worlds** · In progress (owner's choice, 2026-10-03)
+Non-standard bodies (`BOD-02`), starting with flat worlds. Owner's decisions:
+- Planets and moons get a **Shape**: Globe or **Flat world**, changeable any time; maps,
+  terrain, regions, and pins are kept.
+- **The whole world on top**: the north pole at the center and the far south around the rim
+  (like the Polar map); bare rock underneath.
+- **Physically flat light**: the disc tumbles like a spinning coin, so the whole face is lit at
+  once and every place shares the same sun height; two summers and two winters a year, and
+  no climate zones by latitude.
+- **Three PRs:** flat worlds you can make, see, and edit (PR #46); the close-up view; the
+  flat-world sky (day and night, seasons, weather).
+
 **Milestone 18: Comets and Meteor Showers** · Complete (PR #45 merged 2026-10-03; owner's choice, 2026-10-03)
 Meteor showers (`EVT-02`), simulated from comets. Owner's decisions:
 - **Comets** are a new kind of body: they circle a star on an elongated orbit, have a color and
@@ -943,10 +955,35 @@ place).
   then undid it; undid and redid the whole session (back to "saved" at the start); and save →
   reopen kept the system. Benchmark: same as `main` back to back (~141 fps).
 
-**BOD-02 — Non-standard bodies** · Idea · Base
+**BOD-02 — Non-standard bodies** · In progress (M19: flat worlds) · Base
 **Intent:** Support bodies that aren't spheres, such as flat worlds and world trees.
-**Notes / open questions:** How these interact with physics, orbits, and light/shadow.
-**Implementation:** —
+**Notes / open questions:** How these interact with physics, orbits, and light/shadow. Flat
+worlds (M19): orbits are unchanged; light is physical (the disc tumbles); eclipses still treat
+the body as a sphere of its radius. World trees and other shapes are still open.
+**Implementation (flat worlds you can make, see, and edit, PR #46):**
+- **Model:** `BodyShape` (`Sphere`, `FlatDisc`) and `Body.Shape`, for planets and moons only.
+  Format **version 16** (optional `shape`, `"flat-disc"`).
+- **Layout** (`Geometry/FlatDisc.cs`, Core): the top face holds every latitude and longitude,
+  with the north pole at the center; distance from the center is the angle from the pole, so
+  the disc's radius is π times the matching globe's and every distance from the center is true
+  (azimuthal equidistant, like the Polar map). `Body.RadiusKm` stays the matching globe's
+  radius, so everything measured in km on the map works unchanged.
+- **Drawing:** `godot/Rendering/FlatDiscMeshes.cs` (the top face, and the rock rim and
+  underside); `planet.gdshader`'s `flat_disc` maps each pixel back to the globe direction it
+  stands for, so maps, terrain, patterns, pieces, and the grid all carry over. The disc is lit
+  by its flat normal. It **tumbles like a coin**: its spin axis lies across the disc (toward
+  longitude 90° east), leaning by the axial tilt as a globe's would.
+- **Surface points:** `godot/Rendering/GlobeShape.cs` places anything on either shape
+  (regions, pins, the brush, markers); `GlobePicker` finds the point under the mouse on the
+  top face (seen only from above).
+- **App:** a **Shape** field (Globe / Flat world) in the System panel, one undo step
+  (`WorldSession.SetBodyShape`); its tooltip gives the disc's own size. The camera frames a
+  flat world by its full width; the close-up local view stays off for flat worlds until the
+  next PR.
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: switching to
+  a flat world and back (undo), regions in the north and far south in the right places, the
+  point under the mouse and back on screen to the pixel, the tumbling face and lit rock over a
+  day. Benchmark: no change.
 
 **BOD-03 — Other astral features** · Idea · —
 **Intent:** Asteroids, nebulas, and similar features.
