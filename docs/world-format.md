@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 7** (see **Version history** at the end)
+**Current format version: 8** (see **Version history** at the end)
 
 ## Container
 
@@ -20,11 +20,11 @@ A `.nworld` file is a standard **zip archive** containing:
   which also blocks names that try to escape the archive (`../`).
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB.
 
-## `world.json` (version 7)
+## `world.json` (version 8)
 
 ```json
 {
-  "formatVersion": 7,
+  "formatVersion": 8,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -110,6 +110,16 @@ A `.nworld` file is a standard **zip archive** containing:
       }
     }
   ],
+  "regions": [
+    {
+      "id": "4e4e4e4e-4e4e-4e4e-4e4e-4e4e4e4e4e4e",
+      "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "name": "The Western Coast",
+      "notes": "Fishing towns.",
+      "color": "#5090D0",
+      "corners": [[10, -35], [10, -25], [16, -25], [16.5, -35]]
+    }
+  ],
   "journal": [
     {
       "id": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
@@ -117,6 +127,7 @@ A `.nworld` file is a standard **zip archive** containing:
       "text": "First line.\nSecond line.",
       "location": {
         "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+        "region": "4e4e4e4e-4e4e-4e4e-4e4e-4e4e4e4e4e4e",
         "latitude": 12.5,
         "longitude": -30.25
       },
@@ -195,6 +206,13 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…pieces[].width` | yes | Degrees of arc the bounding box spans left to right (0.1 to 180). The height follows from the box's true shape. |
 | `…pieces[].warp` | no | Edit Points (`MAP-02`): where each outline point has been dragged to, as `[u, v]` in the piece's box (0–1 from its top-left before warping; may go beyond). Exactly one per `outline.points`, in the same order. Omitted when the piece isn't warped. |
 | `bodies[].surface.fillColor` | yes | `#RRGGBB`. Color where the map doesn't cover the globe |
+| `regions` | no | Areas outlined on planets and moons (`LORE-01`), in drawing order (later on top). Omitted when there are none. Up to 5,000. They may overlap. |
+| `…regions[].id` | yes | GUID, unique among regions |
+| `…regions[].body` | yes | The `id` of the planet or moon it's on (not a star) |
+| `…regions[].name` | yes | Not empty, up to 100 characters |
+| `…regions[].notes` | no | Plain text, up to 20,000 characters. Omitted when empty. |
+| `…regions[].color` | yes | `#RRGGBB`: its outline and fill color |
+| `…regions[].corners` | yes | 3 to 1,000 `[latitude, longitude]` corners in order around the outline (at least 3 different), joined by great-circle arcs. Every corner must be within 85° of the outline's center (see **Regions** below). |
 | `journal` | no | Journal entries (`LORE-02`), in the order they were added. Omitted when there are none. Up to 10,000. |
 | `…journal[].id` | yes | GUID, unique among entries |
 | `…journal[].title` | yes | Not empty, up to 200 characters |
@@ -220,8 +238,16 @@ A `.nworld` file is a standard **zip archive** containing:
 | `view.focusOffset` | no | `[x, y, z]` view-pan offset from the planet's center; default `[0, 0, 0]` |
 
 **Locations** (journal entries and events): `body` is the `id` of a body that exists. An
-optional pin on its surface is given by `latitude` (−90 to 90) and `longitude` (−180 to 180),
-both or neither; without them it means the body as a whole.
+optional `region` is the `id` of a region on that same body. An optional pin on its surface is
+given by `latitude` (−90 to 90) and `longitude` (−180 to 180), both or neither; without a region
+or pin it means the body as a whole.
+
+**Regions** (`SphericalPolygon` in Core). An outline's **center** is the direction of the sum
+of its corners' unit vectors (with the axes of the **Orbits** section's body frame: latitude φ,
+longitude λ give (cos φ sin λ, sin φ, cos φ cos λ)). A spot is **inside** if, projected with
+the corners onto the plane touching the sphere at the center (from the sphere's center, which
+keeps great-circle edges straight), it's inside the projected polygon by the even-odd rule.
+Spots on the far half of the sphere are never inside.
 
 Names written for enums (`kind`, `projection`) are fixed strings. They're not the code's enum
 names, so renaming code never changes the format.
@@ -302,3 +328,4 @@ If anything fails, the existing world file is left untouched.
 | 5 | Star systems (M4): `timeDays`; bodies gain `radiusKm`, `dayLengthHours`, `axialTilt`, optional `orbit`; kinds `star` and `moon` | Each body gets `radiusKm` 6371, `dayLengthHours` 24, `axialTilt` 0, and no orbit |
 | 6 | Calendars and seasons (M5): bodies gain `axialTiltDirection` and an optional `calendar` | Each body gets `axialTiltDirection` 0 and no calendar |
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
+| 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
