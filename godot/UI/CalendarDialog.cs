@@ -7,8 +7,9 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The calendar editor for a planet or moon (VISION.md CAL-01): its months (any number, any
-/// lengths), weekdays, year numbering with an optional era, and the date the world's clock
-/// starts on. Changes apply together when the user presses Save, as one undo step.
+/// lengths), weekdays, year numbering with an optional era, the date the world's clock starts
+/// on, and whether the world is kept fitted to it (CAL-02), with a preview of what that
+/// changes. Changes apply together when the user presses Save, as one undo step.
 /// </summary>
 /// <remarks>
 /// A body without a calendar starts from a simple one that fits its year: twelve months sharing
@@ -28,6 +29,10 @@ public partial class CalendarDialog : ConfirmationDialog
     private SpinBox _startDay = null!;
     private OptionButton _startWeekday = null!;
     private Label _summary = null!;
+    private CheckBox _fitYear = null!;
+    private OptionButton _fitBy = null!;
+    private OptionButton _monthMoon = null!;
+    private Label _fitPreview = null!;
     private Label _problem = null!;
     private Button _removeButton = null!;
     private Guid _bodyId;
@@ -72,6 +77,10 @@ public partial class CalendarDialog : ConfirmationDialog
         _summary = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         layout.AddChild(_summary);
 
+        // Right under the year comparison, so its preview shows without scrolling.
+        layout.AddChild(Heading("Fit the World"));
+        layout.AddChild(BuildFitFields());
+
         layout.AddChild(Heading("Weekdays"));
         _weekdayRows = new VBoxContainer();
         layout.AddChild(_weekdayRows);
@@ -97,7 +106,9 @@ public partial class CalendarDialog : ConfirmationDialog
         Title = $"{body.Name}'s Calendar";
         _removeButton.Visible = body.Calendar is not null;
         _problem.Text = "";
+        ShowMoonChoices(body);
         ShowCalendar(body.Calendar ?? Starter(_bodyYearDays));
+        ShowFit(body);
         PopupCentered();
     }
 
@@ -143,7 +154,19 @@ public partial class CalendarDialog : ConfirmationDialog
             return;
         }
 
-        var calendar = new Calendar
+        if (Session.SetCalendar(_bodyId, EditedCalendar()) is string problem)
+        {
+            _problem.Text = $"Can't save: {problem}.";
+            return;
+        }
+
+        Hide();
+    }
+
+    // The calendar as the dialog shows it now.
+    private Calendar EditedCalendar()
+    {
+        return new Calendar
         {
             Months = [.. _months.Select(row =>
                 new CalendarMonth(row.Name.Text.Trim(), (int)row.Days!.Value))],
@@ -153,14 +176,130 @@ public partial class CalendarDialog : ConfirmationDialog
             StartMonth = Math.Max(0, _startMonth.Selected),
             StartDay = (int)_startDay.Value,
             StartWeekday = _weekdays.Count == 0 ? 0 : Math.Max(0, _startWeekday.Selected),
+            Fit = _fitYear.ButtonPressed ? (CalendarFit)_fitBy.GetSelectedId() : CalendarFit.None,
+            MonthMoonId = _monthMoon.GetSelectedMetadata().AsString() is { Length: > 0 } moon
+                ? Guid.Parse(moon)
+                : null,
         };
-        if (Session.SetCalendar(_bodyId, calendar) is string problem)
+    }
+
+    // Whether the world is kept fitted to the calendar, and how (VISION.md CAL-02).
+    private Control BuildFitFields()
+    {
+        var box = new VBoxContainer();
+        _fitYear = new CheckBox
         {
-            _problem.Text = $"Can't save: {problem}.";
+            Text = "Keep each year exactly one calendar year",
+            TooltipText = "Adjusts the world so the calendar never drifts against the seasons, " +
+                "and keeps it that way after later edits",
+        };
+        _fitYear.Toggled += on =>
+        {
+            _fitBy.Disabled = !on;
+            RefreshFit();
+        };
+        box.AddChild(_fitYear);
+
+        var grid = new GridContainer { Columns = 2 };
+        _fitBy = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _fitBy.AddItem("Changing the year's length (the orbit)", (int)CalendarFit.YearLength);
+        _fitBy.AddItem("Changing the day's length (the spin)", (int)CalendarFit.DayLength);
+        _fitBy.ItemSelected += _ => RefreshFit();
+        AddLabelled(grid, "By", _fitBy);
+        _monthMoon = new OptionButton
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "Sets this moon's orbit so it goes from new moon to new moon once " +
+                "per month (the average month, if they differ)",
+        };
+        _monthMoon.ItemSelected += _ => RefreshFit();
+        AddLabelled(grid, "Month moon", _monthMoon);
+        box.AddChild(grid);
+
+        _fitPreview = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
+        box.AddChild(_fitPreview);
+        return box;
+    }
+
+    // The moons circling the body, any of which can keep the months.
+    private void ShowMoonChoices(Body body)
+    {
+        _monthMoon.Clear();
+        _monthMoon.AddItem("None");
+        _monthMoon.SetItemMetadata(0, "");
+        foreach (Body moon in Session!.World.Bodies.Where(b =>
+            b.Kind == BodyKind.Moon && b.Orbit?.ParentId == body.Id))
+        {
+            _monthMoon.AddItem(moon.Name);
+            _monthMoon.SetItemMetadata(_monthMoon.ItemCount - 1, moon.Id.ToString());
+        }
+
+        _monthMoon.Disabled = _monthMoon.ItemCount == 1;
+    }
+
+    // Shows the body's fit settings. Turning fitting on picks a sensible default: planets
+    // change their year, moons their day (a moon's year is its planet's orbit).
+    private void ShowFit(Body body)
+    {
+        CalendarFit fit = body.Calendar?.Fit ?? CalendarFit.None;
+        _fitYear.SetPressedNoSignal(fit != CalendarFit.None);
+        CalendarFit by = fit != CalendarFit.None ? fit
+            : body.Kind == BodyKind.Moon ? CalendarFit.DayLength : CalendarFit.YearLength;
+        _fitBy.Select(_fitBy.GetItemIndex((int)by));
+        _fitBy.Disabled = fit == CalendarFit.None;
+        int moon = 0;
+        for (int i = 0; i < _monthMoon.ItemCount; i++)
+        {
+            if (_monthMoon.GetItemMetadata(i).AsString() == body.Calendar?.MonthMoonId?.ToString())
+            {
+                moon = i;
+            }
+        }
+
+        _monthMoon.Select(moon);
+        RefreshFit();
+    }
+
+    // What saving would change in the world, or why the fit can't be met.
+    private void RefreshFit()
+    {
+        if (_fitPreview is null || Session is null
+            || Session.World.Bodies.FirstOrDefault(b => b.Id == _bodyId) is not Body body
+            || _months.Count == 0)
+        {
             return;
         }
 
-        Hide();
+        Calendar calendar = EditedCalendar();
+        if (calendar.Fit == CalendarFit.None && calendar.MonthMoonId is null)
+        {
+            _fitPreview.Text = "Not fitted: the calendar is your design, and may drift against " +
+                "the seasons.";
+            _fitPreview.Modulate = new Color(1, 1, 1, 0.6f);
+            return;
+        }
+
+        if (calendar.Problem() is null
+            && CalendarFitting.Problem(Session.World.Bodies, body, calendar) is string problem)
+        {
+            _fitPreview.Text = $"Can't fit: {problem}.";
+            _fitPreview.Modulate = new Color(1.0f, 0.55f, 0.5f);
+            return;
+        }
+
+        IReadOnlyList<FitChange> changes =
+            CalendarFitting.Preview(Session.World.Bodies, body, calendar);
+        _fitPreview.Modulate = Colors.White;
+        _fitPreview.Text = changes.Count == 0
+            ? "The world already fits this calendar."
+            : "Saving changes:\n" + string.Join("\n", changes.Select(Describe));
+    }
+
+    private static string Describe(FitChange change)
+    {
+        return change.What == FitTarget.DayLength
+            ? $"• {change.BodyName}'s day: {change.Before:0.###} → {change.After:0.###} hours"
+            : $"• {change.BodyName}'s orbit: {change.Before:0.###} → {change.After:0.###} days";
     }
 
     private Control BuildYearAndStartFields()
@@ -331,6 +470,7 @@ public partial class CalendarDialog : ConfirmationDialog
         double days = _months.Sum(row => row.Days!.Value);
         _summary.Text = $"A calendar year has {days:N0} days. One trip around the star takes " +
             $"{_bodyYearDays:N2} of this body's days.";
+        RefreshFit();
     }
 
     private static Label Heading(string text)

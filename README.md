@@ -70,7 +70,11 @@ open, the selected body's path is drawn in yellow, and every change shows live a
 solstices fall.
 
 Planets and moons can have their own calendar: **Calendar · Edit…** in the panel sets its months,
-weekdays, year numbering (with an optional era), and the date the clock starts on. Below it, the
+weekdays, year numbering (with an optional era), and the date the clock starts on. Under **Fit
+the World**, it can keep each year exactly one calendar year, so dates never drift against the
+seasons, by changing either the year's length (the orbit) or the day's length; a **Month moon**
+makes a moon go from new moon to new moon once a month. The editor previews what saving changes,
+and the fitted fields are locked in the panel (their tooltips say why). Below the calendar, the
 panel lists the year's solstices and equinoxes with **Go to** buttons, and they are marked on the
 orbit too (equinoxes as dots, solstices as diamonds).
 

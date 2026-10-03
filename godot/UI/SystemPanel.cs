@@ -24,6 +24,8 @@ public partial class SystemPanel : CanvasLayer
     private const int BottomOffset = 48;
 
     private const double KmPerAu = 149_597_870.7;
+    private const string DayLengthTip = "How long one spin takes, in standard hours (Earth: 24)";
+    private const string PeriodTip = "How long one trip around takes (Earth: 365.25 days)";
 
     private Tree _tree = null!;
     private Button _addMoonButton = null!;
@@ -191,7 +193,7 @@ public partial class SystemPanel : CanvasLayer
             CommitPhysical);
         _axialTilt = AddField(grid, "Axial tilt", 0, 180, 0.1, "°", CommitPhysical);
         _radius.TooltipText = "The body's radius (Earth: 6,371 km)";
-        _dayLength.TooltipText = "How long one spin takes, in standard hours (Earth: 24)";
+        _dayLength.TooltipText = DayLengthTip;
         _axisDirection = AddField(grid, "Axis direction", 0, 360, 1, "°", CommitPhysical)
             .WithWrapAround();
         _axialTilt.TooltipText = "How far the spin axis leans (Earth: 23.4°)";
@@ -243,7 +245,7 @@ public partial class SystemPanel : CanvasLayer
 
         _period = AddField(grid, "Period", 0.0001, Orbit.MaxPeriodDays, 0.01, "days",
             CommitOrbit);
-        _period.TooltipText = "How long one trip around takes (Earth: 365.25 days)";
+        _period.TooltipText = PeriodTip;
         _startAngle = AddField(grid, "Start angle", 0, 360, 1, "°", CommitOrbit)
             .WithWrapAround();
         _startAngle.TooltipText = "Where along the orbit the body is at day 1";
@@ -393,6 +395,8 @@ public partial class SystemPanel : CanvasLayer
 
         _radius.ShowValue(body.RadiusKm);
         _dayLength.ShowValue(body.DayLengthHours);
+        (Body? dayBy, Body? periodBy) = CalendarFitting.FittedBy(Session!.World.Bodies, body);
+        Lock(_dayLength, dayBy, DayLengthTip, "keeps each year exactly one calendar year");
         _axialTilt.ShowValue(body.AxialTiltDegrees);
         _axisDirection.ShowValue(body.AxialTiltDirectionDegrees);
         _temperature.ShowValue(body.AverageTemperatureC);
@@ -406,6 +410,9 @@ public partial class SystemPanel : CanvasLayer
         if (body.Orbit is Orbit orbit)
         {
             ShowOrbit(body, orbit);
+            Lock(_period, periodBy, PeriodTip, periodBy?.Calendar?.MonthMoonId == body.Id
+                ? $"keeps one cycle of {body.Name} per month"
+                : "keeps each year exactly one calendar year");
         }
 
         _calendar?.Refresh();
@@ -447,6 +454,17 @@ public partial class SystemPanel : CanvasLayer
         {
             _extrasToggle.ButtonPressed = true;
         }
+    }
+
+    // A field set by a calendar that fits the world (VISION.md CAL-02) can't be typed in; its
+    // tooltip says which calendar sets it.
+    private static void Lock(SpinBox field, Body? fittedBy, string tip, string why)
+    {
+        field.Editable = fittedBy is null;
+        field.TooltipText = fittedBy is null
+            ? tip
+            : $"Set by {fittedBy.Name}'s calendar, which {why}. To change it, turn that off " +
+              "in the calendar editor.";
     }
 
     private DistanceUnit SelectedUnit() => (DistanceUnit)_distanceUnit.GetSelectedId();
