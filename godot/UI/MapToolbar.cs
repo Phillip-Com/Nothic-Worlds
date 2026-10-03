@@ -29,7 +29,9 @@ public partial class MapToolbar : CanvasLayer
     private Button _importButton = null!;
     private Button _clearButton = null!;
     private Button _calibrateButton = null!;
+    private Button _systemButton = null!;
     private Button _journalButton = null!;
+    private Button _timelineButton = null!;
     private Button _regionsButton = null!;
     private OptionButton _mapType = null!;
     private ColorPickerButton _fillColor = null!;
@@ -64,19 +66,8 @@ public partial class MapToolbar : CanvasLayer
     /// <summary>The timeline strip, shown and hidden by the Timeline… button.</summary>
     [Export] public TimelineStrip? Timeline { get; set; }
 
-    /// <summary>The pins on the globes, shown and hidden by the Pins toggle.</summary>
-    [Export] public PinMarkers? Pins { get; set; }
-
-    /// <summary>
-    /// The weather pins: the Weather Pin button adds one, and the Pins toggle hides them too.
-    /// </summary>
-    [Export] public WeatherMarkers? Weather { get; set; }
-
     /// <summary>The Regions panel, shown and hidden by the Regions… button.</summary>
     [Export] public RegionsPanel? RegionsPanel { get; set; }
-
-    /// <summary>The regions drawn on the globes, shown and hidden by the Regions toggle.</summary>
-    [Export] public Rendering.RegionRenderer? Regions { get; set; }
 
     /// <summary>Space at the start of the toolbar row, where the File menu goes.</summary>
     public HBoxContainer MenuArea { get; } = new();
@@ -97,41 +88,27 @@ public partial class MapToolbar : CanvasLayer
         layout.AddChild(controls);
         controls.AddChild(MenuArea);
 
-        var systemButton = CreateButton(
-            "System…", "The star system: add, delete, and edit suns, planets, and moons");
-        systemButton.ToggleMode = true;
-        systemButton.Toggled += open =>
+        controls.AddChild(new VSeparator());
+        _systemButton = CreateButton(
+            "System", "The star system: add, delete, and edit suns, planets, and moons");
+        _systemButton.ToggleMode = true;
+        _systemButton.Toggled += open =>
         {
             if (SystemPanel is not null)
             {
                 SystemPanel.IsPanelOpen = open;
             }
         };
-        controls.AddChild(systemButton);
-
-        _importButton = CreateButton(
-            "Import Map…", "Wrap a map image (PNG, JPG, WebP) onto the planet");
-        _importButton.Pressed += () => _fileDialog.PopupCentered();
-        controls.AddChild(_importButton);
-
-        _clearButton = CreateButton("Clear Map", "Remove the map and show the grid");
-        _clearButton.Pressed += () => Session?.ClearMap();
-        controls.AddChild(_clearButton);
-
-        _calibrateButton = CreateButton(
-            "Calibrate…",
-            "Line the map up with the globe by dragging its latitude/longitude lines");
-        _calibrateButton.Pressed += () => Calibration?.Open();
-        controls.AddChild(_calibrateButton);
+        controls.AddChild(_systemButton);
 
         // The panels on the right share it, one at a time (owner's choices): opening one
         // closes the others.
         var piecesButton = CreateButton(
-            "Pieces…", "Cut pieces from the map or other images and place them on the globe");
+            "Pieces", "Cut pieces from the map or other images and place them on the globe");
         _journalButton = CreateButton(
-            "Journal…", "The world's journal: write entries about places and history");
+            "Journal", "The world's journal: write entries about places and history");
         _regionsButton = CreateButton(
-            "Regions…", "Outline and name regions on the planet: countries, forests, seas");
+            "Regions", "Outline and name regions on the planet: countries, forests, seas");
         Button[] rightPanels = [piecesButton, _journalButton, _regionsButton];
         foreach (Button button in rightPanels)
         {
@@ -171,59 +148,34 @@ public partial class MapToolbar : CanvasLayer
             }
         };
 
-        var timelineButton = CreateButton(
-            "Timeline…", "The timeline strip: your world's history, as lanes of events");
-        timelineButton.ToggleMode = true;
-        timelineButton.Toggled += open =>
+        _timelineButton = CreateButton(
+            "Timeline", "The timeline strip: your world's history, as lanes of events");
+        _timelineButton.ToggleMode = true;
+        _timelineButton.Toggled += open =>
         {
             if (Timeline is not null)
             {
                 Timeline.IsStripOpen = open;
             }
         };
-        controls.AddChild(timelineButton);
+        controls.AddChild(_timelineButton);
+        controls.AddChild(new VSeparator());
 
-        Button weatherButton = CreateButton("Weather Pin",
-            "Add a weather pin: click the spot on the planet, then name it");
-        weatherButton.Pressed += () => Weather?.StartAdding();
-        controls.AddChild(weatherButton);
+        _importButton = CreateButton(
+            "Import Map…", "Wrap a map image (PNG, JPG, WebP) onto the planet");
+        _importButton.Pressed += () => _fileDialog.PopupCentered();
+        controls.AddChild(_importButton);
 
-        var pinsToggle = new CheckButton
-        {
-            Text = "Pins",
-            ButtonPressed = true,
-            FocusMode = Control.FocusModeEnum.None,
-            TooltipText = "Show the pins of journal entries and events on the globes",
-        };
-        pinsToggle.Toggled += on =>
-        {
-            if (Pins is not null)
-            {
-                Pins.ShowPins = on;
-            }
+        _clearButton = CreateButton("Clear Map", "Remove the map and show the grid");
+        _clearButton.Pressed += () => Session?.ClearMap();
+        controls.AddChild(_clearButton);
 
-            if (Weather is not null)
-            {
-                Weather.ShowPins = on;
-            }
-        };
-        controls.AddChild(pinsToggle);
+        _calibrateButton = CreateButton(
+            "Calibrate…",
+            "Line the map up with the globe by dragging its latitude/longitude lines");
+        _calibrateButton.Pressed += () => Calibration?.Open();
+        controls.AddChild(_calibrateButton);
 
-        var regionsToggle = new CheckButton
-        {
-            Text = "Regions",
-            ButtonPressed = true,
-            FocusMode = Control.FocusModeEnum.None,
-            TooltipText = "Show the regions outlined on the globes",
-        };
-        regionsToggle.Toggled += on =>
-        {
-            if (Regions is not null)
-            {
-                Regions.ShowRegions = on;
-            }
-        };
-        controls.AddChild(regionsToggle);
 
         controls.AddChild(CreateLabel("  Map type:"));
         _mapType = CreateMapTypeDropdown();
@@ -271,6 +223,18 @@ public partial class MapToolbar : CanvasLayer
     public void ShowJournal()
     {
         _journalButton.ButtonPressed = true;
+    }
+
+    /// <summary>Opens the System panel.</summary>
+    public void ShowSystem()
+    {
+        _systemButton.ButtonPressed = true;
+    }
+
+    /// <summary>Shows the timeline strip.</summary>
+    public void ShowTimeline()
+    {
+        _timelineButton.ButtonPressed = true;
     }
 
     /// <summary>Opens the Regions panel (closing the others on the right).</summary>
