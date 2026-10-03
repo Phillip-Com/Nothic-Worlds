@@ -53,13 +53,13 @@ public static class TimeRuler
             }
         }
 
-        double monthDays = (double)calendar.DaysPerYear / calendar.Months.Count;
+        double monthDays = calendar.AverageDaysPerYear / calendar.Months.Count;
         if (spanBodyDays / monthDays <= maxTicks)
         {
             return MonthTicks(body, calendar, fromDays, toDays);
         }
 
-        long years = NiceStep(spanBodyDays / calendar.DaysPerYear, maxTicks);
+        long years = NiceStep(spanBodyDays / calendar.AverageDaysPerYear, maxTicks);
         return YearTicks(body, calendar, fromDays, toDays, years);
     }
 

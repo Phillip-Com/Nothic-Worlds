@@ -424,6 +424,16 @@ internal static class WorldMapper
             },
             Fit = WorldFormat.CalendarFitName(calendar.Fit),
             MonthMoon = calendar.MonthMoonId,
+            Leap = calendar.Leap is LeapRule leap
+                ? new LeapDocument
+                {
+                    Every = leap.Every,
+                    Except = leap.Except,
+                    ExceptAgain = leap.ExceptAgain,
+                    Month = leap.Month,
+                    Days = leap.Days,
+                }
+                : null,
         };
     }
 
@@ -444,6 +454,9 @@ internal static class WorldMapper
             StartWeekday = document.Start.Weekday,
             Fit = WorldFormat.ParseCalendarFit(document.Fit),
             MonthMoonId = document.MonthMoon,
+            Leap = document.Leap is LeapDocument leap
+                ? new LeapRule(leap.Every, leap.Except, leap.ExceptAgain, leap.Month, leap.Days)
+                : null,
         };
     }
 

@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 13;
+    public const int CurrentVersion = 14;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -136,6 +136,10 @@ internal static partial class WorldFormat
         // ocean blue they always had, moons become grey and rocky (owner's choice), and stars
         // are yellow, as they always were.
         AddAppearances,
+
+        // 13 → 14: calendars gained an optional "leap" rule (leap years, M17). Older calendars
+        // have no leap years, so nothing changes.
+        document => document,
     ];
 
     // The climates the version 12 upgrade gives types by name. Deliberately a copy, like

@@ -52,8 +52,24 @@ public sealed record Calendar
     /// </summary>
     public Guid? MonthMoonId { get; init; }
 
-    /// <summary>How many days a year of this calendar has.</summary>
+    /// <summary>
+    /// The calendar's leap years (VISION.md CAL-04), or null for none: every year is
+    /// <see cref="DaysPerYear"/> long.
+    /// </summary>
+    public LeapRule? Leap { get; init; }
+
+    /// <summary>How many days a common (not leap) year of this calendar has.</summary>
     public long DaysPerYear => Months.Sum(month => (long)month.Days);
+
+    /// <summary>The average length of a year, counting leap years, in days.</summary>
+    public double AverageDaysPerYear => DaysPerYear + (Leap?.AverageExtraDays ?? 0);
+
+    /// <summary>How many days a month has in the year with this number.</summary>
+    public int DaysInMonth(long year, int month)
+    {
+        return Months[month].Days
+            + (Leap is LeapRule leap && leap.Month == month && leap.IsLeap(year) ? leap.Days : 0);
+    }
 
     /// <summary>What's wrong with this calendar, or null if it's usable.</summary>
     public string? Problem()
@@ -80,10 +96,26 @@ public sealed record Calendar
             return "the starting date isn't in the calendar";
         }
 
-        return StartWeekday < 0 || (Weekdays.Count > 0 && StartWeekday >= Weekdays.Count)
-            || (Weekdays.Count == 0 && StartWeekday != 0)
-            ? "the starting weekday isn't in the calendar"
-            : null;
+        if (StartWeekday < 0 || (Weekdays.Count > 0 && StartWeekday >= Weekdays.Count)
+            || (Weekdays.Count == 0 && StartWeekday != 0))
+        {
+            return "the starting weekday isn't in the calendar";
+        }
+
+        if (Leap is LeapRule leap)
+        {
+            if (leap.Problem(Months.Count) is string problem)
+            {
+                return problem;
+            }
+
+            if ((long)Months[leap.Month].Days + leap.Days > MaxMonthDays)
+            {
+                return $"a month can have at most {MaxMonthDays:N0} days, leap days included";
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Calendars are equal when every part matches, including the lists.</summary>
@@ -98,7 +130,8 @@ public sealed record Calendar
             && StartDay == other.StartDay
             && StartWeekday == other.StartWeekday
             && Fit == other.Fit
-            && MonthMoonId == other.MonthMoonId;
+            && MonthMoonId == other.MonthMoonId
+            && Leap == other.Leap;
     }
 
     /// <inheritdoc/>
