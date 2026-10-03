@@ -85,6 +85,10 @@ edit it: title, timeline, dates, place, description, and the journal entries it 
 **New Event** adds one at the current time; **Timelines…** adds, renames, recolors, hides,
 reorders, and deletes timelines (deleting one deletes its events; Ctrl+Z brings them back).
 
+Entries and events placed on a planet or moon can also be pinned to a spot: **Pin on Globe…** in
+their editor flies there, and you click the spot (Esc cancels). Pins show on the globe; click
+one to see what's there and open it. The **Pins** toggle in the toolbar hides them.
+
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers
 back after a crash.

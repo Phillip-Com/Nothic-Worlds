@@ -29,6 +29,7 @@ public partial class MapToolbar : CanvasLayer
     private Button _importButton = null!;
     private Button _clearButton = null!;
     private Button _calibrateButton = null!;
+    private Button _journalButton = null!;
     private OptionButton _mapType = null!;
     private ColorPickerButton _fillColor = null!;
     private Control _fillColorControls = null!;
@@ -61,6 +62,9 @@ public partial class MapToolbar : CanvasLayer
 
     /// <summary>The timeline strip, shown and hidden by the Timeline… button.</summary>
     [Export] public TimelineStrip? Timeline { get; set; }
+
+    /// <summary>The pins on the globes, shown and hidden by the Pins toggle.</summary>
+    [Export] public PinMarkers? Pins { get; set; }
 
     /// <summary>Space at the start of the toolbar row, where the File menu goes.</summary>
     public HBoxContainer MenuArea { get; } = new();
@@ -110,10 +114,10 @@ public partial class MapToolbar : CanvasLayer
 
         var piecesButton = CreateButton(
             "Pieces…", "Cut pieces from the map or other images and place them on the globe");
-        var journalButton = CreateButton(
+        _journalButton = CreateButton(
             "Journal…", "The world's journal: write entries about places and history");
         piecesButton.ToggleMode = true;
-        journalButton.ToggleMode = true;
+        _journalButton.ToggleMode = true;
         piecesButton.Toggled += open =>
         {
             if (Pieces is not null)
@@ -123,10 +127,10 @@ public partial class MapToolbar : CanvasLayer
 
             if (open)
             {
-                journalButton.ButtonPressed = false;  // One panel on the right at a time.
+                _journalButton.ButtonPressed = false;  // One panel on the right at a time.
             }
         };
-        journalButton.Toggled += open =>
+        _journalButton.Toggled += open =>
         {
             if (Journal is not null)
             {
@@ -139,7 +143,7 @@ public partial class MapToolbar : CanvasLayer
             }
         };
         controls.AddChild(piecesButton);
-        controls.AddChild(journalButton);
+        controls.AddChild(_journalButton);
 
         var timelineButton = CreateButton(
             "Timeline…", "The timeline strip: your world's history, as lanes of events");
@@ -152,6 +156,22 @@ public partial class MapToolbar : CanvasLayer
             }
         };
         controls.AddChild(timelineButton);
+
+        var pinsToggle = new CheckButton
+        {
+            Text = "Pins",
+            ButtonPressed = true,
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Show the pins of journal entries and events on the globes",
+        };
+        pinsToggle.Toggled += on =>
+        {
+            if (Pins is not null)
+            {
+                Pins.ShowPins = on;
+            }
+        };
+        controls.AddChild(pinsToggle);
 
         controls.AddChild(CreateLabel("  Map type:"));
         _mapType = CreateMapTypeDropdown();
@@ -191,6 +211,14 @@ public partial class MapToolbar : CanvasLayer
         Session.Changed += SyncWithWorld;
         Session.WorldClosed += _ => _mapFileName = null;
         SyncWithWorld();
+    }
+
+    /// <summary>
+    /// Opens the Journal panel (closing the Pieces panel, which shares its side).
+    /// </summary>
+    public void ShowJournal()
+    {
+        _journalButton.ButtonPressed = true;
     }
 
     /// <summary>Shows an informational message that fades after a few seconds.</summary>

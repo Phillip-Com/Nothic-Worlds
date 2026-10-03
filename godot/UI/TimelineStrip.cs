@@ -31,6 +31,9 @@ public partial class TimelineStrip : CanvasLayer
     /// <summary>The time bar, for gliding the clock to an event.</summary>
     [Export] public TimeControls? Time { get; set; }
 
+    /// <summary>Places pins by clicking on the globe (for the event editor).</summary>
+    [Export] public Controls.PinPlacer? Placer { get; set; }
+
     /// <summary>Whether the strip is shown (it's still hidden while the toolbar is).</summary>
     public bool IsStripOpen
     {
@@ -73,7 +76,12 @@ public partial class TimelineStrip : CanvasLayer
         _canvas.EventDoubleClicked += timelineEvent => _eventDialog.Edit(timelineEvent);
         layout.AddChild(_canvas);
 
-        _eventDialog = new EventDialog { Session = Session, GlideTo = time => Time?.GlideTo(time) };
+        _eventDialog = new EventDialog
+        {
+            Session = Session,
+            GlideTo = time => Time?.GlideTo(time),
+            Placer = Placer,
+        };
         AddChild(_eventDialog);
         _timelinesDialog = new TimelinesDialog { Session = Session };
         AddChild(_timelinesDialog);
@@ -112,6 +120,13 @@ public partial class TimelineStrip : CanvasLayer
             Modulate = new Color(1, 1, 1, 0.55f),
         });
         return row;
+    }
+
+    /// <summary>Opens an event's editor (e.g. from a pin's pop-up).</summary>
+    public void EditEvent(TimelineEvent timelineEvent)
+    {
+        _canvas.HighlightedEventId = timelineEvent.Id;
+        _eventDialog.Edit(timelineEvent);
     }
 
     private void AddEvent()

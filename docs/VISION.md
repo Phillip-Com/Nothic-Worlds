@@ -122,7 +122,9 @@ Writing the world's history and lore (`LORE-02`, `LORE-03`). Owner's decisions:
 - **Event dates:** a moment, with an optional end for things that last (drawn as bars). Stored
   as world time and shown in the selected body's calendar.
 - **Four PRs:** Core (model, links, places, format v7) (PR #23); the journal panel (PR #24);
-  the timeline strip (PR #25); pins on the globe.
+  the timeline strip (PR #25); pins on the globe (PR #26).
+- **Pins (owner's choices, 2026-10-02):** placed by clicking on the globe (coordinates are shown,
+  not typed); always shown, with a **Pins** toggle to hide them.
 - **The strip (owner's choices, 2026-10-02):** clicking an event jumps the clock there and
   double-clicking edits it; deleting a timeline deletes its events (one undo step); events
   aren't dragged to new dates yet; the strip shows only the user's events, not seasons or
@@ -962,7 +964,7 @@ the world.
 **Intent:** Draw outlines around specific regions or locations on the world, with optional notes.
 **Implementation:** —
 
-**LORE-02 — Journal system** · In Progress (Core and panel done, PRs #23–#24) · Base
+**LORE-02 — Journal system** · Implemented (M7) · Base
 **Intent:** Start with a simple journal. Entries are sortable and can be linked to locations.
 Clicking a location can pop up its journal entries to read. The exact interaction is to be worked
 out later.
@@ -997,7 +999,22 @@ out later.
 - Journal writing no longer makes the seasons and eclipses work themselves out again:
   `WorldSession` keeps a separate system version for those caches.
 
-**LORE-03 — Timelines** · In Progress (Core and strip done, PRs #23, #25) · Base
+**Implementation (pins, PR #26):**
+- `godot/Controls/PinPlacer.cs`: **Pin on Globe…** (in the journal editor and the event editor)
+  flies to the place's body and waits for a click on its surface (`GlobePicker.CoordinateAt`);
+  Esc cancels, and clicks off the globe still turn the camera. The event editor steps aside
+  meanwhile and comes back with its unsaved changes and the new pin (saved with Save).
+  **Remove Pin** keeps the place without a spot. Stars can't be pinned (no surface).
+- `godot/UI/PinMarkers.cs` (its own overlay, after the body markers so it gets clicks first):
+  a pin for each pinned entry (parchment color) and event (its timeline's color; hidden
+  timelines have none), on planets and moons drawn at least 24 pixels across, on the side
+  facing the camera only. Pins within 14 pixels merge into one with a count. Clicking one pops
+  up the place's coordinates and what's there; choosing an entry opens it in the Journal panel
+  (`MapToolbar.ShowJournal`, `JournalPanel.SelectEntry`), choosing an event opens its editor
+  (`TimelineStrip.EditEvent`). A **Pins** toggle in the toolbar hides them all.
+- `godot/UI/PlaceText.cs`: coordinates as words ("18.29° N, 8.23° W").
+
+**LORE-03 — Timelines** · Implemented (M7) · Base
 **Intent:** Timelines of events. They become relevant once orbiting bodies are introduced, and
 they're key helpers for the calendar features (`CAL-01`–`CAL-03`, `SIM-02`).
 **Implementation (Core, PR #23):**
