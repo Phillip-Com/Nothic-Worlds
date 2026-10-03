@@ -39,7 +39,7 @@ public static class CalendarFitting
         {
             if (BodyClock.YearOrbitOf(bodies, body) is Body owner && fittedOrbits.Add(owner.Id))
             {
-                double period = body.Calendar!.DaysPerYear * body.DayLengthHours / 24.0;
+                double period = body.Calendar!.AverageDaysPerYear * body.DayLengthHours / 24.0;
                 changed |= SetPeriod(owner, period, failures);
             }
         }
@@ -49,7 +49,7 @@ public static class CalendarFitting
             if (BodyClock.YearOrbitOf(bodies, body) is not null)
             {
                 double hours = BodyClock.YearDays(bodies, body) * 24.0
-                    / body.Calendar!.DaysPerYear;
+                    / body.Calendar!.AverageDaysPerYear;
                 changed |= SetDayLength(body, hours, failures);
             }
         }
@@ -163,7 +163,7 @@ public static class CalendarFitting
         }
 
         Calendar calendar = body.Calendar!;
-        double monthDays = (double)calendar.DaysPerYear / calendar.Months.Count
+        double monthDays = calendar.AverageDaysPerYear / calendar.Months.Count
             * body.DayLengthHours / 24.0;
         double yearDays = owner.Orbit!.PeriodDays;
         bool sameWayRound = moon.Orbit.TiltDegrees > 90 == owner.Orbit.TiltDegrees > 90;

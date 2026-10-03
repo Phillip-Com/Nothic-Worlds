@@ -120,6 +120,16 @@ internal sealed class CalendarDocument
     public required CalendarStartDocument Start { get; init; }
     public string? Fit { get; init; }  // Added in format version 11; omitted when not fitted
     public Guid? MonthMoon { get; init; }  // Added in format version 11
+    public LeapDocument? Leap { get; init; }  // Added in format version 14
+}
+
+internal sealed class LeapDocument
+{
+    public required int Every { get; init; }
+    public int? Except { get; init; }
+    public int? ExceptAgain { get; init; }
+    public required int Month { get; init; }
+    public required int Days { get; init; }
 }
 
 internal sealed class MonthDocument

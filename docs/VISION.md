@@ -108,7 +108,14 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 16: Body Appearance** · In Progress (owner's choice, 2026-10-03)
+**Milestone 17: Leap Years** · In progress (owner's choice, 2026-10-03)
+Calendars can add leap days on a rule (new feature `CAL-04`). Owner's decisions:
+- **Rule:** "every N years, except every M, but every K" (up to three tiers, like ours).
+- **Leap days** are added to a chosen month.
+- A **Suggest** button works out a rule that keeps the calendar with the real year.
+- One PR (PR #43), with format version 14.
+
+**Milestone 16: Body Appearance** · Complete (PR #42 merged 2026-10-03; owner's choice, 2026-10-03)
 Give bodies their own look (`BOD-06`). Owner's decisions:
 - **Planets and moons:** a color and a surface pattern (Plain, Rocky, Banded, Icy, Cloudy),
   shown where there's no map; terrain and maps still draw on top.
@@ -1185,6 +1192,27 @@ system's parameters (e.g. orbital periods, rotation speed) so the user's calenda
   the engine stalled 30–50 ms drawing shapes there (caught by the benchmark).
 - Wording in one place: `godot/UI/SeasonText.cs`. Events are named for the north ("Northern
   summer solstice"); the south's season shows alongside.
+
+**CAL-04 — Leap years** · Implemented (M17) · Base
+**Intent:** Calendars can add leap days on a regular rule, so they can follow the real year
+without the world being changed to fit.
+**Implementation (PR #43):**
+- **Model:** `Model/LeapRule.cs` (`Every`, optional `Except` and `ExceptAgain`, `Month`, `Days`):
+  a year is a leap year if its number divides by `Every`, unless it divides by `Except`, unless
+  it divides by `ExceptAgain` (each a larger multiple of the one before). `Calendar.Leap`,
+  `AverageDaysPerYear`, and `DaysInMonth(year, month)`. Format **version 14** (`leap`).
+- **Dates:** `Simulation/CalendarMath.cs` counts leap years arithmetically (no loops), so dates
+  far from the start are as fast as near ones: it estimates the year from the average year, then
+  corrects it. Tested against our own calendar (146,097 days in 400 years) and round trips.
+- **Average year:** fitting (`CAL-02`) and the time ruler use `AverageDaysPerYear`, so a fitted
+  calendar with leap years keeps the orbit at the true average (365.2425 days for ours).
+- **Suggest:** `LeapRule.Suggest` tries one tier, then two, then three, taking a further tier only
+  when it halves the drift, and stops once drift is under a day per 2,000 years.
+- **App:** `godot/UI/LeapYearSection.cs`, the calendar editor's **Leap Years** section under the
+  months: an on/off box, the rule's fields (0 = no exception), the leap days and their month,
+  **Suggest**, and a line with the average year and how often it drifts a day from the real one.
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: turning it on,
+  Suggest, Save (the leap month gains its day in leap years), and save/reopen.
 
 ### 4.7 Events (`EVT`)
 

@@ -80,7 +80,9 @@ open, the selected body's path is drawn in yellow, and every change shows live a
 solstices fall.
 
 Planets and moons can have their own calendar: **Calendar · Edit…** in the panel sets its months,
-weekdays, year numbering (with an optional era), and the date the clock starts on. Under **Fit
+weekdays, year numbering (with an optional era), and the date the clock starts on. **Leap
+Years** adds days to a month on a rule like ours ("every 4 years, except every 100, but every
+400"); **Suggest** works one out that keeps the calendar with the real year. Under **Fit
 the World**, it can keep each year exactly one calendar year, so dates never drift against the
 seasons, by changing either the year's length (the orbit) or the day's length; a **Month moon**
 makes a moon go from new moon to new moon once a month. The editor previews what saving changes,
