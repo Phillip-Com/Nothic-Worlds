@@ -24,6 +24,13 @@ namespace NothicWorlds.Core.Simulation;
 /// are milder than inland; the kind of ground at the spot widens or narrows the day/night swing
 /// (deserts swing most) and makes ice and mountains colder. Without terrain, nothing
 /// changes.</para>
+/// <para><b>Rain is an estimate too</b> (VISION.md WTH-03; owner's choice: temperature and
+/// rainfall). It adds a tropical rain belt that follows the star a month behind (wet seasons
+/// near the equator, dry ones beside them), a storm belt in the middle latitudes that shifts
+/// with the seasons, and a little drizzle everywhere; then scales by the moisture the terrain
+/// gives (sea air wetter, deserts very dry; average without painted terrain) and by the cold
+/// (cold air holds little water). Tuned so an Earth-like planet gets about 1,750 mm a year at
+/// the equator, 250 at 30°, 1,000 at 50°, and almost none at the poles.</para>
 /// <para>The year repeats: times outside the year worked out are wrapped into it (exact for a
 /// planet circling its star; close for a moon).</para>
 /// </remarks>
@@ -49,6 +56,23 @@ public sealed class ClimateYear
     private const double MaritimeSeasonSoftening = 0.6;
     private const double MaritimeSwingSoftening = 0.7;
     private const double MaritimeExtraLag = 1.0;
+
+    // Rain, in mm per standard day: the tropical belt's peak (it sits at this share of the
+    // star's lagged latitude, this many degrees wide), the storm belt's peak (centred at this
+    // latitude, shifted by this share of the season's star latitude), and the drizzle anywhere.
+    private const double TropicalRainMm = 9.0;
+    private const double TropicalBeltShare = 0.6;
+    private const double TropicalBeltWidth = 11.0;
+    private const double StormRainMm = 2.6;
+    private const double StormBeltLatitude = 48.0;
+    private const double StormBeltShift = 0.35;
+    private const double StormBeltWidth = 13.0;
+    private const double DrizzleMm = 0.25;
+
+    // Cold air holds little water: rain fades from full at 10 °C to its least at −25 °C.
+    private const double RainFullAtC = 10.0;
+    private const double RainLeastAtC = -25.0;
+    private const double ColdestRainShare = 0.15;
 
     private readonly ClimateDay[] _days;
 
@@ -128,6 +152,9 @@ public sealed class ClimateYear
         ClimateKind? ground = terrain?.Here;
         double spotAverage = sunlight.Average();
         double[] felt = Lagged(sunlight, step, HeatLagDays * (1 + MaritimeExtraLag * maritime));
+        double[] beltLatitude = Lagged(
+            [.. declinations.Select(d => double.RadiansToDegrees(d))], step, HeatLagDays);
+        double moisture = Moisture(terrain);
         double swing = Math.Min(MaxDayNightSwingC,
             DayNightSwingC * Math.Sqrt(body.DayLengthHours / 24.0)
                 * (1 - MaritimeSwingSoftening * maritime) * SwingFactor(ground));
@@ -141,8 +168,9 @@ public sealed class ClimateYear
             double mean = baseline + seasons * (felt[i] - spotAverage);
             double noon = 90 - Math.Abs(spot.LatitudeDegrees
                 - double.RadiansToDegrees(declinations[i]));
+            double rain = Rain(spot.LatitudeDegrees, beltLatitude[i], mean) * moisture;
             days[i] = new ClimateDay(fromDays + (i + 0.5) * step, mean, mean - swing / 2,
-                mean + swing / 2, daylight[i], Math.Max(-90, noon), sunlight[i]);
+                mean + swing / 2, daylight[i], Math.Max(-90, noon), sunlight[i], rain);
         }
 
         return new ClimateYear(days, fromDays, year, terrain);
@@ -162,14 +190,39 @@ public sealed class ClimateYear
     }
 
     /// <summary>
+    /// How much the terrain makes it rain compared with average ground (1): sea air brings
+    /// more, inland less; deserts very little, wetlands, forests, and mountains more. 1
+    /// without painted terrain.
+    /// </summary>
+    public static double Moisture(TerrainSurroundings? terrain)
+    {
+        if (terrain is null || (terrain.Here is null && terrain.WaterShare == 0))
+        {
+            return 1.0;
+        }
+
+        // About two-thirds water around (like Earth on average) gives 1.
+        double air = 0.4 + 0.9 * terrain.Maritime;
+        return air * terrain.Here switch
+        {
+            ClimateKind.Desert => 0.15,
+            ClimateKind.Ice => 0.5,
+            ClimateKind.Forest => 1.2,
+            ClimateKind.Wetland or ClimateKind.Mountains => 1.3,
+            _ => 1.0,
+        };
+    }
+
+    /// <summary>
     /// The average weather over a stretch of time (e.g. a month), wrapped into the year: the
-    /// mean of the days' lows, highs, means, daylight, noon heights, and sunlight.
+    /// mean of the days' lows, highs, means, daylight, noon heights, sunlight, and rain (still
+    /// per day; multiply by the stretch's length for its total).
     /// </summary>
     public ClimateDay Average(double fromDays, double toDays)
     {
         double step = YearDays / _days.Length;
         int count = Math.Max(1, (int)Math.Round((toDays - fromDays) / step));
-        double low = 0, high = 0, mean = 0, light = 0, noon = 0, sun = 0;
+        double low = 0, high = 0, mean = 0, light = 0, noon = 0, sun = 0, rain = 0;
         for (int i = 0; i < count; i++)
         {
             ClimateDay day = DayAt(fromDays + (i + 0.5) * (toDays - fromDays) / count);
@@ -179,10 +232,11 @@ public sealed class ClimateYear
             light += day.DaylightHours;
             noon += day.NoonSunDegrees;
             sun += day.Sunlight;
+            rain += day.RainMm;
         }
 
         return new ClimateDay((fromDays + toDays) / 2, mean / count, low / count, high / count,
-            light / count, noon / count, sun / count);
+            light / count, noon / count, sun / count, rain / count);
     }
 
     // The share of the day the star is up, and the day's average of sin(star height) (its
@@ -197,6 +251,27 @@ public sealed class ClimateYear
             + Math.Cos(latitude) * Math.Cos(declination) * Math.Sin(hourAngle)) / Math.PI;
         return (hourAngle / Math.PI, Math.Max(0, dailyMean));
     }
+
+    // Rain on average ground, in mm per day, at a latitude, with the star's (lagged) latitude
+    // and the day's mean temperature.
+    private static double Rain(double latitude, double starLatitude, double meanC)
+    {
+        double belt = TropicalBeltShare * starLatitude;
+        double tropical = TropicalRainMm * Bell(latitude - belt, TropicalBeltWidth);
+
+        // The storm belt sits farther from the equator in summer (when the star is on this
+        // side), nearer in winter.
+        double summer = latitude >= 0 ? starLatitude : -starLatitude;
+        double stormLatitude = StormBeltLatitude + StormBeltShift * summer;
+        double storms = StormRainMm * Bell(Math.Abs(latitude) - stormLatitude, StormBeltWidth);
+
+        double warmth = Math.Clamp(
+            (meanC - RainLeastAtC) / (RainFullAtC - RainLeastAtC), ColdestRainShare, 1.0);
+        return (tropical + storms + DrizzleMm) * warmth;
+    }
+
+    private static double Bell(double offset, double width) =>
+        Math.Exp(-(offset / width) * (offset / width));
 
     // How the kind of ground widens or narrows the day/night swing: dry air lets deserts heat
     // and cool most; plants and wet ground hold heat.
