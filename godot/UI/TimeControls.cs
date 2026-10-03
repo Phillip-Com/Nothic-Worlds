@@ -93,7 +93,7 @@ public partial class TimeControls : CanvasLayer
             "Play", TogglePlaying, "Run the world clock: every body moves and spins");
         row.AddChild(_playButton);
 
-        _speed = new OptionButton { FocusMode = Control.FocusModeEnum.None };
+        _speed = new Dropdown { FocusMode = Control.FocusModeEnum.None };
         foreach ((string label, _) in _speeds)
         {
             _speed.AddItem(label);
@@ -105,7 +105,7 @@ public partial class TimeControls : CanvasLayer
 
         row.AddChild(CreateButton("−", () => Step(-1),
             "Step the clock back (the bodies glide into place)"));
-        _step = new OptionButton { FocusMode = Control.FocusModeEnum.None };
+        _step = new Dropdown { FocusMode = Control.FocusModeEnum.None };
         foreach (string label in _stepLabels)
         {
             _step.AddItem(label);

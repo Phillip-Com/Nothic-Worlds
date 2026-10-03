@@ -102,6 +102,7 @@ public partial class SystemPanel : CanvasLayer
         panel.OffsetRight = ScreenMargin + PanelWidth;
         panel.OffsetTop = TopOffset;
         panel.OffsetBottom = -BottomOffset;
+        panel.AddThemeStyleboxOverride("panel", PanelStyle.SidePanel());
         AddChild(panel);
 
         var scroll = new ScrollContainer
@@ -181,7 +182,7 @@ public partial class SystemPanel : CanvasLayer
         var grid = new GridContainer { Columns = 2 };
         grid.AddChild(new Label { Text = "Kind" });
         var kindRow = new HBoxContainer();
-        _kind = new OptionButton { FocusMode = Control.FocusModeEnum.None };
+        _kind = new Dropdown { FocusMode = Control.FocusModeEnum.None };
         _kind.AddItem("Planet", (int)BodyKind.Planet);
         _kind.AddItem("Moon", (int)BodyKind.Moon);
         _kind.ItemSelected += index => CommitKind((BodyKind)_kind.GetItemId((int)index));
@@ -223,7 +224,7 @@ public partial class SystemPanel : CanvasLayer
         var layout = new VBoxContainer();
         var grid = new GridContainer { Columns = 2 };
         grid.AddChild(new Label { Text = "Orbits" });
-        _parent = new OptionButton
+        _parent = new Dropdown
         {
             FocusMode = Control.FocusModeEnum.None,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
@@ -235,7 +236,7 @@ public partial class SystemPanel : CanvasLayer
         var distanceRow = new HBoxContainer();
         _distance = CreateField(0.000001, 1e13, 0.001, "", CommitOrbit);
         _distance.TooltipText = "The orbit's size: average distance, center to center";
-        _distanceUnit = new OptionButton { FocusMode = Control.FocusModeEnum.None };
+        _distanceUnit = new Dropdown { FocusMode = Control.FocusModeEnum.None };
         _distanceUnit.AddItem("km", (int)DistanceUnit.Kilometers);
         _distanceUnit.AddItem("AU", (int)DistanceUnit.AstronomicalUnits);
         _distanceUnit.TooltipText = "AU: the Earth–Sun distance (about 149.6 million km)";

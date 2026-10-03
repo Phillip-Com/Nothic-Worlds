@@ -29,7 +29,7 @@ public partial class DateFields : GridContainer
             UpdateOnTextChanged = true,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
         }.WithArrowKeys();
-        _month = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        _month = new Dropdown { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         _month.ItemSelected += _ => LimitDayToMonth();
         _day = new SpinBox
         {
