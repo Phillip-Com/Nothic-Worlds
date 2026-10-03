@@ -89,6 +89,14 @@ Entries and events placed on a planet or moon can also be pinned to a spot: **Pi
 their editor flies there, and you click the spot (Esc cancels). Pins show on the globe; click
 one to see what's there and open it. The **Pins** toggle in the toolbar hides them.
 
+**Regions…** opens the regions panel (in place of the Journal and Pieces panels). **New Region**
+lets you click corners around an area on the planet; press Enter or click the first corner to
+finish. Name it, pick its color, and write notes; **Edit Points** lets you drag corners, drag the
+small middle handles to add corners, and right-click a corner to delete it. Regions show as a
+colored outline and light fill with their name, and clicking one shows its notes and everything
+placed in it. Journal entries and events can be placed in a region with the **Region** choice in
+their editor. The **Regions** toggle hides them all.
+
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers
 back after a crash.

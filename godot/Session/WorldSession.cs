@@ -385,7 +385,7 @@ public partial class WorldSession : Node
         var removed = new HashSet<Guid>(descendants.Select(d => d.Id)) { bodyId };
         Guid? parent = body.Orbit?.ParentId;
         World.Bodies.RemoveAll(b => removed.Contains(b.Id));
-        ClearPlacesOn(removed);
+        ClearLoreOn(removed);
         if (removed.Contains(SelectedBodyId))
         {
             SelectedBodyId = parent is Guid p && FindBody(p) is not null

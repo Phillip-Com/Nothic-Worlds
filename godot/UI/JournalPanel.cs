@@ -28,6 +28,7 @@ public partial class JournalPanel : CanvasLayer
     private Control _editor = null!;
     private LineEdit _title = null!;
     private OptionButton _place = null!;
+    private RegionChoice _region = null!;
     private Label _pin = null!;
     private Button _pinButton = null!;
     private Button _unpinButton = null!;
@@ -206,6 +207,9 @@ public partial class JournalPanel : CanvasLayer
         _place.ItemSelected += _ => Commit();
         placeRow.AddChild(_place);
         editor.AddChild(placeRow);
+        _region = new RegionChoice();
+        _region.Changed += Commit;
+        editor.AddChild(_region);
         var pinRow = new HBoxContainer();
         _pin = new Label { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         pinRow.AddChild(_pin);
@@ -338,17 +342,22 @@ public partial class JournalPanel : CanvasLayer
             if (Session?.World.Journal.FirstOrDefault(e => e.Id == entryId) is JournalEntry now)
             {
                 Report(Session.UpdateJournalEntry(
-                    now with { Location = new LoreLocation(place.BodyId, spot) }));
+                    now with { Location = SamePlace(now.Location, place) with { Pin = spot } }));
             }
         });
     }
+
+    // The entry's place now if it's still on the same body (keeping its region), else the one
+    // the pin was started for.
+    private static LoreLocation SamePlace(LoreLocation? now, LoreLocation started) =>
+        now?.BodyId == started.BodyId ? now : started;
 
     private void RemovePin()
     {
         if (Session is not null && Selected is { Location: LoreLocation place } entry)
         {
             Report(Session.UpdateJournalEntry(
-                entry with { Location = new LoreLocation(place.BodyId) }));
+                entry with { Location = place with { Pin = null } }));
         }
     }
 
@@ -366,7 +375,8 @@ public partial class JournalPanel : CanvasLayer
             return null;
         }
 
-        return current?.BodyId == body ? current : new LoreLocation(body);
+        LoreLocation place = current?.BodyId == body ? current : new LoreLocation(body);
+        return _region.Apply(Session!.World, place);
     }
 
     private void Refresh()
@@ -470,6 +480,7 @@ public partial class JournalPanel : CanvasLayer
         }
 
         ShowPlaces(entry.Location);
+        _region.ShowFor(Session!.World, entry.Location);
         Body? placeBody = PlaceBody(entry.Location);
         _pin.Text = entry.Location?.Pin is { } pin
             ? $"Pinned at {PlaceText.Describe(pin)}"

@@ -116,7 +116,9 @@ Named areas outlined on planets and moons (`LORE-01`). Owner's decisions:
   enough.
 - **Regions are places:** besides their own notes, journal entries and events can be placed in
   a region; clicking a region pops up its notes and everything placed in it.
-- **Two PRs:** Core (regions on the sphere, format v8) (PR #27), then the app.
+- **Two PRs:** Core (regions on the sphere, format v8) (PR #27), then the app (PR #28).
+- **Deleting a body deletes its regions** in the same undo step, and regions have their **own
+  Regions toggle** (owner's choices, 2026-10-02).
 - Working assumptions (Claude's, stated in the plan): regions belong to a planet or moon,
   overlap freely, and have a name, color, and notes; a Regions panel shares the right side
   with the Journal and Pieces panels.
@@ -973,7 +975,7 @@ the world.
 
 ### 4.9 Lore & Journal (`LORE`)
 
-**LORE-01 — Region outlines** · In Progress (Core done, PR #27) · Base
+**LORE-01 — Region outlines** · Implemented (M8) · Base
 **Intent:** Draw outlines around specific regions or locations on the world, with optional notes.
 **Implementation (Core, PR #27):**
 - `Model/Region.cs`: an immutable record in `World.Regions` (drawing order): the body (a
@@ -993,6 +995,37 @@ the world.
 - Tested: inside/outside, either winding, across the date line, around a pole, the far side,
   great-circle edges, too-large outlines, the rules above, and a golden version 8 file plus
   damaged-file cases.
+
+**Implementation (app, PR #28):**
+- `godot/Rendering/RegionRenderer.cs`: one mesh per globe, a child of its surface (so it
+  turns and tilts with the body), holding every region on it: a fill at 18% opacity, cut by
+  `SphericalPolygon.FillTriangles` (ear clipping on the inside test's projection, then split
+  until edges are 1.5° or less so it hugs the sphere), and the outline along `EdgePath`. Both
+  are unshaded, lifted just above the map. A body's mesh is rebuilt only when its regions
+  change; the region selected in the panel is outlined in white.
+- `godot/Controls/RegionEditor.cs` (last in the scene, so it gets clicks first): **New Region**
+  takes clicks on the selected globe as corners (Enter or the first corner finishes, Backspace
+  removes the last, Esc cancels). **Edit Points** shows a handle on every corner and the middle
+  of every edge: drag a corner to move it, drag a middle handle to add a corner, right-click a
+  corner to delete it (at least three stay). Each drag is one undo step (a session gesture).
+  Clicks off the globe still turn the camera.
+- `godot/UI/RegionsPanel.cs`, opened by **Regions…** (one at a time with Journal and Pieces;
+  `MapToolbar` unpresses the others): the selected body's regions, **New Region**, **Delete**,
+  and the selected region's name, color, notes, corner count, **Edit Points**, and the entries
+  and events placed in it (each opens). Everything applies as it's changed and is undoable.
+- `godot/UI/RegionMarkers.cs`: each region's name at its center on globes at least 60 pixels
+  across; a short click on a region of the selected body pops up its name, notes, what's placed
+  in it, and **Edit Region…** (overlapping regions all show). Ignored while drawing, editing,
+  placing a pin, or with the Pieces panel open; pins take their clicks first.
+- `godot/UI/RegionChoice.cs`: the **Region** dropdown in the journal and event editors
+  ("Anywhere on the body", or one of its regions), shown when the place's body has regions.
+  Placing or removing a pin keeps the region.
+- Session (`WorldSession.Regions.cs`): `AddRegion` (default name and the next of six colors),
+  `UpdateRegion` (typing and color picking merge into one step), `DeleteRegion` (places in it
+  keep their body). Regions are in undo snapshots and the saved-state check (`LoreState`), and
+  deleting a body deletes its regions (owner's choice).
+- The overlays redraw only when they have something to show (caught by the benchmark: the
+  slowest frames had crept up while they redrew empty every frame).
 
 **LORE-02 — Journal system** · Implemented (M7) · Base
 **Intent:** Start with a simple journal. Entries are sortable and can be linked to locations.

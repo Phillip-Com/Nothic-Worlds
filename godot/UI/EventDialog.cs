@@ -20,6 +20,7 @@ public partial class EventDialog : ConfirmationDialog
     private CheckBox _lasts = null!;
     private DateFields _end = null!;
     private OptionButton _place = null!;
+    private RegionChoice _region = null!;
     private Label _pin = null!;
     private Button _pinButton = null!;
     private Button _unpinButton = null!;
@@ -69,10 +70,14 @@ public partial class EventDialog : ConfirmationDialog
         _place.ItemSelected += _ =>
         {
             _location = ChosenPlace(_location);
+            _region.ShowFor(Session.World, _location);
             ShowPin();
         };
         AddLabelled(grid, "Place", _place);
         layout.AddChild(grid);
+        _region = new RegionChoice();
+        _region.Changed += () => _location = _region.Apply(Session.World, _location);
+        layout.AddChild(_region);
         layout.AddChild(BuildPinRow());
 
         layout.AddChild(new Label { Text = "Starts" });
@@ -119,6 +124,7 @@ public partial class EventDialog : ConfirmationDialog
         ShowTimelines(timelineEvent.TimelineId);
         _location = timelineEvent.Location;
         ShowPlaces(timelineEvent.Location);
+        _region.ShowFor(Session.World, _location);
         ShowPin();
         _start.ShowTime(body, timelineEvent.StartDays);
         _lasts.ButtonPressed = timelineEvent.EndDays is not null;
@@ -194,7 +200,7 @@ public partial class EventDialog : ConfirmationDialog
         };
         _unpinButton.Pressed += () =>
         {
-            _location = _location is null ? null : new LoreLocation(_location.BodyId);
+            _location = _location is null ? null : _location with { Pin = null };
             ShowPin();
         };
         row.AddChild(_unpinButton);
@@ -226,7 +232,7 @@ public partial class EventDialog : ConfirmationDialog
         Hide();
         Placer.Start(place.BodyId, spot =>
         {
-            _location = new LoreLocation(place.BodyId, spot);
+            _location = (_location ?? place) with { Pin = spot };
             ShowPin();
             PopupCentered();
         }, cancelled: () => PopupCentered());
