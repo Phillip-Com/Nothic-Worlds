@@ -23,9 +23,10 @@ public partial class RegionRenderer : Node
     private const double StepDegrees = 1.5;
     private const float FillAlpha = 0.18f;
 
-    // What each body's mesh was built from (its regions, in order, and the highlight), so it's
-    // rebuilt only when that changes.
-    private readonly Dictionary<Guid, (List<Region> Regions, Guid? Highlight)> _built = [];
+    // What each body's mesh was built from (its regions, in order, the highlight, and the
+    // globe's shape), so it's rebuilt only when that changes.
+    private readonly Dictionary<Guid, (List<Region> Regions, Guid? Highlight, BodyShape Shape)>
+        _built = [];
 
     private readonly StandardMaterial3D _material = new()
     {
@@ -101,7 +102,8 @@ public partial class RegionRenderer : Node
             Guid? highlight = regions.Any(r => r.Id == _highlighted) ? _highlighted : null;
             var mesh = globe.GetNodeOrNull<MeshInstance3D>(MeshName);
             if (mesh is not null && _built.TryGetValue(body.Id, out var built)
-                && built.Regions.SequenceEqual(regions) && built.Highlight == highlight)
+                && built.Regions.SequenceEqual(regions) && built.Highlight == highlight
+                && built.Shape == globe.Shape)
             {
                 continue;
             }
@@ -113,12 +115,12 @@ public partial class RegionRenderer : Node
                 globe.AddChild(mesh);
             }
 
-            mesh.Mesh = BuildMesh(regions, highlight);
-            _built[body.Id] = (regions, highlight);
+            mesh.Mesh = BuildMesh(regions, highlight, globe.Shape);
+            _built[body.Id] = (regions, highlight, globe.Shape);
         }
     }
 
-    private static ArrayMesh? BuildMesh(List<Region> regions, Guid? highlight)
+    private static ArrayMesh? BuildMesh(List<Region> regions, Guid? highlight, BodyShape shape)
     {
         if (regions.Count == 0)
         {
@@ -136,7 +138,7 @@ public partial class RegionRenderer : Node
             {
                 foreach (Vector3D point in fill)
                 {
-                    fillPoints.Add(ToGodot(point, FillLift));
+                    fillPoints.Add(GlobeShape.SurfacePoint(shape, point, FillLift));
                     fillColors.Add(color with { A = FillAlpha });
                 }
             }
@@ -145,8 +147,10 @@ public partial class RegionRenderer : Node
             List<GeoCoordinate> path = SphericalPolygon.EdgePath(region.Corners, StepDegrees);
             for (int i = 1; i < path.Count; i++)
             {
-                linePoints.Add(ToGodot(SphericalPolygon.ToUnit(path[i - 1]), OutlineLift));
-                linePoints.Add(ToGodot(SphericalPolygon.ToUnit(path[i]), OutlineLift));
+                linePoints.Add(GlobeShape.SurfacePoint(
+                    shape, SphericalPolygon.ToUnit(path[i - 1]), OutlineLift));
+                linePoints.Add(GlobeShape.SurfacePoint(
+                    shape, SphericalPolygon.ToUnit(path[i]), OutlineLift));
                 lineColors.Add(line);
                 lineColors.Add(line);
             }
@@ -172,7 +176,4 @@ public partial class RegionRenderer : Node
         arrays[(int)Mesh.ArrayType.Color] = colors.ToArray();
         mesh.AddSurfaceFromArrays(primitive, arrays);
     }
-
-    private static Vector3 ToGodot(Vector3D unit, float lift) =>
-        new((float)unit.X * lift, (float)unit.Y * lift, (float)unit.Z * lift);
 }

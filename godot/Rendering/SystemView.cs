@@ -222,8 +222,14 @@ public partial class SystemView : Node3D
                 || (visual.Surface is null) != isStar)
             {
                 visual?.Free();
-                _visuals[body.Id] = CreateVisual(body);
+                visual = CreateVisual(body);
+                _visuals[body.Id] = visual;
                 created.Add(body.Id);
+            }
+
+            if (visual.Surface is PlanetSurface surface)
+            {
+                surface.Shape = body.Shape;
             }
         }
 
@@ -264,8 +270,10 @@ public partial class SystemView : Node3D
         }
 
         _flightFrom = Origin;
-        _flightFromRadius = _layout.TryGetValue(_focusId, out DisplayBody from) ? from.Radius : 1;
-        double toRadius = _layout[bodyId].Radius;
+        _flightFromRadius = _layout.TryGetValue(_focusId, out DisplayBody from)
+            ? FramingRadius(_focusId, from)
+            : 1;
+        double toRadius = FramingRadius(bodyId, _layout[bodyId]);
         _flightFromAltitude = Camera?.CurrentAltitude ?? 2.0;
         _flightToAltitude = _flightFromAltitude <= CloseUpAltitude
             ? _flightFromAltitude
@@ -326,11 +334,12 @@ public partial class SystemView : Node3D
 
         double eased = Ease(_flightProgress);
         Origin = _flightFrom + (focus.Position - _flightFrom) * eased;
-        double radius = Math.Exp(Lerp(Math.Log(_flightFromRadius), Math.Log(focus.Radius), eased));
+        double focusRadius = FramingRadius(_focusId, focus);
+        double radius = Math.Exp(Lerp(Math.Log(_flightFromRadius), Math.Log(focusRadius), eased));
         if (_flightProgress >= 1.0)
         {
             Origin = focus.Position;
-            radius = focus.Radius;
+            radius = focusRadius;
         }
 
         bool anyStar = false;
@@ -403,10 +412,27 @@ public partial class SystemView : Node3D
         }
     }
 
+    // How far out the camera frames a body: a flat world reaches π times its globe's radius.
+    private double FramingRadius(Guid bodyId, DisplayBody place) =>
+        Session?.World.Bodies.Find(b => b.Id == bodyId)?.Shape == BodyShape.FlatDisc
+            ? place.Radius * FlatDisc.Radius
+            : place.Radius;
+
+    // A flat world tumbles like a spinning coin (owner's choice: physically flat, VISION.md
+    // BOD-02): its spin axis lies across the disc (toward longitude 90° east, the disc's +X),
+    // and its top face (+Y) starts facing +Z, then turns with the spin.
+    private static readonly Basis _flatDiscTurn = new(Vector3.Up, Vector3.Back, Vector3.Right);
+
     // The body spins about its own axis, and the axis leans by the tilt toward the tilt
     // direction, so the north pole points exactly where Core's BodyOrientation (and so the
-    // season calculations) says.
+    // season calculations) says. A flat world's spin axis lies across its disc instead.
     private static Basis Orientation(Body body, double timeDays)
+    {
+        Basis globe = GlobeOrientation(body, timeDays);
+        return body.Shape == BodyShape.FlatDisc ? globe * _flatDiscTurn : globe;
+    }
+
+    private static Basis GlobeOrientation(Body body, double timeDays)
     {
         var spin = new Basis(
             Vector3.Up, (float)double.DegreesToRadians(BodyClock.SpinDegrees(body, timeDays)));
@@ -425,9 +451,11 @@ public partial class SystemView : Node3D
             return;
         }
 
+        // Flat worlds get their own close-up view in a later step (VISION.md BOD-02).
         bool flying = _flightProgress < 1.0;
-        Camera.AllowLocalView = !flying;
-        if (!flying && world.Bodies.Find(b => b.Id == _focusId) is Body focusBody)
+        Body? focused = world.Bodies.Find(b => b.Id == _focusId);
+        Camera.AllowLocalView = !flying && focused?.Shape != BodyShape.FlatDisc;
+        if (Camera.AllowLocalView && focused is Body focusBody)
         {
             Camera.SurfaceFrame = Orientation(focusBody, world.TimeDays);
             Camera.FollowSurface();

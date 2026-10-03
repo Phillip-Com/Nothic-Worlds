@@ -438,6 +438,25 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
+    /// Makes a planet or moon a globe or a flat world (VISION.md BOD-02). Its maps, terrain,
+    /// regions, and pins stay where they are on the map; only the body's shape changes.
+    /// </summary>
+    public void SetBodyShape(Guid bodyId, BodyShape shape)
+    {
+        if (FindBody(bodyId) is not Body body || body.Shape == shape || !body.HasSurface)
+        {
+            return;
+        }
+
+        RecordUndo(shape == BodyShape.FlatDisc
+            ? $"Make {body.Name} a Flat World"
+            : $"Make {body.Name} a Globe");
+        body.Shape = shape;
+        SyncView();
+        MarkChanged();
+    }
+
+    /// <summary>
     /// Switches a body between planet and moon (stars and comets stay as they are).
     /// </summary>
     public void SetBodyKind(Guid bodyId, BodyKind kind)

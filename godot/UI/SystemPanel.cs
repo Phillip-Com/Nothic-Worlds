@@ -1,4 +1,5 @@
 using Godot;
+using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 using NothicWorlds.Interop;
@@ -36,6 +37,8 @@ public partial class SystemPanel : CanvasLayer
     private LineEdit _name = null!;
     private OptionButton _kind = null!;
     private Label _kindLabel = null!;
+    private OptionButton _shape = null!;
+    private Label _shapeLabel = null!;
     private SpinBox _radius = null!;
     private SpinBox _dayLength = null!;
     private SpinBox _axialTilt = null!;
@@ -202,6 +205,13 @@ public partial class SystemPanel : CanvasLayer
         kindRow.AddChild(_kind);
         kindRow.AddChild(_kindLabel);
         grid.AddChild(kindRow);
+        _shapeLabel = new Label { Text = "Shape" };
+        grid.AddChild(_shapeLabel);
+        _shape = new Dropdown { FocusMode = Control.FocusModeEnum.None };
+        _shape.AddItem("Globe", (int)BodyShape.Sphere);
+        _shape.AddItem("Flat world", (int)BodyShape.FlatDisc);
+        _shape.ItemSelected += index => CommitShape((BodyShape)_shape.GetItemId((int)index));
+        grid.AddChild(_shape);
         _radius = AddField(grid, "Radius", 1, Body.MaxRadiusKm, 1, "km", CommitPhysical);
         _dayLength = AddField(grid, "Day length", 0.01, Body.MaxDayLengthHours, 0.1, "h",
             CommitPhysical);
@@ -405,6 +415,7 @@ public partial class SystemPanel : CanvasLayer
         _kind.Visible = body.HasSurface;
         _kindLabel.Visible = !body.HasSurface;
         _kindLabel.Text = isStar ? "Star" : "Comet";
+        ShowShape(body);
         if (body.HasSurface)
         {
             _kind.Select(_kind.GetItemIndex((int)body.Kind));
@@ -500,6 +511,32 @@ public partial class SystemPanel : CanvasLayer
         {
             Session.RenameBody(Session.SelectedBodyId, _name.Text);
             _name.Text = Session.SelectedBody.Name;
+        }
+    }
+
+    // Only planets and moons can be flat. A flat world's radius is still its matching globe's;
+    // the tooltip gives the disc's own size.
+    private void ShowShape(Body body)
+    {
+        _shape.Visible = body.HasSurface;
+        _shapeLabel.Visible = body.HasSurface;
+        _shape.Select(_shape.GetItemIndex((int)body.Shape));
+        double discKm = body.RadiusKm * FlatDisc.Radius;
+        _shape.TooltipText = body.Shape == BodyShape.FlatDisc
+            ? $"A flat world: the whole map on top, the north pole at the center and the far " +
+                $"south around the rim. The disc is {discKm:N0} km from center to rim (Radius " +
+                "is the matching globe's)."
+            : "A globe, or a flat world with the whole map on a disc";
+        _radius.TooltipText = body.Shape == BodyShape.FlatDisc
+            ? $"The matching globe's radius; the disc reaches {discKm:N0} km from its center"
+            : "The body's radius (Earth: 6,371 km)";
+    }
+
+    private void CommitShape(BodyShape shape)
+    {
+        if (!_syncing)
+        {
+            Session?.SetBodyShape(Session.SelectedBodyId, shape);
         }
     }
 
