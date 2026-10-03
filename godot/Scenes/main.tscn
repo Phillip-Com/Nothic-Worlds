@@ -27,6 +27,7 @@
 [ext_resource type="Script" path="res://UI/RegionMarkers.cs" id="25_region_markers"]
 [ext_resource type="Script" path="res://UI/RegionsPanel.cs" id="26_regions_panel"]
 [ext_resource type="Script" path="res://Controls/RegionEditor.cs" id="27_region_editor"]
+[ext_resource type="Script" path="res://UI/WeatherMarkers.cs" id="28_weather"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -78,7 +79,7 @@ script = ExtResource("4_overlay")
 script = ExtResource("5_indicator")
 Camera = NodePath("../PlanetCamera")
 
-[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Calibration", "Pieces", "SystemPanel", "Journal", "Timeline", "Pins", "RegionsPanel", "Regions")]
+[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Calibration", "Pieces", "SystemPanel", "Journal", "Timeline", "Pins", "RegionsPanel", "Regions", "Weather")]
 script = ExtResource("7_toolbar")
 Session = NodePath("../WorldSession")
 Calibration = NodePath("../CalibrationWorkspace")
@@ -88,6 +89,7 @@ Timeline = NodePath("../TimelineStrip")
 Pins = NodePath("../PinMarkers")
 RegionsPanel = NodePath("../RegionsPanel")
 Regions = NodePath("../RegionRenderer")
+Weather = NodePath("../WeatherMarkers")
 SystemPanel = NodePath("../SystemPanel")
 
 [node name="FileMenu" type="Node" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
@@ -197,6 +199,14 @@ Camera = NodePath("../PlanetCamera")
 Toolbar = NodePath("../MapToolbar")
 Journal = NodePath("../JournalPanel")
 Timeline = NodePath("../TimelineStrip")
+
+[node name="WeatherMarkers" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar", "Placer")]
+script = ExtResource("28_weather")
+Session = NodePath("../WorldSession")
+System = NodePath("../SystemView")
+Camera = NodePath("../PlanetCamera")
+Toolbar = NodePath("../MapToolbar")
+Placer = NodePath("../PinPlacer")
 
 [node name="SystemPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "System", "Time")]
 script = ExtResource("18_system_panel")

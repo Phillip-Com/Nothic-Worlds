@@ -8,11 +8,12 @@ A record of key project decisions made by the owner. Newest first.
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
 | 2026-10-02 | Eclipses are worked out **in the background**, only when the panel or markers ask | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | ~7 ms each on the baseline laptop; keeps edits smooth. VISION.md `EVT-01` |
-| 2026-10-02 | Milestone 9: **weather pin** (`WTH-01`) | In PR | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) | VISION.md §3 |
-| 2026-10-02 | Weather shows **sun and temperature** (no rain or climate types yet); temperatures spread a **user-set average per body** | In PR | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) | The temperature model is Claude's, tuned Earth-like. VISION.md `WTH-01` |
-| 2026-10-02 | Weather pins are **named and saved**, added with a **toolbar button**, shown as a **year chart + today** | In PR | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) | Built in the next PR |
-| 2026-10-02 | Milestone 9 in **two PRs**: Core, then the app | In PR | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) | |
-| 2026-10-02 | World file **format version 9**: average temperatures and weather pins | In PR | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) | docs/world-format.md |
+| 2026-10-02 | Weather pins are **hidden with the Pins toggle** (no separate toggle) and **go with their body** when it's deleted | In PR | [#30](https://github.com/Phillip-Com/Nothic-Worlds/pull/30) | Claude's choices, matching pins and regions. VISION.md `WTH-01` |
+| 2026-10-02 | Milestone 9: **weather pin** (`WTH-01`) | Merged | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) · `3fac945` | VISION.md §3 |
+| 2026-10-02 | Weather shows **sun and temperature** (no rain or climate types yet); temperatures spread a **user-set average per body** | Merged | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) · `3fac945` | The temperature model is Claude's, tuned Earth-like. VISION.md `WTH-01` |
+| 2026-10-02 | Weather pins are **named and saved**, added with a **toolbar button**, shown as a **year chart + today** | Merged | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) · `3fac945` | Built in the next PR |
+| 2026-10-02 | Milestone 9 in **two PRs**: Core, then the app | Merged | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) · `3fac945` | |
+| 2026-10-02 | World file **format version 9**: average temperatures and weather pins | Merged | [#29](https://github.com/Phillip-Com/Nothic-Worlds/pull/29) · `3fac945` | docs/world-format.md |
 | 2026-10-02 | Deleting a body **deletes its regions** (same undo step) | Merged | [#28](https://github.com/Phillip-Com/Nothic-Worlds/pull/28) · `acdc698` | Like its map and pieces. VISION.md `LORE-01` |
 | 2026-10-02 | Regions have **their own Regions toggle** | Merged | [#28](https://github.com/Phillip-Com/Nothic-Worlds/pull/28) · `acdc698` | Next to Pins |
 | 2026-10-02 | Milestone 8: **region outlines** (`LORE-01`) | Merged | [#27](https://github.com/Phillip-Com/Nothic-Worlds/pull/27) · `26b2ea4` | VISION.md §3 |

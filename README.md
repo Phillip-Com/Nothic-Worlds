@@ -97,6 +97,12 @@ colored outline and light fill with their name, and clicking one shows its notes
 placed in it. Journal entries and events can be placed in a region with the **Region** choice in
 their editor. The **Regions** toggle hides them all.
 
+**Weather Pin** adds a weather pin: click the spot on the planet, then name it. Weather pins
+show as small suns; click one to see that spot's weather: today's temperature, daylight, noon sun,
+and season, and a chart of the whole year (temperatures and daylight by month, with today
+marked) that follows the clock. Temperatures are estimates from the sunlight, around the
+planet's **Avg. temperature**, set in the System panel (Earth: about 15 °C).
+
 Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). The app warns
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers
 back after a crash.

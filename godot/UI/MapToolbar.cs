@@ -67,6 +67,11 @@ public partial class MapToolbar : CanvasLayer
     /// <summary>The pins on the globes, shown and hidden by the Pins toggle.</summary>
     [Export] public PinMarkers? Pins { get; set; }
 
+    /// <summary>
+    /// The weather pins: the Weather Pin button adds one, and the Pins toggle hides them too.
+    /// </summary>
+    [Export] public WeatherMarkers? Weather { get; set; }
+
     /// <summary>The Regions panel, shown and hidden by the Regions… button.</summary>
     [Export] public RegionsPanel? RegionsPanel { get; set; }
 
@@ -178,6 +183,11 @@ public partial class MapToolbar : CanvasLayer
         };
         controls.AddChild(timelineButton);
 
+        Button weatherButton = CreateButton("Weather Pin",
+            "Add a weather pin: click the spot on the planet, then name it");
+        weatherButton.Pressed += () => Weather?.StartAdding();
+        controls.AddChild(weatherButton);
+
         var pinsToggle = new CheckButton
         {
             Text = "Pins",
@@ -190,6 +200,11 @@ public partial class MapToolbar : CanvasLayer
             if (Pins is not null)
             {
                 Pins.ShowPins = on;
+            }
+
+            if (Weather is not null)
+            {
+                Weather.ShowPins = on;
             }
         };
         controls.AddChild(pinsToggle);

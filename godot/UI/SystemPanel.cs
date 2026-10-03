@@ -36,6 +36,7 @@ public partial class SystemPanel : CanvasLayer
     private SpinBox _dayLength = null!;
     private SpinBox _axialTilt = null!;
     private SpinBox _axisDirection = null!;
+    private SpinBox _temperature = null!;
     private Control _orbitFields = null!;
     private Label _noOrbit = null!;
     private OptionButton _parent = null!;
@@ -196,6 +197,10 @@ public partial class SystemPanel : CanvasLayer
         _axialTilt.TooltipText = "How far the spin axis leans (Earth: 23.4°)";
         _axisDirection.TooltipText = "Which way the north pole leans, measured like the " +
             "orbit angles. It sets when in the year the solstices fall";
+        _temperature = AddField(grid, "Avg. temperature", Body.MinAverageTemperatureC,
+            Body.MaxAverageTemperatureC, 0.5, "°C", CommitTemperature);
+        _temperature.TooltipText = "The body's average surface temperature over a year " +
+            "(Earth: about 15 °C). Weather pins spread it by latitude and season";
         layout.AddChild(grid);
 
         layout.AddChild(new Label { Text = "Orbit" });
@@ -390,6 +395,11 @@ public partial class SystemPanel : CanvasLayer
         _dayLength.ShowValue(body.DayLengthHours);
         _axialTilt.ShowValue(body.AxialTiltDegrees);
         _axisDirection.ShowValue(body.AxialTiltDirectionDegrees);
+        _temperature.ShowValue(body.AverageTemperatureC);
+
+        // Stars have no surface weather.
+        _temperature.Visible = !isStar;
+        _temperature.GetParent().GetChild<Control>(_temperature.GetIndex() - 1).Visible = !isStar;
 
         _orbitFields.Visible = body.Orbit is not null;
         _noOrbit.Visible = body.Orbit is null;
@@ -468,6 +478,15 @@ public partial class SystemPanel : CanvasLayer
         string? problem = Session.SetBodyPhysical(Session.SelectedBodyId,
             _radius.Value, _dayLength.Value, _axialTilt.Value, _axisDirection.Value);
         ReportProblem(problem);
+    }
+
+    private void CommitTemperature()
+    {
+        if (!_syncing && Session is not null)
+        {
+            ReportProblem(
+                Session.SetAverageTemperature(Session.SelectedBodyId, _temperature.Value));
+        }
     }
 
     private void CommitOrbit()

@@ -118,7 +118,8 @@ The weather at named spots on a planet or moon (`WTH-01`). Owner's decisions:
   the body's calendar) with a marker at today, plus today's numbers.
 - **Weather pins are named and saved** with the world, with their own icon on the globe; added
   with a **Weather Pin** toolbar button, then a click on the spot.
-- **Two PRs:** Core (the model, average temperature, pins, format v9) (PR #29), then the app.
+- **Two PRs:** Core (the model, average temperature, pins, format v9) (PR #29), then the app
+  (PR #30).
 
 **Milestone 8: Region Outlines** · Complete (PR #28 merged 2026-10-02; owner's choice, 2026-10-02)
 Named areas outlined on planets and moons (`LORE-01`). Owner's decisions:
@@ -975,7 +976,7 @@ system's parameters (e.g. orbital periods, rotation speed) so the user's calenda
 
 ### 4.8 Weather & Climate (`WTH`)
 
-**WTH-01 — Weather pin** · In Progress (Core done, PR #29) · Base
+**WTH-01 — Weather pin** · Implemented (M9) · Base
 **Intent:** Drop a pin on a region to see what its weather would be, based on climate zone,
 season, etc. This is the lightweight version that works on any system.
 **Implementation (Core, PR #29):**
@@ -1000,6 +1001,28 @@ season, etc. This is the lightweight version that works on any system.
   the average shifting everything, an elongated orbit's brighter closest approach, longer days
   swinging more, the year repeating, no weather without a star, determinism, and a golden
   version 9 file plus damaged-file cases.
+
+**Implementation (app, PR #30):**
+- **Weather Pin** in the toolbar (`godot/UI/WeatherMarkers.cs`): reuses `PinPlacer` for the
+  click on the selected planet or moon, then asks for a name ("Weather pin N" to start), adds
+  the pin, and opens its weather.
+- Pins show as small suns with their names (`WeatherMarkers`, after the journal pins in the
+  scene so a click on one is taken first), on globes at least 24 pixels across; the **Pins**
+  toggle hides them along with the journal pins. Clicking one opens its weather.
+- `godot/UI/WeatherWindow.cs` (doesn't block the app, so the clock can run): the pin's name
+  (editable), place, today's temperature (low/high), daylight, noon sun height, and season for
+  the pin's hemisphere; the year chart; a note that the temperatures are estimates around the
+  body's average; **Delete Pin**. The year shown is the calendar year containing today, month
+  by month (or the body's own year in twelfths, without a calendar); its weather is worked out
+  again only when that year or the world changes.
+- `godot/UI/WeatherChart.cs`: per month, a bar from the average low to the average high
+  (colored cold blue to hot red) with the mean as a dot; daylight as a line on its own scale
+  (6-hour steps); a dashed line at today.
+- **Avg. temperature** (°C) in the System panel for planets and moons
+  (`WorldSession.SetAverageTemperature`, one undo step while holding the arrow).
+- Session (`WorldSession.Weather.cs`): `AddWeatherPin`, `RenameWeatherPin`,
+  `DeleteWeatherPin`; weather pins are in undo snapshots and the saved-state check, and go
+  with their body when it's deleted.
 
 **WTH-02 — Live weather simulation** · Idea · Advanced
 **Intent:** As detailed as possible. Ideally the user can watch clouds and weather move across

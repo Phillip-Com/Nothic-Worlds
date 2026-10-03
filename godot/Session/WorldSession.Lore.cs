@@ -252,12 +252,13 @@ public partial class WorldSession
         MarkChanged(systemChanged: false);
     }
 
-    // Owner's choices: when bodies are deleted, their regions go too, and entries and events
-    // placed on them stay, with their place cleared. Part of the deletion's undo step, so
-    // Ctrl+Z brings it all back.
+    // Owner's choices: when bodies are deleted, their regions and weather pins go too (like
+    // their map), and entries and events placed on them stay, with their place cleared. Part
+    // of the deletion's undo step, so Ctrl+Z brings it all back.
     private void ClearLoreOn(HashSet<Guid> removedBodies)
     {
         World.Regions.RemoveAll(r => removedBodies.Contains(r.BodyId));
+        World.WeatherPins.RemoveAll(p => removedBodies.Contains(p.BodyId));
 
         bool IsOnRemoved(LoreLocation? place) =>
             place is not null && removedBodies.Contains(place.BodyId);
