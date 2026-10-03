@@ -41,7 +41,7 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 | Fly to another body (sun, planet, moon) | Click it, its dot, or its name | — |
 
 The app opens maximized. Along the top are the **File**, **Edit**, **View**, and **Add** menus,
-then a button for each panel: **System** (left), **Pieces**, **Journal**, and **Regions** (right,
+then a button for each panel: **System** (left), **Map**, **Journal**, and **Regions** (right,
 one at a time), and **Timeline** (bottom). **View** shows or hides pins, weather pins, regions,
 the season and eclipse markers, and the grid, and switches between a readable view and **True
 Scale**. **Add** adds anything, opening the panel it belongs to.
@@ -81,7 +81,7 @@ time bar's **Go to…** dialog always offers a jump to the next solar and the ne
 eclipse. Each moon's previous and next eclipse are also marked on its orbit (when they're within
 one orbit of now): gold-ringed dark disks for solar eclipses, dark red disks for lunar ones.
 
-**Journal** opens the journal on the right (in place of the Pieces panel). Search and sort your
+**Journal** opens the journal on the right (in place of the Map panel). Search and sort your
 entries, add one with **New Entry**, and write: each entry has a title, an optional place (a
 planet, moon, or star), and text. Changes go into the world as you type, and Ctrl+Z undoes them.
 Deleting a body keeps the entries about it, just without their place.
@@ -97,7 +97,7 @@ Entries and events placed on a planet or moon can also be pinned to a spot: **Pi
 their editor flies there, and you click the spot (Esc cancels). Pins show on the globe; click
 one to see what's there and open it. **View ▸ Pins** hides them.
 
-**Regions** opens the regions panel (in place of the Journal and Pieces panels). **New Region**
+**Regions** opens the regions panel (in place of the Journal and Map panels). **New Region**
 lets you click corners around an area on the planet; press Enter or click the first corner to
 finish. Name it, pick its color, and write notes; **Edit Points** lets you drag corners, drag the
 small middle handles to add corners, and right-click a corner to delete it. Regions show as a
@@ -115,8 +115,8 @@ Worlds are saved as `.nworld` files (in `Documents\Nothic Worlds\` by default). 
 before closing with unsaved changes, and keeps a recovery copy every 5 minutes that it offers
 back after a crash.
 
-Use **Import Map…** (top-left) to wrap a map image onto the planet. Set **Map type** to match the
-layout the map was drawn in:
+Everything for the planet's map is in the **Map** panel (right). Use **Import Map…** to wrap a
+map image onto the planet. Set **Map type** to match the layout the map was drawn in:
 
 | Map type | For |
 |----------|-----|
@@ -134,13 +134,13 @@ latitude/longitude line to where it really is on your map while watching the glo
 **Done** (Enter) or **Cancel** (Esc). Right-click a line to remove it. Calibration is saved with
 the world.
 
-To place parts of a map by hand, open **Pieces**. **Cut from Map…** or **Cut from Image…** opens
-the Cut editor: drag a box (**Rectangle**), or click points around a region and click the first
-point again (**Freeform**). Scroll to zoom and right-drag to pan. **Add Piece** puts it on the
-globe: a cut from the main map starts exactly where it already shows, and one from another image
-starts in the middle of the view.
+To place parts of a map by hand, use **Map Pieces**, the lower half of the Map panel. **Cut from
+Map…** or **Cut from Image…** opens the Cut editor: drag a box (**Rectangle**), or click points
+around a region and click the first point again (**Freeform**). Scroll to zoom and right-drag to
+pan. **Add Piece** puts it on the globe: a cut from the main map starts exactly where it already
+shows, and one from another image starts in the middle of the view.
 
-While the Pieces panel is open, click a piece on the globe to select it, then:
+While the Map panel is open, click a piece on the globe to select it, then:
 
 | Action | How |
 |--------|-----|

@@ -8,6 +8,7 @@ A record of key project decisions made by the owner. Newest first.
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
 | 2026-10-02 | Eclipses are worked out **in the background**, only when the panel or markers ask | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | ~7 ms each on the baseline laptop; keeps edits smooth. VISION.md `EVT-01` |
+| 2026-10-03 | The **Map panel** scrolls and runs from the top bar to the time bar, like the Journal and Regions panels; stars show a "no map" note | In PR | [#32](https://github.com/Phillip-Com/Nothic-Worlds/pull/32) | Claude's choices, so it works in small windows. VISION.md `UI-01` |
 | 2026-10-02 | Milestone 10: **layout tidy-up** (`UI-01`) | Merged | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) · `3335993` | VISION.md §3 |
 | 2026-10-02 | Top of the screen: **menus (File, Edit, View, Add) plus one row of panel buttons** | Merged | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) · `3335993` | The Add menu is Claude's addition. VISION.md `UI-01` |
 | 2026-10-02 | Show/hide switches move to a **View menu**, including **True Scale** (from the time bar); weather pins get their own item | Merged | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) · `3335993` | Supersedes "weather pins hidden with the Pins toggle" |
