@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 15: Small Fixes** · In Progress (owner's choice, 2026-10-03)
+**Milestone 15: Small Fixes** · Complete (PR #41 merged 2026-10-03; owner's choice, 2026-10-03)
 One tidy-up PR for issues found along the way (PR #41): dropdowns that could pick an item by
 accident in short windows, and markers showing through the side panels (see `UI-01`).
 
