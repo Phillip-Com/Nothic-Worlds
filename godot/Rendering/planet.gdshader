@@ -71,6 +71,17 @@ uniform vec4 piece_warp_rects[32];
 const int WARP_SIZE = 64;
 const int WARP_TILES_ACROSS = 8;
 
+// Painted terrain (VISION.md BOD-05): one terrain code per cell of a cube-sphere grid, the six
+// faces as layers. The math must match NothicWorlds.Core.Geometry.CubeSphere (which has the
+// tests). The palette holds each code's color, with alpha 0 for unpainted and unknown codes.
+uniform bool has_terrain = false;
+uniform bool show_terrain = true;
+uniform sampler2DArray terrain_cells : filter_nearest, repeat_disable;
+uniform sampler2D terrain_palette : filter_nearest, repeat_disable;
+// How strongly terrain covers a map (and its pieces), so the map shows through for tracing.
+// Without a map, terrain is the surface itself.
+uniform float terrain_over_map = 0.6;
+const int TERRAIN_FACE_SIZE = 1024;
 uniform vec3 base_color : source_color = vec3(0.13, 0.27, 0.45);
 uniform vec3 grid_color : source_color = vec3(0.75, 0.8, 0.9);
 uniform vec3 highlight_color : source_color = vec3(1.0, 0.8, 0.35);
@@ -351,6 +362,36 @@ vec3 draw_pieces(vec3 color, vec3 direction, float pixel_angle) {
 	return color;
 }
 
+// The terrain cell a direction points into: (column, row, face). See CubeSphere.CellAt, whose
+// face axes are written out here as plain components (indexing arrays per pixel is slow on
+// some graphics cards). `on_face` is the point on the cube face: (along "right", along "up").
+ivec3 terrain_cell(vec3 d) {
+	vec3 size = abs(d);
+	int face;
+	vec2 on_face;
+	if (size.x >= size.y && size.x >= size.z) {
+		face = d.x >= 0.0 ? 0 : 1;
+		on_face = vec2(-d.z, d.y) / d.x * vec2(1.0, sign(d.x));
+	} else if (size.y >= size.z) {
+		face = d.y >= 0.0 ? 2 : 3;
+		on_face = vec2(d.x, -d.z) / d.y * vec2(sign(d.y), 1.0);
+	} else {
+		face = d.z >= 0.0 ? 4 : 5;
+		on_face = vec2(d.x, d.y) / d.z * vec2(1.0, sign(d.z));
+	}
+
+	vec2 spread = atan(on_face) * (4.0 / PI);  // Equal-angle spacing, -1 to 1
+	vec2 position = vec2(spread.x, -spread.y);  // Rows run down from the top
+	ivec2 cell = ivec2(floor((position + 1.0) * 0.5 * float(TERRAIN_FACE_SIZE)));
+	return ivec3(clamp(cell, ivec2(0), ivec2(TERRAIN_FACE_SIZE - 1)), face);
+}
+
+// The painted terrain's color here (alpha 0 where nothing is painted).
+vec4 terrain_color(vec3 direction) {
+	float code = texelFetch(terrain_cells, terrain_cell(direction), 0).r;
+	return texelFetch(terrain_palette, ivec2(int(round(code * 255.0)), 0), 0);
+}
+
 void fragment() {
 	vec3 direction = normalize(local_direction);
 	float latitude = degrees(asin(clamp(direction.y, -1.0, 1.0)));
@@ -358,6 +399,11 @@ void fragment() {
 
 	vec3 color = has_map ? sample_map(radians(latitude), radians(longitude)) : base_color;
 	color = draw_pieces(color, direction, length(fwidth(direction)));
+	if (has_terrain && show_terrain) {
+		vec4 terrain = terrain_color(direction);
+		float strength = has_map || piece_count > 0 ? terrain_over_map : 1.0;
+		color = mix(color, terrain.rgb, terrain.a * strength);
+	}
 
 	if (show_grid) {
 		float grid = max(

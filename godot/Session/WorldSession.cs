@@ -1325,6 +1325,7 @@ public partial class WorldSession : Node
         {
             ShowSurfaceSettings(body);
             ShowPieces(body);
+            ShowTerrain(body);
         }
 
         _ = ShowMapsAsync();
@@ -1346,6 +1347,7 @@ public partial class WorldSession : Node
             {
                 ShowSurfaceSettings(body);
                 ShowPieces(body);
+                ShowTerrain(body);
             }
         }
 
@@ -1506,6 +1508,7 @@ public partial class WorldSession : Node
         {
             ShowSurfaceSettings(body);
             ShowPieces(body);
+            ShowTerrain(body);
         }
 
         if (selectionChanged)

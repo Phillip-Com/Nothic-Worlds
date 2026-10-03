@@ -56,6 +56,9 @@ public partial class RegionMarkers : CanvasLayer
     /// <summary>While the Map panel is open, clicks on the globe are for map pieces.</summary>
     [Export] public MapPanel? Map { get; set; }
 
+    /// <summary>While its panel is open, clicks on the globe paint terrain.</summary>
+    [Export] public TerrainPanel? Terrain { get; set; }
+
     /// <summary>The Regions panel, for "Edit Region".</summary>
     [Export] public RegionsPanel? Panel { get; set; }
 
@@ -134,7 +137,8 @@ public partial class RegionMarkers : CanvasLayer
     private bool IsSomethingElseActive()
     {
         return (Editor?.IsDrawing ?? false) || Editor?.EditingRegionId is not null
-            || (Placer?.IsPlacing ?? false) || (Map?.IsPanelOpen ?? false);
+            || (Placer?.IsPlacing ?? false) || (Map?.IsPanelOpen ?? false)
+            || (Terrain?.IsPanelOpen ?? false);
     }
 
     // The selected body's regions under a screen position, topmost (latest drawn) first.

@@ -1,4 +1,5 @@
 using Godot;
+using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Maps;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Interop;
@@ -8,8 +9,9 @@ namespace NothicWorlds.Rendering;
 /// <summary>
 /// Controls what's drawn on one planet's or moon's surface through <c>planet.gdshader</c>: an
 /// imported map (VISION.md MAP-01), how it wraps onto the globe (MAP-03, MAP-04), map pieces
-/// (MAP-02), and the latitude/longitude grid. The grid shows by default and hides when a map is
-/// applied; G toggles it (handled by <see cref="SystemView"/> for every globe at once).
+/// (MAP-02), painted terrain (BOD-05), and the latitude/longitude grid. The grid shows by default
+/// and hides when a map is applied; G toggles it (handled by <see cref="SystemView"/> for every
+/// globe at once).
 /// </summary>
 public partial class PlanetSurface : MeshInstance3D
 {
@@ -32,6 +34,13 @@ public partial class PlanetSurface : MeshInstance3D
     private readonly WarpLookup?[] _warpTiles = new WarpLookup?[SurfaceSettings.MaxPieces];
     private ImageTexture? _warpTexture;
 
+    // Painted terrain: the six faces as layers of one texture (only while something is
+    // painted, about 6 MB), the grid they show, and the colors of the terrain codes.
+    private Texture2DArray? _terrainTexture;
+    private TerrainGrid _shownTerrain = TerrainGrid.Empty;
+    private ImageTexture? _terrainPalette;
+    private byte[] _paletteBytes = [];
+
     /// <summary>True if a map image is currently applied.</summary>
     public bool HasMap { get; private set; }
 
@@ -43,6 +52,15 @@ public partial class PlanetSurface : MeshInstance3D
     {
         get => (bool)GetParameter("show_grid");
         set => SurfaceMaterial.SetShaderParameter("show_grid", value);
+    }
+
+    /// <summary>
+    /// Whether painted terrain is drawn (View ▸ Terrain). Painting still works while hidden.
+    /// </summary>
+    public bool ShowTerrain
+    {
+        get => (bool)GetParameter("show_terrain");
+        set => SurfaceMaterial.SetShaderParameter("show_terrain", value);
     }
 
     /// <summary>
@@ -163,6 +181,78 @@ public partial class PlanetSurface : MeshInstance3D
         SurfaceMaterial.SetShaderParameter("piece_count", count);
     }
 
+    /// <summary>
+    /// Shows the body's painted terrain (VISION.md BOD-05). Only the faces that changed since the
+    /// last call are sent to the graphics card, so it's cheap to call on every brush movement.
+    /// </summary>
+    public void SetTerrain(TerrainGrid terrain)
+    {
+        if (ReferenceEquals(terrain, _shownTerrain))
+        {
+            return;
+        }
+
+        if (terrain.IsEmpty)
+        {
+            // Nothing painted: free the texture's memory.
+            SurfaceMaterial.SetShaderParameter("has_terrain", false);
+            SurfaceMaterial.SetShaderParameter("terrain_cells", default);
+            _terrainTexture = null;
+        }
+        else if (_terrainTexture is null)
+        {
+            var faces = new Godot.Collections.Array<Image>();
+            for (int face = 0; face < CubeSphere.FaceCount; face++)
+            {
+                faces.Add(FaceImage(terrain, face));
+            }
+
+            _terrainTexture = new Texture2DArray();
+            _terrainTexture.CreateFromImages(faces);
+            SurfaceMaterial.SetShaderParameter("terrain_cells", _terrainTexture);
+            SurfaceMaterial.SetShaderParameter("has_terrain", true);
+        }
+        else
+        {
+            foreach (int face in terrain.FacesChangedFrom(_shownTerrain))
+            {
+                _terrainTexture.UpdateLayer(FaceImage(terrain, face), face);
+            }
+        }
+
+        _shownTerrain = terrain;
+    }
+
+    /// <summary>Sets the color each terrain code is drawn in (others stay unpainted).</summary>
+    public void SetTerrainColors(IEnumerable<TerrainType> types)
+    {
+        // One RGBA pixel per code; alpha 0 (the default) draws as unpainted.
+        var bytes = new byte[(byte.MaxValue + 1) * 4];
+        foreach (TerrainType type in types)
+        {
+            int at = type.Code * 4;
+            (bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]) =
+                (type.Color.R, type.Color.G, type.Color.B, 255);
+        }
+
+        if (bytes.AsSpan().SequenceEqual(_paletteBytes))
+        {
+            return;
+        }
+
+        _paletteBytes = bytes;
+        Image image = Image.CreateFromData(byte.MaxValue + 1, 1, false, Image.Format.Rgba8, bytes);
+        if (_terrainPalette is null)
+        {
+            _terrainPalette = ImageTexture.CreateFromImage(image);
+            SurfaceMaterial.SetShaderParameter("terrain_palette", _terrainPalette);
+        }
+        else
+        {
+            _terrainPalette.Update(image);
+        }
+    }
+
     /// <summary>Wraps a map texture onto the planet and hides the grid.</summary>
     public void SetMap(Texture2D texture)
     {
@@ -184,6 +274,15 @@ public partial class PlanetSurface : MeshInstance3D
         MapTexture = null;
         HasMap = false;
         ShowGrid = true;
+    }
+
+    // One face of a terrain grid as a one-byte-per-cell image.
+    private static Image FaceImage(TerrainGrid terrain, int face)
+    {
+        var cells = new byte[TerrainGrid.CellsPerFace];
+        terrain.CopyFace(face, cells);
+        return Image.CreateFromData(
+            TerrainGrid.FaceSize, TerrainGrid.FaceSize, false, Image.Format.R8, cells);
     }
 
     // Copies a lookup into its tile of the atlas, unless that tile already holds it.

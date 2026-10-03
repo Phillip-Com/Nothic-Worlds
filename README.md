@@ -36,15 +36,15 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 | Performance overlay | — | F3 |
 | New world / Open / Save / Save As | **File** menu | Ctrl+N / Ctrl+O / Ctrl+S / Ctrl+Shift+S |
 | Undo / Redo | **Edit** menu | Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) |
-| Show or hide pins, regions, markers, the grid; true scale | **View** menu | — |
+| Show or hide pins, regions, terrain, markers, the grid; true scale | **View** menu | — |
 | Add a planet, moon, star, region, weather pin, journal entry, or event | **Add** menu | — |
 | Fly to another body (sun, planet, moon) | Click it, its dot, or its name | — |
 
 The app opens maximized. Along the top are the **File**, **Edit**, **View**, and **Add** menus,
-then a button for each panel: **System** (left), **Map**, **Journal**, and **Regions** (right,
-one at a time), and **Timeline** (bottom). **View** shows or hides pins, weather pins, regions,
-the season and eclipse markers, and the grid, and switches between a readable view and **True
-Scale**. **Add** adds anything, opening the panel it belongs to.
+then a button for each panel: **System** (left), **Map**, **Terrain**, **Journal**, and
+**Regions** (right, one at a time), and **Timeline** (bottom). **View** shows or hides pins,
+weather pins, regions, terrain, the season and eclipse markers, and the grid, and switches between
+a readable view and **True Scale**. **Add** adds anything, opening the panel it belongs to.
 
 A new world is a small star system: a sun with one planet orbiting it. Zoom out to see the whole
 system, and click any body to fly to it. The map tools work on the selected body; stars have no
@@ -97,13 +97,22 @@ Entries and events placed on a planet or moon can also be pinned to a spot: **Pi
 their editor flies there, and you click the spot (Esc cancels). Pins show on the globe; click
 one to see what's there and open it. **View ▸ Pins** hides them.
 
-**Regions** opens the regions panel (in place of the Journal and Map panels). **New Region**
+**Regions** opens the regions panel (in place of the other panels on the right). **New Region**
 lets you click corners around an area on the planet; press Enter or click the first corner to
 finish. Name it, pick its color, and write notes; **Edit Points** lets you drag corners, drag the
 small middle handles to add corners, and right-click a corner to delete it. Regions show as a
 colored outline and light fill with their name, and clicking one shows its notes and everything
 placed in it. Journal entries and events can be placed in a region with the **Region** choice in
 their editor. **View ▸ Regions** hides them all.
+
+**Terrain** opens the terrain panel. While it's open, drag on the selected planet or moon to
+paint with the selected terrain type (a circle shows the brush), or choose **Erase**. Set the
+brush's radius with the slider or in km. To turn the view while painting, drag off the planet or
+use the arrow keys. Each stroke is one undo step. Every world starts with 12 terrain types
+(Ocean, Forest, Mountains, and more); **New Type** adds one, and the name and color below the list
+edit the selected one. Deleting a type clears it wherever it's painted (Ctrl+Z brings it back).
+Without a map, painted terrain is the planet's surface; over a map it's see-through, so you can
+trace the map. **View ▸ Terrain** hides it.
 
 **Add ▸ Weather Pin** adds a weather pin: click the spot on the planet, then name it. Weather pins
 show as small suns; click one to see that spot's weather: today's temperature, daylight, noon sun,

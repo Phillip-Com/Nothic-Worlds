@@ -60,6 +60,7 @@ public partial class SystemView : Node3D
     };
 
     private SystemScale _scale = SystemScale.Readable;
+    private bool _showTerrain = true;
     private Dictionary<Guid, DisplayBody> _layout = [];
     private Guid _focusId;
     private double _flightProgress = 1.0;
@@ -147,6 +148,26 @@ public partial class SystemView : Node3D
                 if (visual.Surface is PlanetSurface surface)
                 {
                     surface.ShowGrid = value;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether painted terrain shows on the globes (View ▸ Terrain), for every globe at once,
+    /// including ones added later.
+    /// </summary>
+    public bool ShowTerrain
+    {
+        get => _showTerrain;
+        set
+        {
+            _showTerrain = value;
+            foreach (BodyVisual visual in _visuals.Values)
+            {
+                if (visual.Surface is PlanetSurface surface)
+                {
+                    surface.ShowTerrain = value;
                 }
             }
         }
@@ -436,6 +457,7 @@ public partial class SystemView : Node3D
                 Mesh = _sphere,
                 MaterialOverride = (ShaderMaterial)PlanetMaterial!.Duplicate(),
             };
+            surface.ShowTerrain = _showTerrain;
             root.AddChild(surface);
         }
 

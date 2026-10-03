@@ -844,7 +844,7 @@ place).
 architecture implications. This needs a design review before any related data format is fixed.
 **Implementation:** —
 
-**BOD-05 — Terrain/biome painting** · In Progress (Core done, PR #33) · Base
+**BOD-05 — Terrain/biome painting** · In Progress (painting done, PR #34) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.
 **Implementation (Core, PR #33):**
 - `Geometry/CubeSphere.cs`: divides a sphere into six square faces of cells (an "equal-angle"
@@ -871,6 +871,36 @@ architecture implications. This needs a design review before any related data fo
 - **Tests:** `CubeSphereTests`, `TerrainGridTests`, `TerrainTypeTests`, and golden-file and
   damaged-file tests for version 10 in `WorldPackageTests` (with `TestPng`, an independent PNG
   writer, to check images the app didn't write).
+**Implementation (painting, PR #34):**
+- **Drawing** (`godot/Rendering/planet.gdshader`, `PlanetSurface.cs`): each painted body's grid
+  is a six-layer one-byte texture (`Texture2DArray`, about 6 MB, only while something is
+  painted) plus a 256-color palette. The shader repeats `CubeSphere`'s math with each face's
+  axes written out (looking up arrays per pixel was measurably slower). Without a map (or
+  pieces), terrain is the surface; over one it's mixed in at 60% so the map shows through.
+  `SetTerrain` re-uploads only the faces a stroke changed (`FacesChangedFrom`).
+- **View ▸ Terrain** (`SystemView.ShowTerrain`, `ViewMenu.cs`): one switch for every globe,
+  including ones added later.
+- **Session** (`godot/Session/WorldSession.Terrain.cs`): `AddTerrainType`,
+  `UpdateTerrainType` (rapid edits merge into one undo step), `DeleteTerrainType` (clears its
+  cells on every body; one step), `PaintTerrain` (a stroke segment on the selected body), and
+  `TerrainAt`. The terrain types joined `LoreState`, so they're in undo and "unsaved changes".
+- **Brush** (`godot/Controls/TerrainBrush.cs`, last in the scene so it gets clicks first):
+  while the Terrain panel shows, left-drag on the selected globe paints from the last spot to
+  the mouse (one undo step per stroke, through `BeginGesture`); a drag that starts off the
+  globe turns the camera as usual. A circle on the globe shows the brush.
+- **Panel** (`godot/UI/TerrainPanel.cs`): Paint/Erase, the brush radius (a slider spanning
+  0.05° to 45°, and the same in km for the selected body), the type list with color swatches,
+  New Type, Delete, and the selected type's name and color. The **Terrain** button joined the
+  right-side panel group in `MapToolbar`; region labels ignore clicks while it's open.
+- **Verified in the running app** with real clicks and drags, maximized and at 1152 × 648:
+  painting, choosing a type from the list, Erase, undo, a drag off the globe (turns the view,
+  paints nothing), the overlay on an imported map, View ▸ Terrain, New Type / rename / Delete,
+  save and reopen (painted, nothing unsaved), a star (note shown, brush off), and Journal
+  closing the panel. A check on all six faces compared the drawn colors with Core's cells at
+  about 5,000 points per view: 99% agree, the rest on circle edges.
+- **Benchmark** (fullscreen, back to back with `main`): the default world is unchanged (about
+  190 fps both); a world with a painted planet on screen drops from about 189 to 177 fps (6%,
+  0.35 ms a frame), and uses 6 MB more video memory.
 
 **BOD-06 — Custom surface appearance** · Idea · Base
 **Intent:** Custom textures/appearance for bodies beyond defaults (see also `MAP-01`).

@@ -1,0 +1,157 @@
+using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Model;
+using NothicWorlds.Rendering;
+
+namespace NothicWorlds.Session;
+
+// The terrain part of the open world (VISION.md BOD-05): the world's terrain types and the
+// terrain painted on planets and moons, all undoable.
+public partial class WorldSession
+{
+    // Colors offered in turn for new terrain types: distinct from the defaults.
+    private static readonly RgbColor[] _newTerrainColors =
+    [
+        new(0xB0, 0x60, 0xC0),  // Violet
+        new(0xD0, 0x50, 0x40),  // Rust
+        new(0x50, 0xC0, 0xB0),  // Teal
+        new(0xE0, 0xA0, 0x30),  // Gold
+        new(0x90, 0x90, 0x98),  // Slate
+    ];
+
+    /// <summary>The world's terrain types, in list order.</summary>
+    public IReadOnlyList<TerrainType> TerrainTypes => World.TerrainTypes;
+
+    /// <summary>
+    /// Adds a terrain type with a default name and the next color in turn, at the end of the
+    /// list.
+    /// </summary>
+    /// <returns>The new type, or null if the world already has the most allowed.</returns>
+    public TerrainType? AddTerrainType()
+    {
+        if (TerrainType.FreeCode(World.TerrainTypes) is not byte code)
+        {
+            return null;
+        }
+
+        int number = 1;
+        while (World.TerrainTypes.Any(type => type.Name == $"New Terrain {number}"))
+        {
+            number++;
+        }
+
+        var type = new TerrainType(code, $"New Terrain {number}",
+            _newTerrainColors[World.TerrainTypes.Count % _newTerrainColors.Length]);
+        RecordUndo("Add Terrain Type");
+        World.TerrainTypes.Add(type);
+        TerrainTypesChanged();
+        return type;
+    }
+
+    /// <summary>
+    /// Renames or recolors a terrain type (found by its code). Rapid changes to the same type
+    /// (typing, picking a color) are one undo step.
+    /// </summary>
+    /// <returns>What's wrong with the change (nothing is changed then), or null.</returns>
+    public string? UpdateTerrainType(TerrainType changed)
+    {
+        int index = World.TerrainTypes.FindIndex(type => type.Code == changed.Code);
+        if (index < 0)
+        {
+            return null;
+        }
+
+        TerrainType current = World.TerrainTypes[index];
+        changed = changed with { Name = changed.Name.Trim() };
+        if (changed == current)
+        {
+            return null;
+        }
+
+        if (TerrainType.Problem([changed]) is string problem)
+        {
+            return problem;
+        }
+
+        RecordUndo($"Edit {current.Name}", mergeKey: ("terrain type", current.Code));
+        World.TerrainTypes[index] = changed;
+        TerrainTypesChanged();
+        return null;
+    }
+
+    /// <summary>
+    /// Deletes a terrain type, clearing it from every body it's painted on. One undo step.
+    /// </summary>
+    public void DeleteTerrainType(byte code)
+    {
+        int index = World.TerrainTypes.FindIndex(type => type.Code == code);
+        if (index < 0)
+        {
+            return;
+        }
+
+        RecordUndo($"Delete {World.TerrainTypes[index].Name}");
+        World.TerrainTypes.RemoveAt(index);
+        foreach (Body body in World.Bodies)
+        {
+            body.Surface.Terrain = body.Surface.Terrain.Replace(code, 0);
+            ShowTerrain(body);
+        }
+
+        TerrainTypesChanged();
+    }
+
+    /// <summary>
+    /// Paints the selected body along a brush stroke from <paramref name="from"/> to
+    /// <paramref name="to"/> (the same spot for a single dab), with terrain
+    /// <paramref name="code"/> (0 erases). Wrap a whole stroke in <see cref="BeginGesture"/> and
+    /// <see cref="EndGesture"/> to make it one undo step.
+    /// </summary>
+    public void PaintTerrain(
+        GeoCoordinate from, GeoCoordinate to, double radiusDegrees, byte code)
+    {
+        if (!SelectedBodyHasSurface || IsBusy)
+        {
+            return;
+        }
+
+        Body body = SelectedBody;
+        TerrainGrid painted = body.Surface.Terrain.PaintStroke(
+            SphericalPolygon.ToUnit(from), SphericalPolygon.ToUnit(to), radiusDegrees, code);
+        if (ReferenceEquals(painted, body.Surface.Terrain))
+        {
+            return;
+        }
+
+        RecordUndo(code == 0 ? "Erase Terrain" : "Paint Terrain");
+        body.Surface.Terrain = painted;
+        ShowTerrain(body);
+        MarkChanged(systemChanged: false);
+    }
+
+    /// <summary>The terrain type painted at a spot on the selected body, or null.</summary>
+    public TerrainType? TerrainAt(GeoCoordinate spot)
+    {
+        byte code = SelectedBody.Surface.Terrain.CodeAt(SphericalPolygon.ToUnit(spot));
+        return World.TerrainTypes.Find(type => type.Code == code);
+    }
+
+    // Sends a body's terrain, and the colors to draw it in, to its globe.
+    private void ShowTerrain(Body body)
+    {
+        if (System?.SurfaceFor(body.Id) is PlanetSurface surface)
+        {
+            surface.SetTerrainColors(World.TerrainTypes);
+            surface.SetTerrain(body.Surface.Terrain);
+        }
+    }
+
+    private void TerrainTypesChanged()
+    {
+        foreach (Body body in World.Bodies)
+        {
+            ShowTerrain(body);
+        }
+
+        MarkChanged(systemChanged: false);
+    }
+}

@@ -7,7 +7,7 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The Journal panel (VISION.md LORE-02), on the right of the screen (one at a time with the
-/// Map and Regions panels; owner's choice): the world's journal entries, searchable and
+/// Map, Terrain, and Regions panels; owner's choice): the world's journal entries, searchable and
 /// sortable, and an editor for the selected one: its title, place, text, and the timeline events
 /// that link to it. Every change applies as it's typed and can be undone (typing in one entry is
 /// one step).

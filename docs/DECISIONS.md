@@ -7,13 +7,17 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-10-03 | Milestone 11: **terrain painting** (`BOD-05`) | In PR | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) | VISION.md §3 |
-| 2026-10-03 | Terrain types are an **editable list per world**, starting from 12 defaults | In PR | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) | Older worlds get the defaults on upgrade. VISION.md `BOD-05` |
-| 2026-10-03 | Terrain is the surface without a map, and a **see-through overlay over a map**, with View ▸ Terrain | In PR | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) | Built in the next PR |
-| 2026-10-03 | Painting tools get their **own Terrain panel** | In PR | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) | Built in the next PR |
-| 2026-10-03 | Terrain detail: a **cube-sphere grid, 1,024 × 1,024 cells per face** (~10 km on Earth) | In PR | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) | About 6 MB per fully painted body |
-| 2026-10-03 | Terrain is saved as an **8-bit greyscale PNG per painted body** inside the world file (format version 10) | In PR | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) | Readable without Godot. docs/world-format.md |
-| 2026-10-03 | Milestone 11 in **three PRs**: Core, then drawing and the Terrain panel, then polish and benchmark | In PR | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) |  |
+| 2026-10-03 | Terrain over a map is mixed in at **60%**; without a map or pieces it's the surface | In PR | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) | Claude's choice. VISION.md `BOD-05` |
+| 2026-10-03 | The brush paints only the **selected** body; dragging **off the globe turns the view** while painting | In PR | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) | Claude's choice, like region drawing |
+| 2026-10-03 | Brush radius spans **0.05° to 45°**, shown in km for the selected body | In PR | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) | Claude's choice |
+| 2026-10-03 | Deleting a terrain type needs **no confirmation** (it's one undo step) | In PR | [#34](https://github.com/Phillip-Com/Nothic-Worlds/pull/34) | Matches pieces and regions |
+| 2026-10-03 | Milestone 11: **terrain painting** (`BOD-05`) | Merged | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) · `2c4caa4` | VISION.md §3 |
+| 2026-10-03 | Terrain types are an **editable list per world**, starting from 12 defaults | Merged | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) · `2c4caa4` | Older worlds get the defaults on upgrade. VISION.md `BOD-05` |
+| 2026-10-03 | Terrain is the surface without a map, and a **see-through overlay over a map**, with View ▸ Terrain | Merged | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) · `2c4caa4` | Built in the next PR |
+| 2026-10-03 | Painting tools get their **own Terrain panel** | Merged | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) · `2c4caa4` | Built in the next PR |
+| 2026-10-03 | Terrain detail: a **cube-sphere grid, 1,024 × 1,024 cells per face** (~10 km on Earth) | Merged | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) · `2c4caa4` | About 6 MB per fully painted body |
+| 2026-10-03 | Terrain is saved as an **8-bit greyscale PNG per painted body** inside the world file (format version 10) | Merged | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) · `2c4caa4` | Readable without Godot. docs/world-format.md |
+| 2026-10-03 | Milestone 11 in **three PRs**: Core, then drawing and the Terrain panel, then polish and benchmark | Merged | [#33](https://github.com/Phillip-Com/Nothic-Worlds/pull/33) · `2c4caa4` |  |
 | 2026-10-02 | Eclipses are worked out **in the background**, only when the panel or markers ask | Merged | [#22](https://github.com/Phillip-Com/Nothic-Worlds/pull/22) · `396d454` | ~7 ms each on the baseline laptop; keeps edits smooth. VISION.md `EVT-01` |
 | 2026-10-03 | The **Map panel** scrolls and runs from the top bar to the time bar, like the Journal and Regions panels; stars show a "no map" note | Merged | [#32](https://github.com/Phillip-Com/Nothic-Worlds/pull/32) · `51edda7` | Claude's choices, so it works in small windows. VISION.md `UI-01` |
 | 2026-10-02 | Milestone 10: **layout tidy-up** (`UI-01`) | Merged | [#31](https://github.com/Phillip-Com/Nothic-Worlds/pull/31) · `3335993` | VISION.md §3 |

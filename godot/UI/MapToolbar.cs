@@ -4,8 +4,8 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The top bar (VISION.md UI-01): a slot for the File, Edit, View, and Add menus, then the panel
-/// buttons (System, Map, Journal, Regions, Timeline), plus a message line underneath that other
-/// parts of the app use. Success messages fade after a few seconds. Warnings and errors stay
+/// buttons (System, Map, Terrain, Journal, Regions, Timeline), plus a message line underneath that
+/// other parts of the app use. Success messages fade after a few seconds. Warnings and errors stay
 /// until the next message.
 /// </summary>
 public partial class MapToolbar : CanvasLayer
@@ -33,9 +33,12 @@ public partial class MapToolbar : CanvasLayer
     /// <summary>The Map panel, shown and hidden by the Map button.</summary>
     [Export] public MapPanel? MapPanel { get; set; }
 
+    /// <summary>The Terrain panel, shown and hidden by the Terrain button.</summary>
+    [Export] public TerrainPanel? Terrain { get; set; }
+
     /// <summary>
     /// The Journal panel, shown and hidden by the Journal button. It shares the right side
-    /// with the Map and Regions panels, one at a time (owner's choice).
+    /// with the Map, Terrain, and Regions panels, one at a time (owner's choice).
     /// </summary>
     [Export] public JournalPanel? Journal { get; set; }
 
@@ -83,11 +86,13 @@ public partial class MapToolbar : CanvasLayer
             "Map",
             "The planet's map: import it, line it up, and place pieces cut from it or other " +
             "images");
+        var terrainButton = CreateButton(
+            "Terrain", "Paint terrain onto the planet: oceans, forests, mountains, and more");
         _journalButton = CreateButton(
             "Journal", "The world's journal: write entries about places and history");
         _regionsButton = CreateButton(
             "Regions", "Outline and name regions on the planet: countries, forests, seas");
-        Button[] rightPanels = [mapButton, _journalButton, _regionsButton];
+        Button[] rightPanels = [mapButton, terrainButton, _journalButton, _regionsButton];
         foreach (Button button in rightPanels)
         {
             button.ToggleMode = true;
@@ -109,6 +114,13 @@ public partial class MapToolbar : CanvasLayer
             if (MapPanel is not null)
             {
                 MapPanel.IsPanelOpen = open;
+            }
+        };
+        terrainButton.Toggled += open =>
+        {
+            if (Terrain is not null)
+            {
+                Terrain.IsPanelOpen = open;
             }
         };
         _journalButton.Toggled += open =>

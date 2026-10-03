@@ -5,8 +5,8 @@ using NothicWorlds.Rendering;
 namespace NothicWorlds.UI;
 
 /// <summary>
-/// The View menu (VISION.md UI-01; owner's choice: the show/hide switches as checkable items in
-/// one menu): Pins, Weather Pins, Regions, Season Markers, Eclipse Markers, Grid (also the G
+/// The View menu (VISION.md UI-01; owner's choice: the show/hide switches as checkable items in one
+/// menu): Pins, Weather Pins, Regions, Terrain, Season Markers, Eclipse Markers, Grid (also the G
 /// key), and True Scale. The checkmarks are refreshed each time it opens, so they always match
 /// what's shown.
 /// </summary>
@@ -32,7 +32,7 @@ public partial class ViewMenu : Node
     /// <summary>The eclipse markers.</summary>
     [Export] public EclipseMarkers? Eclipses { get; set; }
 
-    /// <summary>The system view: the grid and true scale.</summary>
+    /// <summary>The system view: terrain, the grid, and true scale.</summary>
     [Export] public SystemView? System { get; set; }
 
     private enum MenuItem
@@ -41,6 +41,7 @@ public partial class ViewMenu : Node
         WeatherPins,
         Regions,
         SeasonMarkers,
+        Terrain,
         EclipseMarkers,
         Grid,
         TrueScale,
@@ -64,6 +65,7 @@ public partial class ViewMenu : Node
         menu.AddCheckItem("Pins", (int)MenuItem.Pins);
         menu.AddCheckItem("Weather Pins", (int)MenuItem.WeatherPins);
         menu.AddCheckItem("Regions", (int)MenuItem.Regions);
+        menu.AddCheckItem("Terrain", (int)MenuItem.Terrain);
         menu.AddSeparator();
         menu.AddCheckItem("Season Markers", (int)MenuItem.SeasonMarkers);
         menu.AddCheckItem("Eclipse Markers", (int)MenuItem.EclipseMarkers);
@@ -93,6 +95,7 @@ public partial class ViewMenu : Node
         MenuItem.Regions => Regions?.ShowRegions ?? false,
         MenuItem.SeasonMarkers => Bodies?.ShowSeasonMarkers ?? false,
         MenuItem.EclipseMarkers => Eclipses?.ShowMarkers ?? false,
+        MenuItem.Terrain => System?.ShowTerrain ?? false,
         MenuItem.Grid => System?.ShowGrid ?? false,
         _ => System?.DisplayScale == SystemScale.True,
     };
@@ -116,6 +119,9 @@ public partial class ViewMenu : Node
                 break;
             case MenuItem.EclipseMarkers when Eclipses is not null:
                 Eclipses.ShowMarkers = on;
+                break;
+            case MenuItem.Terrain when System is not null:
+                System.ShowTerrain = on;
                 break;
             case MenuItem.Grid when System is not null:
                 System.ShowGrid = on;
