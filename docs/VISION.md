@@ -117,8 +117,8 @@ Non-standard bodies (`BOD-02`), starting with flat worlds. Owner's decisions:
 - **Physically flat light**: the disc tumbles like a spinning coin, so the whole face is lit at
   once and every place shares the same sun height; two summers and two winters a year, and
   no climate zones by latitude.
-- **Three PRs:** flat worlds you can make, see, and edit (PR #46); the close-up view; the
-  flat-world sky (day and night, seasons, weather).
+- **Three PRs:** flat worlds you can make, see, and edit (PR #46); the close-up view
+  (PR #47); the flat-world sky (day and night, seasons, weather).
 
 **Milestone 18: Comets and Meteor Showers** · Complete (PR #45 merged 2026-10-03; owner's choice, 2026-10-03)
 Meteor showers (`EVT-02`), simulated from comets. Owner's decisions:
@@ -984,6 +984,30 @@ the body as a sphere of its radius. World trees and other shapes are still open.
   a flat world and back (undo), regions in the north and far south in the right places, the
   point under the mouse and back on screen to the pixel, the tumbling face and lit rock over a
   day. Benchmark: no change.
+
+**Implementation (the close-up view, PR #47):**
+- `PlanetCamera` has a flat world's own close-up (it knows the focused body's `Shape`):
+  zooming in below the local view's altitude while above the face hovers over a spot on the
+  top face, looking straight down, with the disc's center (its north pole) up on screen. It
+  starts above the spot the camera was looking at, as far away as it was, so what's in the
+  middle stays there; the switch blends the camera from its old pose over 0.4 s.
+- Dragging and the pan keys slide across the face (what's under the mouse follows it, apart
+  from turning to keep the center up). It rides with the tumbling disc, as the globe's local
+  view rides with its spin. Zooming out above 1.5 disc radii goes back to orbiting (well
+  above where the close-up starts, so the two don't flip back and forth). From below the disc
+  there's no close-up; you see the rock.
+- **Zoom to** (regions, pins, weather pins) glides down to the spot on the face, at a height
+  that fits it. A close-up view is saved as the orbiting view above it.
+- The closest approach (10 km) and the near clipping distance measure from the disc itself
+  (`SystemView.DistanceToDisc`), so the face isn't cut away close up.
+- **Scale bar:** `Geometry/SurfaceDistance.cs` (Core) measures ground distance along a globe
+  or straight across a flat world's face, its real ground (around the disc, distances are
+  longer than on the globe the farther south they are).
+- **Verified in the running app** with real scrolling and dragging, maximized and at
+  1152 × 648: zooming in keeps the pole in the middle, dragging slides across the face, it
+  stays over the same ground as the disc tumbles, zooming out orbits again, and Zoom to on a
+  far-south region lands on it with the scale bar, north arrow, and coordinates right.
+  Benchmark: no change.
 
 **BOD-03 — Other astral features** · Idea · —
 **Intent:** Asteroids, nebulas, and similar features.

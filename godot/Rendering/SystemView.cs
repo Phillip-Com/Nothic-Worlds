@@ -414,9 +414,12 @@ public partial class SystemView : Node3D
 
     // How far out the camera frames a body: a flat world reaches π times its globe's radius.
     private double FramingRadius(Guid bodyId, DisplayBody place) =>
-        Session?.World.Bodies.Find(b => b.Id == bodyId)?.Shape == BodyShape.FlatDisc
-            ? place.Radius * FlatDisc.Radius
+        Session?.World.Bodies.Find(b => b.Id == bodyId) is Body body
+            ? place.Radius * ShapeExtent(body)
             : place.Radius;
+
+    private static double ShapeExtent(Body body) =>
+        body.Shape == BodyShape.FlatDisc ? FlatDisc.Radius : 1;
 
     // A flat world tumbles like a spinning coin (owner's choice: physically flat, VISION.md
     // BOD-02): its spin axis lies across the disc (toward longitude 90° east, the disc's +X),
@@ -451,10 +454,10 @@ public partial class SystemView : Node3D
             return;
         }
 
-        // Flat worlds get their own close-up view in a later step (VISION.md BOD-02).
         bool flying = _flightProgress < 1.0;
         Body? focused = world.Bodies.Find(b => b.Id == _focusId);
-        Camera.AllowLocalView = !flying && focused?.Shape != BodyShape.FlatDisc;
+        Camera.AllowLocalView = !flying;
+        Camera.Shape = focused?.Shape ?? BodyShape.Sphere;
         if (Camera.AllowLocalView && focused is Body focusBody)
         {
             Camera.SurfaceFrame = Orientation(focusBody, world.TimeDays);
@@ -475,7 +478,8 @@ public partial class SystemView : Node3D
         if (Session?.World.Bodies.Find(b => b.Id == _focusId) is Body focused)
         {
             Camera.MinAltitude = (float)Math.Clamp(
-                ClosestApproachKm / focused.RadiusKm, MinRelativeAltitude, 0.05);
+                ClosestApproachKm / (focused.RadiusKm * ShapeExtent(focused)),
+                MinRelativeAltitude, 0.05);
         }
 
         double extent = 0;
@@ -506,12 +510,26 @@ public partial class SystemView : Node3D
         Vector3 at = Camera!.GlobalPosition;
         var camera = new Vector3D(at.X, at.Y, at.Z) + Origin;
         double nearest = double.MaxValue;
-        foreach (DisplayBody place in _layout.Values)
+        foreach ((Guid id, DisplayBody place) in _layout)
         {
-            nearest = Math.Min(nearest, (place.Position - camera).Length - place.Radius);
+            double distance = _visuals.GetValueOrDefault(id) is
+            { Surface.Shape: BodyShape.FlatDisc } flat
+                ? DistanceToDisc(flat.Root, at) * place.Radius
+                : (place.Position - camera).Length - place.Radius;
+            nearest = Math.Min(nearest, distance);
         }
 
         return nearest;
+    }
+
+    // How far a point is from a flat world's disc, in its globe's radii (its own space, where the
+    // disc is FlatDisc's size).
+    private static double DistanceToDisc(Node3D root, Vector3 point)
+    {
+        Vector3 local = root.GlobalTransform.AffineInverse() * point;
+        double across = Math.Max(0, new Vector2(local.X, local.Z).Length() - FlatDisc.Radius);
+        double up = Math.Max(0, Math.Abs(local.Y) - FlatDisc.HalfThickness);
+        return Math.Sqrt(across * across + up * up);
     }
 
     private BodyVisual CreateVisual(Body body)

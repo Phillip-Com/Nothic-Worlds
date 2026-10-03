@@ -127,7 +127,8 @@ public partial class LocalViewAids : CanvasLayer
     private void DrawScaleBar(
         PlanetSurface globe, Body body, Vector2 middle, Vector2 at, Font font)
     {
-        // Measured across the middle of the view, on the real body's size.
+        // Measured across the middle of the view, on the real body's size (across a flat
+        // world's face, which is its real ground).
         const float sample = 100.0f;
         if (GlobePicker.CoordinateAt(Camera!, globe, middle) is not GeoCoordinate a
             || GlobePicker.CoordinateAt(Camera!, globe, middle + new Vector2(sample, 0))
@@ -136,8 +137,7 @@ public partial class LocalViewAids : CanvasLayer
             return;
         }
 
-        double kmPerPixel = SphericalCoordinates.ArcDegrees(a, b) * Math.PI / 180
-            * body.RadiusKm / sample;
+        double kmPerPixel = SurfaceDistance.Km(body.Shape, body.RadiusKm, a, b) / sample;
         if (kmPerPixel <= 0)
         {
             return;

@@ -24,6 +24,12 @@ namespace NothicWorlds.Controls;
 /// planet's own. Farther out they're fixed in space, and the planet turns beneath. Crossing
 /// between the two keeps the camera where it is; only which way is "up" eases round.
 /// </para>
+/// <para>
+/// A flat world (VISION.md BOD-02) has its own close-up: hovering over a spot on its top face,
+/// looking straight down with the disc's center (its north pole) up on screen, and dragging
+/// slides across the face like a map. It rides with the tumbling disc. Zooming out past
+/// <see cref="FlatLocalExitAltitude"/> returns to orbiting it.
+/// </para>
 /// </summary>
 public partial class PlanetCamera : Camera3D
 {
@@ -33,8 +39,24 @@ public partial class PlanetCamera : Camera3D
     // Limits how fast longitude changes near the poles, where it gets very compressed.
     private const double MinLongitudeScale = 0.1;
 
-    /// <summary>Planet radius in world units.</summary>
+    /// <summary>
+    /// Planet radius in world units: how big the body is for framing it (a flat world's is its
+    /// disc's radius).
+    /// </summary>
     [Export] public float PlanetRadius { get; set; } = 1.0f;
+
+    /// <summary>
+    /// The focused body's shape (VISION.md BOD-02), which decides what its close-up is. Set
+    /// every frame by whatever places the planet.
+    /// </summary>
+    public BodyShape Shape { get; set; } = BodyShape.Sphere;
+
+    /// <summary>
+    /// In a flat world's close-up, zooming out above this height (in <see cref="PlanetRadius"/>,
+    /// the disc's radius) returns to orbiting. Well above where the close-up starts, so the two
+    /// don't flip back and forth.
+    /// </summary>
+    public const float FlatLocalExitAltitude = 1.5f;
 
     /// <summary>Closest the camera can get to the surface, as a fraction of the radius.</summary>
     [Export] public float MinAltitude { get; set; } = 0.05f;
@@ -115,6 +137,18 @@ public partial class PlanetCamera : Camera3D
     private bool _local;
     private Vector3 _currentUp = Vector3.Up;
 
+    // A flat world's close-up: the spot on the top face below the camera (x and z, in the
+    // matching globe's radii, as in FlatDisc), and the altitude is the height above the face.
+    private bool _flatLocal;
+    private Vector2 _targetSpot;
+    private Vector2 _currentSpot;
+
+    // Going into or out of a flat world's close-up turns the camera from looking at the disc at
+    // an angle to looking straight down (or back): it blends from where it was over a moment.
+    private const float SwitchBlendSeconds = 0.4f;
+    private Transform3D _blendFrom;
+    private float _blend = 1.0f;
+
     // A spot to glide to in the local view once it's allowed (e.g. after flying to the body).
     private (GeoCoordinate Spot, float Altitude)? _pendingSurfaceTarget;
 
@@ -126,7 +160,7 @@ public partial class PlanetCamera : Camera3D
     public float CurrentAltitude => _currentAltitude;
 
     /// <summary>True while the camera is in the local view (riding with the ground).</summary>
-    public bool IsLocalView => _local;
+    public bool IsLocalView => _local || _flatLocal;
 
     /// <summary>How panning currently behaves, based on zoom.</summary>
     public PanMode PanMode =>
@@ -135,7 +169,7 @@ public partial class PlanetCamera : Camera3D
     /// <summary>What the user is doing with the camera right now.</summary>
     public CameraAction CurrentAction => _dragButton switch
     {
-        MouseButton.Left => _local ? CameraAction.Panning : CameraAction.Orbiting,
+        MouseButton.Left => IsLocalView ? CameraAction.Panning : CameraAction.Orbiting,
         MouseButton.Right => CameraAction.Panning,
         _ => _keyboardPanning ? CameraAction.Panning : CameraAction.None,
     };
@@ -203,7 +237,7 @@ public partial class PlanetCamera : Camera3D
             _targetFocusOffset = Vector3.Zero;
         }
 
-        SetLocal(AllowLocalView && _targetAltitude < LocalViewMaxAltitude);
+        UpdateLocalMode();
         if (_pendingSurfaceTarget is var (spot, altitude) && AllowLocalView)
         {
             _pendingSurfaceTarget = null;
@@ -211,6 +245,7 @@ public partial class PlanetCamera : Camera3D
         }
 
         EaseTowardTarget((float)delta);
+        _blend = Mathf.Min(1.0f, _blend + (float)delta / SwitchBlendSeconds);
         UpdateTransform();
     }
 
@@ -223,11 +258,14 @@ public partial class PlanetCamera : Camera3D
     {
         // Seen from a low altitude a, the screen's half-height spans about a·tan(fov/2) radians
         // of the ground; leave a little margin around the span.
+        // On a flat world a radian of arc is one globe radius of the face, and the altitude is
+        // measured in disc radii, π times as big.
         double halfSpan = double.DegreesToRadians(spanDegrees) / 2 * 1.25;
-        float altitude = Mathf.Clamp(
-            (float)(halfSpan / Math.Tan(double.DegreesToRadians(Fov) / 2)),
-            MinAltitude, LocalViewMaxAltitude * 0.9f);
-        _pendingSurfaceTarget = (spot, altitude);
+        bool flat = Shape == BodyShape.FlatDisc;
+        double altitude = halfSpan / Math.Tan(double.DegreesToRadians(Fov) / 2)
+            / (flat ? FlatDisc.Radius : 1);
+        _pendingSurfaceTarget = (spot, Mathf.Clamp((float)altitude, MinAltitude,
+            (flat ? FlatLocalExitAltitude : LocalViewMaxAltitude) * 0.9f));
     }
 
     /// <summary>
@@ -236,7 +274,7 @@ public partial class PlanetCamera : Camera3D
     /// </summary>
     public void FollowSurface()
     {
-        if (_local)
+        if (IsLocalView)
         {
             UpdateTransform();
         }
@@ -248,10 +286,18 @@ public partial class PlanetCamera : Camera3D
     /// </summary>
     public void Orbit(Vector2 screenDelta)
     {
-        if (_local)
+        if (IsLocalView)
         {
             // Looking straight down at a map, dragging moves the map, as in map apps.
-            PanAcrossSurface(screenDelta);
+            if (_flatLocal)
+            {
+                PanAcrossFace(screenDelta);
+            }
+            else
+            {
+                PanAcrossSurface(screenDelta);
+            }
+
             return;
         }
 
@@ -264,7 +310,11 @@ public partial class PlanetCamera : Camera3D
     /// </summary>
     public void Pan(Vector2 screenDelta)
     {
-        if (PanMode == PanMode.Surface)
+        if (_flatLocal)
+        {
+            PanAcrossFace(screenDelta);
+        }
+        else if (PanMode == PanMode.Surface)
         {
             PanAcrossSurface(screenDelta);
         }
@@ -308,6 +358,7 @@ public partial class PlanetCamera : Camera3D
     public void ResetView()
     {
         SetLocal(false);
+        _flatLocal = false;
         _targetLatitude = StartLatitude;
         _targetLongitude = StartLongitude;
         _targetAltitude = Mathf.Clamp(StartAltitude, MinAltitude, MaxAltitude);
@@ -320,6 +371,11 @@ public partial class PlanetCamera : Camera3D
     /// </summary>
     public CameraView GetView()
     {
+        if (_flatLocal)
+        {
+            return FlatLocalAsOrbit();
+        }
+
         return new CameraView(
             _targetLatitude,
             SphericalCoordinates.WrapLongitude(_targetLongitude),
@@ -348,11 +404,25 @@ public partial class PlanetCamera : Camera3D
                 (float)view.FocusOffsetX, (float)view.FocusOffsetY, (float)view.FocusOffsetZ);
             _targetFocusOffset = offset.LimitLength(PlanetRadius * (1.0f + MaxAltitude));
 
-            // A view saved close up was saved in the planet's own frame (see GetView).
-            _local = AllowLocalView && _targetAltitude < LocalViewMaxAltitude;
+            // A view saved close up was saved in the planet's own frame (see GetView). A flat
+            // world's close-up is saved as the orbiting view above it, so it opens orbiting.
+            _flatLocal = false;
+            _local = AllowLocalView && Shape != BodyShape.FlatDisc
+                && _targetAltitude < LocalViewMaxAltitude;
         }
 
         SnapToTarget();
+    }
+
+    // In a flat world's close-up: slides across the face, so what's under the mouse follows it.
+    private void PanAcrossFace(Vector2 screenDelta)
+    {
+        Basis basis = GlobalTransform.Basis;
+        Vector3 move = (-basis.X * screenDelta.X + basis.Y * screenDelta.Y)
+            * WorldUnitsPerPixel(_currentAltitude * PlanetRadius);
+        Vector3 onFace = SurfaceFrame.Inverse() * move / GlobeRadius;
+        _targetSpot = (_targetSpot + new Vector2(onFace.X, onFace.Z))
+            .LimitLength((float)FlatDisc.Radius);
     }
 
     private void PanAcrossSurface(Vector2 screenDelta)
@@ -439,13 +509,14 @@ public partial class PlanetCamera : Camera3D
         _currentLatitude += (_targetLatitude - _currentLatitude) * t;
         _currentLongitude += (_targetLongitude - _currentLongitude) * t;
         _currentFocusOffset = _currentFocusOffset.Lerp(_targetFocusOffset, t);
+        _currentSpot = _currentSpot.Lerp(_targetSpot, t);
         // Ease altitude in log space so zooming in and out feel equally smooth.
         _currentAltitude = Mathf.Exp(
             Mathf.Lerp(Mathf.Log(_currentAltitude), Mathf.Log(_targetAltitude), t));
 
         // Up turns gently between the fixed frame's and the planet's north (they differ by
         // the planet's tilt and spin).
-        Vector3 up = Frame * Vector3.Up;
+        Vector3 up = Frame * LocalUp;
         _currentUp = _currentUp.Slerp(up, t * 0.5f).Normalized();
     }
 
@@ -455,12 +526,19 @@ public partial class PlanetCamera : Camera3D
         _currentLongitude = _targetLongitude;
         _currentAltitude = _targetAltitude;
         _currentFocusOffset = _targetFocusOffset;
-        _currentUp = Frame * Vector3.Up;
+        _currentSpot = _targetSpot;
+        _currentUp = Frame * LocalUp;
         UpdateTransform();
     }
 
     private void GlideToSurface(GeoCoordinate spot, float altitude)
     {
+        if (Shape == BodyShape.FlatDisc)
+        {
+            GlideToFace(spot, altitude);
+            return;
+        }
+
         _targetAltitude = altitude;
         SetLocal(true);
         _targetFocusOffset = Vector3.Zero;
@@ -469,8 +547,153 @@ public partial class PlanetCamera : Camera3D
             + SphericalCoordinates.LongitudeDelta(_currentLongitude, spot.LongitudeDegrees);
     }
 
+    // A flat world's close-up starts from wherever the camera is, then heads for the spot.
+    private void GlideToFace(GeoCoordinate spot, float altitude)
+    {
+        if (!_flatLocal && !EnterFlatLocal())
+        {
+            SnapAboveFace();
+        }
+
+        Vector3D point = FlatDisc.TopPointFor(
+            SphericalCoordinates.ToDirection(spot).ToVector3D());
+        _targetSpot = new Vector2((float)point.X, (float)point.Z);
+        _targetAltitude = altitude;
+    }
+
+    // From below or beside the disc there's no spot under the camera: start straight above the
+    // center instead, at the camera's distance.
+    private void SnapAboveFace()
+    {
+        _flatLocal = true;
+        _currentSpot = Vector2.Zero;
+        _targetSpot = Vector2.Zero;
+        _currentAltitude = Mathf.Clamp(Position.Length() / PlanetRadius, MinAltitude,
+            FlatLocalExitAltitude);
+        _targetFocusOffset = Vector3.Zero;
+        _currentFocusOffset = Vector3.Zero;
+    }
+
+    // The matching globe's radius in world units (a flat world's disc is π times as wide).
+    private float GlobeRadius =>
+        Shape == BodyShape.FlatDisc ? PlanetRadius / (float)FlatDisc.Radius : PlanetRadius;
+
+    // Which way is up on screen in the planet's own frame: north for a globe; toward the
+    // center (the north pole) in a flat world's close-up.
+    private Vector3 LocalUp
+    {
+        get
+        {
+            if (!_flatLocal)
+            {
+                return Vector3.Up;
+            }
+
+            Vector2 toCenter = -_currentSpot;
+            return toCenter.LengthSquared() > 1e-8f
+                ? new Vector3(toCenter.X, 0, toCenter.Y).Normalized()
+                : Vector3.Forward;
+        }
+    }
+
+    // Moves between orbiting and the local view as the zoom crosses the thresholds: the
+    // globe's local view, or a flat world's close-up (entered only from above its face).
+    private void UpdateLocalMode()
+    {
+        bool flat = Shape == BodyShape.FlatDisc;
+        if (_flatLocal && (!flat || !AllowLocalView || _targetAltitude > FlatLocalExitAltitude))
+        {
+            ExitFlatLocal();
+        }
+
+        if (flat)
+        {
+            SetLocal(false);
+            if (!_flatLocal && AllowLocalView && _targetAltitude < LocalViewMaxAltitude)
+            {
+                EnterFlatLocal();
+            }
+
+            return;
+        }
+
+        SetLocal(AllowLocalView && _targetAltitude < LocalViewMaxAltitude);
+    }
+
+    // Starts a flat world's close-up over the spot below the camera, at its height, carrying
+    // on any zoom under way. False if the camera isn't above the face.
+    private bool EnterFlatLocal()
+    {
+        Basis toDisc = SurfaceFrame.Inverse();
+        Vector3 local = toDisc * Position;
+        float faceHeight = (float)FlatDisc.HalfThickness * GlobeRadius;
+        if (local.Y <= faceHeight)
+        {
+            return false;
+        }
+
+        // Keep what's in the middle of the view in the middle: start above the spot the camera
+        // is looking at (or the one below it, if it looks past the disc), as far away as now.
+        Vector3 ahead = toDisc * -GlobalTransform.Basis.Z;
+        Vector3 spot = new(local.X, faceHeight, local.Z);
+        if (ahead.Y < 0)
+        {
+            Vector3 hit = local + ahead * ((faceHeight - local.Y) / ahead.Y);
+            if (new Vector2(hit.X, hit.Z).Length() <= FlatDisc.Radius * GlobeRadius)
+            {
+                spot = hit;
+            }
+        }
+
+        float zoom = _targetAltitude / _currentAltitude;
+        StartBlend();
+        _flatLocal = true;
+        _currentSpot = new Vector2(spot.X, spot.Z) / GlobeRadius;
+        _currentSpot = _currentSpot.LimitLength((float)FlatDisc.Radius);
+        _targetSpot = _currentSpot;
+        _currentAltitude = Mathf.Max(local.DistanceTo(spot) / PlanetRadius, MinAltitude);
+        _targetAltitude = Mathf.Clamp(_currentAltitude * zoom, MinAltitude, MaxAltitude);
+        _targetFocusOffset = Vector3.Zero;
+        _currentFocusOffset = Vector3.Zero;
+        _currentUp = SurfaceFrame * LocalUp;
+        return true;
+    }
+
+    // Back to orbiting, from wherever the close-up left the camera.
+    private void ExitFlatLocal()
+    {
+        CameraView view = FlatLocalAsOrbit();
+        float zoomedTo = _targetAltitude;
+        StartBlend();
+        _flatLocal = false;
+        _currentLatitude = view.LatitudeDegrees;
+        _currentLongitude = view.LongitudeDegrees;
+        _targetLatitude = view.LatitudeDegrees;
+        _targetLongitude = view.LongitudeDegrees;
+        _currentAltitude = (float)view.Altitude;
+        _targetAltitude = Mathf.Clamp(Mathf.Max(zoomedTo, _currentAltitude), MinAltitude,
+            MaxAltitude);
+    }
+
+    // The orbiting view where the close-up's camera is now (in fixed space). Above the middle
+    // of the disc that can be inside the disc's reach, so it's kept at least halfway out.
+    private CameraView FlatLocalAsOrbit()
+    {
+        Vector3 position = Position.LengthSquared() > 0 ? Position : Vector3.Up * PlanetRadius;
+        GeoCoordinate direction = SphericalCoordinates.FromDirection(position.ToNumerics());
+        float altitude = Mathf.Max(position.Length() / PlanetRadius - 1, 0.5f);
+        return new CameraView(direction.LatitudeDegrees, direction.LongitudeDegrees, altitude,
+            0, 0, 0);
+    }
+
+    private void StartBlend()
+    {
+        _blendFrom = Transform;
+        _blend = 0.0f;
+    }
+
     // The frame latitude and longitude are measured in: the planet's in the local view.
-    private Basis Frame => _local ? SurfaceFrame : Basis.Identity;
+    private Basis Frame => IsLocalView ? SurfaceFrame : Basis.Identity;
 
     // Switches between the local view and the fixed frame, re-expressing where the camera is
     // and where it's heading in the new frame, so nothing moves.
@@ -504,6 +727,24 @@ public partial class PlanetCamera : Camera3D
 
     private void UpdateTransform()
     {
+        if (_flatLocal)
+        {
+            UpdateFlatTransform();
+        }
+        else
+        {
+            UpdateOrbitTransform();
+        }
+
+        if (_blend < 1.0f)
+        {
+            float eased = _blend * _blend * (3 - 2 * _blend);
+            Transform = _blendFrom.InterpolateWith(Transform, eased);
+        }
+    }
+
+    private void UpdateOrbitTransform()
+    {
         var coordinate = new GeoCoordinate(_currentLatitude, _currentLongitude);
         Vector3 direction = Frame * SphericalCoordinates.ToDirection(coordinate).ToGodot();
         Vector3 focus = _currentFocusOffset;
@@ -519,5 +760,16 @@ public partial class PlanetCamera : Camera3D
 
         Position = position;
         LookAt(focus, _currentUp);
+    }
+
+    // Straight above the spot on the face, looking down, with the disc's center up on screen.
+    private void UpdateFlatTransform()
+    {
+        float globe = GlobeRadius;
+        var ground = new Vector3(_currentSpot.X * globe, (float)FlatDisc.HalfThickness * globe,
+            _currentSpot.Y * globe);
+        Vector3 above = ground + Vector3.Up * (_currentAltitude * PlanetRadius);
+        Position = SurfaceFrame * above;
+        LookAt(SurfaceFrame * ground, _currentUp);
     }
 }
