@@ -25,6 +25,8 @@ public partial class WeatherWindow : AcceptDialog
     private Label _yearLabel = null!;
     private WeatherChart _chart = null!;
     private Label _terrain = null!;
+    private ScrollContainer _scroll = null!;
+    private VBoxContainer _layout = null!;
     private Label _note = null!;
     private Guid? _pinId;
 
@@ -63,6 +65,7 @@ public partial class WeatherWindow : AcceptDialog
         };
 
         var layout = new VBoxContainer { CustomMinimumSize = new Vector2(ContentWidth, 0) };
+        _layout = layout;
         _name = new LineEdit { PlaceholderText = "Name" };
         _name.TextSubmitted += _ => CommitName();
         _name.FocusExited += CommitName;
@@ -80,7 +83,13 @@ public partial class WeatherWindow : AcceptDialog
         _note = WrappingLabel();
         _note.Modulate = new Color(1, 1, 1, 0.6f);
         layout.AddChild(_note);
-        AddChild(layout);
+        // Scrolls when the screen is too short for everything (the chart, the rain, the notes).
+        _scroll = new ScrollContainer
+        {
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        _scroll.AddChild(layout);
+        AddChild(_scroll);
 
         Session.Changed += () =>
         {
@@ -102,11 +111,30 @@ public partial class WeatherWindow : AcceptDialog
         Refresh();
         if (Pin is not null)
         {
+            FitToScreen();
             PopupCentered();
         }
     }
 
     private WeatherPin? Pin => Session.World.WeatherPins.FirstOrDefault(p => p.Id == _pinId);
+
+    // As tall as the content, but never taller than the screen leaves room for (beside the
+    // title and the buttons); the rest scrolls.
+    private void FitToScreen()
+    {
+        const float titleAndButtons = 120;
+        float room = GetTree().Root.GetVisibleRect().Size.Y - titleAndButtons;
+        float content = _layout.GetCombinedMinimumSize().Y;
+        _scroll.CustomMinimumSize = new Vector2(ContentWidth + 12, Math.Min(content, room));
+        ResetSize();
+    }
+
+    // A whole number of degrees, never "-0".
+    private static string Degrees(double celsius)
+    {
+        double rounded = Math.Round(celsius);
+        return (rounded == 0 ? 0 : rounded).ToString("0");
+    }
 
     private void CommitName()
     {
@@ -162,21 +190,38 @@ public partial class WeatherWindow : AcceptDialog
             return;
         }
 
-        ShowToday(body, pin, climate, now);
-        _yearLabel.Text = yearName;
-        _chart.Show([.. months.Select(m =>
+        List<WeatherChart.Month> chartMonths = [.. months.Select(m =>
         {
             ClimateDay average = climate.Average(m.From, m.To);
             return new WeatherChart.Month(m.Label, average.LowC, average.MeanC, average.HighC,
-                average.DaylightHours);
-        })], (float)((now - from) / (to - from)));
+                average.DaylightHours, average.RainMm * (m.To - m.From));
+        })];
+        int thisMonth = months.FindIndex(m => now >= m.From && now < m.To);
+        ShowToday(body, pin, climate, now,
+            thisMonth < 0 ? null : RainText(chartMonths, thisMonth));
+        double yearRain = chartMonths.Sum(m => m.RainMm);
+        _yearLabel.Text = $"{yearName} · {yearRain:N0} mm of rain a year";
+        _chart.Show(chartMonths, (float)((now - from) / (to - from)));
         _terrain.Text = ClimateText.Describe(climate.Terrain);
         _note.Text = $"Estimated from the sunlight here, around {body.Name}'s average of " +
             $"{body.AverageTemperatureC:0.#} °C (set in the System panel), adjusted for the " +
-            "painted terrain. Air and winds aren't modeled.";
+            "painted terrain. Rain comes from a tropical rain belt that follows the sun, storms " +
+            "in the middle latitudes, and the moisture nearby. Winds aren't modeled.";
     }
 
-    private void ShowToday(Body body, WeatherPin pin, ClimateYear climate, double now)
+    // This month's rain, and whether it's a wet or dry season (well above or below the
+    // year's average month).
+    private static string RainText(List<WeatherChart.Month> months, int index)
+    {
+        double rain = months[index].RainMm;
+        double average = months.Average(m => m.RainMm);
+        string season = rain > 1.6 * average ? " (wet season)"
+            : rain < 0.4 * average ? " (dry season)" : "";
+        return $"{rain:N0} mm of rain this month{season}";
+    }
+
+    private void ShowToday(
+        Body body, WeatherPin pin, ClimateYear climate, double now, string? rain)
     {
         ClimateDay today = climate.DayAt(now);
         var daylight = TimeSpan.FromHours(today.DaylightHours);
@@ -196,8 +241,10 @@ public partial class WeatherWindow : AcceptDialog
             ? $"noon sun {today.NoonSunDegrees:0}° up"
             : "the sun doesn't rise";
         _today.Text = $"{BodyClock.Describe(body, now)}\n" +
-            $"{today.MeanC:0} °C (low {today.LowC:0}, high {today.HighC:0}) · " +
-            $"{(int)daylight.TotalHours} h {daylight.Minutes:00} m of daylight · {sun}{season}";
+            $"{Degrees(today.MeanC)} °C (low {Degrees(today.LowC)}, " +
+            $"high {Degrees(today.HighC)}) · " +
+            $"{(int)daylight.TotalHours} h {daylight.Minutes:00} m of daylight · {sun}{season}" +
+            (rain is null ? "" : $"\n{rain}");
     }
 
     // The year around a time: the calendar year containing it, month by month, or (without a
