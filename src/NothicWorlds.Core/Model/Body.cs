@@ -18,6 +18,14 @@ public sealed class Body
     /// <summary>The longest allowed day, in hours.</summary>
     public const double MaxDayLengthHours = 1e7;
 
+    /// <summary>
+    /// The coldest average temperature a body can have, in °C (just above absolute zero).
+    /// </summary>
+    public const double MinAverageTemperatureC = -270;
+
+    /// <summary>The hottest average temperature a body can have, in °C.</summary>
+    public const double MaxAverageTemperatureC = 2000;
+
     /// <summary>What's drawn on the body's surface.</summary>
     public SurfaceSettings Surface { get; } = new();
 
@@ -43,6 +51,12 @@ public sealed class Body
     /// (VISION.md CAL-03).
     /// </summary>
     public double AxialTiltDirectionDegrees { get; set; }
+
+    /// <summary>
+    /// The body's average surface temperature over a year, in °C (VISION.md WTH-01; owner's
+    /// choice: set by the user, Earth is about 15). Weather pins spread it by latitude and season.
+    /// </summary>
+    public double AverageTemperatureC { get; set; } = 15.0;
 
     /// <summary>The body's own calendar (VISION.md CAL-01), or null to count plain days.</summary>
     public Calendar? Calendar { get; set; }
@@ -75,6 +89,13 @@ public sealed class Body
             return "a body's axial tilt must be 0° to 180°, with a direction";
         }
 
+        if (!double.IsFinite(AverageTemperatureC)
+            || AverageTemperatureC is < MinAverageTemperatureC or > MaxAverageTemperatureC)
+        {
+            return $"a body's average temperature must be {MinAverageTemperatureC} °C to " +
+                $"{MaxAverageTemperatureC} °C";
+        }
+
         return Orbit?.Problem() ?? Calendar?.Problem();
     }
 
@@ -89,6 +110,7 @@ public sealed class Body
             && RadiusKm == other.RadiusKm && DayLengthHours == other.DayLengthHours
             && AxialTiltDegrees == other.AxialTiltDegrees
             && AxialTiltDirectionDegrees == other.AxialTiltDirectionDegrees
+            && AverageTemperatureC == other.AverageTemperatureC
             && Orbit == other.Orbit && Calendar == other.Calendar
             && Surface.HasSameContent(other.Surface);
     }
@@ -105,6 +127,7 @@ public sealed class Body
             DayLengthHours = DayLengthHours,
             AxialTiltDegrees = AxialTiltDegrees,
             AxialTiltDirectionDegrees = AxialTiltDirectionDegrees,
+            AverageTemperatureC = AverageTemperatureC,
             Orbit = Orbit,  // Immutable, safe to share.
             Calendar = Calendar,  // Immutable, safe to share.
         };

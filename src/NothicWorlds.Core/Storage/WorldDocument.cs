@@ -14,6 +14,7 @@ internal sealed class WorldDocument
     public double? TimeDays { get; init; }  // Added in format version 5
     public required List<BodyDocument> Bodies { get; init; }
     public List<RegionDocument>? Regions { get; init; }  // Added in format version 8
+    public List<WeatherPinDocument>? WeatherPins { get; init; }  // Added in format version 9
     public List<JournalEntryDocument>? Journal { get; init; }  // Added in format version 7
     public List<TimelineDocument>? Timelines { get; init; }  // Added in format version 7
     public List<EventDocument>? Events { get; init; }  // Added in format version 7
@@ -36,6 +37,15 @@ internal sealed class LocationDocument
     public Guid? Region { get; init; }  // Added in format version 8
     public double? Latitude { get; init; }  // Both or neither: the pin
     public double? Longitude { get; init; }
+}
+
+internal sealed class WeatherPinDocument
+{
+    public required Guid Id { get; init; }
+    public required Guid Body { get; init; }
+    public required string Name { get; init; }
+    public required double Latitude { get; init; }
+    public required double Longitude { get; init; }
 }
 
 internal sealed class RegionDocument
@@ -77,6 +87,7 @@ internal sealed class BodyDocument
     public required double DayLengthHours { get; init; }  // Added in format version 5
     public required double AxialTilt { get; init; }  // Added in format version 5
     public required double AxialTiltDirection { get; init; }  // Added in format version 6
+    public required double AverageTemperature { get; init; }  // Added in format version 9
     public OrbitDocument? Orbit { get; init; }  // Added in format version 5
     public CalendarDocument? Calendar { get; init; }  // Added in format version 6
     public required SurfaceDocument Surface { get; init; }

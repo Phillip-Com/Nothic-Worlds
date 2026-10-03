@@ -108,7 +108,19 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 8: Region Outlines** · In Progress (owner's choice, 2026-10-02)
+**Milestone 9: Weather Pin** · In Progress (owner's choice, 2026-10-02)
+The weather at named spots on a planet or moon (`WTH-01`). Owner's decisions:
+- **Content:** sun and temperature: daylight hours, how high the sun gets, and a temperature
+  range through the year, with the season. No rain or climate types yet.
+- **Temperatures** come from each planet or moon's **average temperature**, set by the user
+  (Earth: 15 °C); the sunlight math spreads it by latitude and season. No star brightness.
+- **Shown** as a pop-up with a **year chart** (temperature range and daylight per month, in
+  the body's calendar) with a marker at today, plus today's numbers.
+- **Weather pins are named and saved** with the world, with their own icon on the globe; added
+  with a **Weather Pin** toolbar button, then a click on the spot.
+- **Two PRs:** Core (the model, average temperature, pins, format v9) (PR #29), then the app.
+
+**Milestone 8: Region Outlines** · Complete (PR #28 merged 2026-10-02; owner's choice, 2026-10-02)
 Named areas outlined on planets and moons (`LORE-01`). Owner's decisions:
 - **Drawing:** click points around the region on the globe, then drag points to adjust, add
   points on an edge, or delete them (like map pieces' Edit Points).
@@ -963,10 +975,31 @@ system's parameters (e.g. orbital periods, rotation speed) so the user's calenda
 
 ### 4.8 Weather & Climate (`WTH`)
 
-**WTH-01 — Weather pin** · Idea · Base
+**WTH-01 — Weather pin** · In Progress (Core done, PR #29) · Base
 **Intent:** Drop a pin on a region to see what its weather would be, based on climate zone,
 season, etc. This is the lightweight version that works on any system.
-**Implementation:** —
+**Implementation (Core, PR #29):**
+- `Simulation/ClimateYear.cs`: a year of days at a spot (360 per year). **Exact from the
+  simulation:** the star's declination and distance each day give the daylight hours (polar day
+  and night included), the noon sun height, and the day's sunlight relative to the body's
+  average (1 is average; the distance factor is 1/r² against its yearly mean).
+  **Temperatures, an estimate** (owner's choice: around `Body.AverageTemperatureC`):
+  average + 62.5 °C × (the spot's yearly sunlight − 1) + 20 °C × (the day's sunlight felt
+  through a 30-day heat lag − the spot's yearly sunlight), with a day/night swing of
+  10 °C × √(day length ÷ 24 h), capped at 60. On an Earth-like planet: about 29 °C at the
+  equator, 9 °C at 45° (−1 to 19 through the year, 8.6–15.4 hours of daylight), −16 °C at the
+  poles, with the warmest day about 27 days after midsummer. `DayAt` (wrapped into the year)
+  and `Average(from, to)` (e.g. a month) answer the chart; a body without a star has no
+  weather.
+- `Model/WeatherPin.cs` (in `World.WeatherPins`): a named spot on a planet or moon;
+  `WeatherPin.Problem(world)` checks them together.
+- `Body.AverageTemperatureC` (−270 to 2,000 °C; default 15).
+- World file **format version 9** (bodies' `averageTemperature`, optional `weatherPins`).
+- Tested: daylight against Earth's, polar day and night, noon heights, no tilt → 12 hours,
+  Earth-like temperatures falling toward the poles, the month-long lag, opposite hemispheres,
+  the average shifting everything, an elongated orbit's brighter closest approach, longer days
+  swinging more, the year repeating, no weather without a star, determinism, and a golden
+  version 9 file plus damaged-file cases.
 
 **WTH-02 — Live weather simulation** · Idea · Advanced
 **Intent:** As detailed as possible. Ideally the user can watch clouds and weather move across
