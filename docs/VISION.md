@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 10: Layout Tidy-Up** · In Progress (owner's choice, 2026-10-02)
+**Milestone 10: Layout Tidy-Up** · Complete (PR #32 merged 2026-10-03; owner's choice, 2026-10-02)
 Settle the main screen before adding more (`UI-01`): the top bar had overflowed small windows and
 had look-alike controls (Regions vs Regions…). Owner's decisions:
 - **A menu bar plus one row of panel buttons** (System, Map, Journal, Regions, Timeline).
