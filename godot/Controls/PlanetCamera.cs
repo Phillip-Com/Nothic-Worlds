@@ -17,6 +17,13 @@ namespace NothicWorlds.Controls;
 /// </list>
 /// Movement eases toward a target position instead of jumping, so it feels smooth.
 /// Assumes the planet is centered at the world origin.
+/// <para>
+/// Close to the ground (below <see cref="LocalViewMaxAltitude"/>) the camera is in the
+/// <b>local view</b> (VISION.md REN-04): it rides with the planet, staying over the same ground
+/// as it spins, with the planet's north up on screen. Its latitude and longitude are then the
+/// planet's own. Farther out they're fixed in space, and the planet turns beneath. Crossing
+/// between the two keeps the camera where it is; only which way is "up" eases round.
+/// </para>
 /// </summary>
 public partial class PlanetCamera : Camera3D
 {
@@ -53,6 +60,23 @@ public partial class PlanetCamera : Camera3D
     /// </summary>
     [Export] public float SurfacePanMaxAltitude { get; set; } = 1.0f;
 
+    /// <summary>
+    /// Below this altitude (in radii) the camera is in the local view (see the class notes).
+    /// At 0.25 an Earth-sized planet's view is about 2,500 km across.
+    /// </summary>
+    [Export] public float LocalViewMaxAltitude { get; set; } = 0.25f;
+
+    /// <summary>
+    /// How the focused planet is turned right now (its spin and tilt), which the local view
+    /// rides with. Set every frame by whatever places the planet.
+    /// </summary>
+    public Basis SurfaceFrame { get; set; } = Basis.Identity;
+
+    /// <summary>
+    /// Whether the local view may be used. Off while flying between bodies, whose frames differ.
+    /// </summary>
+    public bool AllowLocalView { get; set; } = true;
+
     [Export] public float StartAltitude { get; set; } = 2.0f;
     [Export] public double StartLatitude { get; set; } = 20.0;
     [Export] public double StartLongitude { get; set; }
@@ -86,12 +110,20 @@ public partial class PlanetCamera : Camera3D
     private float _currentAltitude;
     private Vector3 _currentFocusOffset;
 
+    // In the local view, latitude and longitude are in the planet's own frame (SurfaceFrame);
+    // otherwise in fixed space. Which way is up on screen eases between the two.
+    private bool _local;
+    private Vector3 _currentUp = Vector3.Up;
+
     // The mouse button that started the current drag, if any.
     private MouseButton _dragButton = MouseButton.None;
     private bool _keyboardPanning;
 
     /// <summary>How far the camera is from the surface, in planet radii.</summary>
     public float CurrentAltitude => _currentAltitude;
+
+    /// <summary>True while the camera is in the local view (riding with the ground).</summary>
+    public bool IsLocalView => _local;
 
     /// <summary>How panning currently behaves, based on zoom.</summary>
     public PanMode PanMode =>
@@ -100,7 +132,7 @@ public partial class PlanetCamera : Camera3D
     /// <summary>What the user is doing with the camera right now.</summary>
     public CameraAction CurrentAction => _dragButton switch
     {
-        MouseButton.Left => CameraAction.Orbiting,
+        MouseButton.Left => _local ? CameraAction.Panning : CameraAction.Orbiting,
         MouseButton.Right => CameraAction.Panning,
         _ => _keyboardPanning ? CameraAction.Panning : CameraAction.None,
     };
@@ -168,16 +200,36 @@ public partial class PlanetCamera : Camera3D
             _targetFocusOffset = Vector3.Zero;
         }
 
+        SetLocal(AllowLocalView && _targetAltitude < LocalViewMaxAltitude);
         EaseTowardTarget((float)delta);
         UpdateTransform();
     }
 
     /// <summary>
+    /// Places the camera again for the current <see cref="SurfaceFrame"/>, so in the local view
+    /// it keeps up with the ground in the same frame the planet moved.
+    /// </summary>
+    public void FollowSurface()
+    {
+        if (_local)
+        {
+            UpdateTransform();
+        }
+    }
+
+    /// <summary>
     /// Rotates around the focus point as if dragged by <paramref name="screenDelta"/> pixels, at
-    /// a steady rate regardless of zoom.
+    /// a steady rate regardless of zoom. In the local view it pans the map instead.
     /// </summary>
     public void Orbit(Vector2 screenDelta)
     {
+        if (_local)
+        {
+            // Looking straight down at a map, dragging moves the map, as in map apps.
+            PanAcrossSurface(screenDelta);
+            return;
+        }
+
         MoveAngles(screenDelta.Y * OrbitDegreesPerPixel, -screenDelta.X * OrbitDegreesPerPixel);
     }
 
@@ -230,6 +282,7 @@ public partial class PlanetCamera : Camera3D
     /// <summary>Returns to the starting view, centered on the planet.</summary>
     public void ResetView()
     {
+        SetLocal(false);
         _targetLatitude = StartLatitude;
         _targetLongitude = StartLongitude;
         _targetAltitude = Mathf.Clamp(StartAltitude, MinAltitude, MaxAltitude);
@@ -237,7 +290,8 @@ public partial class PlanetCamera : Camera3D
     }
 
     /// <summary>
-    /// Where the camera is heading, for saving with the world (VISION.md SAV-01).
+    /// Where the camera is heading, for saving with the world (VISION.md SAV-01). In the local
+    /// view the latitude and longitude are the planet's own.
     /// </summary>
     public CameraView GetView()
     {
@@ -268,6 +322,9 @@ public partial class PlanetCamera : Camera3D
             var offset = new Vector3(
                 (float)view.FocusOffsetX, (float)view.FocusOffsetY, (float)view.FocusOffsetZ);
             _targetFocusOffset = offset.LimitLength(PlanetRadius * (1.0f + MaxAltitude));
+
+            // A view saved close up was saved in the planet's own frame (see GetView).
+            _local = AllowLocalView && _targetAltitude < LocalViewMaxAltitude;
         }
 
         SnapToTarget();
@@ -360,6 +417,11 @@ public partial class PlanetCamera : Camera3D
         // Ease altitude in log space so zooming in and out feel equally smooth.
         _currentAltitude = Mathf.Exp(
             Mathf.Lerp(Mathf.Log(_currentAltitude), Mathf.Log(_targetAltitude), t));
+
+        // Up turns gently between the fixed frame's and the planet's north (they differ by
+        // the planet's tilt and spin).
+        Vector3 up = Frame * Vector3.Up;
+        _currentUp = _currentUp.Slerp(up, t * 0.5f).Normalized();
     }
 
     private void SnapToTarget()
@@ -368,13 +430,47 @@ public partial class PlanetCamera : Camera3D
         _currentLongitude = _targetLongitude;
         _currentAltitude = _targetAltitude;
         _currentFocusOffset = _targetFocusOffset;
+        _currentUp = Frame * Vector3.Up;
         UpdateTransform();
+    }
+
+    // The frame latitude and longitude are measured in: the planet's in the local view.
+    private Basis Frame => _local ? SurfaceFrame : Basis.Identity;
+
+    // Switches between the local view and the fixed frame, re-expressing where the camera is
+    // and where it's heading in the new frame, so nothing moves.
+    private void SetLocal(bool local)
+    {
+        if (local == _local)
+        {
+            return;
+        }
+
+        Basis toNew = local ? SurfaceFrame.Inverse() : SurfaceFrame;
+        (_currentLatitude, _currentLongitude) =
+            Reexpress(toNew, _currentLatitude, _currentLongitude);
+        (_targetLatitude, _targetLongitude) = Reexpress(toNew, _targetLatitude, _targetLongitude);
+        _local = local;
+    }
+
+    // A direction given as latitude/longitude, turned by `turn`, as latitude/longitude again.
+    // The longitude stays unwrapped near the old one, so easing never takes the long way round.
+    private static (double Latitude, double Longitude) Reexpress(
+        Basis turn, double latitude, double longitude)
+    {
+        Vector3 direction = SphericalCoordinates
+            .ToDirection(new GeoCoordinate(Math.Clamp(latitude, -90, 90), longitude))
+            .ToGodot();
+        GeoCoordinate turned = SphericalCoordinates.FromDirection((turn * direction).ToNumerics());
+        double newLongitude = longitude
+            + SphericalCoordinates.LongitudeDelta(longitude, turned.LongitudeDegrees);
+        return (Math.Clamp(turned.LatitudeDegrees, -MaxLatitude, MaxLatitude), newLongitude);
     }
 
     private void UpdateTransform()
     {
         var coordinate = new GeoCoordinate(_currentLatitude, _currentLongitude);
-        Vector3 direction = SphericalCoordinates.ToDirection(coordinate).ToGodot();
+        Vector3 direction = Frame * SphericalCoordinates.ToDirection(coordinate).ToGodot();
         Vector3 focus = _currentFocusOffset;
         Vector3 position = focus + direction * PlanetRadius * (1.0f + _currentAltitude);
 
@@ -387,6 +483,6 @@ public partial class PlanetCamera : Camera3D
         }
 
         Position = position;
-        LookAt(focus, Vector3.Up);
+        LookAt(focus, _currentUp);
     }
 }

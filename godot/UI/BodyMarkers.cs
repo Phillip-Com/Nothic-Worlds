@@ -168,7 +168,9 @@ public partial class BodyMarkers : CanvasLayer
 
     private void DrawMarkers()
     {
-        if (!Visible)
+        // In the local view the camera looks straight down at the ground: markers out in
+        // space would only clutter the map (VISION.md REN-04).
+        if (!Visible || Camera!.IsLocalView)
         {
             return;
         }

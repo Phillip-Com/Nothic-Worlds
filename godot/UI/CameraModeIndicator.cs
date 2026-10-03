@@ -18,7 +18,7 @@ public partial class CameraModeIndicator : CanvasLayer
     private Label _actionLabel = null!;
     private Label _modeLabel = null!;
     private CameraAction? _shownAction;
-    private PanMode? _shownMode;
+    private string? _shownMode;
 
     /// <summary>The camera to report on.</summary>
     [Export] public PlanetCamera? Camera { get; set; }
@@ -64,13 +64,15 @@ public partial class CameraModeIndicator : CanvasLayer
             _actionLabel.Visible = action != CameraAction.None;
         }
 
-        PanMode mode = Camera.PanMode;
+        string mode = Camera.IsLocalView
+            ? "Local view: the ground, north up  (zoom out for the globe)"
+            : Camera.PanMode == PanMode.Surface
+                ? "Pan: Surface  (zoom out to slide the view)"
+                : "Pan: View  (zoom in to pan across the surface)";
         if (mode != _shownMode)
         {
             _shownMode = mode;
-            _modeLabel.Text = mode == PanMode.Surface
-                ? "Pan: Surface  (zoom out to slide the view)"
-                : "Pan: View  (zoom in to pan across the surface)";
+            _modeLabel.Text = mode;
         }
     }
 
