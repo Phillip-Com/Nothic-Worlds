@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 12: Calendar Fitting** · In Progress (owner's choice, 2026-10-03)
+**Milestone 12: Calendar Fitting** · Complete (PR #36 merged 2026-10-03; owner's choice, 2026-10-03)
 Keep the world fitted to a calendar, so its dates never drift against the seasons (`CAL-02`).
 Owner's decisions:
 - **A lasting switch** per calendar: while it's on, the world stays fitted, and the fitted
