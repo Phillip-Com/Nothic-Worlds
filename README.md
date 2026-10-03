@@ -98,6 +98,12 @@ time bar's **Go to…** dialog always offers a jump to the next solar and the ne
 eclipse. Each moon's previous and next eclipse are also marked on its orbit (when they're within
 one orbit of now): gold-ringed dark disks for solar eclipses, dark red disks for lunar ones.
 
+Comets make **meteor showers**: wherever a planet's orbit passes close to a comet's orbit, the
+planet runs into the comet's dust at the same time every year. The panel lists the coming year's
+showers (with how many meteors an hour fall at the peak, how long they last, and **Go to**), the
+time bar shows one while it's under way, and a small streak marks each one on the orbit
+(**View ▸ Meteor Shower Markers** hides them). Bigger comets make stronger showers.
+
 **Journal** opens the journal on the right (in place of the Map panel). Search and sort your
 entries, add one with **New Entry**, and write: each entry has a title, an optional place (a
 planet, moon, or star), and text. Changes go into the world as you type, and Ctrl+Z undoes them.

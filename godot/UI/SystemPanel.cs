@@ -61,6 +61,7 @@ public partial class SystemPanel : CanvasLayer
     private SpinBox _tiltDirection = null!;
     private CalendarSection? _calendar;
     private EclipseSection? _eclipses;
+    private MeteorShowerSection? _showers;
     private bool _open;
     private bool _syncing;
 
@@ -149,6 +150,8 @@ public partial class SystemPanel : CanvasLayer
         layout.AddChild(new HSeparator());
         _eclipses = new EclipseSection { Session = Session, Time = Time };
         layout.AddChild(_eclipses);
+        _showers = new MeteorShowerSection { Session = Session, Time = Time };
+        layout.AddChild(_showers);
 
         Session.Changed += SyncWithWorld;
         Session.SelectionChanged += SyncWithWorld;
@@ -436,6 +439,12 @@ public partial class SystemPanel : CanvasLayer
         {
             _eclipses.Visible = body.HasSurface;  // Stars and comets have no eclipses.
             _eclipses.Refresh();
+        }
+
+        if (_showers is not null)
+        {
+            _showers.Visible = body.HasSurface;  // Nor meteor showers.
+            _showers.Refresh();
         }
 
         _syncing = false;

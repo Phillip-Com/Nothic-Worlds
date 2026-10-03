@@ -66,6 +66,11 @@ public partial class WorldSession : Node
     private (World World, int Version, Guid BodyId)? _eclipsesUnderway;
     private (World World, int Version, Guid BodyId)? _eclipsesFailed;
 
+    // The selected body's meteor showers, worked out the same way (see SelectedMeteorShowers).
+    private (World World, int Version, Guid BodyId, MeteorShowerTimeline Timeline)? _showers;
+    private (World World, int Version, Guid BodyId)? _showersUnderway;
+    private (World World, int Version, Guid BodyId)? _showersFailed;
+
     // Undo/redo: snapshots of every body. While a gesture (a drag, or a calibration session) is
     // under way, its edits add up to one step, recorded when it ends.
     private readonly UndoHistory<EditSnapshot> _history = new();
@@ -95,6 +100,12 @@ public partial class WorldSession : Node
     /// <see cref="SelectedEclipses"/>).
     /// </summary>
     public event Action? EclipsesReady;
+
+    /// <summary>
+    /// Raised when the selected body's meteor showers have been worked out (see
+    /// <see cref="SelectedMeteorShowers"/>).
+    /// </summary>
+    public event Action? MeteorShowersReady;
 
     /// <summary>Raised when a world is closed (replaced or the app quits), with its ID.</summary>
     public event Action<Guid>? WorldClosed;
@@ -641,6 +652,34 @@ public partial class WorldSession : Node
             if (!timeline.Covers(TimeDays))
             {
                 StartWorkingOutEclipses();
+            }
+
+            return timeline;
+        }
+    }
+
+    /// <summary>
+    /// The selected body's meteor showers (VISION.md EVT-02), or null before they're first
+    /// worked out. Like eclipses, they're worked out in the background, only once something
+    /// asks, and again after an edit or a new selection; <see cref="MeteorShowersReady"/> is
+    /// raised when they're in. While an edit's are being worked out, the body's last ones stay,
+    /// so nothing flickers during a drag. They repeat every year, so time passing never
+    /// changes them.
+    /// </summary>
+    public MeteorShowerTimeline? SelectedMeteorShowers
+    {
+        get
+        {
+            if (_showers is not var (world, version, bodyId, timeline) || world != World
+                || bodyId != SelectedBody.Id)
+            {
+                StartWorkingOutMeteorShowers();
+                return null;
+            }
+
+            if (version != _systemVersion)
+            {
+                StartWorkingOutMeteorShowers();
             }
 
             return timeline;
@@ -1472,6 +1511,39 @@ public partial class WorldSession : Node
     {
         return (world.Bodies.FirstOrDefault(body => body.HasSurface)
             ?? world.Bodies[0]).Id;
+    }
+
+    // Works out the selected body's meteor showers in the background, like its eclipses.
+    private async void StartWorkingOutMeteorShowers()
+    {
+        (World World, int Version, Guid BodyId) wanted =
+            (World, _systemVersion, SelectedBody.Id);
+        if (_showersUnderway is not null || _showersFailed == wanted)
+        {
+            return;
+        }
+
+        _showersUnderway = wanted;
+        List<Body> bodies = CloneBodies(World.Bodies);
+        Body body = bodies.First(b => b.Id == wanted.BodyId);
+        try
+        {
+            MeteorShowerTimeline timeline =
+                await Task.Run(() => MeteorShowerTimeline.For(bodies, body));
+            _showers = (wanted.World, wanted.Version, wanted.BodyId, timeline);
+        }
+        catch (ArgumentException exception)
+        {
+            // An invalid system can't have showers; edits never leave one, so this is a bug.
+            GD.PushError($"Couldn't work out meteor showers: {exception.Message}");
+            _showersFailed = wanted;
+        }
+        finally
+        {
+            _showersUnderway = null;
+        }
+
+        MeteorShowersReady?.Invoke();
     }
 
     // Works out the selected body's eclipses in the background, unless that's already under

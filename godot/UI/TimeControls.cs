@@ -10,7 +10,8 @@ namespace NothicWorlds.UI;
 /// pause the world clock, pick how fast it runs, step it back or forward by a chosen amount, see
 /// the date on the selected body (in its calendar, or "Day 1,204, 14:30" in its own days
 /// without one), and jump to a date. (True scale is in the View menu.)
-/// A second line shows the body's seasons and its next solstice or equinox.
+/// A second line shows the body's seasons and its next solstice or equinox, and a third any
+/// meteor shower under way (EVT-02).
 /// </summary>
 /// <remarks>
 /// Steps and jumps glide: the clock runs quickly to the new time (owner's request), so bodies
@@ -43,6 +44,7 @@ public partial class TimeControls : CanvasLayer
     private OptionButton _speed = null!;
     private Label _time = null!;
     private Label _seasons = null!;
+    private Label _shower = null!;
     private ConfirmationDialog _goToDialog = null!;
     private DateFields _goToDate = null!;
     private NextEclipseJumps _eclipseJumps = null!;
@@ -83,6 +85,13 @@ public partial class TimeControls : CanvasLayer
             MouseFilter = Control.MouseFilterEnum.Pass,
         };
         infoRows.AddChild(_seasons);
+        _shower = new Label
+        {
+            HorizontalAlignment = HorizontalAlignment.Right,
+            MouseFilter = Control.MouseFilterEnum.Pass,
+            Visible = false,
+        };
+        infoRows.AddChild(_shower);
 
         var panel = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd };
         stack.AddChild(panel);
@@ -136,6 +145,7 @@ public partial class TimeControls : CanvasLayer
         Session.TimeChanged += ShowTime;
         Session.SelectionChanged += ShowTime;
         Session.Changed += ShowTime;  // Edits can move the seasons (tilt, orbit, calendar).
+        Session.MeteorShowersReady += ShowTime;
         Session.WorldClosed += _ =>
         {
             SetPlaying(false);
@@ -245,6 +255,23 @@ public partial class TimeControls : CanvasLayer
         {
             _seasons.Visible = false;
         }
+
+        ShowShower(body, now);
+    }
+
+    private void ShowShower(Body body, double now)
+    {
+        if (!body.HasSurface || Session!.SelectedMeteorShowers?.ActiveAt(now) is not { } shower)
+        {
+            _shower.Visible = false;
+            return;
+        }
+
+        _shower.Text = MeteorText.UnderWay(shower, body, Session.World.Bodies, now);
+        _shower.TooltipText = $"A meteor shower: {body.Name} is passing through the dust " +
+            $"along a comet's orbit.\nPeak: {BodyClock.Describe(body, shower.PeakDays)}, " +
+            $"{MeteorText.Details(shower, body).ToLowerInvariant()}.";
+        _shower.Visible = true;
     }
 
     private void AskForDate()

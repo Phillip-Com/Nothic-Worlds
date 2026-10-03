@@ -6,7 +6,8 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The View menu (VISION.md UI-01; owner's choice: the show/hide switches as checkable items in one
-/// menu): Pins, Weather Pins, Regions, Terrain, Season Markers, Eclipse Markers, Grid (also the G
+/// menu): Pins, Weather Pins, Regions, Terrain, Season Markers, Meteor Shower Markers, Eclipse
+/// Markers, Grid (also the G
 /// key), and True Scale. The checkmarks are refreshed each time it opens, so they always match
 /// what's shown.
 /// </summary>
@@ -41,6 +42,7 @@ public partial class ViewMenu : Node
         WeatherPins,
         Regions,
         SeasonMarkers,
+        ShowerMarkers,
         Terrain,
         EclipseMarkers,
         Grid,
@@ -68,6 +70,7 @@ public partial class ViewMenu : Node
         menu.AddCheckItem("Terrain", (int)MenuItem.Terrain);
         menu.AddSeparator();
         menu.AddCheckItem("Season Markers", (int)MenuItem.SeasonMarkers);
+        menu.AddCheckItem("Meteor Shower Markers", (int)MenuItem.ShowerMarkers);
         menu.AddCheckItem("Eclipse Markers", (int)MenuItem.EclipseMarkers);
         menu.AddSeparator();
         menu.AddCheckItem("Grid (G)", (int)MenuItem.Grid);
@@ -94,6 +97,7 @@ public partial class ViewMenu : Node
         MenuItem.WeatherPins => Weather?.ShowPins ?? false,
         MenuItem.Regions => Regions?.ShowRegions ?? false,
         MenuItem.SeasonMarkers => Bodies?.ShowSeasonMarkers ?? false,
+        MenuItem.ShowerMarkers => Bodies?.ShowShowerMarkers ?? false,
         MenuItem.EclipseMarkers => Eclipses?.ShowMarkers ?? false,
         MenuItem.Terrain => System?.ShowTerrain ?? false,
         MenuItem.Grid => System?.ShowGrid ?? false,
@@ -116,6 +120,9 @@ public partial class ViewMenu : Node
                 break;
             case MenuItem.SeasonMarkers when Bodies is not null:
                 Bodies.ShowSeasonMarkers = on;
+                break;
+            case MenuItem.ShowerMarkers when Bodies is not null:
+                Bodies.ShowShowerMarkers = on;
                 break;
             case MenuItem.EclipseMarkers when Eclipses is not null:
                 Eclipses.ShowMarkers = on;

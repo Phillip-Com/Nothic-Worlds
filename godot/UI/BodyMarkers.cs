@@ -46,8 +46,13 @@ public partial class BodyMarkers : CanvasLayer
     private static readonly Color _autumnColor = new(0.95f, 0.55f, 0.3f);
     private static readonly Color _winterColor = new(0.6f, 0.8f, 1.0f);
 
+    // Meteor shower markers: a small streak, like a meteor.
+    private static readonly Color _meteorColor = new(0.75f, 0.95f, 1.0f);
+    private static readonly Vector2 _streak = new(-11, -7);
+
     private Control _overlay = null!;
     private bool _showSeasons = true;
+    private bool _showShowers = true;
     private Vector2? _pressedAt;
     private Guid? _pressedBody;
 
@@ -55,6 +60,10 @@ public partial class BodyMarkers : CanvasLayer
     // so drawing every frame allocates nothing (allocations add up to garbage-collection
     // stutters).
     private SeasonMarkerPlan? _seasonPlan;
+
+    // The meteor shower markers being shown. A shower happens at the same point of the orbit
+    // every year, so they only change with the showers themselves.
+    private ShowerMarkerPlan? _showerPlan;
 
     // Reused corner lists for drawing diamonds.
     private readonly Vector2[] _diamond = new Vector2[4];
@@ -74,8 +83,29 @@ public partial class BodyMarkers : CanvasLayer
     private readonly record struct SeasonMarker(
         double TimeDays, bool IsSolstice, Color Color, string Label);
 
+    // The markers for a year of meteor showers: which orbit they sit on, and each one's peak
+    // time and label.
+    private sealed record ShowerMarkerPlan(
+        MeteorShowerTimeline Timeline,
+        Body? Traveller,
+        Body? Parent,
+        IReadOnlyList<(double TimeDays, string Label)> Markers);
+
     /// <summary>The system view, for where each body is drawn.</summary>
     [Export] public SystemView? System { get; set; }
+
+    /// <summary>
+    /// Whether the meteor shower markers show (View ▸ Meteor Shower Markers; VISION.md EVT-02).
+    /// </summary>
+    public bool ShowShowerMarkers
+    {
+        get => _showShowers;
+        set
+        {
+            _showShowers = value;
+            _overlay?.QueueRedraw();
+        }
+    }
 
     /// <summary>Whether the solstice and equinox markers show (View ▸ Season Markers).</summary>
     public bool ShowSeasonMarkers
@@ -204,6 +234,79 @@ public partial class BodyMarkers : CanvasLayer
         {
             DrawSeasonMarkers(font);
         }
+
+        if (_showShowers)
+        {
+            DrawShowerMarkers(font);
+        }
+    }
+
+    // Where on the orbit that shows the selected body's year each meteor shower peaks.
+    private void DrawShowerMarkers(Font font)
+    {
+        if (CurrentShowerPlan() is not { Traveller: Body traveller, Parent: Body parent } plan
+            || !System!.Layout.TryGetValue(parent.Id, out DisplayBody parentPlace))
+        {
+            return;
+        }
+
+        foreach ((double timeDays, string label) in plan.Markers)
+        {
+            Vector3D onOrbit = parentPlace.Position + SystemLayout.OrbitPoint(
+                traveller, parent, timeDays, System.DisplayScale);
+            Vector3 scenePosition = System.ToScene(onOrbit);
+            if (Camera!.IsPositionBehind(scenePosition))
+            {
+                continue;
+            }
+
+            // Off-screen markers are skipped, as for the seasons.
+            Vector2 center = Camera.UnprojectPosition(scenePosition);
+            if (!_overlay.GetRect().Grow(OffScreenMarginPixels).HasPoint(center))
+            {
+                continue;
+            }
+
+            _overlay.DrawLine(center, center + _streak, Colors.Black, 4.0f);
+            _overlay.DrawLine(center, center + _streak, _meteorColor, 2.0f);
+            _overlay.DrawCircle(center, SeasonMarkerRadius - 1 + 1.5f, Colors.Black);
+            _overlay.DrawCircle(center, SeasonMarkerRadius - 1, _meteorColor);
+            Vector2 at = center + new Vector2(SeasonMarkerRadius + 4, SeasonMarkerRadius + 12);
+            _overlay.DrawString(font, at + Vector2.One, label, modulate: Colors.Black);
+            _overlay.DrawString(font, at, label, modulate: _meteorColor);
+        }
+    }
+
+    // The shower markers to show now: the cached ones, unless the showers changed. Null while
+    // they're still being worked out.
+    private ShowerMarkerPlan? CurrentShowerPlan()
+    {
+        if (Session!.SelectedMeteorShowers is not MeteorShowerTimeline timeline)
+        {
+            return null;
+        }
+
+        if (_showerPlan is { } cached && cached.Timeline == timeline)
+        {
+            return cached;
+        }
+
+        IReadOnlyList<Body> bodies = Session.World.Bodies;
+        Body? traveller = Seasons.OrbitShowingYear(bodies, Session.SelectedBody);
+        Body? parent = traveller?.Orbit is Orbit orbit
+            ? bodies.FirstOrDefault(b => b.Id == orbit.ParentId)
+            : null;
+        (double, string)[] markers = [.. timeline.Between(0, timeline.YearDays)
+            .Where(shower => shower.PeakDays >= 0 && shower.PeakDays < timeline.YearDays)
+            .Select(shower => (shower.PeakDays, MarkerLabel(shower, bodies)))];
+        _showerPlan = new ShowerMarkerPlan(timeline, traveller, parent, markers);
+        return _showerPlan;
+    }
+
+    private static string MarkerLabel(MeteorShower shower, IReadOnlyList<Body> bodies)
+    {
+        string? comet = bodies.FirstOrDefault(b => b.Id == shower.CometId)?.Name;
+        return comet is null ? "Meteor shower" : $"{comet} meteors";
     }
 
     // The selected body's year of solstices and equinoxes, on the orbit that shows its year.
