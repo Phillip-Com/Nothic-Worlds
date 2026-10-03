@@ -7,6 +7,8 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-03 | Rain is estimated from a **tropical rain belt following the sun**, a **mid-latitude storm belt**, drizzle, the cold, and the terrain's **moisture** | In PR | [#40](https://github.com/Phillip-Com/Nothic-Worlds/pull/40) | Claude's model, tuned to Earth-like totals. VISION.md `WTH-03` |
+| 2026-10-03 | The weather window **scrolls** when the screen is too short | In PR | [#40](https://github.com/Phillip-Com/Nothic-Worlds/pull/40) | Claude's fix (it no longer fit at 1152 × 648) |
 | 2026-10-03 | Milestone 14: **terrain-aware weather** (new `WTH-03`), temperature and rainfall in **two PRs** | Merged | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) · `823d2ea` | VISION.md §3 |
 | 2026-10-03 | Each terrain type gets a **climate kind** from a fixed list, picked in the Terrain panel | Merged | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) · `823d2ea` | Format version 12; older types get theirs by name |
 | 2026-10-03 | **Water counts across ~500 km** around a weather pin; other kinds where it stands; one explanation line in the window | Merged | [#39](https://github.com/Phillip-Com/Nothic-Worlds/pull/39) · `823d2ea` | VISION.md `WTH-03` |
