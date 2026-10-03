@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 16: Body Appearance** · In Progress (owner's choice, 2026-10-03)
+**Milestone 16: Body Appearance** · Complete (PR #42 merged 2026-10-03; owner's choice, 2026-10-03)
 Give bodies their own look (`BOD-06`). Owner's decisions:
 - **Planets and moons:** a color and a surface pattern (Plain, Rocky, Banded, Icy, Cloudy),
   shown where there's no map; terrain and maps still draw on top.
