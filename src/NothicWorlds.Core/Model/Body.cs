@@ -18,6 +18,11 @@ public sealed class Body
     /// <summary>What kind of body this is.</summary>
     public BodyKind Kind { get; set; } = BodyKind.Planet;
 
+    /// <summary>
+    /// The body's shape (VISION.md BOD-02): a globe, or for a planet or moon, a flat world.
+    /// </summary>
+    public BodyShape Shape { get; set; } = BodyShape.Sphere;
+
     /// <summary>The largest allowed radius, in km (far beyond the biggest known stars).</summary>
     public const double MaxRadiusKm = 1e10;
 
@@ -41,7 +46,10 @@ public sealed class Body
     /// <summary>What's drawn on the body's surface.</summary>
     public SurfaceSettings Surface { get; } = new();
 
-    /// <summary>The body's radius in km (Earth's by default).</summary>
+    /// <summary>
+    /// The body's radius in km (Earth's by default). For a flat world it's the radius of the
+    /// matching globe; the disc itself is π times as wide (see <see cref="Geometry.FlatDisc"/>).
+    /// </summary>
     public double RadiusKm { get; set; } = 6371.0;
 
     /// <summary>
@@ -108,6 +116,11 @@ public sealed class Body
                 $"{MaxAverageTemperatureC} °C";
         }
 
+        if (!HasSurface && Shape != BodyShape.Sphere)
+        {
+            return "only planets and moons can be flat";
+        }
+
         if (Kind == BodyKind.Comet && Calendar is not null)
         {
             return "a comet can't have a calendar";
@@ -118,12 +131,13 @@ public sealed class Body
 
     /// <summary>
     /// True if <paramref name="other"/> would save exactly the same body: the same name, kind,
-    /// size, day, tilt, orbit, appearance, and surface. Used to tell whether the world still
+    /// shape, size, day, tilt, orbit, appearance, and surface. Used to tell whether the world still
     /// matches its saved file.
     /// </summary>
     public bool HasSameContent(Body other)
     {
         return Id == other.Id && Name == other.Name && Kind == other.Kind
+            && Shape == other.Shape
             && RadiusKm == other.RadiusKm && DayLengthHours == other.DayLengthHours
             && AxialTiltDegrees == other.AxialTiltDegrees
             && AxialTiltDirectionDegrees == other.AxialTiltDirectionDegrees
@@ -141,6 +155,7 @@ public sealed class Body
             Id = Id,
             Name = Name,
             Kind = Kind,
+            Shape = Shape,
             RadiusKm = RadiusKm,
             DayLengthHours = DayLengthHours,
             AxialTiltDegrees = AxialTiltDegrees,

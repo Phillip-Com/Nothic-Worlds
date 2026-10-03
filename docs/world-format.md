@@ -190,6 +190,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `bodies[].id` | yes | GUID, unique within the world |
 | `bodies[].name` | yes | Not empty |
 | `bodies[].kind` | yes | `"star"`, `"planet"`, `"moon"`, or `"comet"`. A comet must circle a star, nothing may circle a comet, and a comet has no `calendar`. Its `appearance` is a `color` and `pattern`, like a moon's. |
+| `bodies[].shape` | no | `"sphere"` or `"flat-disc"` (`BOD-02`); omitted for a sphere. Only planets and moons can be flat. A flat world is a disc with every latitude and longitude on its top face: the north pole at the center, and a point's distance from the center equal to its angle from the pole, so the disc's radius is π × `radiusKm` (`radiusKm` stays the matching globe's). |
 | `bodies[].radiusKm` | yes | Above 0, at most 10¹⁰ |
 | `bodies[].dayLengthHours` | yes | Time for one spin, in standard hours. Above 0, at most 10⁷. |
 | `bodies[].axialTilt` | yes | Degrees the spin axis leans, 0 to 180 |
@@ -416,6 +417,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 16 | Flat worlds (M19): planets and moons gain an optional `shape` | Nothing to change: version 15 bodies are all spheres |
 | 15 | Comets (M18): bodies can be of kind `comet` | Nothing to change: version 14 worlds have no comets |
 | 14 | Leap years (M17): calendars gain optional `leap` | Nothing to change: version 13 calendars have no leap years |
 | 13 | Body appearance (M16): bodies gain `appearance` | Stars get `starType` `yellow`; moons `color` `#8A8A8A` and `pattern` `rocky`; planets `color` `#214573` and `pattern` `plain` (the look they always had) |

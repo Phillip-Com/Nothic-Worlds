@@ -49,6 +49,54 @@ public partial class PlanetSurface : MeshInstance3D
     private ImageTexture? _terrainPalette;
     private byte[] _paletteBytes = [];
 
+    // The globe mesh, kept while the body is flat, and the flat world's rock.
+    private Mesh? _sphereMesh;
+    private MeshInstance3D? _rock;
+    private BodyShape _shape = BodyShape.Sphere;
+
+    private static readonly StandardMaterial3D _rockMaterial = new()
+    {
+        AlbedoColor = new Color(0.36f, 0.33f, 0.30f),
+        Roughness = 1.0f,
+    };
+
+    /// <summary>
+    /// The globe's shape (VISION.md BOD-02): a sphere, or a flat world's disc with bare rock
+    /// underneath. Maps and terrain stay as they are; only where they're drawn changes.
+    /// </summary>
+    public BodyShape Shape
+    {
+        get => _shape;
+        set
+        {
+            if (value == _shape)
+            {
+                return;
+            }
+
+            _shape = value;
+            bool flat = value == BodyShape.FlatDisc;
+            _sphereMesh ??= Mesh;
+            Mesh = flat ? FlatDiscMeshes.Top : _sphereMesh;
+            SurfaceMaterial.SetShaderParameter("flat_disc", flat);
+            if (flat && _rock is null)
+            {
+                _rock = new MeshInstance3D
+                {
+                    Name = "Rock",
+                    Mesh = FlatDiscMeshes.Rock,
+                    MaterialOverride = _rockMaterial,
+                };
+                AddChild(_rock);
+            }
+            else if (!flat && _rock is not null)
+            {
+                _rock.QueueFree();
+                _rock = null;
+            }
+        }
+    }
+
     /// <summary>True if a map image is currently applied.</summary>
     public bool HasMap { get; private set; }
 

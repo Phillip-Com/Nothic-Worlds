@@ -108,10 +108,27 @@ uniform vec3 highlight_color : source_color = vec3(1.0, 0.8, 0.35);
 uniform float grid_spacing_degrees = 15.0;
 uniform float grid_line_pixels = 1.2;
 
+// A flat world (VISION.md BOD-02): the mesh is a disc, and each point stands for the globe
+// direction it maps to (see flat_disc_direction).
+uniform bool flat_disc = false;
+
 varying vec3 local_direction;
 
 void vertex() {
 	local_direction = VERTEX;
+}
+
+// On a flat world's top face, distance from the center is the angle from the north pole (the
+// disc's radius is PI), so a point maps back to the globe direction it stands for. Must match
+// FlatDisc in Core.
+vec3 flat_disc_direction(vec3 point) {
+	float across = length(point.xz);
+	if (across < 1e-6) {
+		return vec3(0.0, 1.0, 0.0);
+	}
+	float from_pole = min(across, PI);
+	vec2 sideways = point.xz / across * sin(from_pole);
+	return vec3(sideways.x, cos(from_pole), sideways.y);
 }
 
 // 1.0 on a line through multiples of `spacing`, fading to 0.0 over `pixels` screen pixels.
@@ -589,7 +606,9 @@ vec3 surface_look(vec3 unit_direction) {
 }
 
 void fragment() {
-	vec3 direction = normalize(local_direction);
+	vec3 direction = flat_disc
+		? flat_disc_direction(local_direction)
+		: normalize(local_direction);
 	float latitude = degrees(asin(clamp(direction.y, -1.0, 1.0)));
 	float longitude = degrees(atan(direction.x, direction.z));
 

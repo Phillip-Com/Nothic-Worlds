@@ -1,3 +1,4 @@
+using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Model;
 
 namespace NothicWorlds.Interop;
@@ -15,6 +16,12 @@ public static class CoreConversions
     }
 
     /// <summary>Converts a Godot vector to a Core (System.Numerics) vector.</summary>
+    public static Vector3D ToVector3D(this System.Numerics.Vector3 vector) =>
+        new(vector.X, vector.Y, vector.Z);
+
+    public static System.Numerics.Vector3 ToNumerics(this Vector3D vector) =>
+        new((float)vector.X, (float)vector.Y, (float)vector.Z);
+
     public static System.Numerics.Vector3 ToNumerics(this Godot.Vector3 vector)
     {
         return new System.Numerics.Vector3(vector.X, vector.Y, vector.Z);

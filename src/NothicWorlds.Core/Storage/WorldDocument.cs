@@ -92,6 +92,7 @@ internal sealed class BodyDocument
     public required Guid Id { get; init; }
     public required string Name { get; init; }
     public required string Kind { get; init; }
+    public string? Shape { get; init; }  // Added in format version 16; omitted for spheres
     public required double RadiusKm { get; init; }  // Added in format version 5
     public required double DayLengthHours { get; init; }  // Added in format version 5
     public required double AxialTilt { get; init; }  // Added in format version 5

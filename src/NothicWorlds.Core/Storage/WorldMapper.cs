@@ -291,6 +291,7 @@ internal static class WorldMapper
             Id = body.Id,
             Name = body.Name,
             Kind = WorldFormat.BodyKindName(body.Kind),
+            Shape = body.Shape == BodyShape.Sphere ? null : WorldFormat.ShapeName(body.Shape),
             RadiusKm = body.RadiusKm,
             DayLengthHours = body.DayLengthHours,
             AxialTilt = body.AxialTiltDegrees,
@@ -538,6 +539,9 @@ internal static class WorldMapper
             Id = document.Id,
             Name = RequireText(document.Name, "planet name"),
             Kind = WorldFormat.ParseBodyKind(document.Kind),
+            Shape = document.Shape is null
+                ? BodyShape.Sphere
+                : WorldFormat.ParseShape(document.Shape),
             RadiusKm = document.RadiusKm,
             DayLengthHours = document.DayLengthHours,
             AxialTiltDegrees = document.AxialTilt,
