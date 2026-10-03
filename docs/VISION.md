@@ -345,7 +345,7 @@ visible. Heavier features go in an opt-in **Advanced** section.
   ~155 fps, **137 MB video memory** (S3TC), 45 MB app memory. The slowest frames sit around
   60–70 fps in every build.
 
-**REN-04 — Top-down local region view** · In Progress (camera done, PR #37) · Base
+**REN-04 — Top-down local region view** · Implemented (M13: PR #37, PR #38) · Base
 **Intent:** Zoom down to a local region and see it as a top-down terrain view.
 **Implementation (camera, PR #37):**
 - `godot/Controls/PlanetCamera.cs`: below `LocalViewMaxAltitude` (0.25 radii, a view about
@@ -372,6 +372,24 @@ visible. Heavier features go in an opt-in **Advanced** section.
   left-drag moves the map with the mouse, the closest approach is 10 km with the ground still
   drawn, zooming back out crosses over without a jump, save/reopen keeps the view, and flying to
   the Sun and back from close up works without errors. Benchmark unchanged (~195 fps both).
+**Implementation (aids and Zoom to, PR #38):**
+- `godot/UI/LocalViewAids.cs`: in the local view only, at the bottom left (moved aside while
+  the System panel is open): a **north arrow** (pointing to the body's north from the middle of
+  the view), a **scale bar** (the largest 1, 2, or 5 × 10ⁿ km up to 160 px, measured across the
+  middle of the view on the body's real radius), and the **coordinates under the mouse**, with
+  the names of any regions there (`LoreRules.RegionsAt`). Redrawn as the view moves.
+- **Zoom to** (`godot/Controls/ZoomTo.cs`): selects the body if needed (flying there), then
+  `PlanetCamera.FlyToSurface` glides down into the local view over the spot, low enough that a
+  given span fits top to bottom (it waits until the flight between bodies is over). A region is
+  shown whole (centered on `SphericalPolygon.Center`, at least 50 km across); a pin with 300 km
+  of ground around it. Buttons: the Regions panel's editor (beside Edit Points), the journal and
+  event pin pop-up, and the weather pin window. `SystemView.FlyTo` now turns the local view off
+  straight away, so a Zoom to queued during a flight uses the right body.
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: Zoom to from
+  the Regions panel (centered to 0.0 km, all corners on screen), from a journal pin's pop-up and
+  a weather pin's window (both 0.0 km off), and to a pin on a moon (selected, flown to, 0.0 km
+  off); the aids readable, the region name under the mouse, and the aids beside the open System
+  panel. Benchmark unchanged (~197 fps both).
 
 **REN-05 — Visual styles** · Idea · Base
 **Intent:** Painterly is the default style. The goal is to let users choose other styles, such

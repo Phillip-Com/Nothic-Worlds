@@ -7,11 +7,12 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-10-03 | Milestone 13: **local region view** (`REN-04`) as a **seamless deeper zoom**, detail from map pieces | In PR | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) | VISION.md §3 |
-| 2026-10-03 | Local view reached by **zooming and Zoom to buttons**; shows a **scale bar, north arrow, and coordinates** | In PR | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) | Built in the next PR |
-| 2026-10-03 | In the local view the camera **rides with the planet** (same ground as time passes, north up); left-drag pans | In PR | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) | Claude's choice |
-| 2026-10-03 | The camera can come within **10 km** of the ground; markers out in space are hidden in the local view | In PR | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) | Claude's choices |
-| 2026-10-03 | Milestone 13 in **two PRs**: the camera, then the on-screen aids and Zoom to buttons | In PR | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) |  |
+| 2026-10-03 | Local view aids sit at the **bottom left** (beside the System panel when open); Zoom to shows a **region whole** and a **pin with 300 km** around it | In PR | [#38](https://github.com/Phillip-Com/Nothic-Worlds/pull/38) | Claude's choices. VISION.md `REN-04` |
+| 2026-10-03 | Milestone 13: **local region view** (`REN-04`) as a **seamless deeper zoom**, detail from map pieces | Merged | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) · `bf6a4c1` | VISION.md §3 |
+| 2026-10-03 | Local view reached by **zooming and Zoom to buttons**; shows a **scale bar, north arrow, and coordinates** | Merged | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) · `bf6a4c1` | Built in the next PR |
+| 2026-10-03 | In the local view the camera **rides with the planet** (same ground as time passes, north up); left-drag pans | Merged | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) · `bf6a4c1` | Claude's choice |
+| 2026-10-03 | The camera can come within **10 km** of the ground; markers out in space are hidden in the local view | Merged | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) · `bf6a4c1` | Claude's choices |
+| 2026-10-03 | Milestone 13 in **two PRs**: the camera, then the on-screen aids and Zoom to buttons | Merged | [#37](https://github.com/Phillip-Com/Nothic-Worlds/pull/37) · `bf6a4c1` |  |
 | 2026-10-03 | Milestone 12: **calendar fitting** (`CAL-02`), in **one PR** | Merged | [#36](https://github.com/Phillip-Com/Nothic-Worlds/pull/36) · `39f2dc8` | VISION.md §3 |
 | 2026-10-03 | Fitting is a **lasting switch** per calendar; fitted fields are locked in the System panel | Merged | [#36](https://github.com/Phillip-Com/Nothic-Worlds/pull/36) · `39f2dc8` | Format version 11 |
 | 2026-10-03 | The user picks **year length or day length**; defaults: planets the orbit, moons the day | Merged | [#36](https://github.com/Phillip-Com/Nothic-Worlds/pull/36) · `39f2dc8` | VISION.md `CAL-02` |

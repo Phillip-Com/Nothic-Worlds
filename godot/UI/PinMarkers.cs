@@ -267,11 +267,27 @@ public partial class PinMarkers : CanvasLayer
         }
 
         Body body = Session!.SelectedBody;
-        _popupList.AddChild(new Label
+        var placeRow = new HBoxContainer();
+        placeRow.AddChild(new Label
         {
             Text = PlaceText.Describe(pins[0].Spot),
             Modulate = new Color(1, 1, 1, 0.6f),
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
         });
+        var zoom = new Button
+        {
+            Text = "Zoom to",
+            TooltipText = "Glide down to look at this spot from close up",
+            FocusMode = Control.FocusModeEnum.None,
+        };
+        GeoCoordinate spot = pins[0].Spot;
+        zoom.Pressed += () =>
+        {
+            _popup.Hide();
+            _ = ZoomTo.PinAsync(Session, Camera!, body.Id, spot);
+        };
+        placeRow.AddChild(zoom);
+        _popupList.AddChild(placeRow);
         foreach (Pin pin in pins.OrderBy(p => p.Event is null ? 0 : 1)
             .ThenBy(p => p.Event?.StartDays ?? 0))
         {

@@ -57,6 +57,9 @@ public partial class RegionsPanel : CanvasLayer
     /// <summary>The Journal panel, to open an entry placed in a region.</summary>
     [Export] public JournalPanel? Journal { get; set; }
 
+    /// <summary>The camera, for Zoom to (VISION.md REN-04).</summary>
+    [Export] public PlanetCamera? Camera { get; set; }
+
     /// <summary>The timeline strip, whose editor opens an event placed in a region.</summary>
     [Export] public TimelineStrip? Timeline { get; set; }
 
@@ -217,6 +220,13 @@ public partial class RegionsPanel : CanvasLayer
             }
         };
         outlineRow.AddChild(_editPoints);
+        outlineRow.AddChild(CreateButton("Zoom to", () =>
+        {
+            if (Session is not null && Camera is not null && Selected is Region region)
+            {
+                _ = ZoomTo.RegionAsync(Session, Camera, region);
+            }
+        }, "Glide down to look at this region from close up"));
         editor.AddChild(outlineRow);
 
         _notes = new TextEdit

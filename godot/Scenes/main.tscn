@@ -32,6 +32,7 @@
 [ext_resource type="Script" path="res://UI/AddMenu.cs" id="30_add_menu"]
 [ext_resource type="Script" path="res://UI/TerrainPanel.cs" id="31_terrain_panel"]
 [ext_resource type="Script" path="res://Controls/TerrainBrush.cs" id="32_terrain_brush"]
+[ext_resource type="Script" path="res://UI/LocalViewAids.cs" id="33_local_aids"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -115,9 +116,10 @@ Toolbar = NodePath("../MapToolbar")
 Time = NodePath("../TimeControls")
 Placer = NodePath("../PinPlacer")
 
-[node name="RegionsPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "Editor", "Renderer", "Journal", "Timeline")]
+[node name="RegionsPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Camera", "Toolbar", "Editor", "Renderer", "Journal", "Timeline")]
 script = ExtResource("26_regions_panel")
 Session = NodePath("../WorldSession")
+Camera = NodePath("../PlanetCamera")
 Toolbar = NodePath("../MapToolbar")
 Editor = NodePath("../RegionEditor")
 Renderer = NodePath("../RegionRenderer")
@@ -136,6 +138,14 @@ Session = NodePath("../WorldSession")
 Calibration = NodePath("../CalibrationWorkspace")
 Cutter = NodePath("../CutEditor")
 Toolbar = NodePath("../MapToolbar")
+
+[node name="LocalViewAids" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar", "SystemPanel")]
+script = ExtResource("33_local_aids")
+Session = NodePath("../WorldSession")
+System = NodePath("../SystemView")
+Camera = NodePath("../PlanetCamera")
+Toolbar = NodePath("../MapToolbar")
+SystemPanel = NodePath("../SystemPanel")
 
 [node name="TerrainPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "Brush")]
 script = ExtResource("31_terrain_panel")

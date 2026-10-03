@@ -78,7 +78,7 @@ public partial class WeatherMarkers : CanvasLayer
             return;
         }
 
-        _window = new WeatherWindow { Session = Session };
+        _window = new WeatherWindow { Session = Session, Camera = Camera };
         AddChild(_window);
         BuildNameDialog();
 
