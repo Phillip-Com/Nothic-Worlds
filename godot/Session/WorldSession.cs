@@ -437,6 +437,59 @@ public partial class WorldSession : Node
         }
     }
 
+    /// <summary>Adds a nebula to the sky (VISION.md BOD-03).</summary>
+    /// <returns>The new nebula, or null if the sky already has as many as it can.</returns>
+    public Nebula? AddNebula()
+    {
+        if (World.Nebulas.Count >= Nebula.MaxCount)
+        {
+            return null;
+        }
+
+        Nebula nebula = NewBodies.Nebula(World.Nebulas);
+        RecordUndo($"Add {nebula.Name}");
+        World.Nebulas.Add(nebula);
+        MarkChanged(systemChanged: false);
+        return nebula;
+    }
+
+    /// <summary>
+    /// Changes a nebula (matched by ID). Rapid changes (dragging a field or a color) are one
+    /// undo step.
+    /// </summary>
+    /// <returns>What's wrong with the nebula (nothing is changed then), or null.</returns>
+    public string? SetNebula(Nebula nebula)
+    {
+        int index = World.Nebulas.FindIndex(n => n.Id == nebula.Id);
+        if (index < 0 || World.Nebulas[index] == nebula)
+        {
+            return null;
+        }
+
+        if (nebula.Problem() is string problem)
+        {
+            return problem;
+        }
+
+        RecordUndo($"Edit {World.Nebulas[index].Name}", mergeKey: ("nebula", nebula.Id));
+        World.Nebulas[index] = nebula;
+        MarkChanged(systemChanged: false);
+        return null;
+    }
+
+    /// <summary>Removes a nebula from the sky.</summary>
+    public void RemoveNebula(Guid nebulaId)
+    {
+        if (World.Nebulas.Find(n => n.Id == nebulaId) is not Nebula nebula)
+        {
+            return;
+        }
+
+        RecordUndo($"Delete {nebula.Name}");
+        World.Nebulas.Remove(nebula);
+        MarkChanged(systemChanged: false);
+    }
+
     /// <summary>
     /// Adds an asteroid belt to a star (VISION.md BOD-03), like our main belt or just beyond
     /// its outermost belt.

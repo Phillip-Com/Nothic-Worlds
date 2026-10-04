@@ -4,9 +4,9 @@ namespace NothicWorlds.Session;
 
 /// <summary>
 /// A copy of a world's regions, weather pins, journal, timelines, and events, plus its terrain
-/// types, for undo and for telling whether the world still matches its saved file (VISION.md
-/// LORE-01, LORE-02, LORE-03, WTH-01, BOD-05). They are immutable records, so copying the lists
-/// is enough: the copies share them.
+/// types and nebulas, for undo and for telling whether the world still matches its saved file
+/// (VISION.md LORE-01, LORE-02, LORE-03, WTH-01, BOD-05, BOD-03). They are immutable records, so
+/// copying the lists is enough: the copies share them.
 /// </summary>
 internal sealed record LoreState(
     IReadOnlyList<TerrainType> TerrainTypes,
@@ -14,13 +14,15 @@ internal sealed record LoreState(
     IReadOnlyList<WeatherPin> WeatherPins,
     IReadOnlyList<JournalEntry> Journal,
     IReadOnlyList<Timeline> Timelines,
-    IReadOnlyList<TimelineEvent> Events)
+    IReadOnlyList<TimelineEvent> Events,
+    IReadOnlyList<Nebula> Nebulas)
 {
     /// <summary>The world's lore as it is now.</summary>
     public static LoreState Of(World world)
     {
         return new LoreState([.. world.TerrainTypes], [.. world.Regions],
-            [.. world.WeatherPins], [.. world.Journal], [.. world.Timelines], [.. world.Events]);
+            [.. world.WeatherPins], [.. world.Journal], [.. world.Timelines], [.. world.Events],
+            [.. world.Nebulas]);
     }
 
     /// <summary>True if the world's lore is exactly this.</summary>
@@ -31,7 +33,8 @@ internal sealed record LoreState(
             && WeatherPins.SequenceEqual(world.WeatherPins)
             && Journal.SequenceEqual(world.Journal)
             && Timelines.SequenceEqual(world.Timelines)
-            && Events.SequenceEqual(world.Events);
+            && Events.SequenceEqual(world.Events)
+            && Nebulas.SequenceEqual(world.Nebulas);
     }
 
     /// <summary>Puts this lore back into the world, replacing what's there.</summary>
@@ -49,5 +52,7 @@ internal sealed record LoreState(
         world.Timelines.AddRange(Timelines);
         world.Events.Clear();
         world.Events.AddRange(Events);
+        world.Nebulas.Clear();
+        world.Nebulas.AddRange(Nebulas);
     }
 }

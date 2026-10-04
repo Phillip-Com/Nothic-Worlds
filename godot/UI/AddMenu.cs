@@ -42,6 +42,7 @@ public partial class AddMenu : Node
         Moon,
         Star,
         Comet,
+        Nebula,
         Region,
         JournalEntry,
         TimelineEvent,
@@ -67,6 +68,7 @@ public partial class AddMenu : Node
         menu.AddItem("Moon", (int)MenuItem.Moon);
         menu.AddItem("Star", (int)MenuItem.Star);
         menu.AddItem("Comet", (int)MenuItem.Comet);
+        menu.AddItem("Nebula", (int)MenuItem.Nebula);
         menu.AddSeparator();
         menu.AddItem("Region", (int)MenuItem.Region);
         menu.AddItem("Weather Pin", (int)MenuItem.WeatherPin);
@@ -106,6 +108,15 @@ public partial class AddMenu : Node
                         MenuItem.Comet => BodyKind.Comet,
                         _ => BodyKind.Star,
                     });
+                }
+
+                break;
+            case MenuItem.Nebula:
+                Toolbar!.ShowSystem();
+                if (Session!.AddNebula() is Nebula nebula)
+                {
+                    Toolbar.ShowInfo($"Added {nebula.Name} to the sky. Set where it is, its " +
+                        "size, and its colors at the bottom of the System panel.");
                 }
 
                 break;
