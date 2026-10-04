@@ -89,14 +89,15 @@ public sealed class World
         };
         copy.Bodies.AddRange(Bodies.Select(body => body.Clone()));
 
-        // Terrain types, regions, weather pins, entries, timelines, and events are immutable
-        // records, safe to share.
+        // Terrain types, regions, weather pins, entries, timelines, events, and nebulas are
+        // immutable records, safe to share.
         copy.TerrainTypes.AddRange(TerrainTypes);
         copy.Regions.AddRange(Regions);
         copy.WeatherPins.AddRange(WeatherPins);
         copy.Journal.AddRange(Journal);
         copy.Timelines.AddRange(Timelines);
         copy.Events.AddRange(Events);
+        copy.Nebulas.AddRange(Nebulas);
         return copy;
     }
 

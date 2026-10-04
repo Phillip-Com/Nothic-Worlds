@@ -1266,6 +1266,8 @@ the body as a sphere of its radius. World trees (M21) hold realms on their branc
 - **Verified in the running app** with real clicks: Add Nebula, its fields, the nebula behind
   the planet when looking toward its direction and absent looking away, a bigger and brighter
   one, the background unchanged without nebulas, and undo. Benchmark: no change.
+- **Fixed (PR #68):** `World.Clone` left nebulas out, and saving (and the recovery copy) works
+  on a clone, so nebulas were lost when a world was saved. Tested by `Clone_CopiesNebulas`.
 
 **BOD-04 — Body sculpting (digital clay)** · Implemented (M24: heights, PRs #60–#63; M25: shapes, PRs #65–#67) · Base
 **Intent:** Mold bodies like digital clay with brush tools. Tools include:
