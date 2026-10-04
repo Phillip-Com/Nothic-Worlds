@@ -43,6 +43,12 @@ public sealed class SurfaceSettings
     /// </summary>
     public HeightGrid Heights { get; set; } = HeightGrid.Empty;
 
+    /// <summary>
+    /// Shapes added to or cut out of the body (VISION.md BOD-04), in order: later ones are
+    /// applied after earlier ones. Planets and moons only. The shapes are immutable.
+    /// </summary>
+    public List<ShapeEdit> Shapes { get; } = [];
+
     /// <summary>Returns an independent copy (e.g. a snapshot for undo).</summary>
     public SurfaceSettings Clone()
     {
@@ -60,6 +66,8 @@ public sealed class SurfaceSettings
         FillColor = source.FillColor;
         Terrain = source.Terrain;  // Immutable, safe to share.
         Heights = source.Heights;  // Immutable, safe to share.
+        Shapes.Clear();
+        Shapes.AddRange(source.Shapes);  // The shapes are immutable; the list is copied.
         Map = source.Map is SurfaceMap map
             ? new SurfaceMap
             {
@@ -75,14 +83,15 @@ public sealed class SurfaceSettings
     /// <summary>
     /// True if <paramref name="other"/> would save exactly the same surface: the same map, map
     /// type, calibration, fill color, pieces (in the same order, with the same names, cuts,
-    /// and placement), painted terrain, and sculpted heights. Used to tell whether the world
-    /// still matches its saved file.
+    /// and placement), painted terrain, sculpted heights, and shapes. Used to tell whether the
+    /// world still matches its saved file.
     /// </summary>
     public bool HasSameContent(SurfaceSettings other)
     {
         return FillColor == other.FillColor
             && Terrain.HasSameCells(other.Terrain)
             && Heights.HasSameCells(other.Heights)
+            && Shapes.SequenceEqual(other.Shapes)
             && SameMap(Map, other.Map)
             && Pieces.Count == other.Pieces.Count
             && Pieces.Zip(other.Pieces).All(pair => SamePiece(pair.First, pair.Second));

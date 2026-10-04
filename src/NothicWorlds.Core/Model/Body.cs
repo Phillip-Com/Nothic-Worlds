@@ -170,9 +170,25 @@ public sealed class Body
             return "only planets and moons can be flat";
         }
 
-        if (!HasSurface && !Surface.Heights.IsEmpty)
+        if (!HasSurface && (!Surface.Heights.IsEmpty || Surface.Shapes.Count > 0))
         {
             return "only planets and moons can be sculpted";
+        }
+
+        if (Surface.Shapes.Count > ShapeEdit.MaxPerBody)
+        {
+            return $"a body can have up to {ShapeEdit.MaxPerBody} shapes";
+        }
+
+        if (Surface.Shapes.Select(shape => shape.Problem(RadiusKm))
+            .FirstOrDefault(p => p is not null) is string shapeProblem)
+        {
+            return shapeProblem;
+        }
+
+        if (Surface.Shapes.Select(shape => shape.Id).Distinct().Count() != Surface.Shapes.Count)
+        {
+            return "two shapes share an ID";
         }
 
         if (Rings is PlanetRings rings && (!HasSurface || rings.Problem() is not null))

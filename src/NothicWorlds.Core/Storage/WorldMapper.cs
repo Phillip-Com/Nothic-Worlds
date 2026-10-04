@@ -381,8 +381,37 @@ internal static class WorldMapper
                 Heights = body.Surface.Heights.IsEmpty
                     ? null
                     : WorldFormat.HeightsEntryName(body.Id),
+                Shapes = body.Surface.Shapes.Count == 0
+                    ? null
+                    : [.. body.Surface.Shapes.Select(ToDocument)],
             },
         };
+    }
+
+    private static ShapeDocument? ToDocument(ShapeEdit shape) => new()
+    {
+        Id = shape.Id,
+        Kind = WorldFormat.ShapeKindName(shape.Kind),
+        Operation = WorldFormat.ShapeOperationName(shape.Operation),
+        Latitude = shape.Spot.LatitudeDegrees,
+        Longitude = shape.Spot.LongitudeDegrees,
+        DepthKm = shape.DepthKm,
+        WidthKm = shape.WidthKm,
+        HeightKm = shape.HeightKm,
+        LengthKm = shape.LengthKm,
+        Turn = NullIfZero(shape.TurnDegrees),
+    };
+
+    // Checked fully afterwards, with the body (Body.Problem).
+    private static ShapeEdit ToShape(ShapeDocument? document)
+    {
+        Require(document is not null, "a shape is missing");
+        Require(document!.Latitude is >= -90 and <= 90 && double.IsFinite(document.Longitude),
+            "a shape's place is out of range");
+        return new ShapeEdit(document.Id, WorldFormat.ParseShapeKind(document.Kind),
+            WorldFormat.ParseShapeOperation(document.Operation),
+            new GeoCoordinate(document.Latitude, document.Longitude), document.DepthKm,
+            document.WidthKm, document.HeightKm, document.LengthKm, document.Turn ?? 0);
     }
 
     private static PieceDocument ToDocument(MapPiece piece)
@@ -634,6 +663,9 @@ internal static class WorldMapper
             Require(body.HasSurface, "only planets and moons can be sculpted");
             body.Surface.Heights = readHeights(heights);
         }
+
+        body.Surface.Shapes.AddRange((document.Surface.Shapes ?? []).Select(ToShape));
+        RequireNoProblem(body.Problem());
 
         if (document.Surface.Pieces is List<PieceDocument> pieces)
         {
