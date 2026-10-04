@@ -108,6 +108,20 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 25: Shapes, Holes, and Hollow Worlds** · In progress (owner's choice, 2026-10-04)
+The rest of body sculpting (`BOD-04`): shapes added to or cut out of a world. Owner's decisions:
+- **Sphere, box, cylinder, and cone,** each **added** or **cut**: domes and craters, walls and
+  quarries, towers, pits, and holes right through a world, and (a sphere cut from inside)
+  hollow worlds.
+- **Placing:** click the globe to place a shape, then drag handles on the globe to move,
+  resize, and turn it, with a list of the body's shapes.
+- **Bare rock** on the faces a shape makes; the original surface keeps its map and terrain.
+- **Built with Godot's own CSG** (its Manifold library) from the sculpted globe's mesh, only for
+  bodies that have shapes. No new dependency.
+- **Base tier, measured first:** drawing a shaped world and how long an edit takes are
+  benchmarked on the baseline laptop before the tools.
+- **Three PRs:** shapes in Core (PR #65), drawing worlds with shapes, then the tools.
+
 **Milestone 24: Body Sculpting (Heights)** · Complete (PR #63 merged 2026-10-04; owner's choice, 2026-10-04)
 Mold bodies like clay (`BOD-04`), starting with heights. Owner's decisions (the design review
 `BOD-04` asked for):
@@ -1250,7 +1264,7 @@ the body as a sphere of its radius. World trees (M21) hold realms on their branc
   the planet when looking toward its direction and absent looking away, a bigger and brighter
   one, the background unchanged without nebulas, and undo. Benchmark: no change.
 
-**BOD-04 — Body sculpting (digital clay)** · In Progress (M24: heights, PRs #60–#63; shapes, holes, and hollows next) · Base
+**BOD-04 — Body sculpting (digital clay)** · In Progress (M24: heights, PRs #60–#63; M25: shapes, PR #65) · Base
 **Intent:** Mold bodies like digital clay with brush tools. Tools include:
 - Raise and lower terrain brushes
 - Basic shape tools to add and subtract terrain, which are also useful for artificial structures
@@ -1338,6 +1352,22 @@ built from both. Heights come first (M24), shapes next.
   40% and 150% brightness) so steep sides darken without going black. Remembered on this
   computer (`AppSettings`). Verified in the running app at midday: ridges and a basin that
   sunlight barely shows stand out. Benchmark: no change.
+**Implementation (shapes in Core, M25, PR #65):**
+- **`Model/ShapeEdit.cs`:** a shape's `Kind` (`ShapeKind`: sphere, box, cylinder, cone),
+  `Operation` (`ShapeOperation`: add, cut), `Spot` on the surface, `DepthKm` (its middle above or
+  below the radius there), `WidthKm`, `HeightKm`, `LengthKm`, and `TurnDegrees`. A sphere uses
+  the width as its diameter; a cylinder and a cone (point up) the width and height; a box all
+  three; unused sizes are kept, so changing the kind keeps them. `Problem` checks sizes (above
+  0, at most 4 radii) and depth (within 4 radii, enough to reach through the world).
+- **`FrameOn(radiusKm)`** (`ShapeFrame`): where a shape sits in the body's own space, in radii:
+  its middle and its across / up / along axes (up from the spot; along north turned clockwise
+  by the turn). Tested: at the equator, turned, at a pole, a cylinder right through the world,
+  and a sphere hollowing the center.
+- **Model:** `SurfaceSettings.Shapes` (in order; copied with the surface, compared for "unsaved
+  changes"); `Body.Problem` allows them on planets and moons only, up to 64, each with its own
+  ID. Saving: format **version 24**, `surface.shapes` (world-format.md **Shapes**). Tested:
+  golden file, older files have none, and refusing an unknown kind or operation, a size of 0, a
+  middle too far away, and a latitude out of range.
 
 **BOD-05 — Terrain/biome painting** · Implemented (M11: PR #33, #34, #35) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.
