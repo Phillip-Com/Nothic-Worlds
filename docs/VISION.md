@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 19: Flat Worlds** · In progress (owner's choice, 2026-10-03)
+**Milestone 19: Flat Worlds** · Complete (PR #48 merged 2026-10-03; owner's choice, 2026-10-03)
 Non-standard bodies (`BOD-02`), starting with flat worlds. Owner's decisions:
 - Planets and moons get a **Shape**: Globe or **Flat world**, changeable any time; maps,
   terrain, regions, and pins are kept.
@@ -1030,7 +1030,9 @@ the body as a sphere of its radius. World trees and other shapes are still open.
   sky everywhere (daylight, noon height, temperature, rain); the noon sun from 90° to 90°
   minus the tilt; a year averaging the body's temperature with two warm spells; water
   measured across the face. Verified in the running app at both sizes: the time bar, season
-  list, and a weather pin's window on a flat world. · Idea · —
+  list, and a weather pin's window on a flat world.
+
+**BOD-03 — Other astral features** · Idea · —
 **Intent:** Asteroids, nebulas, and similar features.
 **Implementation:** —
 
