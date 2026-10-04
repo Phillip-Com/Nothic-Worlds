@@ -1088,8 +1088,7 @@ the body as a sphere of its radius. World trees and other shapes are still open.
   `SetBelt` (one undo step per drag), `RemoveBelt`.
 - **Verified in the running app** with real clicks, maximized and at 1152 × 648: Add Belt on
   the Sun, its fields, the belt from above and edge-on, the rocks drifting as time runs,
-  Delete and undo, and save/reopen. Benchmark with a 2,500-rock belt: no slowdown; video
-  memory +3 MB.
+  and Delete and undo. Benchmark with a 2,500-rock belt: no slowdown; video memory +3 MB.
 
 **BOD-04 — Body sculpting (digital clay)** · Idea · —
 **Intent:** Mold bodies like digital clay with brush tools. Tools include:
