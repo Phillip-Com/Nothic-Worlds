@@ -221,14 +221,13 @@ public partial class SystemView : Node3D
             _visuals.Remove(gone);
         }
 
-        // A star and a planet are drawn differently, so a body that changed between them is
-        // rebuilt.
+        // Stars, world trees, and globes are drawn differently, so a body that changed between
+        // them is rebuilt (a planet becoming a moon keeps its visual, and its loaded maps).
         var created = new HashSet<Guid>();
         foreach (Body body in world.Bodies)
         {
-            bool isStar = body.Kind == BodyKind.Star;
             if (!_visuals.TryGetValue(body.Id, out BodyVisual? visual)
-                || (visual.Surface is null) != isStar)
+                || DrawnAs(visual.Kind) != DrawnAs(body.Kind))
             {
                 visual?.Free();
                 visual = CreateVisual(body);
@@ -358,7 +357,7 @@ public partial class SystemView : Node3D
                 && _layout.TryGetValue(body.Id, out DisplayBody place))
             {
                 PlaceBody(visual, body, place, world.TimeDays);
-                anyStar |= body.Kind == BodyKind.Star;
+                anyStar |= body.Kind == BodyKind.Star || body.Tree?.GlowStrength > 0;
             }
         }
 
@@ -404,6 +403,10 @@ public partial class SystemView : Node3D
         }
 
         PlaceRings(visual, body);
+        if (visual.Tree is WorldTreeVisual tree && body.Tree is WorldTreeLook look)
+        {
+            tree.Show(look);
+        }
 
         if (visual.Tail is CometTailVisual tail && body.Orbit is Orbit cometOrbit
             && _layout.TryGetValue(cometOrbit.ParentId, out DisplayBody star))
@@ -613,6 +616,25 @@ public partial class SystemView : Node3D
         return Math.Sqrt(across * across + up * up);
     }
 
+    // How a kind of body is drawn: as a star, a world tree, or a globe.
+    private static BodyKind DrawnAs(BodyKind kind) =>
+        kind is BodyKind.Star or BodyKind.WorldTree ? kind : BodyKind.Planet;
+
+    // A light like a star's: it reaches everything, with no fall-off. It's kept apart from the
+    // scaled body, so the body's size doesn't change its reach.
+    private OmniLight3D CreateLight(Body body, Color color)
+    {
+        var light = new OmniLight3D
+        {
+            Name = $"Light {body.Name}",
+            OmniRange = 1e7f,
+            OmniAttenuation = 0.0f,
+            LightColor = color,
+        };
+        AddChild(light);
+        return light;
+    }
+
     private BodyVisual CreateVisual(Body body)
     {
         var root = new Node3D { Name = $"Body {body.Name}" };
@@ -620,6 +642,7 @@ public partial class SystemView : Node3D
         PlanetSurface? surface = null;
         OmniLight3D? light = null;
         StandardMaterial3D? starMaterial = null;
+        WorldTreeVisual? tree = null;
         if (body.Kind == BodyKind.Star)
         {
             Color starColor = BodyAppearance.StarColor(body.Appearance.StarType).ToGodot();
@@ -629,17 +652,12 @@ public partial class SystemView : Node3D
                 AlbedoColor = starColor,
             };
             root.AddChild(new MeshInstance3D { Mesh = _sphere, MaterialOverride = starMaterial });
-
-            // Lights everything around it, with no fall-off, like sunlight across a system. It's
-            // kept apart from the scaled star, so the star's size doesn't change its reach.
-            light = new OmniLight3D
-            {
-                Name = $"Light {body.Name}",
-                OmniRange = 1e7f,
-                OmniAttenuation = 0.0f,
-                LightColor = starColor.Lightened(0.6f),
-            };
-            AddChild(light);
+            light = CreateLight(body, starColor.Lightened(0.6f));
+        }
+        else if (body.Kind == BodyKind.WorldTree)
+        {
+            light = CreateLight(body, Colors.White);
+            tree = new WorldTreeVisual(root, light);
         }
         else
         {
@@ -658,8 +676,10 @@ public partial class SystemView : Node3D
 
         return new BodyVisual(body.Id, root, surface)
         {
+            Kind = body.Kind,
             Light = light,
             StarMaterial = starMaterial,
+            Tree = tree,
             Tail = body.Kind == BodyKind.Comet ? new CometTailVisual(this) : null,
         };
     }
@@ -730,6 +750,10 @@ public partial class SystemView : Node3D
         public CometTailVisual? Tail { get; init; }
 
         public RingsVisual? Rings { get; set; }
+
+        public BodyKind Kind { get; init; }
+
+        public WorldTreeVisual? Tree { get; init; }
 
         public void Free()
         {

@@ -49,6 +49,11 @@ public sealed class Body
     public PlanetRings? Rings { get; set; }
 
     /// <summary>
+    /// How a world tree grows and looks (VISION.md BOD-02); null for every other kind.
+    /// </summary>
+    public WorldTreeLook? Tree { get; set; }
+
+    /// <summary>
     /// The asteroid belts circling the body (VISION.md BOD-03). Stars only; empty for others.
     /// </summary>
     public IReadOnlyList<AsteroidBelt> Belts { get; set; } = [];
@@ -136,6 +141,21 @@ public sealed class Body
             return HasSurface ? rings.Problem() : "only planets and moons can have rings";
         }
 
+        if ((Kind == BodyKind.WorldTree) != (Tree is not null))
+        {
+            return Tree is null ? "a world tree needs its look" : "only world trees grow branches";
+        }
+
+        if (Tree?.Problem() is string treeProblem)
+        {
+            return treeProblem;
+        }
+
+        if (Kind == BodyKind.WorldTree && Calendar is not null)
+        {
+            return "a world tree can't have a calendar";
+        }
+
         if (Belts.Count > 0 && Kind != BodyKind.Star)
         {
             return "only stars can have asteroid belts";
@@ -162,7 +182,7 @@ public sealed class Body
 
     /// <summary>
     /// True if <paramref name="other"/> would save exactly the same body: the same name, kind,
-    /// shape, size, day, tilt, orbit, appearance, rings, belts, and surface. Used to tell
+    /// shape, size, day, tilt, orbit, appearance, rings, belts, tree, and surface. Used to tell
     /// whether the world still matches its saved file.
     /// </summary>
     public bool HasSameContent(Body other)
@@ -175,7 +195,7 @@ public sealed class Body
             && AverageTemperatureC == other.AverageTemperatureC
             && Orbit == other.Orbit && Calendar == other.Calendar
             && Appearance == other.Appearance && Rings == other.Rings
-            && Belts.SequenceEqual(other.Belts)
+            && Belts.SequenceEqual(other.Belts) && Tree == other.Tree
             && Surface.HasSameContent(other.Surface);
     }
 
@@ -198,6 +218,7 @@ public sealed class Body
             Appearance = Appearance,  // Immutable, safe to share.
             Rings = Rings,  // Immutable, safe to share.
             Belts = [.. Belts],  // The belts are immutable; the list is copied.
+            Tree = Tree,  // Immutable, safe to share.
         };
         copy.Surface.RestoreFrom(Surface);
         return copy;

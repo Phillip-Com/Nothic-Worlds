@@ -42,6 +42,7 @@ public partial class AddMenu : Node
         Moon,
         Star,
         Comet,
+        WorldTree,
         Nebula,
         Region,
         JournalEntry,
@@ -68,6 +69,7 @@ public partial class AddMenu : Node
         menu.AddItem("Moon", (int)MenuItem.Moon);
         menu.AddItem("Star", (int)MenuItem.Star);
         menu.AddItem("Comet", (int)MenuItem.Comet);
+        menu.AddItem("World Tree", (int)MenuItem.WorldTree);
         menu.AddItem("Nebula", (int)MenuItem.Nebula);
         menu.AddSeparator();
         menu.AddItem("Region", (int)MenuItem.Region);
@@ -97,7 +99,8 @@ public partial class AddMenu : Node
     {
         switch (item)
         {
-            case MenuItem.Planet or MenuItem.Moon or MenuItem.Star or MenuItem.Comet:
+            case MenuItem.Planet or MenuItem.Moon or MenuItem.Star or MenuItem.Comet
+                or MenuItem.WorldTree:
                 Toolbar!.ShowSystem();
                 if (SystemPanel is not null)
                 {
@@ -106,6 +109,7 @@ public partial class AddMenu : Node
                         MenuItem.Planet => BodyKind.Planet,
                         MenuItem.Moon => BodyKind.Moon,
                         MenuItem.Comet => BodyKind.Comet,
+                        MenuItem.WorldTree => BodyKind.WorldTree,
                         _ => BodyKind.Star,
                     });
                 }

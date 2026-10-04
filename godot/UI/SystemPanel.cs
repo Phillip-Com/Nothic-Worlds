@@ -67,6 +67,7 @@ public partial class SystemPanel : CanvasLayer
     private MeteorShowerSection? _showers;
     private RingsSection? _rings;
     private BeltsSection? _belts;
+    private WorldTreeSection? _treeLook;
     private NebulasSection? _nebulas;
     private AsteroidEventsSection? _asteroids;
     private bool _open;
@@ -181,6 +182,9 @@ public partial class SystemPanel : CanvasLayer
         buttons.AddChild(_addMoonButton);
         buttons.AddChild(CreateButton("Add Star", () => _ = AddAsync(BodyKind.Star),
             "A companion star, far out around the system's central star"));
+        buttons.AddChild(CreateButton("Add World Tree", () => _ = AddAsync(BodyKind.WorldTree),
+            "A vast glowing tree circling the selected body's star, whose branches can hold " +
+            "realms"));
         buttons.AddChild(CreateButton("Add Comet", () => _ = AddAsync(BodyKind.Comet),
             "A comet on a long, elongated orbit around the selected body's star, crossing the " +
             "innermost planet's orbit"));
@@ -244,6 +248,8 @@ public partial class SystemPanel : CanvasLayer
             layout.AddChild(_rings);
             _belts = new BeltsSection { Session = Session };
             layout.AddChild(_belts);
+            _treeLook = new WorldTreeSection { Session = Session };
+            layout.AddChild(_treeLook);
         }
 
         layout.AddChild(new Label { Text = "Orbit" });
@@ -366,6 +372,7 @@ public partial class SystemPanel : CanvasLayer
             BodyKind.Star => "star",
             BodyKind.Moon => "moon",
             BodyKind.Comet => "comet",
+            BodyKind.WorldTree => "world tree",
             _ => "planet",
         };
         item.SetText(0, $"{body.Name}  ({kind})");
@@ -430,7 +437,12 @@ public partial class SystemPanel : CanvasLayer
         bool isStar = body.Kind == BodyKind.Star;
         _kind.Visible = body.HasSurface;
         _kindLabel.Visible = !body.HasSurface;
-        _kindLabel.Text = isStar ? "Star" : "Comet";
+        _kindLabel.Text = body.Kind switch
+        {
+            BodyKind.Star => "Star",
+            BodyKind.WorldTree => "World tree",
+            _ => "Comet",
+        };
         ShowShape(body);
         if (body.HasSurface)
         {
@@ -471,6 +483,11 @@ public partial class SystemPanel : CanvasLayer
         if (_rings is not null)
         {
             _rings.Visible = body.HasSurface;  // Stars and comets have no rings.
+        }
+
+        if (_treeLook is not null)
+        {
+            _treeLook.Visible = body.Kind == BodyKind.WorldTree;
         }
 
         if (_belts is not null)
@@ -559,9 +576,14 @@ public partial class SystemPanel : CanvasLayer
                 $"south around the rim. The disc is {discKm:N0} km from center to rim (Radius " +
                 "is the matching globe's)."
             : "A globe, or a flat world with the whole map on a disc";
-        _radius.TooltipText = body.Shape == BodyShape.FlatDisc
+        _radius.TooltipText = body.Kind == BodyKind.WorldTree
+            ? $"Half the tree's height: it stands {2 * body.RadiusKm:N0} km tall"
+            : body.Shape == BodyShape.FlatDisc
             ? $"The matching globe's radius; the disc reaches {discKm:N0} km from its center"
             : "The body's radius (Earth: 6,371 km)";
+        _dayLength.TooltipText = body.Kind == BodyKind.WorldTree
+            ? "How long the tree takes to turn once: the year of the realms on its branches"
+            : DayLengthTip;
     }
 
     private void CommitShape(BodyShape shape)
@@ -642,9 +664,10 @@ public partial class SystemPanel : CanvasLayer
     private void ShowAppearance(Body body)
     {
         bool isStar = body.Kind == BodyKind.Star;
+        // A world tree's look is in its own section.
         foreach (Control control in _surfaceLook)
         {
-            control.Visible = !isStar;
+            control.Visible = !isStar && body.Kind != BodyKind.WorldTree;
         }
 
         foreach (Control control in _starLook)

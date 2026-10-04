@@ -214,6 +214,7 @@ public partial class BodyMarkers : CanvasLayer
                 BodyKind.Star => BodyAppearance.StarColor(body.Appearance.StarType).ToGodot(),
                 BodyKind.Moon => _moonColor,
                 BodyKind.Comet => _cometColor,
+                BodyKind.WorldTree => body.Tree?.Glow.ToGodot() ?? _planetColor,
                 _ => _planetColor,
             };
             if (radius < DotBelowPixels)
