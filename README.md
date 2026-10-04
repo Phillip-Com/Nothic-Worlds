@@ -106,6 +106,10 @@ looking straight down with the north pole up; drag to slide across it. A flat wo
 everywhere has sunrise at the same moment, and it has two summers a year (when the noon sun is
 overhead) and two winters, with weather that doesn't change with latitude.
 
+**Rings** in the System panel give a planet or moon banded rings like Saturn's: set where they
+start and end (in its radii) and their color. The planet casts its shadow across them, and
+they cast theirs on the planet.
+
 Comets make **meteor showers**: wherever a planet's orbit passes close to a comet's orbit, the
 planet runs into the comet's dust at the same time every year. The panel lists the coming year's
 showers (with how many meteors an hour fall at the peak, how long they last, and **Go to**), the
