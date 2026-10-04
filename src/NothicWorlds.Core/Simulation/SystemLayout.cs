@@ -101,6 +101,16 @@ public static class SystemLayout
             DisplayRadius(parent.RadiusKm, scale), DisplayRadius(body.RadiusKm, scale), scale);
     }
 
+    // A realm is drawn at its branch tip, scaled with its tree (whose drawn size the readable
+    // view squeezes), and nudged out by its own radius so it rests on the tip.
+    private static Vector3D OnBranch(
+        Vector3D trueOffset, Body tree, double treeDisplayRadius, double realmDisplayRadius)
+    {
+        Vector3D tip = trueOffset * (treeDisplayRadius / tree.RadiusKm);
+        double length = tip.Length;
+        return length > 0 ? tip * ((length + realmDisplayRadius) / length) : tip;
+    }
+
     private static DisplayBody Place(
         Body body,
         Dictionary<Guid, Body> byId,
@@ -120,8 +130,9 @@ public static class SystemLayout
             Body parent = byId[orbit.ParentId];
             DisplayBody parentPlace = Place(parent, byId, truePositions, scale, layout);
             Vector3D trueOffset = truePositions[body.Id] - truePositions[parent.Id];
-            position = parentPlace.Position
-                + DisplayOffset(trueOffset, parentPlace.Radius, radius, scale);
+            position = parentPlace.Position + (body.Branch is not null && parent.Tree is not null
+                ? OnBranch(trueOffset, parent, parentPlace.Radius, radius)
+                : DisplayOffset(trueOffset, parentPlace.Radius, radius, scale));
         }
 
         var place = new DisplayBody(position, radius);

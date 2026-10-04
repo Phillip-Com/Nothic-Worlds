@@ -551,6 +551,61 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
+    /// Hangs a planet or moon on a world tree's branch as a realm (VISION.md BOD-02), or lets it
+    /// go with a null tree: it then keeps circling the tree where it was, now freely.
+    /// </summary>
+    /// <returns>What's wrong (nothing is changed then), or null.</returns>
+    public string? HangOnBranch(Guid bodyId, Guid? treeId, int branch)
+    {
+        if (FindBody(bodyId) is not Body body || !body.HasSurface)
+        {
+            return null;
+        }
+
+        if (treeId is not Guid id)
+        {
+            if (body.Branch is null)
+            {
+                return null;
+            }
+
+            RecordUndo($"Let {body.Name} Go");
+            body.Branch = null;
+            SyncView();
+            MarkChanged();
+            return null;
+        }
+
+        if (FindBody(id) is not { Tree: WorldTreeLook } tree)
+        {
+            return "only a world tree has branches";
+        }
+
+        if (body.Branch == branch && body.Orbit?.ParentId == id)
+        {
+            return null;
+        }
+
+        // Check before changing anything (the tree mustn't hang on its own realm, either).
+        (int? oldBranch, Orbit? oldOrbit) = (body.Branch, body.Orbit);
+        body.Branch = branch;
+        body.Orbit = Realms.OrbitOnBranch(tree, branch);
+        string? problem = Realms.Problem(World.Bodies) ?? SystemHierarchy.Problem(World.Bodies);
+        (body.Branch, body.Orbit) = (oldBranch, oldOrbit);
+        if (problem is not null)
+        {
+            return problem;
+        }
+
+        RecordUndo($"Hang {body.Name} on {tree.Name}");
+        body.Branch = branch;
+        body.Orbit = Realms.OrbitOnBranch(tree, branch);
+        SyncView();
+        MarkChanged();
+        return null;
+    }
+
+    /// <summary>
     /// Changes how a world tree grows and looks (VISION.md BOD-02). Rapid changes (dragging a
     /// field or a color) are one undo step.
     /// </summary>
@@ -567,9 +622,18 @@ public partial class WorldSession : Node
             return problem;
         }
 
+        // A branch holding a realm can't be taken away.
+        int? highest = World.Bodies
+            .Where(b => b.Branch is not null && b.Orbit?.ParentId == treeId)
+            .Max(b => b.Branch);
+        if (highest is int used && used >= look.Branches)
+        {
+            return $"a realm hangs on branch {used + 1}: move it first";
+        }
+
         RecordUndo($"Change {tree.Name}'s Look", mergeKey: ("tree", treeId));
         tree.Tree = look;
-        MarkChanged(systemChanged: false);
+        MarkChanged();  // Its realms move with its branches.
         return null;
     }
 
@@ -685,6 +749,11 @@ public partial class WorldSession : Node
         if (FindBody(bodyId) is not Body body || body.Orbit == orbit)
         {
             return null;
+        }
+
+        if (body.Branch is not null)
+        {
+            return $"{body.Name} hangs on a branch, which sets its orbit";
         }
 
         if (orbit.Problem() is string problem)
@@ -1862,14 +1931,16 @@ public partial class WorldSession : Node
     }
 
     // `systemChanged` false: only journal writing changed, so the simulation caches stay.
-    // After any change to the system, calendars that fit the world (VISION.md CAL-02) adjust it
-    // again, as part of the same edit (and undo step).
+    // After any change to the system, realms move to where their branches hold them (VISION.md
+    // BOD-02), then calendars that fit the world (CAL-02) adjust it again, as part of the same
+    // edit (and undo step).
     private void MarkChanged(bool systemChanged = true)
     {
         _editVersion++;
         bool refitted = false;
         if (systemChanged)
         {
+            Realms.Apply(World.Bodies);
             refitted = CalendarFitting.Apply(World.Bodies);
             _systemVersion++;
         }

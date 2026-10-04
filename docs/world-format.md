@@ -194,6 +194,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `bodies[].rings` | no | Rings (`BOD-03`), planets and moons only: `inner` and `outer` (in the body's radii; a flat world's disc radius), at least 1.05 and at most 50, `outer` beyond `inner`; `color` (`#RRGGBB`). They lie in the body's equatorial plane. Omitted for none. |
 | `bodies[].belts` | no | Asteroid belts (`BOD-03`), stars only; omitted for none. Each: `id` (GUID, unique within the star), `name` (1–100 characters), `innerKm` and `outerKm` (above 0, `outerKm` beyond `innerKm`, at most 10¹³), `thickness` (how far the rocks' orbits tilt, 0–45°), `density` (0.01–1), `color` (`#RRGGBB`). Only the belt is saved; its rocks are drawn from it. |
 | `bodies[].tree` | for world trees | How a world tree grows and looks (`BOD-02`); required for kind `"world-tree"` and not allowed otherwise: `branches` (3–16 great branches), `spread` (0.3–1.5), `seed` (0 or more; the same seed always grows the same tree), `bark`, `leaves`, `glow` (`#RRGGBB`), `glowStrength` (0–4). A tree's `radiusKm` is half its height and its `dayLengthHours` is how long it takes to turn. |
+| `bodies[].branch` | no | For a realm: which great branch (counting from 0) of the world tree it orbits it hangs on (`BOD-02`); planets and moons only, one realm to a branch. Its `orbit` is then set by the branch when the world loads: round the trunk at the tip's distance, lifted to the tip's height, tilted with the tree, and one turn of the tree long. |
 | `bodies[].radiusKm` | yes | Above 0, at most 10¹⁰ |
 | `bodies[].dayLengthHours` | yes | Time for one spin, in standard hours. Above 0, at most 10⁷. |
 | `bodies[].axialTilt` | yes | Degrees the spin axis leans, 0 to 180 |
@@ -218,6 +219,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…orbit.closestApproach` | no | Degrees: the direction of the closest approach. Default 0. |
 | `…orbit.tilt` | no | Degrees from the reference plane, 0 (default) to 180. Over 90 runs backwards. |
 | `…orbit.tiltDirection` | no | Degrees: where the orbit rises north through the reference plane. Default 0. |
+| `…orbit.height` | no | Km the whole orbit is lifted along its own axis (the way its tilt points up); omitted for 0. Set for realms hung high or low on a world tree (`BOD-02`). |
 | `bodies[].surface.map` | no | Omitted when the planet has no map |
 | `…map.asset` | yes | Asset entry name (see Container) |
 | `…map.projection` | yes | Map type: `equirectangular` (Globe map), `mercator` (Flat map), `robinson`, `winkel-tripel`, `mollweide`, `gall-peters`, `polar`, `two-hemispheres` |
@@ -421,6 +423,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 21 | Realms (M21): bodies gain an optional `branch`, orbits an optional `height` | Nothing to change: version 20 bodies hang on nothing, and their orbits aren't lifted |
 | 20 | World trees (M21): bodies can be of kind `world-tree`, with a `tree` | Nothing to change: version 19 worlds have none |
 | 19 | Nebulas (M20): the world gains optional `nebulas` | Nothing to change: version 18 skies are empty |
 | 18 | Asteroid belts (M20): stars gain optional `belts` | Nothing to change: version 17 stars have no belts |

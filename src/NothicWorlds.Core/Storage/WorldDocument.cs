@@ -117,6 +117,7 @@ internal sealed class BodyDocument
     public RingsDocument? Rings { get; init; }  // Added in format version 17
     public List<BeltDocument?>? Belts { get; init; }  // Added in format version 18; stars only
     public TreeDocument? Tree { get; init; }  // Added in format version 20; world trees only
+    public int? Branch { get; init; }  // Added in format version 21; realms only
     public required SurfaceDocument Surface { get; init; }
 }
 
@@ -203,6 +204,7 @@ internal sealed class OrbitDocument
     public double? ClosestApproach { get; init; }
     public double? Tilt { get; init; }
     public double? TiltDirection { get; init; }
+    public double? Height { get; init; }  // Added in format version 21
 }
 
 internal sealed class SurfaceDocument

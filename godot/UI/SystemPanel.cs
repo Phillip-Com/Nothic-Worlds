@@ -1,3 +1,4 @@
+using System.Globalization;
 using Godot;
 using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Model;
@@ -50,6 +51,11 @@ public partial class SystemPanel : CanvasLayer
     private Control[] _surfaceLook = [];
     private Control[] _starLook = [];
     private Control _orbitFields = null!;
+    private OptionButton _hangsOn = null!;
+
+    // The orbit fields' own tooltips, put back when a realm is let go.
+    private readonly Dictionary<SpinBox, string> _orbitTips = [];
+    private Label _hangsOnLabel = null!;
     private Label _noOrbit = null!;
     private OptionButton _parent = null!;
     private SpinBox _distance = null!;
@@ -268,6 +274,20 @@ public partial class SystemPanel : CanvasLayer
     {
         var layout = new VBoxContainer();
         var grid = new GridContainer { Columns = 2 };
+
+        // A planet or moon can hang on a world tree's branch as a realm (VISION.md BOD-02).
+        _hangsOnLabel = new Label { Text = "Hangs on" };
+        grid.AddChild(_hangsOnLabel);
+        _hangsOn = new Dropdown
+        {
+            FocusMode = Control.FocusModeEnum.None,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "Hang this world on a world tree's branch as a realm: it rides the " +
+                "tree as it turns (one turn is its year), and the branch sets its orbit",
+        };
+        _hangsOn.ItemSelected += index => CommitHangsOn((int)index);
+        grid.AddChild(_hangsOn);
+
         grid.AddChild(new Label { Text = "Orbits" });
         _parent = new Dropdown
         {
@@ -471,6 +491,7 @@ public partial class SystemPanel : CanvasLayer
             Lock(_period, periodBy, PeriodTip, periodBy?.Calendar?.MonthMoonId == body.Id
                 ? $"keeps one cycle of {body.Name} per month"
                 : "keeps each year exactly one calendar year");
+            ShowHangsOn(body);
         }
 
         _calendar?.Refresh();
@@ -539,6 +560,75 @@ public partial class SystemPanel : CanvasLayer
         {
             _extrasToggle.ButtonPressed = true;
         }
+    }
+
+    // Which branch the body hangs on (if any world tree has branches to offer), and the orbit
+    // fields locked while it hangs, since the branch sets them.
+    private void ShowHangsOn(Body body)
+    {
+        IReadOnlyList<Body> bodies = Session!.World.Bodies;
+        List<Body> trees = [.. bodies.Where(b => b.Tree is not null && b.Id != body.Id)];
+        bool offered = body.HasSurface && trees.Count > 0;
+        _hangsOn.Visible = offered;
+        _hangsOnLabel.Visible = offered;
+        _hangsOn.Clear();
+        _hangsOn.AddItem("Nothing (it orbits freely)");
+        _hangsOn.SetItemMetadata(0, "");
+        _hangsOn.Select(0);
+        foreach (Body tree in trees)
+        {
+            var taken = bodies
+                .Where(b => b.Id != body.Id && b.Branch is int && b.Orbit?.ParentId == tree.Id)
+                .Select(b => b.Branch!.Value)
+                .ToHashSet();
+            for (int branch = 0; branch < tree.Tree!.Branches; branch++)
+            {
+                if (taken.Contains(branch))
+                {
+                    continue;
+                }
+
+                _hangsOn.AddItem($"{tree.Name}, branch {branch + 1}");
+                _hangsOn.SetItemMetadata(_hangsOn.ItemCount - 1, $"{tree.Id}|{branch}");
+                if (body.Branch == branch && body.Orbit?.ParentId == tree.Id)
+                {
+                    _hangsOn.Select(_hangsOn.ItemCount - 1);
+                }
+            }
+        }
+
+        bool hung = body.Branch is not null;
+        _parent.Disabled = hung;
+        foreach (SpinBox field in new[] { _distance, _period, _startAngle, _eccentricity,
+            _closestApproach, _orbitTilt, _tiltDirection })
+        {
+            _orbitTips.TryAdd(field, field.TooltipText);
+            if (hung)
+            {
+                field.Editable = false;
+                field.TooltipText = $"Set by the branch {body.Name} hangs on";
+            }
+            else if (field != _period)  // The period's lock is the calendar's (see Lock).
+            {
+                field.Editable = true;
+                field.TooltipText = _orbitTips[field];
+            }
+        }
+    }
+
+    private void CommitHangsOn(int index)
+    {
+        if (_syncing || Session is null)
+        {
+            return;
+        }
+
+        string choice = _hangsOn.GetItemMetadata(index).AsString();
+        ReportProblem(choice.Length == 0
+            ? Session.HangOnBranch(Session.SelectedBodyId, null, 0)
+            : Session.HangOnBranch(Session.SelectedBodyId, Guid.Parse(choice.Split('|')[0]),
+                int.Parse(choice.Split('|')[1], CultureInfo.InvariantCulture)));
+        ShowSelected();
     }
 
     // A field set by a calendar that fits the world (VISION.md CAL-02) can't be typed in; its
