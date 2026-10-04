@@ -31,10 +31,21 @@ public static class SystemLayout
     public static Dictionary<Guid, DisplayBody> At(
         IReadOnlyList<Body> bodies, double timeDays, SystemScale scale)
     {
-        Dictionary<Guid, Vector3D> truePositions = SystemPositions.At(bodies, timeDays);
+        return At(bodies, SystemPositions.At(bodies, timeDays), scale);
+    }
+
+    /// <summary>
+    /// The display positions and radii of the bodies in <paramref name="truePositions"/> (in
+    /// true km), such as physics mode's (VISION.md SIM-03), where bodies may have left their
+    /// designed orbits or merged away. Each is drawn relative to its nearest remaining parent
+    /// up its designed chain (or the system's center), as designed positions are.
+    /// </summary>
+    public static Dictionary<Guid, DisplayBody> At(IReadOnlyList<Body> bodies,
+        IReadOnlyDictionary<Guid, Vector3D> truePositions, SystemScale scale)
+    {
         var byId = bodies.ToDictionary(body => body.Id);
         var layout = new Dictionary<Guid, DisplayBody>();
-        foreach (Body body in bodies)
+        foreach (Body body in bodies.Where(b => truePositions.ContainsKey(b.Id)))
         {
             Place(body, byId, truePositions, scale, layout);
         }
@@ -129,7 +140,7 @@ public static class SystemLayout
     private static DisplayBody Place(
         Body body,
         Dictionary<Guid, Body> byId,
-        Dictionary<Guid, Vector3D> truePositions,
+        IReadOnlyDictionary<Guid, Vector3D> truePositions,
         SystemScale scale,
         Dictionary<Guid, DisplayBody> layout)
     {
@@ -140,18 +151,39 @@ public static class SystemLayout
 
         double radius = DisplayRadius(body.RadiusKm, scale);
         Vector3D position = Vector3D.Zero;
-        if (body.Orbit is Orbit orbit)
+        if (body.Orbit is not null && Anchor(body, byId, truePositions) is Body parent)
         {
-            Body parent = byId[orbit.ParentId];
             DisplayBody parentPlace = Place(parent, byId, truePositions, scale, layout);
             Vector3D trueOffset = truePositions[body.Id] - truePositions[parent.Id];
             position = parentPlace.Position + (body.Branch is not null && parent.Tree is not null
                 ? OnBranch(trueOffset, parent, parentPlace.Radius, radius)
                 : DisplayOffset(trueOffset, parentPlace.Radius, radius, scale));
         }
+        else if (body.Orbit is not null)
+        {
+            // Everything it circled has merged away: draw it from the system's center.
+            position = DisplayOffset(truePositions[body.Id], 0, radius, scale);
+        }
 
         var place = new DisplayBody(position, radius);
         layout[body.Id] = place;
         return place;
+    }
+
+    // The body's nearest parent up its chain that has a position (all of them, for designed
+    // positions), or null to draw it from the system's center.
+    private static Body? Anchor(Body body, Dictionary<Guid, Body> byId,
+        IReadOnlyDictionary<Guid, Vector3D> truePositions)
+    {
+        for (Body current = body; current.Orbit is Orbit orbit;)
+        {
+            current = byId[orbit.ParentId];
+            if (truePositions.ContainsKey(current.Id))
+            {
+                return current;
+            }
+        }
+
+        return null;
     }
 }
