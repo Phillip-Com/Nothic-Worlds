@@ -31,6 +31,12 @@ namespace NothicWorlds.Core.Simulation;
 /// gives (sea air wetter, deserts very dry; average without painted terrain) and by the cold
 /// (cold air holds little water). Tuned so an Earth-like planet gets about 1,750 mm a year at
 /// the equator, 250 at 30°, 1,000 at 50°, and almost none at the poles.</para>
+/// <para><b>Flat worlds</b> (VISION.md BOD-02; owner's choice: physically flat) tumble like a
+/// spinning coin, so the whole face shares one sky: the star is up for half of every day, its
+/// noon height is 90° minus its declination, and its light is the same everywhere. A spot's
+/// year then averages the body's own temperature (plus its terrain), its seasons follow the
+/// noon height (two summers a year), and rain has no belts: an even amount, scaled by moisture
+/// and the cold as above.</para>
 /// <para>The year repeats: times outside the year worked out are wrapped into it (exact for a
 /// planet circling its star; close for a moon).</para>
 /// </remarks>
@@ -68,6 +74,9 @@ public sealed class ClimateYear
     private const double StormBeltShift = 0.35;
     private const double StormBeltWidth = 13.0;
     private const double DrizzleMm = 0.25;
+
+    // Rain on a flat world, which has no belts: about Earth's average, in mm per standard day.
+    private const double FlatRainMm = 2.7;
 
     // Cold air holds little water: rain fades from full at 10 °C to its least at −25 °C.
     private const double RainFullAtC = 10.0;
@@ -136,16 +145,29 @@ public sealed class ClimateYear
         }
 
         // Sunlight relative to the body's average: a whole sphere averages a quarter of the
-        // light it intercepts, at the year's mean of 1/distance².
+        // light it intercepts, at the year's mean of 1/distance². A flat world's face is all
+        // alike, so its average is its own year's.
+        bool flat = body.Shape == BodyShape.FlatDisc;
         double meanInverseSquare = distances.Average(d => 1 / (d * d));
         var sunlight = new double[SamplesPerYear];
         var daylight = new double[SamplesPerYear];
         for (int i = 0; i < SamplesPerYear; i++)
         {
-            (double dayFraction, double dailyMean) = Sun(latitude, declinations[i]);
+            (double dayFraction, double dailyMean) = flat
+                ? FlatSun(declinations[i])
+                : Sun(latitude, declinations[i]);
             daylight[i] = dayFraction * body.DayLengthHours;
             double distanceFactor = 1 / (distances[i] * distances[i]) / meanInverseSquare;
             sunlight[i] = dailyMean * distanceFactor / 0.25;
+        }
+
+        if (flat)
+        {
+            double faceAverage = sunlight.Average();
+            for (int i = 0; i < SamplesPerYear; i++)
+            {
+                sunlight[i] = faceAverage > 0 ? sunlight[i] / faceAverage : 0;
+            }
         }
 
         double maritime = terrain?.Maritime ?? 0;
@@ -166,9 +188,13 @@ public sealed class ClimateYear
         for (int i = 0; i < SamplesPerYear; i++)
         {
             double mean = baseline + seasons * (felt[i] - spotAverage);
-            double noon = 90 - Math.Abs(spot.LatitudeDegrees
-                - double.RadiansToDegrees(declinations[i]));
-            double rain = Rain(spot.LatitudeDegrees, beltLatitude[i], mean) * moisture;
+            double declination = double.RadiansToDegrees(declinations[i]);
+            double noon = flat
+                ? 90 - Math.Abs(declination)
+                : 90 - Math.Abs(spot.LatitudeDegrees - declination);
+            double rain = (flat
+                ? FlatRainMm * Warmth(mean)
+                : Rain(spot.LatitudeDegrees, beltLatitude[i], mean)) * moisture;
             days[i] = new ClimateDay(fromDays + (i + 0.5) * step, mean, mean - swing / 2,
                 mean + swing / 2, daylight[i], Math.Max(-90, noon), sunlight[i], rain);
         }
@@ -252,6 +278,12 @@ public sealed class ClimateYear
         return (hourAngle / Math.PI, Math.Max(0, dailyMean));
     }
 
+    // On a tumbling flat world: the face turns toward the star for half of each turn, and the
+    // star's height then rises and falls with the turn, peaking at 90° minus the declination.
+    // The day's average of sin(height) is cos(declination) / π.
+    private static (double DayFraction, double DailyMean) FlatSun(double declination) =>
+        (0.5, Math.Cos(declination) / Math.PI);
+
     // Rain on average ground, in mm per day, at a latitude, with the star's (lagged) latitude
     // and the day's mean temperature.
     private static double Rain(double latitude, double starLatitude, double meanC)
@@ -265,10 +297,12 @@ public sealed class ClimateYear
         double stormLatitude = StormBeltLatitude + StormBeltShift * summer;
         double storms = StormRainMm * Bell(Math.Abs(latitude) - stormLatitude, StormBeltWidth);
 
-        double warmth = Math.Clamp(
-            (meanC - RainLeastAtC) / (RainFullAtC - RainLeastAtC), ColdestRainShare, 1.0);
-        return (tropical + storms + DrizzleMm) * warmth;
+        return (tropical + storms + DrizzleMm) * Warmth(meanC);
     }
+
+    // How much of the rain falls at a day's mean temperature: cold air holds little water.
+    private static double Warmth(double meanC) => Math.Clamp(
+        (meanC - RainLeastAtC) / (RainFullAtC - RainLeastAtC), ColdestRainShare, 1.0);
 
     private static double Bell(double offset, double width) =>
         Math.Exp(-(offset / width) * (offset / width));

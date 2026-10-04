@@ -102,7 +102,9 @@ one orbit of now): gold-ringed dark disks for solar eclipses, dark red disks for
 north pole at the center, the far south around the rim) and bare rock underneath. Maps, terrain,
 regions, and pins stay where they are on the map. The disc tumbles like a spinning coin, so its
 whole face turns toward the star and away each day. Zoom in over its face for a close-up,
-looking straight down with the north pole up; drag to slide across it.
+looking straight down with the north pole up; drag to slide across it. A flat world shares one sky:
+everywhere has sunrise at the same moment, and it has two summers a year (when the noon sun is
+overhead) and two winters, with weather that doesn't change with latitude.
 
 Comets make **meteor showers**: wherever a planet's orbit passes close to a comet's orbit, the
 planet runs into the comet's dust at the same time every year. The panel lists the coming year's

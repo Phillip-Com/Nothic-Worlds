@@ -118,7 +118,7 @@ Non-standard bodies (`BOD-02`), starting with flat worlds. Owner's decisions:
   once and every place shares the same sun height; two summers and two winters a year, and
   no climate zones by latitude.
 - **Three PRs:** flat worlds you can make, see, and edit (PR #46); the close-up view
-  (PR #47); the flat-world sky (day and night, seasons, weather).
+  (PR #47); the flat-world sky (day and night, seasons, weather) (PR #48).
 
 **Milestone 18: Comets and Meteor Showers** · Complete (PR #45 merged 2026-10-03; owner's choice, 2026-10-03)
 Meteor showers (`EVT-02`), simulated from comets. Owner's decisions:
@@ -955,7 +955,7 @@ place).
   then undid it; undid and redid the whole session (back to "saved" at the start); and save →
   reopen kept the system. Benchmark: same as `main` back to back (~141 fps).
 
-**BOD-02 — Non-standard bodies** · In progress (M19: flat worlds) · Base
+**BOD-02 — Non-standard bodies** · Implemented (M19: flat worlds; other shapes later) · Base
 **Intent:** Support bodies that aren't spheres, such as flat worlds and world trees.
 **Notes / open questions:** How these interact with physics, orbits, and light/shadow. Flat
 worlds (M19): orbits are unchanged; light is physical (the disc tumbles); eclipses still treat
@@ -1009,7 +1009,28 @@ the body as a sphere of its radius. World trees and other shapes are still open.
   far-south region lands on it with the scale bar, north arrow, and coordinates right.
   Benchmark: no change.
 
-**BOD-03 — Other astral features** · Idea · —
+**Implementation (the flat-world sky, PR #48):**
+- **One sky for the whole face** (owner's choice: physically flat): the disc tumbles like a
+  coin, so every place has sunrise at the same moment, the star is up for half of each day,
+  and the noon sun stands at 90° minus the star's declination (its angle from the plane the
+  disc spins in). The clock was already the same everywhere (`BodyClock` counts days).
+- **Seasons** (`Seasons`, Core): the same moments as a globe's equinoxes and solstices, named
+  `Midsummer` (noon sun overhead) and `Midwinter` (lowest); summer follows midsummer and
+  winter midwinter, twice a year, with no hemispheres. With little tilt there are no seasons,
+  as on a globe.
+- **Weather** (`ClimateYear`): every place gets the same sunlight (a day's average of
+  cos(declination) ÷ π), so each place's year averages the body's temperature (plus its
+  terrain), with seasons following the noon height. Rain has no belts: about 2.7 mm a day
+  (Earth's average), scaled by moisture and the cold. `TerrainSurroundings` looks for water
+  straight across the face (VISION.md `WTH-03`).
+- **App:** the time bar shows "Winter · Midsummer in 91 days" (its tooltip explains the one
+  season); the System panel's season list and the orbit markers say Midsummer (dots) and
+  Midwinter (diamonds); the weather window explains a flat world's weather.
+- Tested: two summers and two winters a year at the globe's equinox and solstice times; one
+  sky everywhere (daylight, noon height, temperature, rain); the noon sun from 90° to 90°
+  minus the tilt; a year averaging the body's temperature with two warm spells; water
+  measured across the face. Verified in the running app at both sizes: the time bar, season
+  list, and a weather pin's window on a flat world. · Idea · —
 **Intent:** Asteroids, nebulas, and similar features.
 **Implementation:** —
 

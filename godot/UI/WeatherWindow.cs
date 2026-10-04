@@ -203,10 +203,16 @@ public partial class WeatherWindow : AcceptDialog
         _yearLabel.Text = $"{yearName} · {yearRain:N0} mm of rain a year";
         _chart.Show(chartMonths, (float)((now - from) / (to - from)));
         _terrain.Text = ClimateText.Describe(climate.Terrain);
-        _note.Text = $"Estimated from the sunlight here, around {body.Name}'s average of " +
-            $"{body.AverageTemperatureC:0.#} °C (set in the System panel), adjusted for the " +
-            "painted terrain. Rain comes from a tropical rain belt that follows the sun, storms " +
-            "in the middle latitudes, and the moisture nearby. Winds aren't modeled.";
+        _note.Text = body.Shape == BodyShape.FlatDisc
+            ? $"Estimated from the sunlight on this flat world, which is the same everywhere: " +
+                $"around {body.Name}'s average of {body.AverageTemperatureC:0.#} °C (set in the " +
+                "System panel), with two summers a year, adjusted for the painted terrain. Rain " +
+                "falls evenly, more where it's moist and less where it's cold. Winds aren't " +
+                "modeled."
+            : $"Estimated from the sunlight here, around {body.Name}'s average of " +
+                $"{body.AverageTemperatureC:0.#} °C (set in the System panel), adjusted for the " +
+                "painted terrain. Rain comes from a tropical rain belt that follows the sun, " +
+                "storms in the middle latitudes, and the moisture nearby. Winds aren't modeled.";
     }
 
     // This month's rain, and whether it's a wet or dry season (well above or below the

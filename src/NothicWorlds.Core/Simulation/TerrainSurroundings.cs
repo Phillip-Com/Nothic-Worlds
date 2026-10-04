@@ -53,6 +53,8 @@ public sealed record TerrainSurroundings(ClimateKind? Here, double WaterShare, d
         ClimateKind? here = KindAt(centre);
         int water = here == ClimateKind.Water ? 1 : 0;
         int looked = 1;
+        bool flat = body.Shape == BodyShape.FlatDisc;
+        Vector3D onFace = FlatDisc.TopPointFor(centre);
         (Vector3D east, Vector3D north) = Tangents(centre);
         for (int ring = 1; ring <= Rings; ring++)
         {
@@ -60,14 +62,34 @@ public sealed record TerrainSurroundings(ClimateKind? Here, double WaterShare, d
             for (int i = 0; i < PointsPerRing; i++)
             {
                 double bearing = 2 * Math.PI * (i + 0.5 * (ring % 2)) / PointsPerRing;
-                Vector3D along = east * Math.Sin(bearing) + north * Math.Cos(bearing);
-                Vector3D point = centre * Math.Cos(distance) + along * Math.Sin(distance);
-                water += KindAt(point) == ClimateKind.Water ? 1 : 0;
+                Vector3D? point = flat
+                    ? AcrossFace(onFace, bearing, distance)
+                    : centre * Math.Cos(distance)
+                        + (east * Math.Sin(bearing) + north * Math.Cos(bearing))
+                            * Math.Sin(distance);
+                if (point is not Vector3D direction)
+                {
+                    continue;
+                }
+
+                water += KindAt(direction) == ClimateKind.Water ? 1 : 0;
                 looked++;
             }
         }
 
         return new TerrainSurroundings(here, (double)water / looked, radiusKm);
+    }
+
+    // On a flat world the ground around is straight across the face (VISION.md BOD-02): the
+    // point `distance` (in the globe's radii) away in a direction, as a globe direction, or null
+    // past the rim.
+    private static Vector3D? AcrossFace(Vector3D onFace, double bearing, double distance)
+    {
+        var point = new Vector3D(onFace.X + Math.Sin(bearing) * distance, onFace.Y,
+            onFace.Z + Math.Cos(bearing) * distance);
+        return Math.Sqrt(point.X * point.X + point.Z * point.Z) > FlatDisc.Radius
+            ? null
+            : FlatDisc.DirectionFor(point);
     }
 
     // Two directions along the ground at a point, at right angles (east and north, except at

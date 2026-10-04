@@ -144,8 +144,21 @@ public static class Seasons
         }
 
         return [.. events.Where(e => e.TimeDays >= fromDays && e.TimeDays < toDays)
+            .Select(e => body.Shape == BodyShape.FlatDisc
+                ? e with { Kind = OnFlatWorld(e.Kind) }
+                : e)
             .OrderBy(e => e.TimeDays)];
     }
+
+    // A tumbling flat world's noon sun stands 90° minus the star's declination high, everywhere
+    // (owner's choice: physically flat, VISION.md BOD-02), so it's highest when a globe would
+    // have an equinox and lowest at its solstices: two summers and two winters a year.
+    private static SeasonEventKind OnFlatWorld(SeasonEventKind kind) => kind switch
+    {
+        SeasonEventKind.NorthernSpringEquinox or SeasonEventKind.NorthernAutumnEquinox
+            => SeasonEventKind.Midsummer,
+        _ => SeasonEventKind.Midwinter,
+    };
 
     /// <summary>
     /// The next solstice or equinox after a time, or null if there are no seasons.
@@ -176,9 +189,19 @@ public static class Seasons
         return SeasonsAfter(recent[^1].Kind);
     }
 
-    /// <summary>The season each hemisphere enters at a solstice or equinox.</summary>
+    /// <summary>
+    /// The season each hemisphere enters at a solstice or equinox. A flat world has no
+    /// hemispheres, so both are its one season (summer after midsummer, winter after
+    /// midwinter).
+    /// </summary>
     public static (Season Northern, Season Southern) SeasonsAfter(SeasonEventKind kind)
     {
+        if (kind is SeasonEventKind.Midsummer or SeasonEventKind.Midwinter)
+        {
+            Season season = kind == SeasonEventKind.Midsummer ? Season.Summer : Season.Winter;
+            return (season, season);
+        }
+
         Season northern = kind switch
         {
             SeasonEventKind.NorthernSpringEquinox => Season.Spring,

@@ -136,7 +136,7 @@ public partial class CalendarSection : VBoxContainer
         {
             Text = $"{SeasonText.Name(seasonEvent.Kind)}\n" +
                 $"{BodyClock.Describe(body, seasonEvent.TimeDays)}",
-            TooltipText = $"At the same moment, {SeasonText.SouthernNote(seasonEvent.Kind)}",
+            TooltipText = $"At the same moment, {SeasonText.Note(seasonEvent.Kind)}",
             MouseFilter = MouseFilterEnum.Pass,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
