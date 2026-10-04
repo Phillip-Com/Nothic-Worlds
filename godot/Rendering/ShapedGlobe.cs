@@ -30,7 +30,16 @@ public partial class ShapedGlobe : Node3D
         Roughness = 1.0f,
     };
 
+    private static readonly StandardMaterial3D _previewMaterial = new()
+    {
+        AlbedoColor = new Color(1.0f, 0.85f, 0.2f, 0.35f),
+        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+    };
+
     private CsgCombiner3D? _combiner;
+    private MeshInstance3D? _preview;
     private MeshInstance3D? _drawn;
     private bool _waitingForCarving;
     private (IReadOnlyList<ShapeEdit> Shapes, HeightGrid Heights, double RadiusKm, float Relief)?
@@ -120,19 +129,11 @@ public partial class ShapedGlobe : Node3D
         return mesh;
     }
 
-    // A shape as a CSG node of unit size, stretched and placed by its frame. Its middle rises
-    // with the drawn ground under its spot (the relief is exaggerated, the shapes aren't), so a
-    // shape sitting on a hill still sits on it.
+    // A shape as a CSG node of unit size, stretched and placed (see Placement).
     private CsgPrimitive3D ShapeNode(
         ShapeEdit shape, HeightGrid heights, double radiusKm, float reliefScale)
     {
-        ShapeFrame frame = shape.FrameOn(radiusKm);
-        double groundMeters = heights.SampleAt(frame.Up);
-        double lift = groundMeters * (reliefScale - 1 / (radiusKm * 1000));
-        Vector3D center = frame.Center + frame.Up * lift;
-        double width = shape.WidthKm / radiusKm;
-        double height = shape.Kind == ShapeKind.Sphere ? width : shape.HeightKm / radiusKm;
-        double length = shape.Kind == ShapeKind.Box ? shape.LengthKm / radiusKm : width;
+        Transform3D placement = Placement(shape, heights, radiusKm, reliefScale);
         CsgPrimitive3D node = shape.Kind switch
         {
             ShapeKind.Sphere => new CsgSphere3D
@@ -158,19 +159,75 @@ public partial class ShapedGlobe : Node3D
         node.Operation = shape.Operation == ShapeOperation.Add
             ? CsgShape3D.OperationEnum.Union
             : CsgShape3D.OperationEnum.Subtraction;
-        // East, up, and north make a mirror-image frame, which would turn the shape inside out
-        // (CSG would then add a cut). Every shape is the same either side of its width, so
-        // flipping that one axis fixes it with no visible change.
-        node.Transform = new Transform3D(
-            new Basis(ToGodot(frame.Across * -width), ToGodot(frame.Up * height),
-                ToGodot(frame.Along * length)),
-            ToGodot(center));
+        node.Transform = placement;
         if (shape.Operation == ShapeOperation.Add)
         {
-            HighestTop = Math.Max(HighestTop, (float)(center.Length + height / 2 - 1));
+            HighestTop = Math.Max(HighestTop,
+                placement.Origin.Length() + placement.Basis.Y.Length() / 2 - 1);
         }
 
         return node;
+    }
+
+    /// <summary>
+    /// Shows <paramref name="shape"/> as a see-through preview where it would be carved (while
+    /// a handle drags it; owner's choice: carved when let go), or hides the preview (null).
+    /// </summary>
+    public void ShowPreview(ShapeEdit? shape)
+    {
+        if (shape is null || _built is not { } built)
+        {
+            _preview?.QueueFree();
+            _preview = null;
+            return;
+        }
+
+        if (_preview is null)
+        {
+            _preview = new MeshInstance3D
+            {
+                Name = "Preview",
+                MaterialOverride = _previewMaterial,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            };
+            AddChild(_preview);
+        }
+
+        _preview.Mesh = shape.Kind switch
+        {
+            ShapeKind.Sphere => new SphereMesh { Radius = 0.5f, Height = 1 },
+            ShapeKind.Box => new BoxMesh { Size = Vector3.One },
+            _ => new CylinderMesh
+            {
+                TopRadius = shape.Kind == ShapeKind.Cone ? 0 : 0.5f,
+                BottomRadius = 0.5f,
+                Height = 1,
+            },
+        };
+        _preview.Transform = Placement(shape, built.Heights, built.RadiusKm, built.Relief);
+    }
+
+    // Where a unit-sized shape goes, stretched to its sizes, in the globe's radii. Its middle
+    // rises with the drawn ground under its spot (the relief is exaggerated, the shapes
+    // aren't), so a shape sitting on a hill still sits on it.
+    private static Transform3D Placement(
+        ShapeEdit shape, HeightGrid heights, double radiusKm, float reliefScale)
+    {
+        ShapeFrame frame = shape.FrameOn(radiusKm);
+        double groundMeters = heights.SampleAt(frame.Up);
+        double lift = groundMeters * (reliefScale - 1 / (radiusKm * 1000));
+        Vector3D center = frame.Center + frame.Up * lift;
+        double width = shape.WidthKm / radiusKm;
+        double height = shape.Kind == ShapeKind.Sphere ? width : shape.HeightKm / radiusKm;
+        double length = shape.Kind == ShapeKind.Box ? shape.LengthKm / radiusKm : width;
+
+        // East, up, and north make a mirror-image frame, which would turn the shape inside out
+        // (CSG would then add a cut). Every shape is the same either side of its width, so
+        // flipping that one axis fixes it with no visible change.
+        return new Transform3D(
+            new Basis(ToGodot(frame.Across * -width), ToGodot(frame.Up * height),
+                ToGodot(frame.Along * length)),
+            ToGodot(center));
     }
 
     private static Vector3 ToGodot(Vector3D vector) =>
