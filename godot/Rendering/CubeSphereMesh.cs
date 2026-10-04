@@ -14,37 +14,45 @@ namespace NothicWorlds.Rendering;
 /// </remarks>
 public static class CubeSphereMesh
 {
-    // Squares along each edge of a face: about 11 height cells each. The shader shades every
+    // One mesh for each detail, built the first time it's needed. The shader shades every
     // cell, so the mesh only needs to carry the ground's shape (and its outline).
-    private const int Divisions = 96;
+    private static readonly Dictionary<ReliefDetail, ArrayMesh> _meshes = [];
 
-    private static ArrayMesh? _mesh;
+    /// <summary>The mesh for a level of detail.</summary>
+    public static ArrayMesh For(ReliefDetail detail)
+    {
+        if (!_meshes.TryGetValue(detail, out ArrayMesh? mesh))
+        {
+            mesh = Build((int)detail);
+            _meshes[detail] = mesh;
+        }
 
-    /// <summary>The mesh, built the first time it's needed.</summary>
-    public static ArrayMesh Shared => _mesh ??= Build();
+        return mesh;
+    }
 
-    private static ArrayMesh Build()
+    // `divisions` squares along each edge of a face.
+    private static ArrayMesh Build(int divisions)
     {
         var vertices = new List<Vector3>();
         var indices = new List<int>();
         var welded = new Dictionary<(long, long, long), int>();
         for (int face = 0; face < CubeSphere.FaceCount; face++)
         {
-            var grid = new int[Divisions + 1, Divisions + 1];
-            for (int down = 0; down <= Divisions; down++)
+            var grid = new int[divisions + 1, divisions + 1];
+            for (int down = 0; down <= divisions; down++)
             {
-                for (int across = 0; across <= Divisions; across++)
+                for (int across = 0; across <= divisions; across++)
                 {
                     Vector3D direction = CubeSphere.Direction(
-                        face, (double)across / Divisions, (double)down / Divisions);
+                        face, (double)across / divisions, (double)down / divisions);
                     grid[across, down] = Weld(vertices, welded, direction);
                 }
             }
 
             // Two triangles a square, clockwise seen from outside (Godot's front faces).
-            for (int down = 0; down < Divisions; down++)
+            for (int down = 0; down < divisions; down++)
             {
-                for (int across = 0; across < Divisions; across++)
+                for (int across = 0; across < divisions; across++)
                 {
                     int topLeft = grid[across, down];
                     int topRight = grid[across + 1, down];

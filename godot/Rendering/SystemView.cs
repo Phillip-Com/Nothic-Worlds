@@ -184,6 +184,12 @@ public partial class SystemView : Node3D
     public float ReliefExaggeration { get; set; } = 10;
 
     /// <summary>
+    /// How finely sculpted globes' shapes are drawn (View ▸ Relief Detail; owner's choice: a
+    /// quality setting, remembered on this computer by <see cref="AppSettings"/>).
+    /// </summary>
+    public ReliefDetail ReliefDetail { get; set; } = AppSettings.ReliefDetail;
+
+    /// <summary>
     /// True while physics mode moves the bodies (VISION.md SIM-03): markers on the designed
     /// orbits are hidden then.
     /// </summary>
@@ -426,6 +432,7 @@ public partial class SystemView : Node3D
         if (visual.Surface is PlanetSurface surface)
         {
             surface.ReliefScale = (float)(ReliefExaggeration / (body.RadiusKm * 1000));
+            surface.ReliefDetail = ReliefDetail;
         }
         if (visual.Light is OmniLight3D light)
         {
