@@ -108,6 +108,21 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 23: Physics Mode** · In progress (owner's choice, 2026-10-04)
+An optional switch that moves the system by real gravity (`SIM-03`), from the masses of
+Milestone 22. Owner's decisions:
+- **Start speeds from gravity:** each body starts where its design puts it, moving at the speed
+  gravity would give that orbit, so a well-built system holds together and an unstable one
+  slowly comes apart.
+- **Only the 3D view follows physics:** seasons, calendars, eclipses, and weather stay on the
+  designed orbits.
+- **Switching off returns to the design;** a **Keep as orbits** button turns the simulated paths
+  into new designed orbits (one undo step).
+- **Collisions merge** the smaller body into the bigger (in the simulation only) and are listed.
+- **Base tier**, behind its own switch (off by default): a few dozen bodies' gravity is light.
+- **Two PRs:** the simulation in Core (PR #58), then the switch, drawing, collision list, and
+  Keep button in the app.
+
 **Milestone 22: Stable Orbit Guide** · Complete (PR #57 merged 2026-10-04; owner's choice, 2026-10-04)
 Where gravity would keep orbits steady (`SIM-04`). Orbits stay designed and free; this only
 guides. Owner's decisions:
@@ -1356,10 +1371,40 @@ own day length, and a year is one trip around its star, or its planet's trip for
 over 0.8 s with a smooth start and stop, so bodies sweep along their real orbits instead of
 popping into place. Clicking again mid-glide adds to where it's heading. Stepping pauses Play.
 
-**SIM-03 — Physics mode (toggle)** · Idea · Advanced (probably)
+**SIM-03 — Physics mode (toggle)** · In Progress (M23: the simulation, PR #58) · Base (owner's choice, 2026-10-04: light enough, behind its own switch)
 **Intent:** An optional toggle that simulates the system with real-world physics, so the user can
 see how their system might fall apart.
-**Implementation:** —
+**Implementation (the simulation, M23, PR #58):**
+- **`Simulation/GravitySimulation.cs`** (Core), started at a time with `Start`:
+  - **Start state:** the designed positions; each body's velocity is its parent's plus its
+    designed motion sped up or slowed to gravity's period (`OrbitStability.NaturalPeriodDays`):
+    the same ellipse, so the same place. The system's overall drift is taken away so its
+    balance point stays put.
+  - **Stepping:** every body pulls on every other (`BodyMass` masses), by the leapfrog method
+    (kick, drift, kick), which keeps orbits from gaining or losing energy over time. Each step
+    is 1/200 of the quickest orbit or close pass at that moment (at least 10⁻⁷ days), so a
+    system with our Moon takes about 2,700 steps a year. Ten years of Sun, Earth, and Moon take
+    well under a second; the Earth stays within 0.5% of 1 AU and the Moon with it (tested).
+  - **Deterministic:** the simulation takes its own steps whatever times it's asked for, and
+    positions between steps are interpolated (cubic Hermite from both ends' positions and
+    velocities), so a time gives the same answer however the clock got there (tested: one jump,
+    many small steps, and going back). A checkpoint every 256 steps lets the clock go back.
+    `TryPositionsAt` takes at most a given number of steps, so the app can spread a long jump
+    over several frames and draw where it has got to meanwhile.
+  - **Collisions:** two bodies touch when their closest approach during a step (moving straight
+    across it) is under their radii added (a flat world's rim counts). The smaller merges into
+    the bigger, keeping the total momentum, and the meeting is logged once (`Collision`).
+  - **Realms** ride their tree's branches as designed: they pull on others but aren't pulled,
+    and go with their tree if it's swallowed. Two realms, or a realm and its tree, never meet.
+- **Keep as orbits** (`KeepAsOrbits`, `Simulation/OrbitElements.cs`): turns each body's
+  simulated position and velocity relative to its designed parent into the designed orbit that
+  matches, the exact inverse of `OrbitMath` (tested round trip for round, elongated, tilted,
+  and backwards orbits). A round or flat orbit keeps its designed directions. Bodies that merged
+  away or are escaping (or too elongated to keep) are listed with the reason and keep their
+  design.
+- **`SystemLayout.At(bodies, truePositions, scale)`** draws any true positions as the designed
+  ones are (tested identical); a body whose parent merged away is drawn from its nearest
+  remaining parent.
 
 **SIM-04 — Stable orbit guide** · Implemented (M22) · Base
 **Intent:** For a selected body, show a guiding path for where stable orbits would be.
