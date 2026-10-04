@@ -34,6 +34,7 @@
 [ext_resource type="Script" path="res://Controls/TerrainBrush.cs" id="32_terrain_brush"]
 [ext_resource type="Script" path="res://UI/LocalViewAids.cs" id="33_local_aids"]
 [ext_resource type="Script" uid="uid://bycuo01vgll24" path="res://Rendering/NebulaBackdrop.cs" id="34_nebula_backdrop"]
+[ext_resource type="Script" uid="uid://n530wo5yywp5" path="res://Controls/ShapeHandles.cs" id="35_shape_handles"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -148,11 +149,12 @@ Camera = NodePath("../PlanetCamera")
 Toolbar = NodePath("../MapToolbar")
 SystemPanel = NodePath("../SystemPanel")
 
-[node name="TerrainPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "Brush")]
+[node name="TerrainPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "Brush", "Shapes")]
 script = ExtResource("31_terrain_panel")
 Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 Brush = NodePath("../TerrainBrush")
+Shapes = NodePath("../ShapeHandles")
 
 [node name="CutEditor" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
 script = ExtResource("13_cut")
@@ -274,6 +276,13 @@ Toolbar = NodePath("../MapToolbar")
 
 [node name="TerrainBrush" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar")]
 script = ExtResource("32_terrain_brush")
+Session = NodePath("../WorldSession")
+System = NodePath("../SystemView")
+Camera = NodePath("../PlanetCamera")
+Toolbar = NodePath("../MapToolbar")
+
+[node name="ShapeHandles" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar")]
+script = ExtResource("35_shape_handles")
 Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 Camera = NodePath("../PlanetCamera")
