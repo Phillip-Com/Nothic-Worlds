@@ -23,10 +23,10 @@ public partial class RegionRenderer : Node
     private const double StepDegrees = 1.5;
     private const float FillAlpha = 0.18f;
 
-    // What each body's mesh was built from (its regions, in order, the highlight, and the
-    // globe's shape), so it's rebuilt only when that changes.
-    private readonly Dictionary<Guid, (List<Region> Regions, Guid? Highlight, BodyShape Shape)>
-        _built = [];
+    // What each body's mesh was built from (its regions, in order, the highlight, the globe's
+    // shape, and its relief), so it's rebuilt only when that changes.
+    private readonly Dictionary<Guid,
+        (List<Region> Regions, Guid? Highlight, BodyShape Shape, int Relief)> _built = [];
 
     private readonly StandardMaterial3D _material = new()
     {
@@ -80,6 +80,16 @@ public partial class RegionRenderer : Node
         Refresh();
     }
 
+    public override void _Process(double delta)
+    {
+        // The relief changes with the View menu's exaggeration, not only with edits.
+        if (System is not null && _built.Any(pair => System.SurfaceFor(pair.Key) is { } globe
+            && globe.ReliefVersion != pair.Value.Relief))
+        {
+            Refresh();
+        }
+    }
+
     /// <summary>Brings every globe's region mesh up to date.</summary>
     public void Refresh()
     {
@@ -103,7 +113,7 @@ public partial class RegionRenderer : Node
             var mesh = globe.GetNodeOrNull<MeshInstance3D>(MeshName);
             if (mesh is not null && _built.TryGetValue(body.Id, out var built)
                 && built.Regions.SequenceEqual(regions) && built.Highlight == highlight
-                && built.Shape == globe.Shape)
+                && built.Shape == globe.Shape && built.Relief == globe.ReliefVersion)
             {
                 continue;
             }
@@ -115,13 +125,14 @@ public partial class RegionRenderer : Node
                 globe.AddChild(mesh);
             }
 
-            mesh.Mesh = BuildMesh(regions, highlight, globe.Shape);
-            _built[body.Id] = (regions, highlight, globe.Shape);
+            mesh.Mesh = BuildMesh(regions, highlight, globe);
+            _built[body.Id] = (regions, highlight, globe.Shape, globe.ReliefVersion);
         }
     }
 
-    private static ArrayMesh? BuildMesh(List<Region> regions, Guid? highlight, BodyShape shape)
+    private static ArrayMesh? BuildMesh(List<Region> regions, Guid? highlight, PlanetSurface globe)
     {
+        BodyShape shape = globe.Shape;
         if (regions.Count == 0)
         {
             return null;
@@ -138,7 +149,8 @@ public partial class RegionRenderer : Node
             {
                 foreach (Vector3D point in fill)
                 {
-                    fillPoints.Add(GlobeShape.SurfacePoint(shape, point, FillLift));
+                    fillPoints.Add(GlobeShape.SurfacePoint(shape, point,
+                        FillLift * globe.SurfaceRadiusAt(point)));
                     fillColors.Add(color with { A = FillAlpha });
                 }
             }
@@ -147,10 +159,12 @@ public partial class RegionRenderer : Node
             List<GeoCoordinate> path = SphericalPolygon.EdgePath(region.Corners, StepDegrees);
             for (int i = 1; i < path.Count; i++)
             {
-                linePoints.Add(GlobeShape.SurfacePoint(
-                    shape, SphericalPolygon.ToUnit(path[i - 1]), OutlineLift));
-                linePoints.Add(GlobeShape.SurfacePoint(
-                    shape, SphericalPolygon.ToUnit(path[i]), OutlineLift));
+                foreach (Vector3D end in new[]
+                    { SphericalPolygon.ToUnit(path[i - 1]), SphericalPolygon.ToUnit(path[i]) })
+                {
+                    linePoints.Add(GlobeShape.SurfacePoint(
+                        shape, end, OutlineLift * globe.SurfaceRadiusAt(end)));
+                }
                 lineColors.Add(line);
                 lineColors.Add(line);
             }

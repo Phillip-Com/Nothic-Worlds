@@ -91,6 +91,14 @@ uniform float terrain_over_map = 0.6;
 uniform vec3 unpainted_color : source_color = vec3(0.55, 0.56, 0.58);
 const int TERRAIN_FACE_SIZE = 1024;
 const int TERRAIN_FAR_SIZE = 256;
+// Sculpted heights (VISION.md BOD-04) on the same cube grid: each cell's height in meters plus
+// 32,768, in two bytes (red the high byte, green the low), as in Core's HeightImage. The globe
+// is then the cube-sphere mesh, each vertex lifted by its height times relief_scale (meters to
+// the unit sphere's radius, times the view's exaggeration), and each pixel shaded by the slope.
+uniform bool has_heights = false;
+uniform sampler2DArray heights : filter_nearest, repeat_disable;
+uniform float relief_scale = 0.0;
+
 // The softest edge between terrains up close, in cells (edges sharpen to about a pixel as
 // cells get bigger on screen, and never go softer than this).
 const float TERRAIN_EDGE_CELLS = 0.15;
@@ -125,10 +133,6 @@ uniform vec3 ring_normal = vec3(0.0, 1.0, 0.0);
 uniform vec3 ring_sun = vec3(0.0, 1.0, 0.0);
 
 varying vec3 local_direction;
-
-void vertex() {
-	local_direction = VERTEX;
-}
 
 // On a flat world's top face, distance from the center is the angle from the north pole (the
 // disc's radius is PI), so a point maps back to the globe direction it stands for. Must match
@@ -448,6 +452,44 @@ vec3 terrain_direction(int face, vec2 position) {
 	return vec3(-a, b, -1.0);
 }
 
+// A cell's sculpted height, in meters.
+float cell_height(ivec3 cell) {
+	vec2 bytes = round(texelFetch(heights, cell, 0).rg * 255.0);
+	return bytes.r * 256.0 + bytes.g - 32768.0;
+}
+
+// The height where a direction meets the surface, blended between the four nearest cells'
+// middles on its face. Must match HeightGrid.SampleAt in Core (which has the tests).
+float height_at(vec3 direction) {
+	vec3 position = terrain_face_position(direction);
+	float last = float(TERRAIN_FACE_SIZE - 1);
+	vec2 cells = clamp(position.xy * float(TERRAIN_FACE_SIZE) - 0.5, vec2(0.0), vec2(last));
+	ivec2 base = min(ivec2(cells), ivec2(TERRAIN_FACE_SIZE - 2));
+	vec2 f = cells - vec2(base);
+	int face = int(position.z);
+	float upper = mix(cell_height(ivec3(base, face)),
+		cell_height(ivec3(base + ivec2(1, 0), face)), f.x);
+	float lower = mix(cell_height(ivec3(base + ivec2(0, 1), face)),
+		cell_height(ivec3(base + ivec2(1, 1), face)), f.x);
+	return mix(upper, lower, f.y);
+}
+
+// Which way the sculpted ground faces here, in the body's own space: the slopes found by
+// comparing the heights a cell either side (or a pixel, once cells are smaller than pixels, so
+// distant ground doesn't shimmer). Comparing both sides keeps the cells' edges from showing.
+vec3 relief_normal(vec3 direction, float pixel_angle) {
+	float step = max(HALF_PI / float(TERRAIN_FACE_SIZE), pixel_angle);
+	vec3 side = abs(direction.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+	vec3 first = normalize(cross(direction, side));
+	vec3 second = cross(direction, first);
+	float rise_first = height_at(normalize(direction + first * step))
+		- height_at(normalize(direction - first * step));
+	float rise_second = height_at(normalize(direction + second * step))
+		- height_at(normalize(direction - second * step));
+	return normalize(direction
+		- (first * rise_first + second * rise_second) * (relief_scale / (2.0 * step)));
+}
+
 // A cell's terrain code, and its color with alpha (0 where nothing is painted).
 int terrain_code(ivec3 cell) {
 	return int(round(texelFetch(terrain_cells, cell, 0).r * 255.0));
@@ -617,6 +659,14 @@ vec3 surface_look(vec3 unit_direction) {
 	return color;
 }
 
+void vertex() {
+	local_direction = VERTEX;
+	if (has_heights && !flat_disc) {
+		vec3 direction = normalize(VERTEX);
+		VERTEX = direction * (1.0 + height_at(direction) * relief_scale);
+	}
+}
+
 void fragment() {
 	vec3 direction = flat_disc
 		? flat_disc_direction(local_direction)
@@ -666,4 +716,8 @@ void fragment() {
 
 	ALBEDO = color;
 	ROUGHNESS = 0.9;
+	if (has_heights && !flat_disc) {
+		vec3 normal = relief_normal(direction, pixel_angle);
+		NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(normal, 0.0)).xyz);
+	}
 }

@@ -49,6 +49,15 @@ public partial class PlanetSurface : MeshInstance3D
     private ImageTexture? _terrainPalette;
     private byte[] _paletteBytes = [];
 
+    // Sculpted heights (VISION.md BOD-04): the six faces as layers of one two-byte texture
+    // (only while something is sculpted, about 12 MB), the grid they show, and how far a meter
+    // lifts the unit sphere (with the view's exaggeration).
+    private Texture2DArray? _heightTexture;
+    private readonly byte[] _faceHeightBytes = new byte[HeightGrid.CellsPerFace * 2];
+    private readonly short[] _faceHeights = new short[HeightGrid.CellsPerFace];
+    private HeightGrid _shownHeights = HeightGrid.Empty;
+    private float _reliefScale;
+
     // The globe mesh, kept while the body is flat, and the flat world's rock.
     private Mesh? _sphereMesh;
     private MeshInstance3D? _rock;
@@ -76,8 +85,7 @@ public partial class PlanetSurface : MeshInstance3D
 
             _shape = value;
             bool flat = value == BodyShape.FlatDisc;
-            _sphereMesh ??= Mesh;
-            Mesh = flat ? FlatDiscMeshes.Top : _sphereMesh;
+            ChooseMesh();
             SurfaceMaterial.SetShaderParameter("flat_disc", flat);
             if (flat && _rock is null)
             {
@@ -307,6 +315,91 @@ public partial class PlanetSurface : MeshInstance3D
         _shownTerrain = terrain;
     }
 
+    /// <summary>
+    /// Shows the body's sculpted heights (VISION.md BOD-04): a sculpted globe is drawn as the
+    /// cube-sphere mesh lifted by them. Only the faces that changed since the last call are sent
+    /// to the graphics card, so it's cheap to call on every brush movement.
+    /// </summary>
+    public void SetHeights(HeightGrid heights)
+    {
+        if (ReferenceEquals(heights, _shownHeights))
+        {
+            return;
+        }
+
+        if (heights.IsEmpty)
+        {
+            // Nothing sculpted: back to the plain sphere, and free the texture's memory.
+            SurfaceMaterial.SetShaderParameter("has_heights", false);
+            SurfaceMaterial.SetShaderParameter("heights", default);
+            _heightTexture = null;
+        }
+        else if (_heightTexture is null)
+        {
+            var faces = new Godot.Collections.Array<Image>();
+            for (int face = 0; face < CubeSphere.FaceCount; face++)
+            {
+                faces.Add(HeightFaceImage(heights, face));
+            }
+
+            _heightTexture = new Texture2DArray();
+            _heightTexture.CreateFromImages(faces);
+            SurfaceMaterial.SetShaderParameter("heights", _heightTexture);
+            SurfaceMaterial.SetShaderParameter("has_heights", true);
+        }
+        else
+        {
+            foreach (int face in heights.FacesChangedFrom(_shownHeights))
+            {
+                _heightTexture.UpdateLayer(HeightFaceImage(heights, face), face);
+            }
+        }
+
+        _shownHeights = heights;
+        ChooseMesh();
+        UpdateBounds();
+    }
+
+    /// <summary>
+    /// How far one meter of height lifts the surface, in the globe's radii: the view's relief
+    /// exaggeration over the body's radius in meters. Only touches the shader when it changes.
+    /// </summary>
+    public float ReliefScale
+    {
+        get => _reliefScale;
+        set
+        {
+            if (value != _reliefScale)
+            {
+                _reliefScale = value;
+                SurfaceMaterial.SetShaderParameter("relief_scale", value);
+                UpdateBounds();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Goes up by one whenever the drawn relief changes (the heights or the exaggeration), so
+    /// whatever sits on the surface knows to move.
+    /// </summary>
+    public int ReliefVersion { get; private set; }
+
+    /// <summary>
+    /// How far out the drawn surface is at a direction, in the globe's radii: 1 on an unsculpted
+    /// globe (or a flat world), more on a sculpted hill, less in a basin. Overlays sit on it.
+    /// </summary>
+    public float SurfaceRadiusAt(Vector3D direction) =>
+        _shownHeights.IsEmpty || Shape == BodyShape.FlatDisc
+            ? 1.0f
+            : 1.0f + _reliefScale * (float)_shownHeights.SampleAt(direction);
+
+    /// <summary>
+    /// The highest the surface reaches anywhere, in the globe's radii above it (0 unsculpted).
+    /// </summary>
+    public float HighestRelief => _shownHeights.IsEmpty || Shape == BodyShape.FlatDisc
+        ? 0
+        : Math.Max(0, _reliefScale * _shownHeights.Highest);
+
     /// <summary>Sets the color each terrain code is drawn in (others stay unpainted).</summary>
     public void SetTerrainColors(IEnumerable<TerrainType> types)
     {
@@ -477,6 +570,42 @@ public partial class PlanetSurface : MeshInstance3D
 
     // Writes a table of 32-bit floats into a one-pixel-tall texture, reusing the existing
     // texture when there is one (much cheaper while dragging).
+    // One face's heights as a two-byte image (high byte red, low byte green), as the shader
+    // reads them.
+    private Image HeightFaceImage(HeightGrid heights, int face)
+    {
+        heights.CopyFace(face, _faceHeights);
+        for (int index = 0; index < _faceHeights.Length; index++)
+        {
+            int stored = _faceHeights[index] + 32_768;
+            _faceHeightBytes[index * 2] = (byte)(stored >> 8);
+            _faceHeightBytes[index * 2 + 1] = (byte)stored;
+        }
+
+        return Image.CreateFromData(HeightGrid.FaceSize, HeightGrid.FaceSize, false,
+            Image.Format.Rg8, _faceHeightBytes);
+    }
+
+    // A flat world's disc, a sculpted globe's cube-sphere, or the plain sphere.
+    private void ChooseMesh()
+    {
+        _sphereMesh ??= Mesh;
+        Mesh = Shape == BodyShape.FlatDisc ? FlatDiscMeshes.Top
+            : _shownHeights.IsEmpty ? _sphereMesh
+            : CubeSphereMesh.Shared;
+    }
+
+    // The engine skips drawing what's outside a mesh's bounds, and doesn't know the shader
+    // lifts the ground, so the bounds grow to hold the highest peak.
+    private void UpdateBounds()
+    {
+        ReliefVersion++;
+        float reach = 1.0f + HighestRelief;
+        CustomAabb = HighestRelief > 0
+            ? new Aabb(-Vector3.One * reach, Vector3.One * (2 * reach))
+            : default;
+    }
+
     private static ImageTexture UpdateTable(ImageTexture? texture, float[] values)
     {
         byte[] bytes = new byte[values.Length * sizeof(float)];

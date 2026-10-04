@@ -177,6 +177,13 @@ public partial class SystemView : Node3D
     public bool ShowOrbitGuide { get; set; } = true;
 
     /// <summary>
+    /// How many times taller than true scale sculpted relief is drawn (VISION.md BOD-04; owner's
+    /// choice: heights are true to scale, and the view exaggerates them so they show from
+    /// orbit). View ▸ Relief; not saved.
+    /// </summary>
+    public float ReliefExaggeration { get; set; } = 10;
+
+    /// <summary>
     /// True while physics mode moves the bodies (VISION.md SIM-03): markers on the designed
     /// orbits are hidden then.
     /// </summary>
@@ -416,6 +423,10 @@ public partial class SystemView : Node3D
         visual.Root.Transform = new Transform3D(
             Orientation(body, timeDays).Scaled(Vector3.One * (float)place.Radius),
             ToScene(place.Position));
+        if (visual.Surface is PlanetSurface surface)
+        {
+            surface.ReliefScale = (float)(ReliefExaggeration / (body.RadiusKm * 1000));
+        }
         if (visual.Light is OmniLight3D light)
         {
             light.Position = ToScene(place.Position);
@@ -639,9 +650,11 @@ public partial class SystemView : Node3D
 
         if (Session?.World.Bodies.Find(b => b.Id == _focusId) is Body focused)
         {
+            // Above the highest sculpted peak too, so the camera never ends up inside a hill.
             Camera.MinAltitude = (float)Math.Clamp(
                 ClosestApproachKm / (focused.RadiusKm * ShapeExtent(focused)),
-                MinRelativeAltitude, 0.05);
+                MinRelativeAltitude, 0.05)
+                + (SurfaceFor(focused.Id)?.HighestRelief ?? 0);
         }
 
         double extent = 0;
