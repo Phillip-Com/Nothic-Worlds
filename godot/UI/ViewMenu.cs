@@ -47,6 +47,7 @@ public partial class ViewMenu : Node
         EclipseMarkers,
         Grid,
         TrueScale,
+        OrbitGuide,
     }
 
     public override void _Ready()
@@ -75,9 +76,13 @@ public partial class ViewMenu : Node
         menu.AddSeparator();
         menu.AddCheckItem("Grid (G)", (int)MenuItem.Grid);
         menu.AddCheckItem("True Scale", (int)MenuItem.TrueScale);
+        menu.AddCheckItem("Orbit Guide", (int)MenuItem.OrbitGuide);
         menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.TrueScale),
             "Real sizes and distances (most bodies become tiny dots). Off: a readable view " +
             "with distances compressed and small bodies enlarged.");
+        menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.OrbitGuide),
+            "While the System panel is open: green rings where orbits around the selected " +
+            "body (and around what it circles) would stay steady, red where they wouldn't.");
         menu.AboutToPopup += () => ShowChecks(menu);
         menu.IdPressed += id => Toggle((MenuItem)(int)id);
         Toolbar.MenuArea.AddChild(_button);
@@ -101,6 +106,7 @@ public partial class ViewMenu : Node
         MenuItem.EclipseMarkers => Eclipses?.ShowMarkers ?? false,
         MenuItem.Terrain => System?.ShowTerrain ?? false,
         MenuItem.Grid => System?.ShowGrid ?? false,
+        MenuItem.OrbitGuide => System?.ShowOrbitGuide ?? false,
         _ => System?.DisplayScale == SystemScale.True,
     };
 
@@ -135,6 +141,9 @@ public partial class ViewMenu : Node
                 break;
             case MenuItem.TrueScale when System is not null:
                 System.DisplayScale = on ? SystemScale.True : SystemScale.Readable;
+                break;
+            case MenuItem.OrbitGuide when System is not null:
+                System.ShowOrbitGuide = on;
                 break;
         }
     }
