@@ -6,6 +6,8 @@
 // +Y is north, longitude 0 faces +Z, longitude 90 east faces +X.
 shader_type spatial;
 
+#include "res://Rendering/ring_bands.gdshaderinc"
+
 // Map types. Must match NothicWorlds.Core.Maps.MapProjection, and the math below must match
 // NothicWorlds.Core.Maps.MapProjections.ToImagePosition (which has the tests).
 const int EQUIRECTANGULAR = 0;  // "Globe map"
@@ -111,6 +113,16 @@ uniform float grid_line_pixels = 1.2;
 // A flat world (VISION.md BOD-02): the mesh is a disc, and each point stands for the globe
 // direction it maps to (see flat_disc_direction).
 uniform bool flat_disc = false;
+
+// The planet's rings (VISION.md BOD-03), for the shadow they cast: their radii (in planet
+// radii), their pattern, the plane they lie in (its normal), and the way to the star, both in
+// the planet's own space.
+uniform bool has_rings = false;
+uniform float ring_inner = 1.25;
+uniform float ring_outer = 2.3;
+uniform float ring_seed = 0.0;
+uniform vec3 ring_normal = vec3(0.0, 1.0, 0.0);
+uniform vec3 ring_sun = vec3(0.0, 1.0, 0.0);
 
 varying vec3 local_direction;
 
@@ -623,6 +635,19 @@ void fragment() {
 		vec4 terrain = terrain_color(direction, pixel_angle);
 		float strength = over_map ? terrain_over_map : 1.0;
 		color = color * (1.0 - terrain.a * strength) + terrain.rgb * strength;
+	}
+
+	// The rings' shadow: where the line from here toward the star crosses them. (A flat
+	// world's face is left unshadowed, as for eclipses.)
+	if (has_rings && !flat_disc) {
+		float facing = dot(ring_sun, ring_normal);
+		float ahead = abs(facing) > 1e-4 ? -dot(direction, ring_normal) / facing : -1.0;
+		if (ahead > 0.0) {
+			vec3 hit = direction + ring_sun * ahead;
+			float radius = length(hit - ring_normal * dot(hit, ring_normal));
+			color *= 1.0 - 0.75 * ring_density(
+				(radius - ring_inner) / (ring_outer - ring_inner), ring_seed);
+		}
 	}
 
 	if (show_grid) {

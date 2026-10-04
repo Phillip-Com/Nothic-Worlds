@@ -438,6 +438,31 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
+    /// Gives a planet or moon rings (VISION.md BOD-03), changes them, or removes them with
+    /// null. Rapid changes (dragging a field or a color) are one undo step.
+    /// </summary>
+    /// <returns>What's wrong with the rings (nothing is changed then), or null.</returns>
+    public string? SetRings(Guid bodyId, PlanetRings? rings)
+    {
+        if (FindBody(bodyId) is not Body body || body.Rings == rings || !body.HasSurface)
+        {
+            return null;
+        }
+
+        if (rings?.Problem() is string problem)
+        {
+            return problem;
+        }
+
+        RecordUndo(rings is null ? $"Remove {body.Name}'s Rings"
+            : body.Rings is null ? $"Give {body.Name} Rings"
+            : $"Edit {body.Name}'s Rings", mergeKey: ("rings", bodyId));
+        body.Rings = rings;
+        MarkChanged(systemChanged: false);
+        return null;
+    }
+
+    /// <summary>
     /// Makes a planet or moon a globe or a flat world (VISION.md BOD-02). Its maps, terrain,
     /// regions, and pins stay where they are on the map; only the body's shape changes.
     /// </summary>

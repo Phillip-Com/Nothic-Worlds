@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 16;
+    public const int CurrentVersion = 17;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -153,6 +153,10 @@ internal static partial class WorldFormat
 
         // 15 → 16: planets and moons gained an optional "shape" (flat worlds, M19). Older bodies
         // are all spheres, which is what a missing shape means.
+        document => document,
+
+        // 16 → 17: planets and moons gained optional "rings" (astral features, M20). Older
+        // bodies have none.
         document => document,
     ];
 

@@ -43,6 +43,11 @@ public sealed class Body
     /// </summary>
     public BodyAppearance Appearance { get; set; } = BodyAppearance.DefaultFor(BodyKind.Planet);
 
+    /// <summary>
+    /// The body's rings (VISION.md BOD-03), or null for none. Planets and moons only.
+    /// </summary>
+    public PlanetRings? Rings { get; set; }
+
     /// <summary>What's drawn on the body's surface.</summary>
     public SurfaceSettings Surface { get; } = new();
 
@@ -121,6 +126,11 @@ public sealed class Body
             return "only planets and moons can be flat";
         }
 
+        if (Rings is PlanetRings rings && (!HasSurface || rings.Problem() is not null))
+        {
+            return HasSurface ? rings.Problem() : "only planets and moons can have rings";
+        }
+
         if (Kind == BodyKind.Comet && Calendar is not null)
         {
             return "a comet can't have a calendar";
@@ -131,8 +141,8 @@ public sealed class Body
 
     /// <summary>
     /// True if <paramref name="other"/> would save exactly the same body: the same name, kind,
-    /// shape, size, day, tilt, orbit, appearance, and surface. Used to tell whether the world still
-    /// matches its saved file.
+    /// shape, size, day, tilt, orbit, appearance, rings, and surface. Used to tell whether the
+    /// world still matches its saved file.
     /// </summary>
     public bool HasSameContent(Body other)
     {
@@ -143,7 +153,7 @@ public sealed class Body
             && AxialTiltDirectionDegrees == other.AxialTiltDirectionDegrees
             && AverageTemperatureC == other.AverageTemperatureC
             && Orbit == other.Orbit && Calendar == other.Calendar
-            && Appearance == other.Appearance
+            && Appearance == other.Appearance && Rings == other.Rings
             && Surface.HasSameContent(other.Surface);
     }
 
@@ -164,6 +174,7 @@ public sealed class Body
             Orbit = Orbit,  // Immutable, safe to share.
             Calendar = Calendar,  // Immutable, safe to share.
             Appearance = Appearance,  // Immutable, safe to share.
+            Rings = Rings,  // Immutable, safe to share.
         };
         copy.Surface.RestoreFrom(Surface);
         return copy;

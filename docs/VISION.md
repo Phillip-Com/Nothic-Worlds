@@ -108,7 +108,20 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 19: Flat Worlds** · In progress (owner's choice, 2026-10-03)
+**Milestone 20: Astral Features** · In progress (owner's choice, 2026-10-03)
+Rings, asteroid belts, and nebulas (`BOD-03`), and asteroid events (the rest of `EVT-02`).
+Owner's decisions:
+- **Planetary rings:** banded, in a color you pick, with the planet's shadow on the rings and
+  theirs on the planet.
+- **Asteroid belts:** a belt is one feature on a star (inner and outer distance, thickness,
+  density, color); its rocks are drawn, not saved or edited one by one.
+- **Nebulas:** a backdrop on the sky around the whole system, the same from every planet.
+- **Asteroid events:** worked out from the belts (planets in or near dense belts get more close
+  passes, and rarely an impact), the same every time for a given world; impacts are listed
+  only, with no change to the map.
+- **Four PRs:** rings (PR #49), belts, nebulas, asteroid events.
+
+**Milestone 19: Flat Worlds** · Complete (PR #48 merged 2026-10-03; owner's choice, 2026-10-03)
 Non-standard bodies (`BOD-02`), starting with flat worlds. Owner's decisions:
 - Planets and moons get a **Shape**: Globe or **Flat world**, changeable any time; maps,
   terrain, regions, and pins are kept.
@@ -1030,9 +1043,30 @@ the body as a sphere of its radius. World trees and other shapes are still open.
   sky everywhere (daylight, noon height, temperature, rain); the noon sun from 90° to 90°
   minus the tilt; a year averaging the body's temperature with two warm spells; water
   measured across the face. Verified in the running app at both sizes: the time bar, season
-  list, and a weather pin's window on a flat world. · Idea · —
+  list, and a weather pin's window on a flat world.
+
+**BOD-03 — Other astral features** · In progress (M20) · Base
 **Intent:** Asteroids, nebulas, and similar features.
-**Implementation:** —
+**Implementation (planetary rings, PR #49):**
+- **Model:** `Model/PlanetRings.cs` (`InnerRadii`, `OuterRadii`, `Color`), `Body.Rings` for
+  planets and moons, measured in the body's radii so resizing keeps their shape. Format
+  **version 17** (optional `rings`).
+- **Drawing:** `godot/Rendering/RingsVisual.cs` puts a shared flat ring (radius 1 to 2) in the
+  planet's equatorial plane, as a child of the planet's node; `rings.gdshader` stretches it to
+  the rings' radii and draws the bands, with a gap a little past halfway out like Saturn's
+  Cassini Division. The bands come from `ring_bands.gdshaderinc`, shared with
+  `planet.gdshader`, so the rings and their shadow always agree.
+- **Shadows:** the rings are darkened where the line toward the star passes through the planet;
+  the planet is darkened where that line crosses the rings, by how dense they are there (the
+  winter hemisphere gets the shadow, as on Saturn). Lit from the selected body's star each
+  frame. A flat world's rings circle its spin axis, measured in its disc's radius so they
+  clear the rim; its face isn't shadowed by them (as for eclipses).
+- **App:** a **Rings** section in the System panel (`godot/UI/RingsSection.cs`): an on/off box,
+  **From** and **To** (× radius), and **Color**; `WorldSession.SetRings`, one undo step per
+  drag. Saturn's main rings (1.25 to 2.3 radii, pale tan) to start.
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: switching
+  rings on, the bands and gap, the planet's shadow across them, their shadow on the winter
+  hemisphere, edge-on at an equinox, a flat world's rings, and undo. Benchmark: no change.
 
 **BOD-04 — Body sculpting (digital clay)** · Idea · —
 **Intent:** Mold bodies like digital clay with brush tools. Tools include:
