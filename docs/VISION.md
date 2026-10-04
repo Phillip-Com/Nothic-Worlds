@@ -365,7 +365,7 @@ Each entry uses this format:
 - Benchmark (8k map, fullscreen, back to back with `main`): ~154 → ~147 fps, video memory
   144 → 151 MB, for the added sun, its light, and orbit lines.
 
-**REN-02 — Multi-scale navigation (system → planet → local region)** · In Progress (planet and system views done, PR #17) · Base
+**REN-02 — Multi-scale navigation (system → planet → local region)** · Implemented (planet and system views: PR #17; local region: M13, see `REN-04`) · Base
 **Intent:** Move smoothly from viewing the whole star system down to a local region on a planet.
 M1 covers these camera controls for a single planet:
 - **Orbit:** drag to spin the globe / circle the camera around it
@@ -630,7 +630,7 @@ piece.
 
 ### 4.3 Maps & Image Import (`MAP`)
 
-**MAP-01 — Import map image in a supported layout** · In Progress (equirectangular done in M1) · Base
+**MAP-01 — Import map image in a supported layout** · Implemented (equirectangular: M1; other layouts: M2, see `MAP-04`) · Base
 **Intent:** Import a flat map image and wrap it onto a globe. Supported preset layouts
 (map projections) can be wrapped onto a sphere with little stretching.
 **Notes:** M1 needs only the simplest case: one standard layout (probably equirectangular, a
