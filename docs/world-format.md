@@ -269,6 +269,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…events[].end` | no | When it ends, not before `start`. Omitted for a moment. |
 | `…events[].location` | no | Where it happens (see **Locations**) |
 | `…events[].entries` | no | The `id`s of journal entries it links to, each once (every one must exist). Links are many to many and stored only here; an entry's events are the ones listing it. Omitted when none. |
+| `nebulas` | no | Nebulas on the sky around the system (`BOD-03`), at most 20; omitted for none. Each: `id` (GUID, unique), `name` (1–100 characters), `latitude` (−90 to 90°, above or below the system's reference plane) and `longitude` (any, measured like orbit angles), `size` (its radius on the sky, 2–120°), `brightness` (0.05–1), `color` and `secondColor` (`#RRGGBB`). |
 | `view` | no | Camera when saved. Omitted means the default view. |
 | `view.latitude`, `longitude` | yes | Degrees; camera direction from the focus point. Below an altitude of 0.25 (the local view, `REN-04`) they're the focused body's own coordinates, since the camera rides with its spin; otherwise they're fixed in space. |
 | `view.altitude` | yes | In planet radii above the surface |
@@ -419,6 +420,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 19 | Nebulas (M20): the world gains optional `nebulas` | Nothing to change: version 18 skies are empty |
 | 18 | Asteroid belts (M20): stars gain optional `belts` | Nothing to change: version 17 stars have no belts |
 | 17 | Rings (M20): planets and moons gain optional `rings` | Nothing to change: version 16 bodies have no rings |
 | 16 | Flat worlds (M19): planets and moons gain an optional `shape` | Nothing to change: version 15 bodies are all spheres |

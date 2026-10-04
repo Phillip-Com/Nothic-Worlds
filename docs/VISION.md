@@ -119,7 +119,7 @@ Owner's decisions:
 - **Asteroid events:** worked out from the belts (planets in or near dense belts get more close
   passes, and rarely an impact), the same every time for a given world; impacts are listed
   only, with no change to the map.
-- **Four PRs:** rings (PR #49), belts (PR #50), nebulas, asteroid events.
+- **Four PRs:** rings (PR #49), belts (PR #50), nebulas (PR #51), asteroid events.
 
 **Milestone 19: Flat Worlds** · Complete (PR #48 merged 2026-10-03; owner's choice, 2026-10-03)
 Non-standard bodies (`BOD-02`), starting with flat worlds. Owner's decisions:
@@ -1089,6 +1089,31 @@ the body as a sphere of its radius. World trees and other shapes are still open.
 - **Verified in the running app** with real clicks, maximized and at 1152 × 648: Add Belt on
   the Sun, its fields, the belt from above and edge-on, the rocks drifting as time runs,
   and Delete and undo. Benchmark with a 2,500-rock belt: no slowdown; video memory +3 MB.
+
+**Implementation (nebulas, PR #51):**
+- **Model:** `Model/Nebula.cs` (name; where it is on the sky, as a latitude and longitude around
+  the system; size 2°–120° of radius; brightness; a main color and a wisp color);
+  `World.Nebulas`, up to 20. Format **version 19** (optional `nebulas`). Undo covers them with
+  the world's other non-body state (`LoreState`). `NewBodies.Nebula` turns each new one away
+  from the others by the golden angle.
+- **Painting** (`Simulation/NebulaSky.cs`, Core): an image of every direction (around ×
+  up/down), each nebula a soft glow whose edge and wisps are shaped by noise seeded from its
+  ID, blending between its colors; nebulas add their light together. Deterministic and tested
+  without Godot. Rows are painted in parallel.
+- **Drawing** (`godot/Rendering/NebulaBackdrop.cs`, `nebula_sky.gdshader`): when the nebulas
+  change, the sky is painted in the background at 1024 × 512 (soft clouds don't need more;
+  about a second for two large ones), then shown as the environment's sky with one lookup per
+  background pixel, converted to linear light so the background stays as dark as before. A
+  change made while painting is painted next. Without nebulas the background stays the plain
+  color it always was. Lighting and reflections don't come from the sky, so the planets look
+  the same.
+- **App:** a **Nebulas** section at the bottom of the System panel
+  (`godot/UI/NebulasSection.cs`): each nebula's name, **Up/down**, **Around**, **Size**,
+  **Brightness**, **Color**, **Wisps**, and **Delete**, plus **Add Nebula**; also **Add ▸
+  Nebula**. `WorldSession.AddNebula`, `SetNebula` (one undo step per drag), `RemoveNebula`.
+- **Verified in the running app** with real clicks: Add Nebula, its fields, the nebula behind
+  the planet when looking toward its direction and absent looking away, a bigger and brighter
+  one, the background unchanged without nebulas, and undo. Benchmark: no change.
 
 **BOD-04 — Body sculpting (digital clay)** · Idea · —
 **Intent:** Mold bodies like digital clay with brush tools. Tools include:
