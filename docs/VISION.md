@@ -118,7 +118,8 @@ Let each world choose how it's drawn (`REN-05`). Owner's decisions:
 - **Stored per world,** in the file (format version 25), so a world keeps its look when it's
   saved or shared.
 - **Painterly is the default for every world,** new and existing; Realistic is one click away.
-- **Two PRs:** the style in Core and the file (PR #69), then the looks and the picker.
+- **Two PRs:** the style in Core and the file (PR #69), then the looks and the picker
+  (PR #70).
 
 **Milestone 25: Shapes, Holes, and Hollow Worlds** · Complete (PR #67 merged 2026-10-04; owner's choice, 2026-10-04)
 The rest of body sculpting (`BOD-04`): shapes added to or cut out of a world. Owner's decisions:
@@ -546,7 +547,7 @@ folder (`user://settings.cfg`); a missing or damaged file gives the defaults.
   off); the aids readable, the region name under the mouse, and the aids beside the open System
   panel. Benchmark unchanged (~197 fps both).
 
-**REN-05 — Visual styles** · In Progress (M26: PR #69) · Base
+**REN-05 — Visual styles** · Implemented (M26: PRs #69–#70) · Base
 **Intent:** Painterly is the default style. The goal is to let users choose other styles, such
 as realistic or simple.
 **Implementation (the style in Core, M26, PR #69):**
@@ -556,6 +557,31 @@ as realistic or simple.
   older files have none and load as Painterly (owner's choice: painterly for all). Tested: the
   golden file, each style written by name and read back, version 24 files, and refusing an
   unknown style.
+**Implementation (the looks and the picker, M26, PR #70):**
+- **One shader per style:** the surface moved into `Rendering/planet_surface.gdshaderinc`.
+  `planet.gdshader` (Realistic) is just that, so it draws exactly as before; and
+  `planet_painterly.gdshader` and `planet_simple.gdshader` add `planet_style.gdshaderinc`, with
+  its own `light()` (a shader with one always replaces Godot's lighting, so a switch inside one
+  shader couldn't keep Realistic unchanged). `PlanetSurface.Style` swaps the material's shader;
+  its settings carry over.
+- **Painterly:** three bands of light with soft steps whose edges wander with brush streaks
+  (noise stretched along the latitudes, faded out where finer than a few pixels), a warm glow
+  where day turns to night, and a soft outline in a darker shade of the surface. **Simple:**
+  even daylight with a crisp line to night, and a clean dark outline. Outlines are a constant
+  width in pixels (from how fast the surface turns away per pixel), following the round globe
+  rather than the mesh, whose carved slivers made spikes. Bands come from the angle to the
+  light only, with shadow applied after: mixed in, the globe's speckled self-shadow where light
+  grazes it showed.
+- **Rock faces** of shaped worlds (`ShapedGlobe.UseStyle`): Godot's two-tone "toon" light in
+  Painterly and Simple. Stars, rings, belts, comets, and nebulas are unlit, so every style
+  draws them the same.
+- **Picking it:** **View ▸ Style** (`UI/ViewMenu.cs`), a radio list with tooltips;
+  `WorldSession.SetStyle` is one undo step and an unsaved change (the style is part of
+  `LoreState`); opening a world or undoing shows its style (`SystemView.Style`).
+- **Verified in the running app** with real clicks: View ▸ Style switching, its check marks,
+  undo; each style close up and from afar on a rocky planet, its outline, and a carved pit and
+  an added block. Benchmark (Painterly against `main`, back to back): 193/193 vs 192/200 fps,
+  same memory.
 
 **REN-06 — First-person surface view** · Future · Advanced (probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
