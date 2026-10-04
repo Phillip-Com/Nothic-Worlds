@@ -740,6 +740,31 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
+    /// Sets how dense a body is (VISION.md SIM-04), or null for the typical density of its kind
+    /// and size. Rapid changes (holding the field's arrow) are one undo step.
+    /// </summary>
+    /// <returns>What's wrong with the value (nothing is changed then), or null.</returns>
+    public string? SetDensity(Guid bodyId, double? densityGramsPerCm3)
+    {
+        if (FindBody(bodyId) is not Body body || body.DensityGramsPerCm3 == densityGramsPerCm3)
+        {
+            return null;
+        }
+
+        if (new Body { DensityGramsPerCm3 = densityGramsPerCm3 }.Problem() is string problem)
+        {
+            return problem;
+        }
+
+        // Going back to typical is its own step, not merged into typing a value.
+        RecordUndo($"Edit {body.Name}",
+            mergeKey: densityGramsPerCm3 is null ? null : ("density", bodyId));
+        body.DensityGramsPerCm3 = densityGramsPerCm3;
+        MarkChanged();
+        return null;
+    }
+
+    /// <summary>
     /// Replaces a body's orbit (its parent, size, period, and extras). Rapid changes are one
     /// undo step.
     /// </summary>

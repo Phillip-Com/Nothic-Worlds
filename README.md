@@ -78,7 +78,8 @@ name, kind, shape, radius, day length, axial tilt, and orbit: what it orbits, di
 period, and starting position. Switch on "Elongated or tilted orbit" for more. While the panel is
 open, the selected body's path is drawn in yellow, and every change shows live as you type.
 **Axis direction** sets which way the tilted axis leans, which decides when in the year the
-solstices fall.
+solstices fall. **Density** (Earth: 5.5 g/cm³) gives the body its **Mass**, shown below it; it's
+typical for the body's kind and size until you set it (**Typical** goes back).
 
 Planets and moons can have their own calendar: **Calendar · Edit…** in the panel sets its months,
 weekdays, year numbering (with an optional era), and the date the clock starts on. **Leap

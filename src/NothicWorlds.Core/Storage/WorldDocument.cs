@@ -111,6 +111,7 @@ internal sealed class BodyDocument
     public required double AxialTilt { get; init; }  // Added in format version 5
     public required double AxialTiltDirection { get; init; }  // Added in format version 6
     public required double AverageTemperature { get; init; }  // Added in format version 9
+    public double? Density { get; init; }  // Added in format version 22; omitted when typical
     public OrbitDocument? Orbit { get; init; }  // Added in format version 5
     public CalendarDocument? Calendar { get; init; }  // Added in format version 6
     public required AppearanceDocument Appearance { get; init; }  // Added in format version 13

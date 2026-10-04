@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 21;
+    public const int CurrentVersion = 22;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -172,6 +172,10 @@ internal static partial class WorldFormat
 
         // 20 → 21: realms (M21): planets and moons gained an optional "branch", and orbits an
         // optional "height". Older bodies hang on nothing, and their orbits aren't lifted.
+        document => document,
+
+        // 21 → 22: bodies gained an optional "density" (M22, the stable orbit guide). Older
+        // bodies have the typical density of their kind and size.
         document => document,
     ];
 

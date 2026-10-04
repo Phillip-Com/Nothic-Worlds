@@ -108,7 +108,20 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 21: World Tree** · In progress (owner's choice, 2026-10-04)
+**Milestone 22: Stable Orbit Guide** · In progress (owner's choice, 2026-10-04)
+Where gravity would keep orbits steady (`SIM-04`). Orbits stay designed and free; this only
+guides. Owner's decisions:
+- **Mass from density:** each body has a **Density** (g/cm³), typical for its kind and size
+  until you set it, and the panel shows the mass it gives.
+- **Shows all four:** the zone where the selected body's moons could circle steadily (from its
+  Roche limit out to about half its Hill sphere), how far its neighbors' pull reaches (the gaps
+  where another body fits), warnings on orbits gravity wouldn't keep, and the period gravity
+  would give at an orbit's size, with a button to use it.
+- **Bands and numbers:** shaded bands in the 3D system view around the selected body (green
+  where steady, red too close), switched in the View menu, and the distances in the System panel.
+- **Two PRs:** density and the math (PR #56), then the guide in the app.
+
+**Milestone 21: World Tree** · Complete (PR #55 merged 2026-10-04; owner's choice, 2026-10-04)
 More world shapes (`BOD-02`): a world tree. Owner's decisions:
 - **A tree that holds worlds**, like Yggdrasil: a new kind of body standing in the system (at
   its center, or circling a star), whose great branches hold **realms**: any planet or moon
@@ -1348,9 +1361,42 @@ popping into place. Clicking again mid-glide adds to where it's heading. Steppin
 see how their system might fall apart.
 **Implementation:** —
 
-**SIM-04 — Stable orbit guide** · Idea · —
+**SIM-04 — Stable orbit guide** · In Progress (M22: density and the math, PR #56) · Base
 **Intent:** For a selected body, show a guiding path for where stable orbits would be.
-**Implementation:** —
+**Implementation (density and the math, M22, PR #56):**
+- **Model:** `Body.DensityGramsPerCm3`, optional (null is typical); format **version 22**
+  (`density`). Allowed from 0.000001 (thinner than giant stars) to 10,000,000 (a white dwarf).
+- **Mass** (`Simulation/BodyMass.cs`, Core): density times the volume of a globe the body's
+  size. Typical densities: planets as dense as Earth (5.513) up to 1.5 Earth radii, as dense as
+  Jupiter (1.33) from 4 Earth radii, sliding smoothly between; moons 3.3; comets 0.6; world
+  trees 0.5 (as if their whole size were wood); stars the mass a main-sequence star of their
+  size has (0.08 to 100 Suns). Within 5% of the real Sun, Earth, Jupiter, and Moon (tested).
+  A flat world weighs as much as a globe its radius, but its rim (π radii out) counts for
+  collisions.
+- **Stability** (`Simulation/OrbitStability.cs`, Core), all tested against real values:
+  - **Roche limit** (fluid, 2.44 R ∛(ρ/ρ moon)): Earth's for the Moon is about 18,400 km.
+  - **Hill sphere**: d (1 − e) ∛(m / 3M) at closest approach, against what the body circles or
+    anything heavier circling it (so a planet at the center of its system is limited by its
+    star just as if it circled it); infinite for the main star. Earth's is about 1.5 million km.
+  - **Moon zone** (`MoonZone`): from the Roche limit (for a moon of rock and ice, 3 g/cm³) out to
+    half the Hill sphere; none when there's no room.
+  - **Neighbors' reach** (`Reaches`): each body circling a parent pulls on orbits within 2√3 of
+    its Hill radii of its own path (the classic two-planet Hill stability spacing). Bodies
+    heavier than the parent (a star circling a center planet) are left out.
+  - **Natural period** (`NaturalPeriodDays`, Kepler's third law): a year at Earth's distance from
+    the Sun. Not for realms or the center.
+  - **Warnings** (`Warnings`): orbits that run into their parent, pass inside the Roche limit,
+    stray past half the parent's Hill sphere (0.7 for orbits tilted past 90°, which go
+    backwards), or come within 2√3 mutual Hill radii of a neighbor (or overlap it). Our own
+    Sun, Earth, Moon, Mars, Jupiter, and Saturn give none. Two realms are never warned about
+    each other.
+- **App:** a **Density** field in the System panel's body properties with a **Typical** button
+  (back to the typical density, a separate undo step), and the **Mass** it gives (Sun masses for
+  stars, Earth masses, or kg for tiny bodies), marked "(typical)".
+  `WorldSession.SetDensity`.
+- **Verified in the running app** with real typing and clicks, maximized and at 1152 × 648:
+  typing 2.5 g/cm³ (0.453 Earth masses), Typical (back to 5.51, 1 Earth mass), undo (2.5
+  again), and the Sun (1.41 g/cm³, 1 Sun mass).
 
 ### 4.6 Time & Calendar (`CAL`)
 

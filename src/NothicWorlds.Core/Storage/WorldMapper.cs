@@ -327,6 +327,7 @@ internal static class WorldMapper
                     Pattern = WorldFormat.PatternName(body.Appearance.Pattern),
                 },
             Branch = body.Branch,
+            Density = body.DensityGramsPerCm3,
             Tree = body.Tree is WorldTreeLook tree
                 ? new TreeDocument
                 {
@@ -607,6 +608,7 @@ internal static class WorldMapper
             Belts = [.. (document.Belts ?? []).Select(ToBelt)],
             Tree = document.Tree is TreeDocument tree ? ToTree(tree) : null,
             Branch = document.Branch,
+            DensityGramsPerCm3 = document.Density,
         };
         RequireNoProblem(body.Problem());
         body.Appearance = ToAppearance(document.Appearance, body.Kind);
