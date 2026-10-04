@@ -108,6 +108,19 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 21: World Tree** · In progress (owner's choice, 2026-10-04)
+More world shapes (`BOD-02`): a world tree. Owner's decisions:
+- **A tree that holds worlds**, like Yggdrasil: a new kind of body standing in the system (at
+  its center, or circling a star), whose great branches hold **realms**: any planet or moon
+  (globe or flat world) hung on a branch, keeping its own maps, terrain, calendar, and weather.
+- **Grown from settings:** height, how many branches and how far they spread, bark and leaf
+  colors, and a seed for its shape.
+- **It glows** (a color and strength) and lights its realms; stars light them too, but the tree
+  counts as their sun.
+- **It turns:** each realm circles the trunk once per turn, its year, so seasons work as for a
+  planet around a star.
+- **Three PRs:** the tree itself (PR #53), realms on its branches, and its glow as their sun.
+
 **Milestone 20: Astral Features** · Complete (PR #52 merged 2026-10-04; owner's choice, 2026-10-03)
 Rings, asteroid belts, and nebulas (`BOD-03`), and asteroid events (the rest of `EVT-02`).
 Owner's decisions:
@@ -968,11 +981,11 @@ place).
   then undid it; undid and redid the whole session (back to "saved" at the start); and save →
   reopen kept the system. Benchmark: same as `main` back to back (~141 fps).
 
-**BOD-02 — Non-standard bodies** · Implemented (M19: flat worlds; other shapes later) · Base
+**BOD-02 — Non-standard bodies** · Implemented (M19: flat worlds); world tree in progress (M21) · Base
 **Intent:** Support bodies that aren't spheres, such as flat worlds and world trees.
 **Notes / open questions:** How these interact with physics, orbits, and light/shadow. Flat
 worlds (M19): orbits are unchanged; light is physical (the disc tumbles); eclipses still treat
-the body as a sphere of its radius. World trees and other shapes are still open.
+the body as a sphere of its radius. World trees (M21) hold realms on their branches.
 **Implementation (flat worlds you can make, see, and edit, PR #46):**
 - **Model:** `BodyShape` (`Sphere`, `FlatDisc`) and `Body.Shape`, for planets and moons only.
   Format **version 16** (optional `shape`, `"flat-disc"`).
@@ -1044,6 +1057,31 @@ the body as a sphere of its radius. World trees and other shapes are still open.
   minus the tilt; a year averaging the body's temperature with two warm spells; water
   measured across the face. Verified in the running app at both sizes: the time bar, season
   list, and a weather pin's window on a flat world.
+
+**Implementation (the world tree itself, M21, PR #53):**
+- **Model:** `BodyKind.WorldTree`; `Model/WorldTreeLook.cs` (great branches 3–16, spread,
+  shape seed, bark, leaf, and glow colors, glow strength 0–4) as `Body.Tree`, required for trees
+  and refused for anything else. A tree's radius is half its height and its day is how long it
+  takes to turn; it has no surface or calendar. Format **version 20** (kind `"world-tree"`,
+  `tree`). `NewBodies.WorldTree`: 300,000 km tall, turning once a year, nine branches, glowing
+  gold, circling the selected body's star.
+- **Shape** (`Simulation/WorldTreeShape.cs`, Core): grows a trunk, great branches (spread round
+  the trunk by the golden angle, rising as they reach out, each bending once and ending in a
+  **tip that can hold a realm**), two twigs per branch, and three to five roots, all as tapered
+  straight pieces within the tree's radius. Deterministic: chance comes from
+  `Simulation/SeededRandom.cs`, the repeatable recipe now shared with asteroid events (which
+  keep exactly the dates they had).
+- **Drawing** (`godot/Rendering/WorldTreeVisual.cs`): bark tubes and foliage clumps at branch
+  and twig ends that glow faintly in the glow color, regrown only when the shape changes;
+  turning with the tree (its spin and tilt). A light like a star's, in the glow color and
+  strength, lights the system around it.
+- **App:** **Add World Tree** in the System panel and **Add ▸ World Tree**; a **World Tree**
+  section for its look (`godot/UI/WorldTreeSection.cs`, `WorldSession.SetTreeLook`, one undo step
+  per drag). Its kind shows as "World tree", the planet look fields hide, and the Radius and Day
+  length tooltips explain what they mean for a tree.
+- **Verified in the running app** with real clicks, maximized: Add World Tree, the panel and its
+  fields, the tree from the side and above and in the system, a changed look (more branches,
+  blue glow), and undo. Benchmark: no change.
 
 **BOD-03 — Other astral features** · Implemented (M20: rings, belts, nebulas) · Base
 **Intent:** Asteroids, nebulas, and similar features.
