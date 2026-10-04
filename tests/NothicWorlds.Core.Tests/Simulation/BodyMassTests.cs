@@ -6,7 +6,7 @@ namespace NothicWorlds.Core.Tests.Simulation;
 public sealed class BodyMassTests
 {
     [Theory]
-    [InlineData(BodyKind.Star, 695_700, 1.989e30)]  // The Sun
+    [InlineData(BodyKind.Star, 696_000, 1.989e30)]  // The Sun
     [InlineData(BodyKind.Planet, 6371, 5.972e24)]  // Earth
     [InlineData(BodyKind.Planet, 69_911, 1.898e27)]  // Jupiter
     [InlineData(BodyKind.Moon, 1737, 7.35e22)]  // The Moon
@@ -29,7 +29,7 @@ public sealed class BodyMassTests
             previous = density;
         }
 
-        Assert.Equal(5.51, BodyMass.TypicalDensity(BodyKind.Planet, 6371));
+        Assert.Equal(5.513, BodyMass.TypicalDensity(BodyKind.Planet, 6371));
         Assert.Equal(1.33, BodyMass.TypicalDensity(BodyKind.Planet, 30_000));
     }
 
@@ -39,9 +39,9 @@ public sealed class BodyMassTests
         var body = new Body { RadiusKm = 6371 };
         double typical = BodyMass.Kg(body);
 
-        body.DensityGramsPerCm3 = 5.51 * 2;
+        body.DensityGramsPerCm3 = 5.513 * 2;
 
-        Assert.Equal(11.02, BodyMass.Density(body));
+        Assert.Equal(11.026, BodyMass.Density(body));
         Assert.Equal(2, BodyMass.Kg(body) / typical, 9);
     }
 

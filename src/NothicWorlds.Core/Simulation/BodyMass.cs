@@ -16,12 +16,12 @@ public static class BodyMass
     /// <summary>The Earth's mass, in kg.</summary>
     public const double EarthKg = 5.972e24;
 
-    private const double SunRadiusKm = 695_700;
+    private const double SunRadiusKm = 696_000;
     private const double EarthRadiusKm = 6371;
 
     // Rocky worlds up to 1.5 Earth radii are as dense as Earth; from 4 Earth radii up they're
     // gas giants as dense as Jupiter; in between the density slides from one to the other.
-    private const double RockyDensity = 5.51;
+    private const double RockyDensity = 5.513;
     private const double GasGiantDensity = 1.33;
     private const double LargestRockyRadii = 1.5;
     private const double SmallestGiantRadii = 4;
