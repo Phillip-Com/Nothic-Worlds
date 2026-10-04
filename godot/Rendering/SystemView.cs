@@ -698,7 +698,7 @@ public partial class SystemView : Node3D
             visual.OrbitLine?.QueueFree();
             visual.OrbitLine = null;
             if (byId.GetValueOrDefault(visual.BodyId) is { Orbit: Orbit orbit } body
-                && byId.GetValueOrDefault(orbit.ParentId) is Body parent)
+                && byId.GetValueOrDefault(orbit.ParentId) is Body parent && body.Branch is null)
             {
                 visual.OrbitLine = CreateOrbitLine(body, parent);
             }
