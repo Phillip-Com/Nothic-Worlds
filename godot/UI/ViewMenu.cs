@@ -1,6 +1,7 @@
 using Godot;
 using NothicWorlds.Core.Simulation;
 using NothicWorlds.Rendering;
+using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
 
@@ -87,6 +88,7 @@ public partial class ViewMenu : Node
             "While the System panel is open: green rings where orbits around the selected " +
             "body (and around what it circles) would stay steady, red where they wouldn't.");
         menu.AddSubmenuNodeItem("Relief", BuildReliefMenu());
+        menu.AddSubmenuNodeItem("Relief Detail", BuildReliefDetailMenu());
         menu.AboutToPopup += () => ShowChecks(menu);
         menu.IdPressed += id => Toggle((MenuItem)(int)id);
         Toolbar.MenuArea.AddChild(_button);
@@ -177,5 +179,31 @@ public partial class ViewMenu : Node
             }
         };
         return relief;
+    }
+
+    // How finely sculpted globes are drawn (a quality setting, remembered on this computer).
+    private PopupMenu BuildReliefDetailMenu()
+    {
+        var detail = new PopupMenu();
+        detail.AddRadioCheckItem("Low (lightest)", (int)ReliefDetail.Low);
+        detail.AddRadioCheckItem("Standard", (int)ReliefDetail.Standard);
+        detail.AddRadioCheckItem("High (sharpest outlines)", (int)ReliefDetail.High);
+        detail.AboutToPopup += () =>
+        {
+            for (int index = 0; index < detail.ItemCount; index++)
+            {
+                detail.SetItemChecked(index,
+                    detail.GetItemId(index) == (int)(System?.ReliefDetail ?? 0));
+            }
+        };
+        detail.IdPressed += id =>
+        {
+            if (System is not null)
+            {
+                System.ReliefDetail = (ReliefDetail)(int)id;
+                AppSettings.ReliefDetail = System.ReliefDetail;
+            }
+        };
+        return detail;
     }
 }

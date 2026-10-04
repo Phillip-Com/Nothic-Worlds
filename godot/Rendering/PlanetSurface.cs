@@ -59,6 +59,7 @@ public partial class PlanetSurface : MeshInstance3D
     private readonly short[] _faceHeights = new short[HeightGrid.CellsPerFace];
     private HeightGrid _shownHeights = HeightGrid.Empty;
     private float _reliefScale;
+    private ReliefDetail _reliefDetail = ReliefDetail.Standard;
 
     // The globe mesh, kept while the body is flat, and the flat world's rock.
     private Mesh? _sphereMesh;
@@ -380,6 +381,20 @@ public partial class PlanetSurface : MeshInstance3D
         }
     }
 
+    /// <summary>How finely the sculpted shape is drawn (a quality setting).</summary>
+    public ReliefDetail ReliefDetail
+    {
+        get => _reliefDetail;
+        set
+        {
+            if (value != _reliefDetail)
+            {
+                _reliefDetail = value;
+                ChooseMesh();
+            }
+        }
+    }
+
     /// <summary>
     /// Goes up by one whenever the drawn relief changes (the heights or the exaggeration), so
     /// whatever sits on the surface knows to move.
@@ -595,7 +610,7 @@ public partial class PlanetSurface : MeshInstance3D
         _sphereMesh ??= Mesh;
         Mesh = Shape == BodyShape.FlatDisc ? FlatDiscMeshes.Top
             : _shownHeights.IsEmpty ? _sphereMesh
-            : CubeSphereMesh.Shared;
+            : CubeSphereMesh.For(_reliefDetail);
     }
 
     // The engine skips drawing what's outside a mesh's bounds, and doesn't know the shader
