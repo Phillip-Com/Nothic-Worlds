@@ -33,8 +33,8 @@ public sealed class HeightGridTests
         foreach (double longitude in new[] { 12.0, 17.3, 20.0, 26.1 })
         {
             // Even along the ridge, give or take a cell's middle being off the stroke's line.
-            Assert.InRange(once.HeightAt(At(0, longitude)), 475, 500);
-            Assert.InRange(twice.HeightAt(At(0, longitude)), 950, 1000);
+            Assert.InRange(once.HeightAt(At(0, longitude)), 490, 500);
+            Assert.InRange(twice.HeightAt(At(0, longitude)), 980, 1000);
         }
     }
 
@@ -124,6 +124,36 @@ public sealed class HeightGridTests
         Assert.True(HeightGrid.FromCells(cells).HasSameCells(grid));
         cells[7] = short.MinValue;
         Assert.Throws<ArgumentException>(() => HeightGrid.FromCells(cells));
+    }
+
+    [Fact]
+    public void Sampling_BlendsSmoothlyBetweenCells()
+    {
+        HeightGrid hill = HeightGrid.Empty.Raise(At(0, 30), At(0, 30), 2, 1000);
+
+        // At a cell's middle a sample is the cell; between cells it's between theirs.
+        Vector3D middle = CubeSphere.CellCenter(CubeSphere.CellAt(At(0, 30.5), 1024), 1024);
+        Assert.Equal(hill.HeightAt(middle), hill.SampleAt(middle), 6);
+        double previous = hill.SampleAt(At(0, 30.2));  // Past the peak (a cell from 30°)
+        for (double longitude = 30.21; longitude < 32.5; longitude += 0.01)
+        {
+            double sample = hill.SampleAt(At(0, longitude));
+            Assert.True(sample <= previous + 1e-9, $"At {longitude}");  // Downhill, no steps
+            Assert.True(previous - sample < 10, $"At {longitude}");
+            previous = sample;
+        }
+
+        Assert.Equal(0, hill.SampleAt(At(0, 33)));
+    }
+
+    [Fact]
+    public void TheHighestCell_IsKnown()
+    {
+        Assert.Equal(0, HeightGrid.Empty.Highest);
+        HeightGrid grid = HeightGrid.Empty.Raise(_spot, _spot, 1, 1234)
+            .Raise(At(-50, 0), At(-50, 0), 1, -5000);
+
+        Assert.Equal(grid.HeightAt(_spot), grid.Highest);
     }
 
     [Theory]

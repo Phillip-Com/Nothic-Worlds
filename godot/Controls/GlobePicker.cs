@@ -29,7 +29,7 @@ public static class GlobePicker
         BodyShape shape = ShapeOf(planet);
         Vector3? point = shape == BodyShape.FlatDisc
             ? FacePointHit(origin, direction, nearestWhenMissed)
-            : SpherePointHit(origin, direction, nearestWhenMissed);
+            : SculptedPointHit(planet, origin, direction, nearestWhenMissed);
         return point is Vector3 hit
             ? SphericalCoordinates.FromDirection(GlobeShape.DirectionAt(shape, hit).ToNumerics())
             : null;
@@ -43,8 +43,8 @@ public static class GlobePicker
         PlanetCamera camera, Node3D planet, GeoCoordinate coordinate)
     {
         BodyShape shape = ShapeOf(planet);
-        Vector3 local = GlobeShape.SurfacePoint(
-            shape, SphericalCoordinates.ToDirection(coordinate).ToVector3D());
+        Vector3D toSpot = SphericalCoordinates.ToDirection(coordinate).ToVector3D();
+        Vector3 local = GlobeShape.SurfacePoint(shape, toSpot) * RadiusAt(planet, toSpot);
         Vector3 world = planet.GlobalTransform * local;
         Vector3 outward = planet.GlobalTransform.Basis * GlobeShape.Outward(shape, local);
         bool facesCamera = outward.Dot(camera.GlobalPosition - world) > 0;
@@ -56,12 +56,44 @@ public static class GlobePicker
     private static BodyShape ShapeOf(Node3D planet) =>
         planet is PlanetSurface surface ? surface.Shape : BodyShape.Sphere;
 
-    // Ray–sphere intersection: `along` is the ray's closest approach to the center.
-    private static Vector3? SpherePointHit(Vector3 origin, Vector3 direction, bool nearest)
+    // How far out the drawn surface is there (sculpted relief, VISION.md BOD-04), in radii.
+    private static float RadiusAt(Node3D planet, Vector3D direction) =>
+        planet is PlanetSurface surface ? surface.SurfaceRadiusAt(direction) : 1.0f;
+
+    // Where the ray meets the sculpted surface: it meets a sphere of the height found at the
+    // last try's spot, a few times over, which settles on the ground's height there.
+    private static Vector3? SculptedPointHit(
+        Node3D planet, Vector3 origin, Vector3 direction, bool nearest)
+    {
+        float radius = 1.0f;
+        Vector3? point = null;
+        for (int attempt = 0; attempt < 4; attempt++)
+        {
+            point = SpherePointHit(origin, direction, nearest, radius);
+            if (point is not Vector3 hit || hit.LengthSquared() == 0)
+            {
+                break;
+            }
+
+            float there = RadiusAt(planet, new Vector3D(hit.X, hit.Y, hit.Z));
+            if (Mathf.Abs(there - radius) < 1e-6f)
+            {
+                break;
+            }
+
+            radius = there;
+        }
+
+        return point;
+    }
+
+    // Ray–sphere intersection (in the planet's own space): `along` is the ray's closest
+    // approach to the center.
+    private static Vector3? SpherePointHit(
+        Vector3 origin, Vector3 direction, bool nearest, float radius)
     {
         float along = -origin.Dot(direction);
         Vector3 closest = origin + direction * along;
-        const float radius = 1.0f;  // In the planet's own space.
         float missSquared = closest.LengthSquared();
         if (missSquared <= radius * radius)
         {

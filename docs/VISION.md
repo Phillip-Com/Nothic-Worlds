@@ -120,7 +120,7 @@ Mold bodies like clay (`BOD-04`), starting with heights. Owner's decisions (the 
   from orbit, and shading always shows slopes.
 - **Tools in the Terrain panel:** a Sculpt mode beside Paint/Erase, with the same brush plus a
   strength.
-- **Three PRs:** heights in Core (PR #60), drawing the relief, then the Sculpt tools.
+- **Three PRs:** heights in Core (PR #60), drawing the relief (PR #61), then the Sculpt tools.
 
 **Milestone 23: Physics Mode** · Complete (PR #59 merged 2026-10-04; owner's choice, 2026-10-04)
 An optional switch that moves the system by real gravity (`SIM-03`), from the masses of
@@ -1245,7 +1245,7 @@ the body as a sphere of its radius. World trees (M21) hold realms on their branc
   the planet when looking toward its direction and absent looking away, a bigger and brighter
   one, the background unchanged without nebulas, and undo. Benchmark: no change.
 
-**BOD-04 — Body sculpting (digital clay)** · In Progress (M24: heights in Core, PR #60) · Base
+**BOD-04 — Body sculpting (digital clay)** · In Progress (M24: heights in Core, PR #60; relief drawn, PR #61) · Base
 **Intent:** Mold bodies like digital clay with brush tools. Tools include:
 - Raise and lower terrain brushes
 - Basic shape tools to add and subtract terrain, which are also useful for artificial structures
@@ -1275,6 +1275,38 @@ built from both. Heights come first (M24), shapes next.
   (`heights/<body id>.png`, laid out like the terrain image, height + 32,768). Planets and moons
   only. Tested: golden file, round trip, every PNG row filter from an independent writer, and
   refusing an 8-bit image, an out-of-range height, and heights on a star.
+**Implementation (drawing the relief, M24, PR #61):**
+- **Even strokes** (Core): brushes now ease out from the stroke's path itself (`StrokePath`:
+  the distance to the nearest point of the shortest way between its ends, tested), not from
+  round stamps along it, whose 4% dips between stamps showed as ripples once exaggerated.
+  `HeightGrid.SampleAt` blends between the four nearest cells' middles (tested smooth, as the
+  shader draws it) and `Highest` gives the tallest cell.
+- **Mesh** (`Rendering/CubeSphereMesh.cs`): a sculpted globe is drawn as a cube-sphere of 96 × 96
+  squares a face (about 11 cells each), its vertices on the height grid's spacing and welded
+  along the faces' edges so the surface can't crack. Unsculpted globes keep the plain sphere.
+- **Shader** (`planet.gdshader`): the heights are a six-layer texture of half-precision floats
+  in meters with smaller copies (about 16 MB; drawn heights round by at most 16 m at 32 km,
+  saved ones are exact), blended by the graphics card. The vertex stage lifts each vertex by
+  its height × `relief_scale` (the exaggeration over the radius in meters); each pixel is
+  shaded by the slope from the heights either side of it, a cell apart (or a pixel, with a
+  smaller copy, once cells are smaller than pixels, so distant ground doesn't shimmer).
+  `PlanetSurface.SetHeights` sends only the faces a stroke changed, and grows the mesh's bounds
+  to the highest peak so it isn't culled.
+- **View ▸ Relief:** True Scale (1×), 5×, 10× (the default), 20×, or 50× (`SystemView.
+  ReliefExaggeration`; not saved).
+- **On the ground:** pins, weather pins, markers, the brush circle, and clicks follow the
+  raised surface (`PlanetSurface.SurfaceRadiusAt`; `GlobePicker` finds where a ray meets it by
+  a few rounds of meeting a sphere of the height found); region outlines and fills are lifted
+  onto it and rebuilt when the relief changes; the camera's closest approach includes the
+  highest peak, so it never ends up inside a hill.
+- **Verified in the running app** (heights set directly, as the tools come next), maximized and
+  at 1152 × 648: a mountain range and a basin, from orbit at 1×, 10×, and 50× (the range shows on
+  the planet's edge), where the light grazes it (smooth, no ripples), a region and a weather
+  pin sitting on it, and the local view over a slope. No shader errors.
+- **Benchmark** (fullscreen, against `main`): unsculpted worlds unchanged (198/202 vs 200/200
+  fps). A sculpted planet filling the screen: about 148 fps (from 200; 1.7 ms a frame) and 21 MB
+  more video memory. The first version took it to 130 fps; reading heights through the card's
+  own blending and using 96 rather than 128 squares a face won back the rest.
 
 **BOD-05 — Terrain/biome painting** · Implemented (M11: PR #33, #34, #35) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.

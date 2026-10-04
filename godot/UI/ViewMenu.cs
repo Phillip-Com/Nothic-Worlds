@@ -50,6 +50,9 @@ public partial class ViewMenu : Node
         OrbitGuide,
     }
 
+    // The relief exaggerations offered (owner's choice: about 1× to 50×).
+    private static readonly int[] _reliefChoices = [1, 5, 10, 20, 50];
+
     public override void _Ready()
     {
         if (Toolbar is null)
@@ -83,6 +86,7 @@ public partial class ViewMenu : Node
         menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.OrbitGuide),
             "While the System panel is open: green rings where orbits around the selected " +
             "body (and around what it circles) would stay steady, red where they wouldn't.");
+        menu.AddSubmenuNodeItem("Relief", BuildReliefMenu());
         menu.AboutToPopup += () => ShowChecks(menu);
         menu.IdPressed += id => Toggle((MenuItem)(int)id);
         Toolbar.MenuArea.AddChild(_button);
@@ -146,5 +150,32 @@ public partial class ViewMenu : Node
                 System.ShowOrbitGuide = on;
                 break;
         }
+    }
+
+    // How much sculpted relief is exaggerated (VISION.md BOD-04): one choice of several.
+    private PopupMenu BuildReliefMenu()
+    {
+        var relief = new PopupMenu();
+        foreach (int times in _reliefChoices)
+        {
+            relief.AddRadioCheckItem(times == 1 ? "True Scale (1×)" : $"{times}×", times);
+        }
+
+        relief.AboutToPopup += () =>
+        {
+            for (int index = 0; index < relief.ItemCount; index++)
+            {
+                relief.SetItemChecked(index,
+                    relief.GetItemId(index) == (int)(System?.ReliefExaggeration ?? 1));
+            }
+        };
+        relief.IdPressed += id =>
+        {
+            if (System is not null)
+            {
+                System.ReliefExaggeration = id;
+            }
+        };
+        return relief;
     }
 }

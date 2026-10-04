@@ -91,6 +91,15 @@ uniform float terrain_over_map = 0.6;
 uniform vec3 unpainted_color : source_color = vec3(0.55, 0.56, 0.58);
 const int TERRAIN_FACE_SIZE = 1024;
 const int TERRAIN_FAR_SIZE = 256;
+// Sculpted heights (VISION.md BOD-04) on the same cube grid: each cell's height in meters (as
+// half-precision floats, so the graphics card blends between cells, with smaller copies for
+// far away). The globe is then the cube-sphere mesh, each vertex lifted by its height times
+// relief_scale (meters to the unit sphere's radius, times the view's exaggeration), and each
+// pixel shaded by the slope.
+uniform bool has_heights = false;
+uniform sampler2DArray heights : filter_linear_mipmap, repeat_disable;
+uniform float relief_scale = 0.0;
+
 // The softest edge between terrains up close, in cells (edges sharpen to about a pixel as
 // cells get bigger on screen, and never go softer than this).
 const float TERRAIN_EDGE_CELLS = 0.15;
@@ -125,10 +134,6 @@ uniform vec3 ring_normal = vec3(0.0, 1.0, 0.0);
 uniform vec3 ring_sun = vec3(0.0, 1.0, 0.0);
 
 varying vec3 local_direction;
-
-void vertex() {
-	local_direction = VERTEX;
-}
 
 // On a flat world's top face, distance from the center is the angle from the north pole (the
 // disc's radius is PI), so a point maps back to the globe direction it stands for. Must match
@@ -448,6 +453,32 @@ vec3 terrain_direction(int face, vec2 position) {
 	return vec3(-a, b, -1.0);
 }
 
+// The height where a direction meets the surface, in meters, blended between the four nearest
+// cells' middles on its face (as HeightGrid.SampleAt in Core), or, at `lod` above 0, from a
+// smaller copy averaging 2^lod cells across.
+float height_at(vec3 direction, float lod) {
+	vec3 position = terrain_face_position(direction);
+	return textureLod(heights, position, lod).r;
+}
+
+// Which way the sculpted ground faces here, in the body's own space: the slopes found by
+// comparing the heights a cell either side (or a pixel, once cells are smaller than pixels, so
+// distant ground doesn't shimmer). Comparing both sides keeps the cells' edges from showing.
+vec3 relief_normal(vec3 direction, float pixel_angle) {
+	float cell = HALF_PI / float(TERRAIN_FACE_SIZE);
+	float step = max(cell, pixel_angle);
+	float lod = log2(step / cell);
+	vec3 side = abs(direction.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+	vec3 first = normalize(cross(direction, side));
+	vec3 second = cross(direction, first);
+	float rise_first = height_at(normalize(direction + first * step), lod)
+		- height_at(normalize(direction - first * step), lod);
+	float rise_second = height_at(normalize(direction + second * step), lod)
+		- height_at(normalize(direction - second * step), lod);
+	return normalize(direction
+		- (first * rise_first + second * rise_second) * (relief_scale / (2.0 * step)));
+}
+
 // A cell's terrain code, and its color with alpha (0 where nothing is painted).
 int terrain_code(ivec3 cell) {
 	return int(round(texelFetch(terrain_cells, cell, 0).r * 255.0));
@@ -617,6 +648,14 @@ vec3 surface_look(vec3 unit_direction) {
 	return color;
 }
 
+void vertex() {
+	local_direction = VERTEX;
+	if (has_heights && !flat_disc) {
+		vec3 direction = normalize(VERTEX);
+		VERTEX = direction * (1.0 + height_at(direction, 0.0) * relief_scale);
+	}
+}
+
 void fragment() {
 	vec3 direction = flat_disc
 		? flat_disc_direction(local_direction)
@@ -666,4 +705,8 @@ void fragment() {
 
 	ALBEDO = color;
 	ROUGHNESS = 0.9;
+	if (has_heights && !flat_disc) {
+		vec3 normal = relief_normal(direction, pixel_angle);
+		NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(normal, 0.0)).xyz);
+	}
 }
