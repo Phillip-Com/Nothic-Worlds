@@ -309,6 +309,14 @@ internal static class WorldMapper
                     Color = body.Appearance.Color.ToHex(),
                     Pattern = WorldFormat.PatternName(body.Appearance.Pattern),
                 },
+            Rings = body.Rings is PlanetRings rings
+                ? new RingsDocument
+                {
+                    Inner = rings.InnerRadii,
+                    Outer = rings.OuterRadii,
+                    Color = rings.Color.ToHex(),
+                }
+                : null,
             Surface = new SurfaceDocument
             {
                 Map = map is null ? null : new MapDocument
@@ -551,6 +559,7 @@ internal static class WorldMapper
             Calendar = document.Calendar is CalendarDocument calendar
                 ? ToCalendar(calendar)
                 : null,
+            Rings = document.Rings is RingsDocument rings ? ToRings(rings) : null,
         };
         RequireNoProblem(body.Problem());
         body.Appearance = ToAppearance(document.Appearance, body.Kind);
@@ -580,6 +589,13 @@ internal static class WorldMapper
         }
 
         return body;
+    }
+
+    private static PlanetRings ToRings(RingsDocument document)
+    {
+        Require(RgbColor.TryParseHex(document.Color, out RgbColor color),
+            $"invalid ring color '{document.Color}'");
+        return new PlanetRings(document.Inner, document.Outer, color);
     }
 
     // A star needs its type; a planet or moon its color and pattern. What the other kinds use

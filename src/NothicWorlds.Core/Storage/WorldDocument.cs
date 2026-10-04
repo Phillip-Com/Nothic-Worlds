@@ -101,10 +101,18 @@ internal sealed class BodyDocument
     public OrbitDocument? Orbit { get; init; }  // Added in format version 5
     public CalendarDocument? Calendar { get; init; }  // Added in format version 6
     public required AppearanceDocument Appearance { get; init; }  // Added in format version 13
+    public RingsDocument? Rings { get; init; }  // Added in format version 17
     public required SurfaceDocument Surface { get; init; }
 }
 
 // Planets and moons have a color and pattern; stars a star type.
+internal sealed class RingsDocument
+{
+    public required double Inner { get; init; }
+    public required double Outer { get; init; }
+    public string? Color { get; init; }
+}
+
 internal sealed class AppearanceDocument
 {
     public string? Color { get; init; }
