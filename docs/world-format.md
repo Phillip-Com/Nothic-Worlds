@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 13** (see **Version history** at the end)
+**Current format version: 22** (see **Version history** at the end)
 
 ## Container
 
@@ -201,6 +201,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `bodies[].axialTiltDirection` | yes | Degrees: which way the north pole leans (see the axis rule below) |
 | `bodies[].appearance` | yes | How the body looks (`BOD-06`). Stars: `starType`, one of `"red-dwarf"`, `"orange"`, `"yellow"`, `"white"`, `"blue"` (it sets the star's color and its light's). Planets and moons: `color` (`#RRGGBB`) and `pattern`, one of `"plain"`, `"rocky"`, `"banded"`, `"icy"`, `"cloudy"`, shown where there's no map. |
 | `bodies[].averageTemperature` | yes | °C, −270 to 2,000: the body's average surface temperature over a year (`WTH-01`; Earth about 15). Weather pins spread it by latitude and season. |
+| `bodies[].density` | no | g/cm³, 0.000001 to 10,000,000: how dense the body is (`SIM-04`; Earth 5.5), which with its radius gives its mass, as if it were a globe. Omitted for the typical density of its kind and size (see `BodyMass` in the code). |
 | `bodies[].calendar` | no | The body's own calendar (`CAL-01`). Omitted to count plain days. |
 | `…calendar.months` | yes | 1 to 100 `{ "name", "days" }`, in order; each name not empty, days 1 to 100,000 |
 | `…calendar.weekdays` | no | Weekday names, in order (at most 100, none empty). Omitted for a calendar without weeks. |
@@ -423,6 +424,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 22 | Stable orbit guide (M22): bodies gain an optional `density` | Nothing to change: version 21 bodies have the typical density for their kind and size |
 | 21 | Realms (M21): bodies gain an optional `branch`, orbits an optional `height` | Nothing to change: version 20 bodies hang on nothing, and their orbits aren't lifted |
 | 20 | World trees (M21): bodies can be of kind `world-tree`, with a `tree` | Nothing to change: version 19 worlds have none |
 | 19 | Nebulas (M20): the world gains optional `nebulas` | Nothing to change: version 18 skies are empty |
