@@ -97,6 +97,26 @@ public partial class PlanetSurface : MeshInstance3D
         }
     }
 
+    /// <summary>
+    /// Sets the rings whose shadow falls on the surface (VISION.md BOD-03), or none, with the
+    /// normal of the plane they lie in (in the planet's own space) and their pattern's seed.
+    /// </summary>
+    public void SetRings(PlanetRings? rings, Vector3 normal, float seed)
+    {
+        SurfaceMaterial.SetShaderParameter("has_rings", rings is not null);
+        if (rings is not null)
+        {
+            SurfaceMaterial.SetShaderParameter("ring_inner", (float)rings.InnerRadii);
+            SurfaceMaterial.SetShaderParameter("ring_outer", (float)rings.OuterRadii);
+            SurfaceMaterial.SetShaderParameter("ring_seed", seed);
+            SurfaceMaterial.SetShaderParameter("ring_normal", normal);
+        }
+    }
+
+    /// <summary>The way to the star, in the planet's own space, for the rings' shadow.</summary>
+    public void SetRingSun(Vector3 direction) =>
+        SurfaceMaterial.SetShaderParameter("ring_sun", direction);
+
     /// <summary>True if a map image is currently applied.</summary>
     public bool HasMap { get; private set; }
 

@@ -65,6 +65,7 @@ public partial class SystemPanel : CanvasLayer
     private CalendarSection? _calendar;
     private EclipseSection? _eclipses;
     private MeteorShowerSection? _showers;
+    private RingsSection? _rings;
     private bool _open;
     private bool _syncing;
 
@@ -229,6 +230,11 @@ public partial class SystemPanel : CanvasLayer
             "(Earth: about 15 °C). Weather pins spread it by latitude and season";
         AddAppearanceFields(grid);
         layout.AddChild(grid);
+        if (Session is not null)
+        {
+            _rings = new RingsSection { Session = Session };
+            layout.AddChild(_rings);
+        }
 
         layout.AddChild(new Label { Text = "Orbit" });
         _noOrbit = new Label
@@ -450,6 +456,11 @@ public partial class SystemPanel : CanvasLayer
         {
             _eclipses.Visible = body.HasSurface;  // Stars and comets have no eclipses.
             _eclipses.Refresh();
+        }
+
+        if (_rings is not null)
+        {
+            _rings.Visible = body.HasSurface;  // Stars and comets have no rings.
         }
 
         if (_showers is not null)

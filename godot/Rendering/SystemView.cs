@@ -393,6 +393,8 @@ public partial class SystemView : Node3D
             }
         }
 
+        PlaceRings(visual, body);
+
         if (visual.Tail is CometTailVisual tail && body.Orbit is Orbit cometOrbit
             && _layout.TryGetValue(cometOrbit.ParentId, out DisplayBody star))
         {
@@ -411,6 +413,42 @@ public partial class SystemView : Node3D
                 || (Camera?.CurrentAltitude ?? float.MaxValue) > OwnOrbitLineAltitude;
         }
     }
+
+    // Shows, updates, or removes a body's rings (VISION.md BOD-03), and lights them and their
+    // shadow from its star.
+    private void PlaceRings(BodyVisual visual, Body body)
+    {
+        if (body.Rings is not PlanetRings rings || visual.Surface is not PlanetSurface surface)
+        {
+            if (visual.Rings is not null)
+            {
+                visual.Rings.Free();
+                visual.Rings = null;
+                visual.Surface?.SetRings(null, Vector3.Up, 0);
+            }
+
+            return;
+        }
+
+        visual.Rings ??= new RingsVisual(visual.Root);
+        if (visual.Rings.Show(rings, body.Id, body.Shape))
+        {
+            surface.SetRings(rings, visual.Rings.Normal, visual.Rings.Seed);
+        }
+
+        Vector3 toStar = Session is not null
+            && Seasons.StarFor(Session.World.Bodies, body) is Body star
+            && _layout.TryGetValue(star.Id, out DisplayBody starPlace)
+            && _layout.TryGetValue(body.Id, out DisplayBody here)
+            ? ToGodotDirection(starPlace.Position - here.Position)
+            : Vector3.Up;
+        Vector3 local = (visual.Root.GlobalTransform.Basis.Inverse() * toStar).Normalized();
+        visual.Rings.Light(local);
+        surface.SetRingSun(local);
+    }
+
+    private static Vector3 ToGodotDirection(Vector3D vector) =>
+        new Vector3((float)vector.X, (float)vector.Y, (float)vector.Z).Normalized();
 
     // How far out the camera frames a body: a flat world reaches π times its globe's radius.
     private double FramingRadius(Guid bodyId, DisplayBody place) =>
@@ -648,8 +686,11 @@ public partial class SystemView : Node3D
 
         public CometTailVisual? Tail { get; init; }
 
+        public RingsVisual? Rings { get; set; }
+
         public void Free()
         {
+            Rings?.Free();
             Root.QueueFree();
             OrbitLine?.QueueFree();
             Light?.QueueFree();
