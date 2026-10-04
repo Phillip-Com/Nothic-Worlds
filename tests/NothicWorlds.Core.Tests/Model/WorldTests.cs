@@ -8,6 +8,12 @@ namespace NothicWorlds.Core.Tests.Model;
 public class WorldTests
 {
     [Fact]
+    public void CreateNew_IsPainterly()
+    {
+        Assert.Equal(VisualStyle.Painterly, World.CreateNew("Test").Style);
+    }
+
+    [Fact]
     public void CreateNew_IsAnUnmappedPlanetCirclingASun()
     {
         World world = World.CreateNew("Test");
@@ -35,6 +41,7 @@ public class WorldTests
         Assert.Equal(original.Id, copy.Id);
         Assert.Equal(original.Name, copy.Name);
         Assert.Equal(original.View, copy.View);
+        Assert.Equal(original.Style, copy.Style);
         Assert.Equal(original.Bodies[0].Id, copy.Bodies[0].Id);
         Assert.Equal("assets/x.png", copy.Bodies[0].Surface.Map!.AssetName);
         Assert.Equal(MapProjection.Robinson, copy.Bodies[0].Surface.Map!.Projection);
@@ -90,6 +97,7 @@ public class WorldTests
     {
         World world = World.CreateNew("Original");
         world.View = new CameraView(10, 20, 1.5);
+        world.Style = VisualStyle.Simple;
         world.Bodies[0].Surface.Map = new SurfaceMap
         {
             AssetName = "assets/x.png",

@@ -72,6 +72,9 @@ public sealed class World
     /// </summary>
     public CameraView? View { get; set; }
 
+    /// <summary>How the world is drawn (VISION.md REN-05).</summary>
+    public VisualStyle Style { get; set; } = VisualStyle.Painterly;
+
     /// <summary>
     /// Returns an independent copy of this world. Saving works on a copy, so it can run in the
     /// background while the user keeps editing.
@@ -86,6 +89,7 @@ public sealed class World
             ModifiedUtc = ModifiedUtc,
             View = View,  // Immutable record, safe to share.
             TimeDays = TimeDays,
+            Style = Style,
         };
         copy.Bodies.AddRange(Bodies.Select(body => body.Clone()));
 

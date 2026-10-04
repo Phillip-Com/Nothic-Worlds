@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 24;
+    public const int CurrentVersion = 25;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -84,6 +84,13 @@ internal static partial class WorldFormat
     {
         [BodyShape.Sphere] = "sphere",
         [BodyShape.FlatDisc] = "flat-disc",
+    };
+
+    private static readonly Dictionary<VisualStyle, string> _styleNames = new()
+    {
+        [VisualStyle.Painterly] = "painterly",
+        [VisualStyle.Realistic] = "realistic",
+        [VisualStyle.Simple] = "simple",
     };
 
     private static readonly Dictionary<SurfacePattern, string> _patternNames = new()
@@ -196,6 +203,10 @@ internal static partial class WorldFormat
         document => document,
 
         // 23 → 24: surfaces gained optional "shapes" added or cut (M25). Older bodies have none.
+        document => document,
+
+        // 24 → 25: worlds gained a "style" (M26). Older worlds are painterly, the default
+        // (owner's choice: painterly for all), which a missing style already reads as.
         document => document,
     ];
 
@@ -332,6 +343,10 @@ internal static partial class WorldFormat
 
     public static ShapeOperation ParseShapeOperation(string? name) =>
         Parse(_shapeOperationNames, name, "shape operation");
+
+    public static string StyleName(VisualStyle style) => _styleNames[style];
+
+    public static VisualStyle ParseStyle(string? name) => Parse(_styleNames, name, "style");
 
     public static string PatternName(SurfacePattern pattern) => _patternNames[pattern];
 

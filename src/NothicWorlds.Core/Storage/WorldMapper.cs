@@ -21,6 +21,7 @@ internal static class WorldMapper
             CreatedUtc = world.CreatedUtc,
             ModifiedUtc = world.ModifiedUtc,
             TimeDays = world.TimeDays,
+            Style = WorldFormat.StyleName(world.Style),
             Bodies = world.Bodies.Select(ToDocument).ToList(),
             TerrainTypes = NullIfEmpty(world.TerrainTypes.Select(ToDocument)),
             Regions = NullIfEmpty(world.Regions.Select(ToDocument)),
@@ -66,6 +67,9 @@ internal static class WorldMapper
             ModifiedUtc = document.ModifiedUtc,
             View = document.View is null ? null : ToView(document.View),
             TimeDays = document.TimeDays ?? 0,
+            Style = document.Style is null
+                ? VisualStyle.Painterly
+                : WorldFormat.ParseStyle(document.Style),
         };
         world.Bodies.AddRange(
             document.Bodies.Select(body => ToBody(body, readTerrain, readHeights)));
