@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 20: Astral Features** · In progress (owner's choice, 2026-10-03)
+**Milestone 20: Astral Features** · Complete (PR #52 merged 2026-10-04; owner's choice, 2026-10-03)
 Rings, asteroid belts, and nebulas (`BOD-03`), and asteroid events (the rest of `EVT-02`).
 Owner's decisions:
 - **Planetary rings:** banded, in a color you pick, with the planet's shadow on the rings and
