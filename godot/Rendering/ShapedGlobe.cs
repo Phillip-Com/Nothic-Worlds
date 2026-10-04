@@ -30,6 +30,22 @@ public partial class ShapedGlobe : Node3D
         Roughness = 1.0f,
     };
 
+    /// <summary>
+    /// Lights the bare rock to match the visual style (VISION.md REN-05): Godot's banded
+    /// "toon" light for Painterly and Simple, true light for Realistic. One world is open at a
+    /// time, so every shaped globe shares it.
+    /// </summary>
+    public static void UseStyle(VisualStyle style)
+    {
+        bool styled = style != VisualStyle.Realistic;
+        _rockMaterial.DiffuseMode = styled
+            ? BaseMaterial3D.DiffuseModeEnum.Toon
+            : BaseMaterial3D.DiffuseModeEnum.Burley;
+        _rockMaterial.SpecularMode = styled
+            ? BaseMaterial3D.SpecularModeEnum.Disabled
+            : BaseMaterial3D.SpecularModeEnum.SchlickGgx;
+    }
+
     private static readonly StandardMaterial3D _previewMaterial = new()
     {
         AlbedoColor = new Color(1.0f, 0.85f, 0.2f, 0.35f),

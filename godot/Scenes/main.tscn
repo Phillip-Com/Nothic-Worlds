@@ -172,8 +172,9 @@ script = ExtResource("15_edit")
 Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 
-[node name="ViewMenu" type="Node" parent="." node_paths=PackedStringArray("Toolbar", "Pins", "Weather", "Regions", "Bodies", "Eclipses", "System")]
+[node name="ViewMenu" type="Node" parent="." node_paths=PackedStringArray("Toolbar", "Pins", "Weather", "Regions", "Bodies", "Eclipses", "System", "Session")]
 script = ExtResource("29_view_menu")
+Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 Pins = NodePath("../PinMarkers")
 Weather = NodePath("../WeatherMarkers")
