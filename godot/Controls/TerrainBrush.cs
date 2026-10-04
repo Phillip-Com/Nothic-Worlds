@@ -1,5 +1,6 @@
 using Godot;
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Model;
 using NothicWorlds.Interop;
 using NothicWorlds.Rendering;
 using NothicWorlds.Session;
@@ -8,10 +9,10 @@ using NothicWorlds.UI;
 namespace NothicWorlds.Controls;
 
 /// <summary>
-/// Paints terrain onto the selected planet or moon (VISION.md BOD-05) while the Terrain panel is
-/// open: drag on the globe to paint (or erase), with a circle showing the brush under the mouse.
-/// Each stroke is one undo step. Drags that start off the globe pass through, so the camera
-/// still turns.
+/// Paints terrain onto the selected planet or moon (VISION.md BOD-05), or sculpts it (BOD-04),
+/// while the Terrain panel is open: drag on the globe to paint, erase, or sculpt, with a circle
+/// showing the brush under the mouse. Each stroke is one undo step. Drags that start off the
+/// globe pass through, so the camera still turns.
 /// </summary>
 /// <remarks>
 /// Must come after the camera and the markers in the scene: later nodes get unhandled input
@@ -31,6 +32,12 @@ public partial class TerrainBrush : CanvasLayer
     private GeoCoordinate? _lastSpot;
     private Vector2? _mouse;
 
+    // A sculpting stroke: the heights it started from, its spots so far, and the height
+    // Flatten levels to (where it began).
+    private HeightGrid _strokeStart = HeightGrid.Empty;
+    private readonly List<GeoCoordinate> _path = [];
+    private double _flattenTo;
+
     /// <summary>The open world.</summary>
     [Export] public WorldSession? Session { get; set; }
 
@@ -45,6 +52,15 @@ public partial class TerrainBrush : CanvasLayer
 
     /// <summary>The terrain code painted: a terrain type's code, or 0 to erase.</summary>
     public byte Code { get; set; }
+
+    /// <summary>The sculpting brush, or null to paint (or erase) terrain instead.</summary>
+    public SculptTool? Sculpt { get; set; }
+
+    /// <summary>
+    /// How strongly the sculpting brush works: meters for Raise and Lower, and how far (0 to
+    /// 1) for Smooth and Flatten.
+    /// </summary>
+    public double Strength { get; set; } = 500;
 
     /// <summary>The brush's radius in degrees of arc on the globe.</summary>
     public double RadiusDegrees { get; set; } = 2.0;
@@ -129,6 +145,19 @@ public partial class TerrainBrush : CanvasLayer
             return false;  // Missed the globe: let the camera turn.
         }
 
+        if (Sculpt is SculptTool tool)
+        {
+            Session!.BeginGesture($"{tool} Ground");
+            _painting = true;
+            _lastSpot = spot;
+            _strokeStart = Session.SelectedBody.Surface.Heights;
+            _flattenTo = Session.HeightAt(spot);
+            _path.Clear();
+            _path.Add(spot);
+            SculptPath();
+            return true;
+        }
+
         string action = Code == 0
             ? "Erase Terrain"
             : $"Paint {Session!.TerrainTypes.FirstOrDefault(t => t.Code == Code)?.Name}";
@@ -139,6 +168,25 @@ public partial class TerrainBrush : CanvasLayer
         return true;
     }
 
+    // Redoes the sculpting stroke so far from where it started.
+    private void SculptPath() => Session!.SculptHeights(
+        _strokeStart, _path, RadiusDegrees, Sculpt!.Value, Strength, _flattenTo);
+
+    // Adds a spot to the sculpting stroke once the mouse has moved a quarter of the brush's
+    // radius from the last one (or at the stroke's end), so big brushes, which take longest to
+    // redo, are redone least often.
+    private void ExtendPath(GeoCoordinate spot, bool final)
+    {
+        Vector3D last = SphericalPolygon.ToUnit(_path[^1]);
+        double moved = double.RadiansToDegrees(
+            Math.Acos(Math.Clamp(last.Dot(SphericalPolygon.ToUnit(spot)), -1, 1)));
+        if (moved >= RadiusDegrees / 4 || (final && moved > 0))
+        {
+            _path.Add(spot);
+            SculptPath();
+        }
+    }
+
     private bool EndStroke()
     {
         if (!_painting)
@@ -146,8 +194,15 @@ public partial class TerrainBrush : CanvasLayer
             return false;
         }
 
+        if (Sculpt is not null && _lastSpot is GeoCoordinate end && _path.Count > 0)
+        {
+            ExtendPath(end, final: true);
+        }
+
         _painting = false;
         _lastSpot = null;
+        _path.Clear();
+        _strokeStart = HeightGrid.Empty;
         Session?.EndGesture();
         return true;
     }
@@ -164,9 +219,13 @@ public partial class TerrainBrush : CanvasLayer
         }
 
         GeoCoordinate? spot = SpotAt(mouse);
-        if (spot is GeoCoordinate here)
+        if (spot is GeoCoordinate here && Sculpt is not null)
         {
-            Session!.PaintTerrain(_lastSpot ?? here, here, RadiusDegrees, Code);
+            ExtendPath(here, final: false);
+        }
+        else if (spot is GeoCoordinate paintHere)
+        {
+            Session!.PaintTerrain(_lastSpot ?? paintHere, paintHere, RadiusDegrees, Code);
         }
 
         _lastSpot = spot;
