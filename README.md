@@ -89,6 +89,11 @@ warns about orbits gravity wouldn't keep, and shows the period gravity would giv
 to set it. Your orbits never change on their own. Switch the rings off with **View ▸ Orbit
 Guide**.
 
+Sculpted planets and moons show their relief: mountains rise and basins sink, shaded by the
+light on their slopes. Real relief is tiny next to a planet, so **View ▸ Relief** exaggerates it
+(10× by default; True Scale shows it as it is). Pins, regions, and the camera keep to the raised
+ground.
+
 **Physics** (the switch in the time bar) moves the bodies by real gravity from that moment, each
 starting at its orbit's natural speed, so you can watch whether your system holds together.
 Only the view follows it: seasons, calendars, eclipses, and weather stay on your designed
