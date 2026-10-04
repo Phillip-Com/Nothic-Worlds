@@ -123,7 +123,7 @@ public sealed class MeteorShowerTimeline
             return null;
         }
 
-        if (yearBody.Kind == BodyKind.Star)
+        if (yearBody.GivesLight)
         {
             return (yearBody, time => OrbitMath.OffsetFromParent(orbit, time) * -1,
                 orbit.PeriodDays, orbit.DistanceKm);

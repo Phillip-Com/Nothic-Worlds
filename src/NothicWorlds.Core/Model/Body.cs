@@ -12,6 +12,12 @@ public sealed class Body
     /// </summary>
     public bool HasSurface => Kind is BodyKind.Planet or BodyKind.Moon;
 
+    /// <summary>
+    /// True for a body that lights the worlds around it like a sun: a star, or a world tree
+    /// that glows (VISION.md BOD-02; owner's choice: the tree counts as its realms' sun).
+    /// </summary>
+    public bool GivesLight => Kind == BodyKind.Star || Tree?.GlowStrength > 0;
+
     /// <summary>The body's display name.</summary>
     public string Name { get; set; } = "Planet";
 

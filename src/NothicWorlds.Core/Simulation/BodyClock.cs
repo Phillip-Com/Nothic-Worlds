@@ -44,7 +44,7 @@ public static class BodyClock
         {
             // A star circling this body (or its planet) sets the year from the other side.
             Body? circlingStar = bodies.FirstOrDefault(b =>
-                b.Kind == BodyKind.Star && b.Orbit?.ParentId == current.Id);
+                b.GivesLight && b.Orbit?.ParentId == current.Id);
             if (circlingStar is not null)
             {
                 return circlingStar;
@@ -56,7 +56,7 @@ public static class BodyClock
                 break;
             }
 
-            if (parent.Kind == BodyKind.Star)
+            if (parent.GivesLight)
             {
                 return current;
             }
@@ -73,6 +73,15 @@ public static class BodyClock
     /// </summary>
     public static string Describe(Body body, double timeDays)
     {
+        // A world tree's "day" is one slow turn (its realms' year), so count turns and days.
+        if (body.Kind == BodyKind.WorldTree)
+        {
+            double turnDays = body.DayLengthHours / 24;
+            double turns = Math.Floor(timeDays / turnDays);
+            double day = Math.Floor(timeDays - turns * turnDays);
+            return $"Turn {turns + 1:N0}, day {day + 1:N0}";
+        }
+
         LocalTime local = LocalTimeOn(body, timeDays);
         if (body.Calendar is not Calendar calendar)
         {

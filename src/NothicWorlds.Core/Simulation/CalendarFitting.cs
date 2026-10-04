@@ -37,7 +37,8 @@ public static class CalendarFitting
         var fittedOrbits = new HashSet<Guid>();
         foreach (Body body in Fitted(bodies, CalendarFit.YearLength))
         {
-            if (BodyClock.YearOrbitOf(bodies, body) is Body owner && fittedOrbits.Add(owner.Id))
+            if (BodyClock.YearOrbitOf(bodies, body) is { Branch: null } owner
+                && fittedOrbits.Add(owner.Id))
             {
                 double period = body.Calendar!.AverageDaysPerYear * body.DayLengthHours / 24.0;
                 changed |= SetPeriod(owner, period, failures);
@@ -86,6 +87,15 @@ public static class CalendarFitting
         if (calendar.Fit != CalendarFit.None && BodyClock.YearOrbitOf(bodies, body) is null)
         {
             return $"fitting the year needs a star for {body.Name} to circle";
+        }
+
+        // A realm's year is one turn of its world tree, which its branch holds it to.
+        if (calendar.Fit == CalendarFit.YearLength
+            && BodyClock.YearOrbitOf(bodies, body) is { Branch: not null } realm
+            && bodies.FirstOrDefault(b => b.Id == realm.Orbit!.ParentId) is Body tree)
+        {
+            return $"{realm.Name}'s year is one turn of {tree.Name}: change how long the tree " +
+                "takes to turn (its day length), or fit the day instead";
         }
 
         if (calendar.Fit == CalendarFit.YearLength
