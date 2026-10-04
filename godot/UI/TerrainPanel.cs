@@ -8,10 +8,12 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The Terrain panel (VISION.md BOD-05; owner's choice: its own panel, one at a time with the
-/// others on the right): Paint, Erase, or Sculpt (BOD-04; owner's choice: here), the brush size,
-/// the sculpting brushes and their strength, and the world's terrain types, which can be added,
-/// renamed, recolored, and deleted. While it's open, dragging on the selected planet or moon
-/// paints with the selected type or sculpts it (<see cref="TerrainBrush"/>).
+/// others on the right): Paint, Erase, Sculpt, or Shapes (BOD-04; owner's choice: here), the
+/// brush size, the sculpting brushes and their strength, the shapes (<see cref="ShapesSection"/>),
+/// and the world's terrain types, which can be added, renamed, recolored, and deleted. While
+/// it's open, dragging on the selected planet or moon paints with the selected type or sculpts
+/// it (<see cref="TerrainBrush"/>), or, in Shapes mode, clicking places a shape and its handles
+/// shape it (<see cref="ShapeHandles"/>).
 /// </summary>
 public partial class TerrainPanel : CanvasLayer
 {
@@ -36,6 +38,9 @@ public partial class TerrainPanel : CanvasLayer
     private Button _paintButton = null!;
     private Button _eraseButton = null!;
     private Button _sculptButton = null!;
+    private Button _shapesButton = null!;
+    private Control _brushSize = null!;
+    private ShapesSection? _shapes;
     private Control _sculptTools = null!;
     private readonly Dictionary<SculptTool, Button> _sculptButtons = [];
     private Control _heightRow = null!;
@@ -66,6 +71,9 @@ public partial class TerrainPanel : CanvasLayer
 
     /// <summary>The brush, which paints while the panel shows.</summary>
     [Export] public TerrainBrush? Brush { get; set; }
+
+    /// <summary>The handles that place and shape shapes, in Shapes mode.</summary>
+    [Export] public ShapeHandles? Shapes { get; set; }
 
     /// <summary>Whether the panel is open (it's still hidden while the toolbar is).</summary>
     public bool IsPanelOpen
@@ -151,7 +159,10 @@ public partial class TerrainPanel : CanvasLayer
         _eraseButton = CreateButton("Erase", Refresh, "Remove painted terrain");
         _sculptButton = CreateButton("Sculpt", Refresh,
             "Shape the ground: raise, lower, smooth, or flatten it");
-        foreach (Button button in new[] { _paintButton, _eraseButton, _sculptButton })
+        _shapesButton = CreateButton("Shapes", Refresh,
+            "Add or cut spheres, boxes, cylinders, and cones: holes, hollows, craters, structures");
+        foreach (Button button in
+            new[] { _paintButton, _eraseButton, _sculptButton, _shapesButton })
         {
             button.ToggleMode = true;
             button.ButtonGroup = group;
@@ -188,8 +199,15 @@ public partial class TerrainPanel : CanvasLayer
         _sizeField.WithLiveTyping(ShowSize).ValueChanged += _ => SizeChanged(fromSlider: false);
         sizeRow.AddChild(_sizeField);
         tools.AddChild(sizeRow);
+        _brushSize = sizeRow;
         _sculptTools = BuildSculptTools();
         tools.AddChild(_sculptTools);
+        if (Session is not null && Shapes is not null)
+        {
+            _shapes = new ShapesSection { Session = Session, Handles = Shapes, Toolbar = Toolbar };
+            tools.AddChild(_shapes);
+        }
+
         return tools;
     }
 
@@ -383,12 +401,18 @@ public partial class TerrainPanel : CanvasLayer
         bool canPaint = body.HasSurface;
         _heading.Text = $"Terrain on {body.Name}";
         _note.Text = !canPaint ? "Stars and comets can't be painted. Select a planet or moon."
-            : _sculptButton.ButtonPressed && !Session.SelectedBodyCanBeSculpted
+            : (_sculptButton.ButtonPressed || _shapesButton.ButtonPressed)
+                && !Session.SelectedBodyCanBeSculpted
                 ? "Flat worlds can't be sculpted yet."
                 : "";
         _note.Visible = _note.Text != "";
         _tools.Visible = canPaint;
         _sculptTools.Visible = _sculptButton.ButtonPressed;
+        _brushSize.Visible = !_shapesButton.ButtonPressed;
+        if (_shapes is not null)
+        {
+            _shapes.Visible = _shapesButton.ButtonPressed && Session.SelectedBodyCanBeSculpted;
+        }
         ShowList();
         ShowSelected(force: false);
         ShowSize();
@@ -497,9 +521,15 @@ public partial class TerrainPanel : CanvasLayer
         Brush.Strength = byHeight ? Math.Round(_heightSlider.Value) : _amountSlider.Value / 100;
         Brush.Code = _eraseButton.ButtonPressed ? (byte)0 : _selectedCode ?? 0;
         Brush.RadiusDegrees = _sizeSlider.Value;
-        Brush.IsActive = Visible && Session is { SelectedBodyHasSurface: true } && (sculpting
-            ? Session.SelectedBodyCanBeSculpted
-            : _eraseButton.ButtonPressed || _selectedCode is not null);
+        bool shaping = _shapesButton.ButtonPressed;
+        Brush.IsActive = Visible && !shaping && Session is { SelectedBodyHasSurface: true }
+            && (sculpting
+                ? Session.SelectedBodyCanBeSculpted
+                : _eraseButton.ButtonPressed || _selectedCode is not null);
+        if (Shapes is not null)
+        {
+            Shapes.IsActive = Visible && shaping && Session is { SelectedBodyCanBeSculpted: true };
+        }
     }
 
     private void UpdateVisibility()

@@ -448,6 +448,11 @@ public partial class PlanetSurface : MeshInstance3D
     }
 
     /// <summary>
+    /// Shows a shape being dragged as a see-through preview (VISION.md BOD-04), or hides it.
+    /// </summary>
+    public void SetShapePreview(ShapeEdit? shape) => _carved?.ShowPreview(shape);
+
+    /// <summary>
     /// How far out the drawn surface is at a direction, in the globe's radii: 1 on an unsculpted
     /// globe (or a flat world), more on a sculpted hill, less in a basin. Overlays sit on it.
     /// </summary>

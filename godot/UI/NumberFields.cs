@@ -1,3 +1,4 @@
+using System.Globalization;
 using Godot;
 
 namespace NothicWorlds.UI;
@@ -46,9 +47,35 @@ public static class NumberFields
     /// </param>
     public static SpinBox WithLiveTyping(this SpinBox field, Action editingFinished)
     {
-        field.UpdateOnTextChanged = true;
-        field.GetLineEdit().FocusExited += editingFinished;
+        // Godot's own live update (UpdateOnTextChanged) turns a lone "-" into 0, so a negative
+        // number couldn't be typed. Apply only text that is already a whole number.
+        LineEdit text = field.GetLineEdit();
+        text.TextChanged += typed =>
+        {
+            if (!IsCompleteNumber(typed, field.Suffix))
+            {
+                return;
+            }
+
+            int caret = text.CaretColumn;
+            field.Apply();
+            text.CaretColumn = caret;  // Applying rewrites the text, which moves the caret.
+        };
+        text.FocusExited += editingFinished;
         return field.WithArrowKeys();
+    }
+
+    // True when the text reads as a number, not one partway typed like "-" or "2.".
+    private static bool IsCompleteNumber(string typed, string suffix)
+    {
+        string number = typed.Trim();
+        if (suffix != "" && number.EndsWith(suffix, StringComparison.Ordinal))
+        {
+            number = number[..^suffix.Length].Trim();
+        }
+
+        return !number.EndsWith('.') && double.TryParse(number, NumberStyles.Float,
+            CultureInfo.InvariantCulture, out _);
     }
 
     /// <summary>

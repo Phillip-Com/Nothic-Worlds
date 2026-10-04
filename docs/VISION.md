@@ -122,7 +122,8 @@ The rest of body sculpting (`BOD-04`): shapes added to or cut out of a world. Ow
   main thread: 1.5 s at the Standard mesh. So (owner's choice) shaped worlds carve a coarser
   globe, 32 squares a face (about 0.25 s), and while a handle is dragged the shape shows as a
   see-through preview, carved when it's let go.
-- **Three PRs:** shapes in Core (PR #65), drawing worlds with shapes (PR #66), then the tools.
+- **Three PRs:** shapes in Core (PR #65), drawing worlds with shapes (PR #66), then the tools
+  (PR #67).
 
 **Milestone 24: Body Sculpting (Heights)** · Complete (PR #63 merged 2026-10-04; owner's choice, 2026-10-04)
 Mold bodies like clay (`BOD-04`), starting with heights. Owner's decisions (the design review
@@ -1266,7 +1267,7 @@ the body as a sphere of its radius. World trees (M21) hold realms on their branc
   the planet when looking toward its direction and absent looking away, a bigger and brighter
   one, the background unchanged without nebulas, and undo. Benchmark: no change.
 
-**BOD-04 — Body sculpting (digital clay)** · In Progress (M24: heights, PRs #60–#63; M25: shapes, PRs #65–#66) · Base
+**BOD-04 — Body sculpting (digital clay)** · Implemented (M24: heights, PRs #60–#63; M25: shapes, PRs #65–#67) · Base
 **Intent:** Mold bodies like digital clay with brush tools. Tools include:
 - Raise and lower terrain brushes
 - Basic shape tools to add and subtract terrain, which are also useful for artificial structures
@@ -1394,6 +1395,33 @@ built from both. Heights come first (M24), shapes next.
   a cone, on a sculpted planet. The camera keeps above the tallest added shape.
 - **Benchmark:** unshaped worlds unchanged against `main` (197/201 vs 201/200 fps); a shaped,
   sculpted planet filling the screen: 168 fps, 18 MB more video memory.
+**Implementation (shape tools, M25, PR #67):**
+- **Terrain panel ▸ Shapes** (a fourth mode, `UI/TerrainPanel.cs`): `UI/ShapesSection.cs` picks
+  the kind and Add/Cut for new shapes, lists the body's shapes, and edits the selected one's
+  kind, operation, depth, width, height (not for a sphere), length (a box only), and turn, with
+  **Delete Shape**. The brush is off in this mode; flat worlds get the same note as Sculpt.
+- **`Controls/ShapeHandles.cs`** (a `CanvasLayer` after the camera, like the brush): a click on
+  the globe places a shape and selects it; the selected one has three handles: its middle
+  (move; it keeps its height above the ground), a square at the edge of its width (resize; it
+  keeps its proportions and how it sits on the ground), and a knob past the end of its length
+  (turn, clockwise from north; Shift snaps to 15°). Esc deselects. While a handle is dragged,
+  `PlanetSurface.SetShapePreview` shows the shape see-through (`ShapedGlobe.ShowPreview`, using
+  the same placement as the carving); letting go makes one undo step and carves. Drags off
+  the handles still turn the camera. On a shape that's small on screen the resize and turn
+  handles are kept 28 px from the middle so each can be grabbed, so resizing scales by how far
+  the mouse moves out from the middle compared with where the handle was grabbed.
+- **`Session/WorldSession.Shapes.cs`:** `AddShape` (a new shape is 5% of the radius across; a
+  sphere as tall as it's wide, the others 30%; an added box, cylinder, or cone sits on the
+  ground there, everything else is centered on it), `UpdateShape` (typing in a field merges
+  into one undo step; each handle drag is its own), and `DeleteShape`.
+- **Fixed on the way:** live number fields (`UI/NumberFields.WithLiveTyping`) turned a lone "-"
+  into 0, so negative numbers (a depth below ground, a latitude south) couldn't be typed. They
+  now apply only text that is already a whole number.
+- **Verified in the running app** with real clicks and key presses, maximized and at 1152 × 648:
+  placing a cut cylinder and an added box, moving, resizing, and turning them by their handles
+  (the preview while dragging, carved on release), typing a negative depth, Delete, and undo.
+  Benchmark: not run; nothing is drawn differently outside Shapes mode, and the handles redraw
+  only while it's on.
 
 **BOD-05 — Terrain/biome painting** · Implemented (M11: PR #33, #34, #35) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.
