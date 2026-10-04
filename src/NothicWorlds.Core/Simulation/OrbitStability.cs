@@ -252,10 +252,10 @@ public static class OrbitStability
 
     // How far the body's solid part reaches from its center: a flat world's rim is farther
     // out than its radius.
-    private static double ReachKm(Body body) =>
+    internal static double ReachKm(Body body) =>
         body.Shape == BodyShape.FlatDisc ? body.RadiusKm * FlatDisc.Radius : body.RadiusKm;
 
-    private static double Nearest(Orbit orbit) => orbit.DistanceKm * (1 - orbit.Eccentricity);
+    internal static double Nearest(Orbit orbit) => orbit.DistanceKm * (1 - orbit.Eccentricity);
 
-    private static double Farthest(Orbit orbit) => orbit.DistanceKm * (1 + orbit.Eccentricity);
+    internal static double Farthest(Orbit orbit) => orbit.DistanceKm * (1 + orbit.Eccentricity);
 }

@@ -63,10 +63,21 @@ public static class SystemLayout
             return trueOffsetKm * (1.0 / DisplayUnitKm);
         }
 
-        double displayDistance = parentDisplayRadius + childDisplayRadius
-            + Math.Pow(distanceKm / DisplayUnitKm, ReadableExponent);
+        double displayDistance =
+            DisplayDistance(distanceKm, parentDisplayRadius, childDisplayRadius, scale);
         return trueOffsetKm * (displayDistance / distanceKm);
     }
+
+    /// <summary>
+    /// How far from its parent's center a body at a true distance (in km) is drawn, in display
+    /// units, as <see cref="DisplayOffset"/> draws it (e.g. for the orbit guide's rings).
+    /// </summary>
+    public static double DisplayDistance(double distanceKm, double parentDisplayRadius,
+        double childDisplayRadius, SystemScale scale) =>
+        scale == SystemScale.True || distanceKm == 0
+            ? distanceKm / DisplayUnitKm
+            : parentDisplayRadius + childDisplayRadius
+                + Math.Pow(distanceKm / DisplayUnitKm, ReadableExponent);
 
     /// <summary>
     /// The shape of a body's orbit as drawn, relative to its parent's display position: points
