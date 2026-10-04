@@ -45,6 +45,9 @@ public partial class SystemPanel : CanvasLayer
     private SpinBox _axialTilt = null!;
     private SpinBox _axisDirection = null!;
     private SpinBox _temperature = null!;
+    private SpinBox _density = null!;
+    private Button _typicalDensity = null!;
+    private Label _mass = null!;
     private ColorPickerButton _color = null!;
     private OptionButton _pattern = null!;
     private OptionButton _starType = null!;
@@ -246,6 +249,7 @@ public partial class SystemPanel : CanvasLayer
             Body.MaxAverageTemperatureC, 0.5, "°C", CommitTemperature);
         _temperature.TooltipText = "The body's average surface temperature over a year " +
             "(Earth: about 15 °C). Weather pins spread it by latitude and season";
+        AddDensityFields(grid);
         AddAppearanceFields(grid);
         layout.AddChild(grid);
         if (Session is not null)
@@ -476,6 +480,7 @@ public partial class SystemPanel : CanvasLayer
         _axialTilt.ShowValue(body.AxialTiltDegrees);
         _axisDirection.ShowValue(body.AxialTiltDirectionDegrees);
         _temperature.ShowValue(body.AverageTemperatureC);
+        ShowDensity(body);
         ShowAppearance(body);
 
         // Stars and comets have no surface weather.
@@ -783,6 +788,67 @@ public partial class SystemPanel : CanvasLayer
             Pattern = (SurfacePattern)_pattern.GetSelectedId(),
             StarType = (StarType)_starType.GetSelectedId(),
         });
+    }
+
+    // Density (with a button back to the typical one) and the mass it gives (VISION.md SIM-04).
+    private void AddDensityFields(GridContainer grid)
+    {
+        grid.AddChild(new Label { Text = "Density" });
+        var row = new HBoxContainer();
+        _density = CreateField(0.01, Body.MaxDensityGramsPerCm3, 0.01, "g/cm³", CommitDensity);
+        _density.TooltipText = "How dense the body is (Earth: 5.5 g/cm³, Jupiter: 1.3, ice: " +
+            "0.9). With its size it gives the body's mass, which the stable orbit guide uses";
+        row.AddChild(_density);
+        _typicalDensity = CreateButton("Typical", ResetDensity,
+            "Go back to the usual density for its kind and size, which follows it as it's resized");
+        row.AddChild(_typicalDensity);
+        grid.AddChild(row);
+        grid.AddChild(new Label { Text = "Mass" });
+        _mass = new Label { TooltipText = "Worked out from the body's size and density" };
+        grid.AddChild(_mass);
+    }
+
+    private void ShowDensity(Body body)
+    {
+        _density.ShowValue(BodyMass.Density(body));
+        _typicalDensity.Disabled = body.DensityGramsPerCm3 is null;
+        _mass.Text = MassText(BodyMass.Kg(body), body.Kind)
+            + (body.DensityGramsPerCm3 is null ? " (typical)" : "");
+    }
+
+    // Stars in Sun masses, other big bodies in Earth masses, and small ones in kg.
+    private static string MassText(double kg, BodyKind kind)
+    {
+        if (kind == BodyKind.Star)
+        {
+            return Masses(kg / BodyMass.SunKg, "Sun");
+        }
+
+        double earths = kg / BodyMass.EarthKg;
+        return earths >= 0.001
+            ? Masses(earths, "Earth")
+            : $"{kg.ToString("0.##e+0", CultureInfo.CurrentCulture)} kg";
+    }
+
+    private static string Masses(double count, string of)
+    {
+        string number = count.ToString("#,0.###", CultureInfo.CurrentCulture);
+        return number == "1" ? $"1 {of} mass" : $"{number} {of} masses";
+    }
+
+    private void CommitDensity()
+    {
+        if (!_syncing && Session is not null)
+        {
+            ReportProblem(Session.SetDensity(Session.SelectedBodyId, _density.Value));
+        }
+    }
+
+    private void ResetDensity()
+    {
+        // Leave the field first, or it keeps showing what was typed.
+        _density.GetLineEdit().ReleaseFocus();
+        Session?.SetDensity(Session.SelectedBodyId, null);
     }
 
     private void CommitTemperature()
