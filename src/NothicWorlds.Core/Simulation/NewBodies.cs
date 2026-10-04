@@ -36,7 +36,7 @@ public static class NewBodies
         {
             Name = NextName(bodies, "Planet"),
             Kind = BodyKind.Planet,
-            Orbit = OrbitAround(bodies, parent, distance, StartingPeriod(distance, parent)),
+            Orbit = OrbitAround(bodies, parent, distance, NaturalPeriodDays(distance, parent)),
         };
     }
 
@@ -47,7 +47,7 @@ public static class NewBodies
     public static Body Moon(IReadOnlyList<Body> bodies, Body parent)
     {
         double distance = NextDistance(bodies, parent, MoonOrbitKm);
-        double period = StartingPeriod(distance, parent);
+        double period = NaturalPeriodDays(distance, parent);
         return new Body
         {
             Name = NextName(bodies, "Moon"),
@@ -77,7 +77,7 @@ public static class NewBodies
             // Well beyond its planets, whichever is farther.
             double distance = Math.Max(
                 NextDistance(bodies, parent, CompanionStarOrbitKm), CompanionStarOrbitKm);
-            star.Orbit = OrbitAround(bodies, parent, distance, StartingPeriod(distance, parent));
+            star.Orbit = OrbitAround(bodies, parent, distance, NaturalPeriodDays(distance, parent));
         }
 
         return star;
@@ -97,7 +97,7 @@ public static class NewBodies
             .DefaultIfEmpty(EarthOrbitKm)
             .Min();
         double distance = innermost * CometClosestShare / (1 - CometEccentricity);
-        Orbit orbit = OrbitAround(bodies, star, distance, StartingPeriod(distance, star));
+        Orbit orbit = OrbitAround(bodies, star, distance, NaturalPeriodDays(distance, star));
         double closestApproach = orbit.StartAngleDegrees;
         return new Body
         {
@@ -113,6 +113,26 @@ public static class NewBodies
                 StartAngleDegrees = (closestApproach + 330) % 360,
             },
         };
+    }
+
+    /// <summary>
+    /// A new asteroid belt for <paramref name="star"/>: like our main belt (2.2 to 3.3 times the
+    /// Earth's distance, rocks tilted up to 10°), or, if the star already has belts, just beyond
+    /// the outermost.
+    /// </summary>
+    public static AsteroidBelt Belt(Body star)
+    {
+        double inner = star.Belts.Count == 0
+            ? EarthOrbitKm * 2.2
+            : star.Belts.Max(belt => belt.OuterKm) * SpacingFactor;
+        int number = 1;
+        while (star.Belts.Any(belt => belt.Name == $"Belt {number}"))
+        {
+            number++;
+        }
+
+        return new AsteroidBelt(Guid.NewGuid(), $"Belt {number}", inner, inner * 1.5, 10, 0.5,
+            new RgbColor(0x8A, 0x7F, 0x72));
     }
 
     // "Planet 2", "Moon 1", ...: the first number not already used.
@@ -149,10 +169,15 @@ public static class NewBodies
         };
     }
 
-    // Periods grow with distance as in real systems (period² ∝ distance³), starting from the
-    // Earth around the Sun (for star parents) or the Moon around the Earth (for others), and
-    // treating a bigger parent as heavier. Only a starting value; the user sets the real one.
-    private static double StartingPeriod(double distanceKm, Body parent)
+    /// <summary>
+    /// A natural period for an orbit at <paramref name="distanceKm"/> around
+    /// <paramref name="parent"/>, in standard days: periods grow with distance as in real
+    /// systems (period² ∝ distance³), starting from the Earth around the Sun (for star parents)
+    /// or the Moon around the Earth (for others), and treating a bigger parent as heavier. Used
+    /// for starting values (the user sets the real ones) and for things that aren't designed one
+    /// by one, like the rocks of a belt.
+    /// </summary>
+    public static double NaturalPeriodDays(double distanceKm, Body parent)
     {
         (double period, double distance, double radius) = parent.Kind == BodyKind.Star
             ? (365.25, EarthOrbitKm, SunRadiusKm)

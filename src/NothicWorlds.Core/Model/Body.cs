@@ -48,6 +48,11 @@ public sealed class Body
     /// </summary>
     public PlanetRings? Rings { get; set; }
 
+    /// <summary>
+    /// The asteroid belts circling the body (VISION.md BOD-03). Stars only; empty for others.
+    /// </summary>
+    public IReadOnlyList<AsteroidBelt> Belts { get; set; } = [];
+
     /// <summary>What's drawn on the body's surface.</summary>
     public SurfaceSettings Surface { get; } = new();
 
@@ -131,6 +136,22 @@ public sealed class Body
             return HasSurface ? rings.Problem() : "only planets and moons can have rings";
         }
 
+        if (Belts.Count > 0 && Kind != BodyKind.Star)
+        {
+            return "only stars can have asteroid belts";
+        }
+
+        if (Belts.Select(belt => belt.Problem()).FirstOrDefault(p => p is not null)
+            is string beltProblem)
+        {
+            return beltProblem;
+        }
+
+        if (Belts.Select(belt => belt.Id).Distinct().Count() != Belts.Count)
+        {
+            return "two asteroid belts share an ID";
+        }
+
         if (Kind == BodyKind.Comet && Calendar is not null)
         {
             return "a comet can't have a calendar";
@@ -141,8 +162,8 @@ public sealed class Body
 
     /// <summary>
     /// True if <paramref name="other"/> would save exactly the same body: the same name, kind,
-    /// shape, size, day, tilt, orbit, appearance, rings, and surface. Used to tell whether the
-    /// world still matches its saved file.
+    /// shape, size, day, tilt, orbit, appearance, rings, belts, and surface. Used to tell
+    /// whether the world still matches its saved file.
     /// </summary>
     public bool HasSameContent(Body other)
     {
@@ -154,6 +175,7 @@ public sealed class Body
             && AverageTemperatureC == other.AverageTemperatureC
             && Orbit == other.Orbit && Calendar == other.Calendar
             && Appearance == other.Appearance && Rings == other.Rings
+            && Belts.SequenceEqual(other.Belts)
             && Surface.HasSameContent(other.Surface);
     }
 
@@ -175,6 +197,7 @@ public sealed class Body
             Calendar = Calendar,  // Immutable, safe to share.
             Appearance = Appearance,  // Immutable, safe to share.
             Rings = Rings,  // Immutable, safe to share.
+            Belts = [.. Belts],  // The belts are immutable; the list is copied.
         };
         copy.Surface.RestoreFrom(Surface);
         return copy;

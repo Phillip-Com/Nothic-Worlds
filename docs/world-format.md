@@ -192,6 +192,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `bodies[].kind` | yes | `"star"`, `"planet"`, `"moon"`, or `"comet"`. A comet must circle a star, nothing may circle a comet, and a comet has no `calendar`. Its `appearance` is a `color` and `pattern`, like a moon's. |
 | `bodies[].shape` | no | `"sphere"` or `"flat-disc"` (`BOD-02`); omitted for a sphere. Only planets and moons can be flat. A flat world is a disc with every latitude and longitude on its top face: the north pole at the center, and a point's distance from the center equal to its angle from the pole, so the disc's radius is π × `radiusKm` (`radiusKm` stays the matching globe's). |
 | `bodies[].rings` | no | Rings (`BOD-03`), planets and moons only: `inner` and `outer` (in the body's radii; a flat world's disc radius), at least 1.05 and at most 50, `outer` beyond `inner`; `color` (`#RRGGBB`). They lie in the body's equatorial plane. Omitted for none. |
+| `bodies[].belts` | no | Asteroid belts (`BOD-03`), stars only; omitted for none. Each: `id` (GUID, unique within the star), `name` (1–100 characters), `innerKm` and `outerKm` (above 0, `outerKm` beyond `innerKm`, at most 10¹³), `thickness` (how far the rocks' orbits tilt, 0–45°), `density` (0.01–1), `color` (`#RRGGBB`). Only the belt is saved; its rocks are drawn from it. |
 | `bodies[].radiusKm` | yes | Above 0, at most 10¹⁰ |
 | `bodies[].dayLengthHours` | yes | Time for one spin, in standard hours. Above 0, at most 10⁷. |
 | `bodies[].axialTilt` | yes | Degrees the spin axis leans, 0 to 180 |
@@ -418,6 +419,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 18 | Asteroid belts (M20): stars gain optional `belts` | Nothing to change: version 17 stars have no belts |
 | 17 | Rings (M20): planets and moons gain optional `rings` | Nothing to change: version 16 bodies have no rings |
 | 16 | Flat worlds (M19): planets and moons gain an optional `shape` | Nothing to change: version 15 bodies are all spheres |
 | 15 | Comets (M18): bodies can be of kind `comet` | Nothing to change: version 14 worlds have no comets |

@@ -66,6 +66,7 @@ public partial class SystemPanel : CanvasLayer
     private EclipseSection? _eclipses;
     private MeteorShowerSection? _showers;
     private RingsSection? _rings;
+    private BeltsSection? _belts;
     private bool _open;
     private bool _syncing;
 
@@ -234,6 +235,8 @@ public partial class SystemPanel : CanvasLayer
         {
             _rings = new RingsSection { Session = Session };
             layout.AddChild(_rings);
+            _belts = new BeltsSection { Session = Session };
+            layout.AddChild(_belts);
         }
 
         layout.AddChild(new Label { Text = "Orbit" });
@@ -461,6 +464,11 @@ public partial class SystemPanel : CanvasLayer
         if (_rings is not null)
         {
             _rings.Visible = body.HasSurface;  // Stars and comets have no rings.
+        }
+
+        if (_belts is not null)
+        {
+            _belts.Visible = body.Kind == BodyKind.Star;  // Belts circle stars.
         }
 
         if (_showers is not null)

@@ -102,10 +102,22 @@ internal sealed class BodyDocument
     public CalendarDocument? Calendar { get; init; }  // Added in format version 6
     public required AppearanceDocument Appearance { get; init; }  // Added in format version 13
     public RingsDocument? Rings { get; init; }  // Added in format version 17
+    public List<BeltDocument?>? Belts { get; init; }  // Added in format version 18; stars only
     public required SurfaceDocument Surface { get; init; }
 }
 
 // Planets and moons have a color and pattern; stars a star type.
+internal sealed class BeltDocument
+{
+    public required Guid Id { get; init; }
+    public string? Name { get; init; }
+    public required double InnerKm { get; init; }
+    public required double OuterKm { get; init; }
+    public required double Thickness { get; init; }
+    public required double Density { get; init; }
+    public string? Color { get; init; }
+}
+
 internal sealed class RingsDocument
 {
     public required double Inner { get; init; }
