@@ -67,6 +67,8 @@ internal static class WorldMapper
         };
         world.Bodies.AddRange(document.Bodies.Select(body => ToBody(body, readTerrain)));
         RequireNoProblem(Simulation.SystemHierarchy.Problem(world.Bodies));
+        RequireNoProblem(Simulation.Realms.Problem(world.Bodies));
+        Simulation.Realms.Apply(world.Bodies);
         Require(world.Bodies.All(body => body.Calendar?.MonthMoonId is not Guid moon
                 || world.Bodies.Any(other => other.Id == moon)),
             "a calendar's month moon doesn't exist");
@@ -324,6 +326,7 @@ internal static class WorldMapper
                     Color = body.Appearance.Color.ToHex(),
                     Pattern = WorldFormat.PatternName(body.Appearance.Pattern),
                 },
+            Branch = body.Branch,
             Tree = body.Tree is WorldTreeLook tree
                 ? new TreeDocument
                 {
@@ -520,6 +523,7 @@ internal static class WorldMapper
             ClosestApproach = NullIfZero(orbit.ClosestApproachDegrees),
             Tilt = NullIfZero(orbit.TiltDegrees),
             TiltDirection = NullIfZero(orbit.TiltDirectionDegrees),
+            Height = NullIfZero(orbit.HeightKm),
         };
     }
 
@@ -535,6 +539,7 @@ internal static class WorldMapper
             ClosestApproachDegrees = document.ClosestApproach ?? 0,
             TiltDegrees = document.Tilt ?? 0,
             TiltDirectionDegrees = document.TiltDirection ?? 0,
+            HeightKm = document.Height ?? 0,
         };
     }
 
@@ -601,6 +606,7 @@ internal static class WorldMapper
             Rings = document.Rings is RingsDocument rings ? ToRings(rings) : null,
             Belts = [.. (document.Belts ?? []).Select(ToBelt)],
             Tree = document.Tree is TreeDocument tree ? ToTree(tree) : null,
+            Branch = document.Branch,
         };
         RequireNoProblem(body.Problem());
         body.Appearance = ToAppearance(document.Appearance, body.Kind);

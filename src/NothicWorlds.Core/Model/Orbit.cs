@@ -63,6 +63,13 @@ public sealed record Orbit
     /// </summary>
     public double TiltDirectionDegrees { get; init; }
 
+    /// <summary>
+    /// Optional: how far the whole orbit is lifted along its own axis (the direction its
+    /// tilt points "up"), in km; 0 (the default) is centered on the parent. Set for realms
+    /// hanging high or low on a world tree (VISION.md BOD-02, see <c>Simulation.Realms</c>).
+    /// </summary>
+    public double HeightKm { get; init; }
+
     /// <summary>What's wrong with this orbit, or null if it's usable.</summary>
     public string? Problem()
     {
@@ -79,6 +86,11 @@ public sealed record Orbit
         if (!double.IsFinite(Eccentricity) || Eccentricity < 0 || Eccentricity > MaxEccentricity)
         {
             return $"an orbit's elongation (eccentricity) must be 0 to {MaxEccentricity}";
+        }
+
+        if (!double.IsFinite(HeightKm) || Math.Abs(HeightKm) > MaxDistanceKm)
+        {
+            return $"an orbit's height must be at most {MaxDistanceKm:g} km either way";
         }
 
         if (!double.IsFinite(TiltDegrees) || TiltDegrees < 0 || TiltDegrees > 180)

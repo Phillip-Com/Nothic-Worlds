@@ -49,6 +49,13 @@ public sealed class Body
     public PlanetRings? Rings { get; set; }
 
     /// <summary>
+    /// For a realm (a planet or moon hung on a world tree, VISION.md BOD-02): which of its
+    /// tree's great branches it hangs on, counting from 0; null for a body that orbits freely.
+    /// Its orbit is then set by the branch (see <c>Simulation.Realms</c>).
+    /// </summary>
+    public int? Branch { get; set; }
+
+    /// <summary>
     /// How a world tree grows and looks (VISION.md BOD-02); null for every other kind.
     /// </summary>
     public WorldTreeLook? Tree { get; set; }
@@ -182,8 +189,8 @@ public sealed class Body
 
     /// <summary>
     /// True if <paramref name="other"/> would save exactly the same body: the same name, kind,
-    /// shape, size, day, tilt, orbit, appearance, rings, belts, tree, and surface. Used to tell
-    /// whether the world still matches its saved file.
+    /// shape, size, day, tilt, orbit, branch, appearance, rings, belts, tree, and surface. Used
+    /// to tell whether the world still matches its saved file.
     /// </summary>
     public bool HasSameContent(Body other)
     {
@@ -195,7 +202,7 @@ public sealed class Body
             && AverageTemperatureC == other.AverageTemperatureC
             && Orbit == other.Orbit && Calendar == other.Calendar
             && Appearance == other.Appearance && Rings == other.Rings
-            && Belts.SequenceEqual(other.Belts) && Tree == other.Tree
+            && Belts.SequenceEqual(other.Belts) && Tree == other.Tree && Branch == other.Branch
             && Surface.HasSameContent(other.Surface);
     }
 
@@ -219,6 +226,7 @@ public sealed class Body
             Rings = Rings,  // Immutable, safe to share.
             Belts = [.. Belts],  // The belts are immutable; the list is copied.
             Tree = Tree,  // Immutable, safe to share.
+            Branch = Branch,
         };
         copy.Surface.RestoreFrom(Surface);
         return copy;

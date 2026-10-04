@@ -110,14 +110,14 @@ public static class SystemHierarchy
     /// </summary>
     /// <returns>
     /// The new orbit (or null for none) of each body that changes. Empty if the body is already
-    /// at the center, or is a comet (which must always circle a star).
+    /// at the center, is a comet (which must always circle a star), or hangs on a world tree.
     /// </returns>
     public static Dictionary<Guid, Orbit?> MakeCenter(IReadOnlyList<Body> bodies, Guid centerId)
     {
         var byId = bodies.ToDictionary(body => body.Id);
         var changes = new Dictionary<Guid, Orbit?>();
         if (!byId.TryGetValue(centerId, out Body? center) || center.Orbit is null
-            || center.Kind == BodyKind.Comet)
+            || center.Kind == BodyKind.Comet || center.Branch is not null)
         {
             return changes;
         }
@@ -144,6 +144,7 @@ public static class SystemHierarchy
             ParentId = newParent,
             StartAngleDegrees = (orbit.StartAngleDegrees + 180) % 360,
             ClosestApproachDegrees = (orbit.ClosestApproachDegrees + 180) % 360,
+            HeightKm = -orbit.HeightKm,
         };
     }
 

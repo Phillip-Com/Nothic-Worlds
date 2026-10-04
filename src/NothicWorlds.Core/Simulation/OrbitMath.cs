@@ -31,8 +31,9 @@ public static class OrbitMath
         double x = orbit.DistanceKm * (Math.Cos(eccentricAnomaly) - e);
         double y = orbit.DistanceKm * Math.Sqrt(1 - e * e) * Math.Sin(eccentricAnomaly);
 
-        // In the reference plane, 90° ahead of +X (counterclockwise from the north) is -Z.
-        var inPlane = new Vector3D(x, 0, -y);
+        // In the reference plane, 90° ahead of +X (counterclockwise from the north) is -Z. A
+        // lifted orbit is raised along its own axis (+Y before the tilt).
+        var inPlane = new Vector3D(x, orbit.HeightKm, -y);
         return inPlane
             .RotatedAroundY(orbit.ClosestApproachDegrees - orbit.TiltDirectionDegrees)
             .RotatedAroundX(orbit.TiltDegrees)
