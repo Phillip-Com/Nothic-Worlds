@@ -81,6 +81,14 @@ open, the selected body's path is drawn in yellow, and every change shows live a
 solstices fall. **Density** (Earth: 5.5 g/cm³) gives the body its **Mass**, shown below it; it's
 typical for the body's kind and size until you set it (**Typical** goes back).
 
+The **stable orbit guide** shows where real gravity would keep orbits steady. While the System
+panel is open, see-through rings around the selected body show where its moons could circle
+(green) and where they'd be torn apart or pulled off course (red), and rings around what it
+circles show where it could go. The panel's **Stable Orbits** section gives the distances,
+warns about orbits gravity wouldn't keep, and shows the period gravity would give, with **Use**
+to set it. Your orbits never change on their own. Switch the rings off with **View ▸ Orbit
+Guide**.
+
 Planets and moons can have their own calendar: **Calendar · Edit…** in the panel sets its months,
 weekdays, year numbering (with an optional era), and the date the clock starts on. **Leap
 Years** adds days to a month on a rule like ours ("every 4 years, except every 100, but every

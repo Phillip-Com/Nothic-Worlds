@@ -119,7 +119,7 @@ guides. Owner's decisions:
   would give at an orbit's size, with a button to use it.
 - **Bands and numbers:** shaded bands in the 3D system view around the selected body (green
   where steady, red too close), switched in the View menu, and the distances in the System panel.
-- **Two PRs:** density and the math (PR #56), then the guide in the app.
+- **Two PRs:** density and the math (PR #56), then the guide in the app (PR #57).
 
 **Milestone 21: World Tree** · Complete (PR #55 merged 2026-10-04; owner's choice, 2026-10-04)
 More world shapes (`BOD-02`): a world tree. Owner's decisions:
@@ -1361,7 +1361,7 @@ popping into place. Clicking again mid-glide adds to where it's heading. Steppin
 see how their system might fall apart.
 **Implementation:** —
 
-**SIM-04 — Stable orbit guide** · In Progress (M22: density and the math, PR #56) · Base
+**SIM-04 — Stable orbit guide** · Implemented (M22) · Base
 **Intent:** For a selected body, show a guiding path for where stable orbits would be.
 **Implementation (density and the math, M22, PR #56):**
 - **Model:** `Body.DensityGramsPerCm3`, optional (null is typical); format **version 22**
@@ -1397,6 +1397,32 @@ see how their system might fall apart.
 - **Verified in the running app** with real typing and clicks, maximized and at 1152 × 648:
   typing 2.5 g/cm³ (0.453 Earth masses), Typical (back to 5.51, 1 Earth mass), undo (2.5
   again), and the Sun (1.41 g/cm³, 1 Sun mass).
+
+**Implementation (the guide in the app, M22, PR #57):**
+- **Rings** (`Simulation/OrbitGuide.cs`, Core): for the selected body, the zone around it
+  (where its moons could circle) and, unless it's a realm or circles something lighter, the
+  zone around its parent (where it could), each split edge to edge into steady and unsteady
+  rings: inside the Roche limit, or within a neighbor's reach (overlapping reaches joined; the
+  body's own reach is left out around its parent, since it's the one that would move). A zone
+  nothing limits (the main star's) is drawn to half again past its farthest orbit. A body with
+  no room for moons is unsteady all round. `SystemLayout.DisplayDistance` maps a true distance
+  to the drawn one (shared with `DisplayOffset`, tested equal).
+- **Drawing** (`Rendering/OrbitGuideVisual.cs`): see-through rings flat in the orbit plane,
+  green (steady) and red (not), one mesh per body they're around, rebuilt only when the world,
+  the body, or the scale changes and moved with the bodies each frame. Around the body they line
+  up with its moons' centers; around its parent, with where its own center would be; the
+  innermost ring starts at the drawn edge. Shown for the body the System panel highlights,
+  so only while the panel is open; **View ▸ Orbit Guide** switches it (on by default).
+- **Panel** (`UI/OrbitGuideSection.cs`): a **Stable Orbits** section: where moons (or, around a
+  star or tree, orbits) stay steady; the Roche limit and Hill sphere (km, millions of km, or
+  AU); the body's warnings in amber, or "Its orbit would stay steady"; and **Gravity's period**
+  with **Use** (disabled when it already matches, or when a calendar sets the period). Refused
+  edits show on the message line.
+- **Verified in the running app,** maximized and at 1152 × 648: the planet's moon zone and its
+  place round the Sun, a new moon splitting the zone, the moon pulled in to 12,000 km (no room,
+  the Roche warning), **Use** setting the Moon's period to gravity's 27.29 days, the Sun's
+  zone with the planet's reach, and the guide switched off. Benchmark: no change (it doesn't
+  open the panel, so the guide isn't drawn).
 
 ### 4.6 Time & Calendar (`CAL`)
 
