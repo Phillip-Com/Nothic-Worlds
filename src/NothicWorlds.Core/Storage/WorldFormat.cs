@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 18;
+    public const int CurrentVersion = 19;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -160,6 +160,9 @@ internal static partial class WorldFormat
         document => document,
 
         // 17 → 18: stars gained optional "belts" (asteroid belts, M20). Older stars have none.
+        document => document,
+
+        // 18 → 19: the world gained optional "nebulas" (M20). Older skies are empty.
         document => document,
     ];
 

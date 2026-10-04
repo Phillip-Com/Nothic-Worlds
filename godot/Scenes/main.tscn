@@ -33,6 +33,7 @@
 [ext_resource type="Script" path="res://UI/TerrainPanel.cs" id="31_terrain_panel"]
 [ext_resource type="Script" path="res://Controls/TerrainBrush.cs" id="32_terrain_brush"]
 [ext_resource type="Script" path="res://UI/LocalViewAids.cs" id="33_local_aids"]
+[ext_resource type="Script" uid="uid://bycuo01vgll24" path="res://Rendering/NebulaBackdrop.cs" id="34_nebula_backdrop"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -212,6 +213,11 @@ Toolbar = NodePath("../MapToolbar")
 script = ExtResource("24_region_renderer")
 Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
+
+[node name="NebulaBackdrop" type="Node" parent="." node_paths=PackedStringArray("Session", "Environment")]
+script = ExtResource("34_nebula_backdrop")
+Session = NodePath("../WorldSession")
+Environment = NodePath("../WorldEnvironment")
 
 [node name="RegionMarkers" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar", "Renderer", "Editor", "Placer", "Map", "Terrain", "Panel", "Journal", "Timeline")]
 script = ExtResource("25_region_markers")

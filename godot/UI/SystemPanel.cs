@@ -67,6 +67,7 @@ public partial class SystemPanel : CanvasLayer
     private MeteorShowerSection? _showers;
     private RingsSection? _rings;
     private BeltsSection? _belts;
+    private NebulasSection? _nebulas;
     private bool _open;
     private bool _syncing;
 
@@ -157,6 +158,9 @@ public partial class SystemPanel : CanvasLayer
         layout.AddChild(_eclipses);
         _showers = new MeteorShowerSection { Session = Session, Time = Time };
         layout.AddChild(_showers);
+        layout.AddChild(new HSeparator());
+        _nebulas = new NebulasSection { Session = Session };
+        layout.AddChild(_nebulas);
 
         Session.Changed += SyncWithWorld;
         Session.SelectionChanged += SyncWithWorld;
