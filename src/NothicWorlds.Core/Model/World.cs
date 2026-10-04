@@ -64,6 +64,9 @@ public sealed class World
     /// </summary>
     public List<TimelineEvent> Events { get; } = [];
 
+    /// <summary>The nebulas on the sky around the system (VISION.md BOD-03).</summary>
+    public List<Nebula> Nebulas { get; } = [];
+
     /// <summary>
     /// Where the camera was looking when the world was saved, or null for the default.
     /// </summary>

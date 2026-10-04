@@ -135,6 +135,23 @@ public static class NewBodies
             new RgbColor(0x8A, 0x7F, 0x72));
     }
 
+    /// <summary>
+    /// A new nebula on the sky, a little above the system's plane, turned away from those
+    /// already there (by the golden angle, so however many are added they don't pile up).
+    /// </summary>
+    public static Nebula Nebula(IReadOnlyList<Nebula> existing)
+    {
+        int number = 1;
+        while (existing.Any(nebula => nebula.Name == $"Nebula {number}"))
+        {
+            number++;
+        }
+
+        return new Nebula(Guid.NewGuid(), $"Nebula {number}", 15,
+            (40 + existing.Count * StartAngleStepDegrees) % 360, 25, 0.6,
+            new RgbColor(0xB0, 0x40, 0x80), new RgbColor(0x40, 0x60, 0xC0));
+    }
+
     // "Planet 2", "Moon 1", ...: the first number not already used.
     private static string NextName(IReadOnlyList<Body> bodies, string prefix)
     {

@@ -19,7 +19,20 @@ internal sealed class WorldDocument
     public List<JournalEntryDocument>? Journal { get; init; }  // Added in format version 7
     public List<TimelineDocument>? Timelines { get; init; }  // Added in format version 7
     public List<EventDocument>? Events { get; init; }  // Added in format version 7
+    public List<NebulaDocument?>? Nebulas { get; init; }  // Added in format version 19
     public ViewDocument? View { get; init; }
+}
+
+internal sealed class NebulaDocument
+{
+    public required Guid Id { get; init; }
+    public string? Name { get; init; }
+    public required double Latitude { get; init; }
+    public required double Longitude { get; init; }
+    public required double Size { get; init; }
+    public required double Brightness { get; init; }
+    public string? Color { get; init; }
+    public string? SecondColor { get; init; }
 }
 
 internal sealed class TerrainTypeDocument

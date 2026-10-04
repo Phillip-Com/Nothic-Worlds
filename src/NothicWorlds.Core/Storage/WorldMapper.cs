@@ -28,6 +28,19 @@ internal static class WorldMapper
             Journal = NullIfEmpty(world.Journal.Select(ToDocument)),
             Timelines = NullIfEmpty(world.Timelines.Select(ToDocument)),
             Events = NullIfEmpty(world.Events.Select(ToDocument)),
+            Nebulas = world.Nebulas.Count == 0
+                ? null
+                : [.. world.Nebulas.Select(nebula => new NebulaDocument
+                {
+                    Id = nebula.Id,
+                    Name = nebula.Name,
+                    Latitude = nebula.LatitudeDegrees,
+                    Longitude = nebula.LongitudeDegrees,
+                    Size = nebula.SizeDegrees,
+                    Brightness = nebula.Brightness,
+                    Color = nebula.Color.ToHex(),
+                    SecondColor = nebula.SecondColor.ToHex(),
+                })],
             View = world.View is null ? null : ToDocument(world.View),
         };
     }
@@ -61,6 +74,8 @@ internal static class WorldMapper
         RequireNoProblem(TerrainType.Problem(world.TerrainTypes));
         world.Regions.AddRange((document.Regions ?? []).Select(ToRegion));
         world.WeatherPins.AddRange((document.WeatherPins ?? []).Select(ToWeatherPin));
+        world.Nebulas.AddRange((document.Nebulas ?? []).Select(ToNebula));
+        RequireNoProblem(Nebula.Problem(world.Nebulas));
         RequireNoProblem(WeatherPin.Problem(world));
         world.Journal.AddRange((document.Journal ?? []).Select(ToEntry));
         world.Timelines.AddRange((document.Timelines ?? []).Select(ToTimeline));
@@ -611,6 +626,17 @@ internal static class WorldMapper
             $"invalid belt color '{document.Color}'");
         return new AsteroidBelt(document.Id, document.Name ?? "", document.InnerKm,
             document.OuterKm, document.Thickness, document.Density, color);
+    }
+
+    private static Nebula ToNebula(NebulaDocument? document)
+    {
+        Require(document is not null, "a nebula is empty");
+        Require(RgbColor.TryParseHex(document!.Color, out RgbColor color)
+                && RgbColor.TryParseHex(document.SecondColor, out _),
+            "a nebula's colors are invalid");
+        RgbColor.TryParseHex(document.SecondColor, out RgbColor second);
+        return new Nebula(document.Id, document.Name ?? "", document.Latitude,
+            document.Longitude, document.Size, document.Brightness, color, second);
     }
 
     private static PlanetRings ToRings(RingsDocument document)
