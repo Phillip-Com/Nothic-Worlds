@@ -360,6 +360,8 @@ public partial class WorldSession : Node
             BodyKind.Planet => NewBodies.Planet(World.Bodies, StarOf(selected) ?? Root(selected)),
             BodyKind.Moon when selected.HasSurface => NewBodies.Moon(World.Bodies, selected),
             BodyKind.Star => NewBodies.Star(World.Bodies, Root(selected)),
+            BodyKind.WorldTree =>
+                NewBodies.WorldTree(World.Bodies, StarOf(selected) ?? Root(selected)),
             BodyKind.Comet when (StarOf(selected) ?? World.Bodies.Find(IsStar)) is Body star =>
                 NewBodies.Comet(World.Bodies, star),
             _ => null,
@@ -546,6 +548,29 @@ public partial class WorldSession : Node
         RecordUndo($"Delete {belt.Name}");
         star.Belts = [.. star.Belts.Where(b => b.Id != beltId)];
         MarkChanged(systemChanged: false);
+    }
+
+    /// <summary>
+    /// Changes how a world tree grows and looks (VISION.md BOD-02). Rapid changes (dragging a
+    /// field or a color) are one undo step.
+    /// </summary>
+    /// <returns>What's wrong with the look (nothing is changed then), or null.</returns>
+    public string? SetTreeLook(Guid treeId, WorldTreeLook look)
+    {
+        if (FindBody(treeId) is not { Kind: BodyKind.WorldTree } tree || tree.Tree == look)
+        {
+            return null;
+        }
+
+        if (look.Problem() is string problem)
+        {
+            return problem;
+        }
+
+        RecordUndo($"Change {tree.Name}'s Look", mergeKey: ("tree", treeId));
+        tree.Tree = look;
+        MarkChanged(systemChanged: false);
+        return null;
     }
 
     /// <summary>
