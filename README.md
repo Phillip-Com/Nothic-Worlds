@@ -203,6 +203,15 @@ curves. **View ▸ Terrain** hides it.
 the stroke begins (both by an **Amount**). Each stroke is one undo step. Flat worlds can't be
 sculpted yet.
 
+**Shapes** (in the same panel) adds or cuts spheres, boxes, cylinders, and cones: domes and
+craters, walls and quarries, towers, pits, holes right through a world, and hollow worlds. Pick
+the kind and **Add** or **Cut**, then click the planet to place one. Drag its middle to move it,
+its square to resize it, and its round handle to turn it (Shift snaps to 15°); the world is
+carved when you let go (a see-through preview shows it meanwhile). The list shows the body's
+shapes; the selected one's **Depth** (its middle above the ground's radius, negative below it),
+sizes, and **Turn** can be typed in, and **Delete Shape** removes it. Esc deselects. Shapes'
+new faces are bare rock.
+
 **Add ▸ Weather Pin** adds a weather pin: click the spot on the planet, then name it. Weather pins
 show as small suns; click one to see that spot's weather: today's temperature, daylight, noon sun,
 and season, and a chart of the whole year (temperatures and daylight by month, with today
