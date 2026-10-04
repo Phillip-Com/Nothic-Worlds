@@ -49,9 +49,11 @@ public partial class PlanetSurface : MeshInstance3D
     private ImageTexture? _terrainPalette;
     private byte[] _paletteBytes = [];
 
-    // Sculpted heights (VISION.md BOD-04): the six faces as layers of one two-byte texture
-    // (only while something is sculpted, about 12 MB), the grid they show, and how far a meter
-    // lifts the unit sphere (with the view's exaggeration).
+    // Sculpted heights (VISION.md BOD-04): the six faces as layers of one texture of
+    // half-precision floats with smaller copies (only while something is sculpted, about 16 MB),
+    // the grid they show, and how far a meter lifts the unit sphere (with the exaggeration).
+    // Half precision rounds the drawn heights by at most 16 m (at 32 km); the saved ones are
+    // exact.
     private Texture2DArray? _heightTexture;
     private readonly byte[] _faceHeightBytes = new byte[HeightGrid.CellsPerFace * 2];
     private readonly short[] _faceHeights = new short[HeightGrid.CellsPerFace];
@@ -570,20 +572,21 @@ public partial class PlanetSurface : MeshInstance3D
 
     // Writes a table of 32-bit floats into a one-pixel-tall texture, reusing the existing
     // texture when there is one (much cheaper while dragging).
-    // One face's heights as a two-byte image (high byte red, low byte green), as the shader
-    // reads them.
+    // One face's heights as an image of half-precision floats in meters, with its smaller
+    // copies, as the shader reads them.
     private Image HeightFaceImage(HeightGrid heights, int face)
     {
         heights.CopyFace(face, _faceHeights);
         for (int index = 0; index < _faceHeights.Length; index++)
         {
-            int stored = _faceHeights[index] + 32_768;
-            _faceHeightBytes[index * 2] = (byte)(stored >> 8);
-            _faceHeightBytes[index * 2 + 1] = (byte)stored;
+            BitConverter.TryWriteBytes(_faceHeightBytes.AsSpan(index * 2),
+                (Half)_faceHeights[index]);
         }
 
-        return Image.CreateFromData(HeightGrid.FaceSize, HeightGrid.FaceSize, false,
-            Image.Format.Rg8, _faceHeightBytes);
+        Image image = Image.CreateFromData(HeightGrid.FaceSize, HeightGrid.FaceSize, false,
+            Image.Format.Rh, _faceHeightBytes);
+        image.GenerateMipmaps();
+        return image;
     }
 
     // A flat world's disc, a sculpted globe's cube-sphere, or the plain sphere.

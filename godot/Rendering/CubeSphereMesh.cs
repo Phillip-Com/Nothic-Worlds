@@ -14,9 +14,9 @@ namespace NothicWorlds.Rendering;
 /// </remarks>
 public static class CubeSphereMesh
 {
-    // Squares along each edge of a face: about 8 height cells each. The shader shades every
+    // Squares along each edge of a face: about 11 height cells each. The shader shades every
     // cell, so the mesh only needs to carry the ground's shape (and its outline).
-    private const int Divisions = 128;
+    private const int Divisions = 96;
 
     private static ArrayMesh? _mesh;
 
