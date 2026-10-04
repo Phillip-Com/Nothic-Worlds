@@ -38,6 +38,7 @@ public partial class TimeControls : CanvasLayer
     private static readonly string[] _stepLabels =
         ["1 hour", "1 day", "1 week", "30 days", "1 year"];
 
+    private CheckButton _physics = null!;
     private Button _playButton = null!;
     private OptionButton _step = null!;
     private (double From, double To, double Progress)? _glide;
@@ -128,6 +129,17 @@ public partial class TimeControls : CanvasLayer
             "Step the clock forward (the bodies glide into place)"));
 
         row.AddChild(CreateButton("Go to…", AskForDate, "Jump to a date and hour"));
+        // A switch, so it's plain whether it's on.
+        _physics = new CheckButton
+        {
+            Text = "Physics",
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Move the bodies by real gravity from now on, starting each at its " +
+                "orbit's natural speed (seasons, calendars, and weather stay on the designed " +
+                "orbits). Off goes back to the design",
+        };
+        _physics.Pressed += TogglePhysics;
+        row.AddChild(_physics);
 
         BuildGoToDialog();
 
@@ -151,6 +163,7 @@ public partial class TimeControls : CanvasLayer
             SetPlaying(false);
             _glide = null;
         };
+        Session.Physics.StateChanged += () => _physics.SetPressedNoSignal(Session.Physics.IsOn);
         ShowTime();
     }
 
@@ -314,6 +327,31 @@ public partial class TimeControls : CanvasLayer
         _goToDialog.AddChild(layout);
         _goToDialog.Confirmed += () => GlideTo(_goToDate.TimeDays);
         AddChild(_goToDialog);
+    }
+
+    // Physics mode on or off (VISION.md SIM-03).
+    private void TogglePhysics()
+    {
+        if (Session is null)
+        {
+            return;
+        }
+
+        if (!_physics.ButtonPressed)
+        {
+            Session.Physics.Stop();
+            return;
+        }
+
+        try
+        {
+            Session.Physics.Start(Session.World.Bodies, Session.TimeDays);
+        }
+        catch (ArgumentException error)
+        {
+            _physics.SetPressedNoSignal(false);
+            Toolbar?.ShowError($"Couldn't start physics: {error.Message}");
+        }
     }
 
     private static Button CreateButton(string text, Action pressed, string tooltip)

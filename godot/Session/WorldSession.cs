@@ -173,11 +173,17 @@ public partial class WorldSession : Node
     /// <summary>The world clock, in standard days (VISION.md SIM-02).</summary>
     public double TimeDays => World.TimeDays;
 
+    /// <summary>
+    /// Physics mode (VISION.md SIM-03): the system view following real gravity, while it's on.
+    /// </summary>
+    public PhysicsMode Physics { get; } = new();
+
     public override void _Ready()
     {
         SelectedBodyId = DefaultSelection(World);
         _savedBodies = CloneBodies(World.Bodies);
         _savedLore = LoreState.Of(World);
+        Changed += () => Physics.RestartIfRedesigned(World.Bodies, TimeDays);
         ShowWorld();
     }
 
@@ -186,6 +192,7 @@ public partial class WorldSession : Node
         // However the app ends, don't leave the undo copies in the temporary folder.
         _stash?.Dispose();
         _stash = null;
+        Physics.Dispose();
     }
 
     /// <summary>Replaces the open world with a new one: a sun and one unmapped planet.
@@ -737,6 +744,40 @@ public partial class WorldSession : Node
         MarkChanged();
         TimeChanged?.Invoke();  // The date shown depends on the day length.
         return null;
+    }
+
+    /// <summary>
+    /// Keeps the paths physics mode has the bodies on now as their designed orbits (VISION.md
+    /// SIM-03; owner's choice), as one undo step, and switches physics off: the view carries
+    /// on from the same places. Bodies that merged away or are escaping keep their designs.
+    /// </summary>
+    /// <returns>
+    /// Why each body that couldn't keep its path didn't, by body; null if physics is off.
+    /// </returns>
+    public IReadOnlyDictionary<Guid, string>? KeepPhysicsOrbits()
+    {
+        if (Physics.Keep(TimeDays) is not KeptOrbits kept)
+        {
+            return null;
+        }
+
+        Physics.Stop();
+        if (kept.Orbits.Count > 0)
+        {
+            RecordUndo("Keep physics orbits");
+            foreach ((Guid bodyId, Orbit orbit) in kept.Orbits)
+            {
+                if (FindBody(bodyId) is Body body)
+                {
+                    body.Orbit = orbit;
+                }
+            }
+
+            SyncView();
+            MarkChanged();
+        }
+
+        return kept.NotKept;
     }
 
     /// <summary>
@@ -1994,6 +2035,7 @@ public partial class WorldSession : Node
 
     private void CloseCurrentWorld()
     {
+        Physics.Stop();
         WorldClosed?.Invoke(World.Id);
     }
 

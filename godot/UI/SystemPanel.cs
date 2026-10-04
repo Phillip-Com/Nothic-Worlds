@@ -74,6 +74,7 @@ public partial class SystemPanel : CanvasLayer
     private CalendarSection? _calendar;
     private EclipseSection? _eclipses;
     private OrbitGuideSection? _orbitGuide;
+    private PhysicsSection? _physics;
     private MeteorShowerSection? _showers;
     private RingsSection? _rings;
     private BeltsSection? _belts;
@@ -165,6 +166,8 @@ public partial class SystemPanel : CanvasLayer
         layout.AddChild(new HSeparator());
         _orbitGuide = new OrbitGuideSection { Session = Session, ReportProblem = ReportProblem };
         layout.AddChild(_orbitGuide);
+        _physics = new PhysicsSection { Session = Session, Time = Time, Toolbar = Toolbar };
+        layout.AddChild(_physics);
         layout.AddChild(new HSeparator());
         _calendar = new CalendarSection { Session = Session, Time = Time };
         layout.AddChild(_calendar);
