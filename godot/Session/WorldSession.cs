@@ -438,6 +438,64 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
+    /// Adds an asteroid belt to a star (VISION.md BOD-03), like our main belt or just beyond
+    /// its outermost belt.
+    /// </summary>
+    /// <returns>The new belt, or null if the body isn't a star.</returns>
+    public AsteroidBelt? AddBelt(Guid starId)
+    {
+        if (FindBody(starId) is not { Kind: BodyKind.Star } star)
+        {
+            return null;
+        }
+
+        AsteroidBelt belt = NewBodies.Belt(star);
+        RecordUndo($"Add {belt.Name} to {star.Name}");
+        star.Belts = [.. star.Belts, belt];
+        MarkChanged(systemChanged: false);
+        return belt;
+    }
+
+    /// <summary>
+    /// Changes one of a star's belts (matched by ID). Rapid changes (dragging a field or a
+    /// color) are one undo step.
+    /// </summary>
+    /// <returns>What's wrong with the belt (nothing is changed then), or null.</returns>
+    public string? SetBelt(Guid starId, AsteroidBelt belt)
+    {
+        if (FindBody(starId) is not Body star
+            || star.Belts.FirstOrDefault(b => b.Id == belt.Id) is not AsteroidBelt before
+            || before == belt)
+        {
+            return null;
+        }
+
+        if (belt.Problem() is string problem)
+        {
+            return problem;
+        }
+
+        RecordUndo($"Edit {before.Name}", mergeKey: ("belt", belt.Id));
+        star.Belts = [.. star.Belts.Select(b => b.Id == belt.Id ? belt : b)];
+        MarkChanged(systemChanged: false);
+        return null;
+    }
+
+    /// <summary>Removes one of a star's belts.</summary>
+    public void RemoveBelt(Guid starId, Guid beltId)
+    {
+        if (FindBody(starId) is not Body star
+            || star.Belts.FirstOrDefault(b => b.Id == beltId) is not AsteroidBelt belt)
+        {
+            return;
+        }
+
+        RecordUndo($"Delete {belt.Name}");
+        star.Belts = [.. star.Belts.Where(b => b.Id != beltId)];
+        MarkChanged(systemChanged: false);
+    }
+
+    /// <summary>
     /// Gives a planet or moon rings (VISION.md BOD-03), changes them, or removes them with
     /// null. Rapid changes (dragging a field or a color) are one undo step.
     /// </summary>

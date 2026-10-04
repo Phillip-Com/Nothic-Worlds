@@ -46,6 +46,9 @@ public partial class SystemView : Node3D
     private static readonly Color _orbitColor = new(0.6f, 0.7f, 0.9f, 0.35f);
 
     private readonly Dictionary<Guid, BodyVisual> _visuals = [];
+
+    // Every star's asteroid belts (VISION.md BOD-03), by belt.
+    private readonly Dictionary<Guid, BeltVisual> _belts = [];
     private readonly SphereMesh _sphere = new()
     {
         Radius = 1.0f,
@@ -194,6 +197,12 @@ public partial class SystemView : Node3D
         }
 
         _visuals.Clear();
+        foreach (BeltVisual belt in _belts.Values)
+        {
+            belt.Free();
+        }
+
+        _belts.Clear();
         Sync(world);
         FocusImmediately(focusId);
     }
@@ -353,6 +362,7 @@ public partial class SystemView : Node3D
             }
         }
 
+        PlaceBelts(world);
         FollowFocusedSurface(world);
 
         if (FallbackLight is not null)
@@ -411,6 +421,39 @@ public partial class SystemView : Node3D
             line.MaterialOverride = highlighted ? _highlightMaterial : null;
             line.Visible = highlighted || body.Id != _focusId
                 || (Camera?.CurrentAltitude ?? float.MaxValue) > OwnOrbitLineAltitude;
+        }
+    }
+
+    // Draws every star's belts around it, making a belt's rocks anew when it's added or edited
+    // and removing those of belts that are gone.
+    private void PlaceBelts(World world)
+    {
+        var present = new HashSet<Guid>();
+        foreach (Body star in world.Bodies.Where(b => b.Belts.Count > 0))
+        {
+            if (!_layout.TryGetValue(star.Id, out DisplayBody place))
+            {
+                continue;
+            }
+
+            foreach (AsteroidBelt belt in star.Belts)
+            {
+                present.Add(belt.Id);
+                if (!_belts.TryGetValue(belt.Id, out BeltVisual? visual) || visual.Belt != belt)
+                {
+                    visual?.Free();
+                    visual = new BeltVisual(this, belt);
+                    _belts[belt.Id] = visual;
+                }
+
+                visual.Place(ToScene(place.Position), place.Radius, star, world.TimeDays, _scale);
+            }
+        }
+
+        foreach (Guid gone in _belts.Keys.Where(id => !present.Contains(id)).ToList())
+        {
+            _belts[gone].Free();
+            _belts.Remove(gone);
         }
     }
 
