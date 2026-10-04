@@ -500,6 +500,27 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
+    /// Draws the world in another visual style (VISION.md REN-05; owner's choice: stored with
+    /// the world), as one undo step.
+    /// </summary>
+    public void SetStyle(VisualStyle style)
+    {
+        if (style == World.Style)
+        {
+            return;
+        }
+
+        RecordUndo($"{style} Style");
+        World.Style = style;
+        if (System is not null)
+        {
+            System.Style = style;
+        }
+
+        MarkChanged(systemChanged: false);
+    }
+
+    /// <summary>
     /// Adds an asteroid belt to a star (VISION.md BOD-03), like our main belt or just beyond
     /// its outermost belt.
     /// </summary>
@@ -1711,6 +1732,11 @@ public partial class WorldSession : Node
     // pieces, and maps.
     private void ShowWorld()
     {
+        if (System is not null)
+        {
+            System.Style = World.Style;
+        }
+
         System?.Show(World, SelectedBodyId);
         _shownMaps.Clear();
         foreach (Body body in World.Bodies)
@@ -1732,6 +1758,7 @@ public partial class WorldSession : Node
             return;
         }
 
+        System.Style = World.Style;
         foreach (Guid id in System.Sync(World))
         {
             _shownMaps.Remove(id);

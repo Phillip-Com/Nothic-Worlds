@@ -1,4 +1,5 @@
 using Godot;
+using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 using NothicWorlds.Rendering;
 using NothicWorlds.Session;
@@ -7,10 +8,9 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The View menu (VISION.md UI-01; owner's choice: the show/hide switches as checkable items in one
-/// menu): Pins, Weather Pins, Regions, Terrain, Season Markers, Meteor Shower Markers, Eclipse
-/// Markers, Grid (also the G
-/// key), and True Scale. The checkmarks are refreshed each time it opens, so they always match
-/// what's shown.
+/// menu): the world's Style (REN-05), then Pins, Weather Pins, Regions, Terrain, Season Markers,
+/// Meteor Shower Markers, Eclipse Markers, Grid (also the G key), and True Scale. The checkmarks
+/// are refreshed each time it opens, so they always match what's shown.
 /// </summary>
 public partial class ViewMenu : Node
 {
@@ -37,6 +37,9 @@ public partial class ViewMenu : Node
     /// <summary>The system view: terrain, the grid, and true scale.</summary>
     [Export] public SystemView? System { get; set; }
 
+    /// <summary>The open world, whose style is chosen here.</summary>
+    [Export] public WorldSession? Session { get; set; }
+
     private enum MenuItem
     {
         Pins,
@@ -50,6 +53,8 @@ public partial class ViewMenu : Node
         TrueScale,
         OrbitGuide,
     }
+
+    private const int StyleMenuId = 100;
 
     // The relief exaggerations offered (owner's choice: about 1× to 50×).
     private static readonly int[] _reliefChoices = [1, 5, 10, 20, 50];
@@ -69,6 +74,9 @@ public partial class ViewMenu : Node
             FocusMode = Control.FocusModeEnum.None,
         };
         PopupMenu menu = _button.GetPopup();
+        // Explicit ids: one left out is the item's position, which would clash with MenuItem's.
+        menu.AddSubmenuNodeItem("Style", BuildStyleMenu(), StyleMenuId);
+        menu.AddSeparator(id: StyleMenuId + 1);
         menu.AddCheckItem("Pins", (int)MenuItem.Pins);
         menu.AddCheckItem("Weather Pins", (int)MenuItem.WeatherPins);
         menu.AddCheckItem("Regions", (int)MenuItem.Regions);
@@ -206,6 +214,34 @@ public partial class ViewMenu : Node
             }
         };
         return detail;
+    }
+
+    // How the world is drawn (owner's choice: saved with the world, so it's an undoable edit).
+    private PopupMenu BuildStyleMenu()
+    {
+        var styles = new PopupMenu();
+        (VisualStyle Style, string Tip)[] choices =
+        [
+            (VisualStyle.Painterly, "Soft bands of light, brush strokes, and gentle outlines"),
+            (VisualStyle.Realistic, "True lighting"),
+            (VisualStyle.Simple, "Flat colors, a crisp day and night, and clean outlines"),
+        ];
+        foreach ((VisualStyle style, string tip) in choices)
+        {
+            styles.AddRadioCheckItem(style.ToString(), (int)style);
+            styles.SetItemTooltip(styles.GetItemIndex((int)style), tip);
+        }
+
+        styles.AboutToPopup += () =>
+        {
+            foreach ((VisualStyle style, _) in choices)
+            {
+                styles.SetItemChecked(styles.GetItemIndex((int)style),
+                    Session?.World.Style == style);
+            }
+        };
+        styles.IdPressed += id => Session?.SetStyle((VisualStyle)(int)id);
+        return styles;
     }
 
     // How relief is shaded: by the sunlight, or map-style from a fixed direction.

@@ -96,6 +96,11 @@ ground. **View ▸ Relief Detail** trades sharper mountain outlines for speed (L
 High), and **View ▸ Relief Shading ▸ Map-style** lights relief from the northwest as on printed
 maps, so it shows at any time of day; both are remembered on this computer.
 
+**View ▸ Style** sets how the world is drawn: **Painterly** (the default: soft bands of light
+with brushed edges, a warm glow at dusk, and gentle outlines), **Realistic** (true lighting),
+or **Simple** (flat daylight, a crisp line between day and night, and clean outlines). The
+style is saved with the world, and changing it can be undone.
+
 **Physics** (the switch in the time bar) moves the bodies by real gravity from that moment, each
 starting at its orbit's natural speed, so you can watch whether your system holds together.
 Only the view follows it: seasons, calendars, eclipses, and weather stay on your designed

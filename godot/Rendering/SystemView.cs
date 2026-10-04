@@ -73,6 +73,7 @@ public partial class SystemView : Node3D
     private OrbitGuideVisual? _guide;
     private SystemScale _scale = SystemScale.Readable;
     private bool _showTerrain = true;
+    private VisualStyle _style = VisualStyle.Painterly;
     private Dictionary<Guid, DisplayBody> _layout = [];
     private Guid _focusId;
     private double _flightProgress = 1.0;
@@ -194,6 +195,20 @@ public partial class SystemView : Node3D
     /// or by the sunlight (View ▸ Relief Shading; owner's choice; remembered on this computer).
     /// </summary>
     public bool MapStyleShading { get; set; } = AppSettings.MapStyleShading;
+
+    /// <summary>
+    /// How the open world is drawn (VISION.md REN-05; owner's choice: stored with the world,
+    /// which sets it here).
+    /// </summary>
+    public VisualStyle Style
+    {
+        get => _style;
+        set
+        {
+            _style = value;
+            ShapedGlobe.UseStyle(value);
+        }
+    }
 
     /// <summary>
     /// True while physics mode moves the bodies (VISION.md SIM-03): markers on the designed
@@ -441,6 +456,7 @@ public partial class SystemView : Node3D
             surface.ReliefDetail = ReliefDetail;
             surface.SetShapes(body.Surface.Shapes, body.RadiusKm);
             surface.MapShading = MapStyleShading;
+            surface.Style = Style;
         }
         if (visual.Light is OmniLight3D light)
         {

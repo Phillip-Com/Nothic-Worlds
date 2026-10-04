@@ -28,7 +28,17 @@ public partial class PlanetSurface : MeshInstance3D
     private const int WarpTilesAcross = 8;
     private const int WarpTilesDown = SurfaceSettings.MaxPieces / WarpTilesAcross;
 
+    // The surface shader for each visual style (VISION.md REN-05). Realistic is the one the
+    // scene's material starts with.
+    private static readonly Dictionary<VisualStyle, Shader> _styleShaders = new()
+    {
+        [VisualStyle.Painterly] = GD.Load<Shader>("res://Rendering/planet_painterly.gdshader"),
+        [VisualStyle.Realistic] = GD.Load<Shader>("res://Rendering/planet.gdshader"),
+        [VisualStyle.Simple] = GD.Load<Shader>("res://Rendering/planet_simple.gdshader"),
+    };
+
     private ShaderMaterial? _surfaceMaterial;
+    private VisualStyle _style = VisualStyle.Realistic;
     private ImageTexture? _latitudeTable;
     private ImageTexture? _longitudeTable;
 
@@ -405,6 +415,23 @@ public partial class PlanetSurface : MeshInstance3D
             {
                 _mapShading = value;
                 SurfaceMaterial.SetShaderParameter("map_shading", value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// How the surface is drawn (VISION.md REN-05). Each style is its own shader; the
+    /// material's settings carry over when it changes.
+    /// </summary>
+    public VisualStyle Style
+    {
+        get => _style;
+        set
+        {
+            if (value != _style)
+            {
+                _style = value;
+                SurfaceMaterial.Shader = _styleShaders[value];
             }
         }
     }
