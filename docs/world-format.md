@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 22** (see **Version history** at the end)
+**Current format version: 23** (see **Version history** at the end)
 
 ## Container
 
@@ -15,13 +15,15 @@ A `.nworld` file is a standard **zip archive** containing:
 | `world.json` | The world data (below), UTF-8 JSON, compressed |
 | `assets/<32 hex chars>.<ext>` | The user's **original** map images, unchanged (`png`, `jpg`, `jpeg`, `webp`), stored uncompressed because images are already compressed |
 | `terrain/<32 hex chars>.png` | A body's **painted terrain** (`BOD-05`, see **Terrain** below), named after the body's `id` without dashes. Only bodies with something painted have one. Stored uncompressed (PNG is already compressed). |
+| `heights/<32 hex chars>.png` | A planet or moon's **sculpted heights** (`BOD-04`, see **Heights** below), named the same way. Only sculpted bodies have one. Stored uncompressed. |
 
 - Only assets the world references are saved. Replaced maps don't pile up.
 - Asset names must match `^assets/[0-9a-f]{32}\.(png|jpg|jpeg|webp)$`. Anything else is rejected,
   which also blocks names that try to escape the archive (`../`).
-- Terrain image names must match `^terrain/[0-9a-f]{32}\.png$`.
+- Terrain image names must match `^terrain/[0-9a-f]{32}\.png$`, and height image names
+  `^heights/[0-9a-f]{32}\.png$`.
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB, each terrain image
-  up to 16 MB.
+  up to 16 MB, each height image up to 32 MB.
 
 ## `world.json` (version 13)
 
@@ -238,6 +240,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…pieces[].warp` | no | Edit Points (`MAP-02`): where each outline point has been dragged to, as `[u, v]` in the piece's box (0–1 from its top-left before warping; may go beyond). Exactly one per `outline.points`, in the same order. Omitted when the piece isn't warped. |
 | `bodies[].surface.fillColor` | yes | `#RRGGBB`. Color where the map doesn't cover the globe |
 | `bodies[].surface.terrain` | no | The body's terrain image entry name (see Container and **Terrain**). Omitted when nothing is painted. |
+| `bodies[].surface.heights` | no | The body's height image entry name (see Container and **Heights**). Planets and moons only; omitted when nothing is sculpted. |
 | `terrainTypes` | no | The kinds of terrain that can be painted (`BOD-05`), in list order. Omitted when there are none. Up to 255. New worlds start with 12 defaults. |
 | `…terrainTypes[].code` | yes | 1 to 255, unique among terrain types: the value painted cells store. 0 means unpainted. |
 | `…terrainTypes[].name` | yes | Not empty, up to 60 characters |
@@ -314,6 +317,14 @@ The terrain image is an ordinary **8-bit greyscale PNG**, 1,024 pixels wide and 
 six faces stacked top to bottom in face order, each row by row. Each pixel's value is its
 cell's terrain `code`, or 0 for unpainted. Codes not in `terrainTypes` are kept, and drawn as
 unpainted. Readers accept any PNG row filter, but not interlacing, other bit depths, or colors.
+
+**Heights** (`HeightGrid` and `HeightImage` in Core). Sculpted heights use the same cells as
+**Terrain**: one height per cell, in whole meters up from the body's radius (negative is
+below it), from −32,767 to 32,767. The height image is an ordinary **16-bit greyscale PNG**,
+1,024 × 6,144 pixels laid out exactly as the terrain image, each pixel holding its cell's height
+plus 32,768 (so 0 m is 32,768; a stored 0 is refused). Readers accept any PNG row filter, but
+not interlacing, other bit depths, or colors. Heights are true to scale; how much the view
+exaggerates them isn't stored.
 
 Names written for enums (`kind`, `projection`) are fixed strings. They're not the code's enum
 names, so renaming code never changes the format.
@@ -424,6 +435,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 23 | Body sculpting (M24): surfaces gain optional `heights` (a 16-bit height image) | Nothing to change: version 22 bodies are unsculpted |
 | 22 | Stable orbit guide (M22): bodies gain an optional `density` | Nothing to change: version 21 bodies have the typical density for their kind and size |
 | 21 | Realms (M21): bodies gain an optional `branch`, orbits an optional `height` | Nothing to change: version 20 bodies hang on nothing, and their orbits aren't lifted |
 | 20 | World trees (M21): bodies can be of kind `world-tree`, with a `tree` | Nothing to change: version 19 worlds have none |
