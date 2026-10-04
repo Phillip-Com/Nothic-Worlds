@@ -44,6 +44,21 @@ public class WorldTests
     }
 
     [Fact]
+    public void Clone_CopiesNebulas()
+    {
+        // Saving works on a clone, so a nebula left out of it was lost on save.
+        World original = MappedWorld();
+        var nebula = new Nebula(Guid.NewGuid(), "Veil", 20, 135, 30, 0.6,
+            new RgbColor(176, 64, 128), new RgbColor(64, 96, 192));
+        original.Nebulas.Add(nebula);
+
+        World copy = original.Clone();
+        original.Nebulas.Clear();
+
+        Assert.Equal(nebula, Assert.Single(copy.Nebulas));
+    }
+
+    [Fact]
     public void Clone_IsIndependentOfLaterEdits()
     {
         World original = MappedWorld();
