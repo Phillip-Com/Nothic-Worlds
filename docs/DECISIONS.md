@@ -7,6 +7,7 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-03 | A belt's rocks are **made from its own seed and moved on the GPU** (up to 5,000), drawn far bigger than real rocks so the belt shows | In PR | [#50](https://github.com/Phillip-Com/Nothic-Worlds/pull/50) | Claude's choices. Format version 18. VISION.md `BOD-03` |
 | 2026-10-03 | Milestone 20: **astral features** (`BOD-03`) and **asteroid events** (`EVT-02`), in **four PRs**: rings, belts, nebulas, events | Merged | [#49](https://github.com/Phillip-Com/Nothic-Worlds/pull/49) · `d1edb24` | VISION.md §3 |
 | 2026-10-03 | Rings are **banded, in your color, with shadows** both ways; measured in the body's radii | Merged | [#49](https://github.com/Phillip-Com/Nothic-Worlds/pull/49) · `d1edb24` | Format version 17. VISION.md `BOD-03` |
 | 2026-10-03 | Belts are **one feature per belt** (rocks drawn, not saved); nebulas are a **sky backdrop** | Merged | [#49](https://github.com/Phillip-Com/Nothic-Worlds/pull/49) · `d1edb24` | Recorded here; built in the next PRs. VISION.md `BOD-03` |

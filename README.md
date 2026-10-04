@@ -110,6 +110,9 @@ overhead) and two winters, with weather that doesn't change with latitude.
 start and end (in its radii) and their color. The planet casts its shadow across them, and
 they cast theirs on the planet.
 
+Select a star for **Asteroid Belts**: **Add Belt** puts a belt of drifting rocks around it, like
+our main belt. Set where it starts and ends (in AU), how thick and dense it is, and its color.
+
 Comets make **meteor showers**: wherever a planet's orbit passes close to a comet's orbit, the
 planet runs into the comet's dust at the same time every year. The panel lists the coming year's
 showers (with how many meteors an hour fall at the peak, how long they last, and **Go to**), the

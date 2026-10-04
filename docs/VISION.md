@@ -119,7 +119,7 @@ Owner's decisions:
 - **Asteroid events:** worked out from the belts (planets in or near dense belts get more close
   passes, and rarely an impact), the same every time for a given world; impacts are listed
   only, with no change to the map.
-- **Four PRs:** rings (PR #49), belts, nebulas, asteroid events.
+- **Four PRs:** rings (PR #49), belts (PR #50), nebulas, asteroid events.
 
 **Milestone 19: Flat Worlds** · Complete (PR #48 merged 2026-10-03; owner's choice, 2026-10-03)
 Non-standard bodies (`BOD-02`), starting with flat worlds. Owner's decisions:
@@ -1067,6 +1067,29 @@ the body as a sphere of its radius. World trees and other shapes are still open.
 - **Verified in the running app** with real clicks, maximized and at 1152 × 648: switching
   rings on, the bands and gap, the planet's shadow across them, their shadow on the winter
   hemisphere, edge-on at an equinox, a flat world's rings, and undo. Benchmark: no change.
+
+**Implementation (asteroid belts, PR #50):**
+- **Model:** `Model/AsteroidBelt.cs` (name, inner and outer distance in km, thickness: how far
+  the rocks' orbits tilt, density 1–100%, color); `Body.Belts`, stars only, several allowed,
+  deleted with their star and covered by undo like the rest of the body. Format **version 18**
+  (optional `belts`). `NewBodies.Belt` makes one like our main belt (2.2 to 3.3 AU, 10°, 50%),
+  or just beyond the outermost; `NewBodies.NaturalPeriodDays` (period² ∝ distance³) is now
+  public for things that aren't designed one by one.
+- **Drawing:** `godot/Rendering/BeltVisual.cs` makes a belt's rocks once from its own seed
+  (up to 5,000 at full density, spread evenly over its area, most tilted a little and a few a
+  lot, lumpy and of varied size) and draws them in one batch (a MultiMesh) centered on the
+  star. `belt_rocks.gdshader` moves every rock on the GPU at its natural speed (inner rocks
+  overtake outer ones) and applies the view's distance compression, so nothing is updated
+  rock by rock. Rocks are drawn far bigger than real ones (1.2% of the belt's drawn width), so
+  the belt reads as a band from afar.
+- **App:** stars get an **Asteroid Belts** section in the System panel
+  (`godot/UI/BeltsSection.cs`): each belt's name, **From** and **To** (AU), **Thickness**,
+  **Density**, **Color**, and **Delete**, plus **Add Belt**; `WorldSession.AddBelt`,
+  `SetBelt` (one undo step per drag), `RemoveBelt`.
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: Add Belt on
+  the Sun, its fields, the belt from above and edge-on, the rocks drifting as time runs,
+  Delete and undo, and save/reopen. Benchmark with a 2,500-rock belt: no slowdown; video
+  memory +3 MB.
 
 **BOD-04 — Body sculpting (digital clay)** · Idea · —
 **Intent:** Mold bodies like digital clay with brush tools. Tools include:
