@@ -116,6 +116,24 @@ public static class NewBodies
     }
 
     /// <summary>
+    /// A new world tree circling <paramref name="parent"/> (usually a star) beyond its other
+    /// bodies: 300,000 km tall, turning once a year (365.25 days), glowing gold.
+    /// </summary>
+    public static Body WorldTree(IReadOnlyList<Body> bodies, Body parent)
+    {
+        double distance = NextDistance(bodies, parent, EarthOrbitKm);
+        return new Body
+        {
+            Name = NextName(bodies, "World Tree"),
+            Kind = BodyKind.WorldTree,
+            Tree = WorldTreeLook.Default,
+            RadiusKm = 150_000,
+            DayLengthHours = 365.25 * 24,
+            Orbit = OrbitAround(bodies, parent, distance, NaturalPeriodDays(distance, parent)),
+        };
+    }
+
+    /// <summary>
     /// A new asteroid belt for <paramref name="star"/>: like our main belt (2.2 to 3.3 times the
     /// Earth's distance, rocks tilted up to 10°), or, if the star already has belts, just beyond
     /// the outermost.

@@ -116,10 +116,22 @@ internal sealed class BodyDocument
     public required AppearanceDocument Appearance { get; init; }  // Added in format version 13
     public RingsDocument? Rings { get; init; }  // Added in format version 17
     public List<BeltDocument?>? Belts { get; init; }  // Added in format version 18; stars only
+    public TreeDocument? Tree { get; init; }  // Added in format version 20; world trees only
     public required SurfaceDocument Surface { get; init; }
 }
 
 // Planets and moons have a color and pattern; stars a star type.
+internal sealed class TreeDocument
+{
+    public required int Branches { get; init; }
+    public required double Spread { get; init; }
+    public required int Seed { get; init; }
+    public string? Bark { get; init; }
+    public string? Leaves { get; init; }
+    public string? Glow { get; init; }
+    public required double GlowStrength { get; init; }
+}
+
 internal sealed class BeltDocument
 {
     public required Guid Id { get; init; }

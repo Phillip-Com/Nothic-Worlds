@@ -12,4 +12,11 @@ public enum BodyKind
     /// surface or calendar, and nothing circles it; its dust makes meteor showers.
     /// </summary>
     Comet,
+
+    /// <summary>
+    /// A vast glowing tree standing in the system (VISION.md BOD-02), whose great branches can
+    /// hold realms. Its radius is half its height, and its day is how long it takes to turn.
+    /// Its look is <see cref="Body.Tree"/>.
+    /// </summary>
+    WorldTree,
 }

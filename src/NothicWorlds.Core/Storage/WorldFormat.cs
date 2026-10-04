@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 19;
+    public const int CurrentVersion = 20;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -46,6 +46,7 @@ internal static partial class WorldFormat
         [BodyKind.Star] = "star",
         [BodyKind.Moon] = "moon",
         [BodyKind.Comet] = "comet",
+        [BodyKind.WorldTree] = "world-tree",
     };
 
     private static readonly Dictionary<CalendarFit, string> _calendarFitNames = new()
@@ -163,6 +164,10 @@ internal static partial class WorldFormat
         document => document,
 
         // 18 → 19: the world gained optional "nebulas" (M20). Older skies are empty.
+        document => document,
+
+        // 19 → 20: bodies can be world trees (kind "world-tree", with a "tree", M21). Older
+        // worlds have none.
         document => document,
     ];
 

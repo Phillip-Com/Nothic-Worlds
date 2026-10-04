@@ -324,6 +324,18 @@ internal static class WorldMapper
                     Color = body.Appearance.Color.ToHex(),
                     Pattern = WorldFormat.PatternName(body.Appearance.Pattern),
                 },
+            Tree = body.Tree is WorldTreeLook tree
+                ? new TreeDocument
+                {
+                    Branches = tree.Branches,
+                    Spread = tree.Spread,
+                    Seed = tree.Seed,
+                    Bark = tree.Bark.ToHex(),
+                    Leaves = tree.Leaves.ToHex(),
+                    Glow = tree.Glow.ToHex(),
+                    GlowStrength = tree.GlowStrength,
+                }
+                : null,
             Belts = body.Belts.Count == 0
                 ? null
                 : [.. body.Belts.Select(belt => new BeltDocument
@@ -588,6 +600,7 @@ internal static class WorldMapper
                 : null,
             Rings = document.Rings is RingsDocument rings ? ToRings(rings) : null,
             Belts = [.. (document.Belts ?? []).Select(ToBelt)],
+            Tree = document.Tree is TreeDocument tree ? ToTree(tree) : null,
         };
         RequireNoProblem(body.Problem());
         body.Appearance = ToAppearance(document.Appearance, body.Kind);
@@ -617,6 +630,16 @@ internal static class WorldMapper
         }
 
         return body;
+    }
+
+    private static WorldTreeLook ToTree(TreeDocument document)
+    {
+        Require(RgbColor.TryParseHex(document.Bark, out RgbColor bark)
+                & RgbColor.TryParseHex(document.Leaves, out RgbColor leaves)
+                & RgbColor.TryParseHex(document.Glow, out RgbColor glow),
+            "a world tree's colors are invalid");
+        return new WorldTreeLook(document.Branches, document.Spread, document.Seed, bark, leaves,
+            glow, document.GlowStrength);
     }
 
     private static AsteroidBelt ToBelt(BeltDocument? document)
