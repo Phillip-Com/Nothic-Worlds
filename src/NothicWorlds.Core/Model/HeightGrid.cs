@@ -115,8 +115,19 @@ public sealed class HeightGrid
     /// </exception>
     public HeightGrid Raise(Vector3D from, Vector3D to, double radiusDegrees, double meters)
     {
+        return Raise([from, to], radiusDegrees, meters);
+    }
+
+    /// <summary>
+    /// Raises the ground along a stroke through <paramref name="path"/>'s points (one for a
+    /// dab), as <see cref="Raise(Vector3D, Vector3D, double, double)"/> does along one leg. A
+    /// stroke drawn bit by bit is redone from where it started with its whole path, so the
+    /// joins between bits don't add up into bumps.
+    /// </summary>
+    public HeightGrid Raise(IReadOnlyList<Vector3D> path, double radiusDegrees, double meters)
+    {
         RequireFinite(meters, nameof(meters));
-        return Sculpt(from, to, radiusDegrees, (_, _, _, height, weight) =>
+        return Sculpt(path, radiusDegrees, (_, _, _, height, weight) =>
             height + meters * weight);
     }
 
@@ -131,9 +142,18 @@ public sealed class HeightGrid
     public HeightGrid Flatten(
         Vector3D from, Vector3D to, double radiusDegrees, double targetMeters, double amount)
     {
+        return Flatten([from, to], radiusDegrees, targetMeters, amount);
+    }
+
+    /// <summary>
+    /// Levels the ground along a stroke through <paramref name="path"/>'s points.
+    /// </summary>
+    public HeightGrid Flatten(IReadOnlyList<Vector3D> path, double radiusDegrees,
+        double targetMeters, double amount)
+    {
         RequireFinite(targetMeters, nameof(targetMeters));
         RequireAmount(amount);
-        return Sculpt(from, to, radiusDegrees, (_, _, _, height, weight) =>
+        return Sculpt(path, radiusDegrees, (_, _, _, height, weight) =>
             height + (targetMeters - height) * amount * weight);
     }
 
@@ -145,13 +165,17 @@ public sealed class HeightGrid
     /// <exception cref="ArgumentException">
     /// An end isn't a finite, non-zero direction, or the radius or amount is out of range.
     /// </exception>
-    public HeightGrid Smooth(Vector3D from, Vector3D to, double radiusDegrees, double amount)
+    public HeightGrid Smooth(Vector3D from, Vector3D to, double radiusDegrees, double amount) =>
+        Smooth([from, to], radiusDegrees, amount);
+
+    /// <summary>Evens out bumps along a stroke through <paramref name="path"/>'s points.</summary>
+    public HeightGrid Smooth(IReadOnlyList<Vector3D> path, double radiusDegrees, double amount)
     {
         RequireAmount(amount);
         double cellDegrees = 90.0 / FaceSize;
         int reach = (int)Math.Clamp(Math.Round(radiusDegrees * SmoothingReach / cellDegrees),
             1, MaxSmoothingCells);
-        return Sculpt(from, to, radiusDegrees, (face, column, row, height, weight) =>
+        return Sculpt(path, radiusDegrees, (face, column, row, height, weight) =>
             height + (Average(face, column, row, reach) - height) * amount * weight);
     }
 
@@ -286,10 +310,11 @@ public sealed class HeightGrid
     private delegate double CellChange(int face, int column, int row, short height, double weight);
 
     // Applies a brush along a stroke in one pass, copying each touched tile once.
-    private HeightGrid Sculpt(Vector3D from, Vector3D to, double radiusDegrees, CellChange change)
+    private HeightGrid Sculpt(
+        IReadOnlyList<Vector3D> points, double radiusDegrees, CellChange change)
     {
         CubeGridBrush.RequireRadius(radiusDegrees);
-        var path = new StrokePath(from, to);
+        var path = new StrokePath(points);
         double radius = double.DegreesToRadians(radiusDegrees);
         short[]?[]? changed = null;
         for (int index = 0; index < TileCount; index++)

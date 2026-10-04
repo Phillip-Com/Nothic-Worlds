@@ -128,6 +128,60 @@ public partial class WorldSession
         MarkChanged(systemChanged: false);
     }
 
+    /// <summary>
+    /// True if the selected body can be sculpted (VISION.md BOD-04): a planet or moon shaped as
+    /// a globe (flat worlds don't draw heights yet).
+    /// </summary>
+    public bool SelectedBodyCanBeSculpted =>
+        SelectedBodyHasSurface && SelectedBody.Shape == BodyShape.Sphere;
+
+    /// <summary>
+    /// Sculpts the selected body (VISION.md BOD-04) with a whole stroke so far, through
+    /// <paramref name="path"/>'s spots, redone from <paramref name="before"/> (its heights when
+    /// the stroke began), so a stroke drawn bit by bit has no bumps where the bits join. Wrap a
+    /// whole stroke in <see cref="BeginGesture"/> and <see cref="EndGesture"/> to make it one
+    /// undo step.
+    /// </summary>
+    /// <param name="before">The body's heights when the stroke began.</param>
+    /// <param name="path">The stroke's spots so far, in order.</param>
+    /// <param name="radiusDegrees">The brush's radius, in degrees of arc.</param>
+    /// <param name="tool">Which brush.</param>
+    /// <param name="strength">
+    /// Meters for Raise and Lower; for Smooth and Flatten, how far (0 to 1) to go.
+    /// </param>
+    /// <param name="flattenTo">The height Flatten levels to, in meters.</param>
+    public void SculptHeights(HeightGrid before, IReadOnlyList<GeoCoordinate> path,
+        double radiusDegrees, SculptTool tool, double strength, double flattenTo)
+    {
+        if (!SelectedBodyCanBeSculpted || IsBusy || path.Count == 0)
+        {
+            return;
+        }
+
+        Body body = SelectedBody;
+        Vector3D[] points = [.. path.Select(SphericalPolygon.ToUnit)];
+        HeightGrid sculpted = tool switch
+        {
+            SculptTool.Raise => before.Raise(points, radiusDegrees, strength),
+            SculptTool.Lower => before.Raise(points, radiusDegrees, -strength),
+            SculptTool.Smooth => before.Smooth(points, radiusDegrees, strength),
+            _ => before.Flatten(points, radiusDegrees, flattenTo, strength),
+        };
+        if (sculpted.HasSameCells(body.Surface.Heights))
+        {
+            return;
+        }
+
+        RecordUndo($"{tool} Ground");
+        body.Surface.Heights = sculpted;
+        ShowTerrain(body);
+        MarkChanged(systemChanged: false);
+    }
+
+    /// <summary>The sculpted height at a spot on the selected body, in meters.</summary>
+    public double HeightAt(GeoCoordinate spot) =>
+        SelectedBody.Surface.Heights.SampleAt(SphericalPolygon.ToUnit(spot));
+
     /// <summary>The terrain type painted at a spot on the selected body, or null.</summary>
     public TerrainType? TerrainAt(GeoCoordinate spot)
     {

@@ -196,6 +196,12 @@ Without a map, painted terrain is the planet's surface, and what's not painted y
 over a map it's see-through, so you can trace the map. Edges between terrains are drawn as smooth
 curves. **View ▸ Terrain** hides it.
 
+**Sculpt** (in the same panel) shapes the ground of a planet or moon with the same brush:
+**Raise** and **Lower** push it up or down by the **Height** you set (up to 10 km a stroke, and
+±32 km in all), **Smooth** evens out bumps, and **Flatten** levels the ground to the height where
+the stroke begins (both by an **Amount**). Each stroke is one undo step. Flat worlds can't be
+sculpted yet.
+
 **Add ▸ Weather Pin** adds a weather pin: click the spot on the planet, then name it. Weather pins
 show as small suns; click one to see that spot's weather: today's temperature, daylight, noon sun,
 and season, and a chart of the whole year (temperatures and daylight by month, with today

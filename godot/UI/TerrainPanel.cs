@@ -8,9 +8,10 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The Terrain panel (VISION.md BOD-05; owner's choice: its own panel, one at a time with the
-/// others on the right): Paint or Erase, the brush size, and the world's terrain types, which
-/// can be added, renamed, recolored, and deleted. While it's open, dragging on the selected
-/// planet or moon paints with the selected type (<see cref="TerrainBrush"/>).
+/// others on the right): Paint, Erase, or Sculpt (BOD-04; owner's choice: here), the brush size,
+/// the sculpting brushes and their strength, and the world's terrain types, which can be added,
+/// renamed, recolored, and deleted. While it's open, dragging on the selected planet or moon
+/// paints with the selected type or sculpts it (<see cref="TerrainBrush"/>).
 /// </summary>
 public partial class TerrainPanel : CanvasLayer
 {
@@ -23,11 +24,26 @@ public partial class TerrainPanel : CanvasLayer
     private const double MinRadiusDegrees = 0.05;
     private const double MaxRadiusDegrees = 45;
 
+    // How much Raise and Lower move the ground per stroke, in meters, and how far Smooth and
+    // Flatten go, in percent.
+    private const double MinHeightMeters = 10;
+    private const double MaxHeightMeters = 10_000;
+    private const double MinAmountPercent = 5;
+
     private Label _heading = null!;
     private Label _note = null!;
     private Control _tools = null!;
     private Button _paintButton = null!;
     private Button _eraseButton = null!;
+    private Button _sculptButton = null!;
+    private Control _sculptTools = null!;
+    private readonly Dictionary<SculptTool, Button> _sculptButtons = [];
+    private Control _heightRow = null!;
+    private HSlider _heightSlider = null!;
+    private Label _heightValue = null!;
+    private Control _amountRow = null!;
+    private HSlider _amountSlider = null!;
+    private Label _amountValue = null!;
     private HSlider _sizeSlider = null!;
     private SpinBox _sizeField = null!;
     private ItemList _list = null!;
@@ -102,8 +118,8 @@ public partial class TerrainPanel : CanvasLayer
         layout.AddChild(new HSeparator());
         layout.AddChild(new Label
         {
-            Text = "Drag on the planet to paint. To turn the view, drag off the planet or use " +
-                "the arrow keys. Each stroke is one undo step (Ctrl+Z).",
+            Text = "Drag on the planet to paint or sculpt. To turn the view, drag off the " +
+                "planet or use the arrow keys. Each stroke is one undo step (Ctrl+Z).",
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
             Modulate = new Color(1, 1, 1, 0.6f),
         });
@@ -131,9 +147,11 @@ public partial class TerrainPanel : CanvasLayer
         var tools = new VBoxContainer();
         var modes = new HBoxContainer();
         var group = new ButtonGroup();
-        _paintButton = CreateButton("Paint", UpdateBrush, "Paint with the selected type");
-        _eraseButton = CreateButton("Erase", UpdateBrush, "Remove painted terrain");
-        foreach (Button button in new[] { _paintButton, _eraseButton })
+        _paintButton = CreateButton("Paint", Refresh, "Paint with the selected type");
+        _eraseButton = CreateButton("Erase", Refresh, "Remove painted terrain");
+        _sculptButton = CreateButton("Sculpt", Refresh,
+            "Shape the ground: raise, lower, smooth, or flatten it");
+        foreach (Button button in new[] { _paintButton, _eraseButton, _sculptButton })
         {
             button.ToggleMode = true;
             button.ButtonGroup = group;
@@ -170,7 +188,66 @@ public partial class TerrainPanel : CanvasLayer
         _sizeField.WithLiveTyping(ShowSize).ValueChanged += _ => SizeChanged(fromSlider: false);
         sizeRow.AddChild(_sizeField);
         tools.AddChild(sizeRow);
+        _sculptTools = BuildSculptTools();
+        tools.AddChild(_sculptTools);
         return tools;
+    }
+
+    // The sculpting brushes (VISION.md BOD-04) and how strongly they work.
+    private Control BuildSculptTools()
+    {
+        var box = new VBoxContainer();
+        var brushes = new HBoxContainer();
+        var group = new ButtonGroup();
+        foreach ((SculptTool tool, string tip) in new[]
+        {
+            (SculptTool.Raise, "Push the ground up"),
+            (SculptTool.Lower, "Push the ground down"),
+            (SculptTool.Smooth, "Even out bumps"),
+            (SculptTool.Flatten, "Level the ground to where the stroke begins"),
+        })
+        {
+            Button button = CreateButton(tool.ToString(), Refresh, tip);
+            button.ToggleMode = true;
+            button.ButtonGroup = group;
+            button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            brushes.AddChild(button);
+            _sculptButtons[tool] = button;
+        }
+
+        _sculptButtons[SculptTool.Raise].ButtonPressed = true;
+        box.AddChild(brushes);
+        (_heightRow, _heightSlider, _heightValue) = StrengthRow("Height", MinHeightMeters,
+            MaxHeightMeters, 500, "How far each stroke raises or lowers the ground");
+        box.AddChild(_heightRow);
+        (_amountRow, _amountSlider, _amountValue) = StrengthRow("Amount", MinAmountPercent, 100,
+            50, "How much of the way each stroke goes");
+        box.AddChild(_amountRow);
+        return box;
+    }
+
+    private (Control Row, HSlider Slider, Label Value) StrengthRow(
+        string name, double min, double max, double start, string tip)
+    {
+        var row = new HBoxContainer { TooltipText = tip };
+        row.AddChild(new Label { Text = name });
+        var slider = new HSlider
+        {
+            ExpEdit = true,
+            MinValue = min,
+            MaxValue = max,
+            Step = 0,
+            Value = start,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = tip,
+        };
+        var value = new Label { CustomMinimumSize = new Vector2(70, 0) };
+        slider.ValueChanged += _ => UpdateBrush();
+        row.AddChild(slider);
+        row.AddChild(value);
+        return (row, slider, value);
     }
 
     private Control BuildTypeList()
@@ -305,9 +382,13 @@ public partial class TerrainPanel : CanvasLayer
         Body body = Session.SelectedBody;
         bool canPaint = body.HasSurface;
         _heading.Text = $"Terrain on {body.Name}";
-        _note.Text = canPaint ? "" : "Stars and comets can't be painted. Select a planet or moon.";
-        _note.Visible = !canPaint;
+        _note.Text = !canPaint ? "Stars and comets can't be painted. Select a planet or moon."
+            : _sculptButton.ButtonPressed && !Session.SelectedBodyCanBeSculpted
+                ? "Flat worlds can't be sculpted yet."
+                : "";
+        _note.Visible = _note.Text != "";
         _tools.Visible = canPaint;
+        _sculptTools.Visible = _sculptButton.ButtonPressed;
         ShowList();
         ShowSelected(force: false);
         ShowSize();
@@ -404,10 +485,21 @@ public partial class TerrainPanel : CanvasLayer
             return;
         }
 
+        SculptTool tool = _sculptButtons.First(pair => pair.Value.ButtonPressed).Key;
+        bool byHeight = tool is SculptTool.Raise or SculptTool.Lower;
+        _heightRow.Visible = byHeight;
+        _amountRow.Visible = !byHeight;
+        _heightValue.Text = $"{_heightSlider.Value:N0} m";
+        _amountValue.Text = $"{_amountSlider.Value:N0}%";
+
+        bool sculpting = _sculptButton.ButtonPressed;
+        Brush.Sculpt = sculpting ? tool : null;
+        Brush.Strength = byHeight ? Math.Round(_heightSlider.Value) : _amountSlider.Value / 100;
         Brush.Code = _eraseButton.ButtonPressed ? (byte)0 : _selectedCode ?? 0;
         Brush.RadiusDegrees = _sizeSlider.Value;
-        Brush.IsActive = Visible && Session is { SelectedBodyHasSurface: true }
-            && (_eraseButton.ButtonPressed || _selectedCode is not null);
+        Brush.IsActive = Visible && Session is { SelectedBodyHasSurface: true } && (sculpting
+            ? Session.SelectedBodyCanBeSculpted
+            : _eraseButton.ButtonPressed || _selectedCode is not null);
     }
 
     private void UpdateVisibility()

@@ -121,7 +121,7 @@ Mold bodies like clay (`BOD-04`), starting with heights. Owner's decisions (the 
 - **Tools in the Terrain panel:** a Sculpt mode beside Paint/Erase, with the same brush plus a
   strength.
 - **Three PRs:** heights in Core (PR #60), drawing the relief (PR #61, with its quality setting
-  in PR #62), then the Sculpt tools.
+  in PR #62), then the Sculpt tools (PR #63).
 
 **Milestone 23: Physics Mode** · Complete (PR #59 merged 2026-10-04; owner's choice, 2026-10-04)
 An optional switch that moves the system by real gravity (`SIM-03`), from the masses of
@@ -1250,7 +1250,7 @@ the body as a sphere of its radius. World trees (M21) hold realms on their branc
   the planet when looking toward its direction and absent looking away, a bigger and brighter
   one, the background unchanged without nebulas, and undo. Benchmark: no change.
 
-**BOD-04 — Body sculpting (digital clay)** · In Progress (M24: heights in Core, PR #60; relief drawn, PR #61) · Base
+**BOD-04 — Body sculpting (digital clay)** · In Progress (M24: heights, PRs #60–#63; shapes, holes, and hollows next) · Base
 **Intent:** Mold bodies like digital clay with brush tools. Tools include:
 - Raise and lower terrain brushes
 - Basic shape tools to add and subtract terrain, which are also useful for artificial structures
@@ -1314,6 +1314,22 @@ built from both. Heights come first (M24), shapes next.
   fps). A sculpted planet filling the screen: about 148 fps (from 200; 1.7 ms a frame) and 21 MB
   more video memory. The first version took it to 130 fps; reading heights through the card's
   own blending and using 96 rather than 128 squares a face won back the rest.
+**Implementation (the Sculpt tools, M24, PR #63):**
+- **Panel** (`UI/TerrainPanel.cs`): **Sculpt** beside Paint and Erase, with **Raise**,
+  **Lower**, **Smooth**, and **Flatten**. Raise and Lower take a **Height** (10 m to 10 km a
+  stroke, 500 m to start); Smooth and Flatten an **Amount** (5% to 100%, 50% to start). The
+  brush size is shared with painting. Flat worlds say they can't be sculpted yet.
+- **Strokes** (`Controls/TerrainBrush.cs`, `WorldSession.SculptHeights`): a stroke keeps the
+  heights it began with and its spots so far, and every update redoes the whole stroke from
+  those (Core's brushes now take a path of points, tested: no bumps where the bits join), so it's
+  one even shape and one undo step ("Raise Ground", ...). A spot is added once the mouse has
+  moved a quarter of the brush's radius (and at the end), so big brushes, slowest to redo, are
+  redone least often. Flatten levels to the height under the stroke's first spot.
+- **Verified in the running app** with real clicks and drags, maximized and at 1152 × 648:
+  Sculpt, a Raise stroke (3,000 m), Lower, Smooth (the peak wears to 2,976 m), Flatten, undoing
+  each stroke as one step back to flat, and the flat-world note. In full sunlight relief shows
+  only faintly (it's shaded by real light, and the ambient light softens it), strongest near
+  sunrise and sunset or exaggerated further.
 
 **BOD-05 — Terrain/biome painting** · Implemented (M11: PR #33, #34, #35) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.
