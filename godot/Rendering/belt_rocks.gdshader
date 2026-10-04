@@ -22,6 +22,11 @@ const float KM_PER_AU = 149597870.7;
 const float KM_PER_UNIT = 6371.0;
 const float READABLE_EXPONENT = 0.4;
 
+// Rocks are drawn far bigger than real ones so a belt shows from afar, but up close (say, a
+// planet inside the belt) they'd look moon-sized: so none may look bigger than this, as an angle
+// seen from the camera (about 4 pixels across on a 1080-pixel-high screen). Owner's request.
+const float MAX_ROCK_ANGLE = 0.004;
+
 varying float shade;
 
 void vertex() {
@@ -39,7 +44,9 @@ void vertex() {
 	vec3 spot = flat_spot * cos(tilt) + cross(axis, flat_spot) * sin(tilt)
 		+ axis * dot(axis, flat_spot) * (1.0 - cos(tilt));
 
-	VERTEX = spot + VERTEX * vec3(COLOR.g, 1.0, COLOR.b) * COLOR.r * rock_size;
+	float to_camera = distance((MODEL_MATRIX * vec4(spot, 1.0)).xyz, CAMERA_POSITION_WORLD);
+	float size = min(COLOR.r * rock_size, to_camera * MAX_ROCK_ANGLE);
+	VERTEX = spot + VERTEX * vec3(COLOR.g, 1.0, COLOR.b) * size;
 
 	// Lit from the star at the center.
 	shade = (0.2 + 0.8 * max(0.0, dot(normalize(NORMAL), -normalize(spot)))) * COLOR.a;

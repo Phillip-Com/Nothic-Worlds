@@ -117,6 +117,11 @@ our main belt. Set where it starts and ends (in AU), how thick and dense it is, 
 on the sky around the whole system: set where each one is, how big and bright it looks, and its
 two colors. They look the same from every planet.
 
+A planet or moon whose orbit runs through or near a belt gets **asteroid events**: close passes
+and, rarely, impacts, listed under **Asteroid Events** in the System panel with **Go to** (and
+**Zoom to** where an impact hits). Denser belts send more; the same world always has the same
+events.
+
 Comets make **meteor showers**: wherever a planet's orbit passes close to a comet's orbit, the
 planet runs into the comet's dust at the same time every year. The panel lists the coming year's
 showers (with how many meteors an hour fall at the peak, how long they last, and **Go to**), the

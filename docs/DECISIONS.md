@@ -7,7 +7,9 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
-| 2026-10-03 | The nebula sky is **painted in Core in the background** (1024 × 512) and shown as the environment's sky; nothing changes without nebulas | In PR | [#51](https://github.com/Phillip-Com/Nothic-Worlds/pull/51) | Claude's choice: one lookup per pixel to draw. Format version 19. VISION.md `BOD-03` |
+| 2026-10-04 | Belt rocks **shrink up close** (none looks bigger than about 4 pixels), keeping their size from afar | In PR | [#52](https://github.com/Phillip-Com/Nothic-Worlds/pull/52) | Owner's request. VISION.md `BOD-03` |
+| 2026-10-03 | Asteroid events: **24 passes a year** inside a full-density belt (by exposure and density), **0.4% impacts** for an Earth-sized body; a fixed recipe seeded by body, belt, and year | In PR | [#52](https://github.com/Phillip-Com/Nothic-Worlds/pull/52) | Claude's numbers. VISION.md `EVT-02` |
+| 2026-10-03 | The nebula sky is **painted in Core in the background** (1024 × 512) and shown as the environment's sky; nothing changes without nebulas | Merged | [#51](https://github.com/Phillip-Com/Nothic-Worlds/pull/51) · `9ba23ea` | Claude's choice: one lookup per pixel to draw. Format version 19. VISION.md `BOD-03` |
 | 2026-10-03 | A belt's rocks are **made from its own seed and moved on the GPU** (up to 5,000), drawn far bigger than real rocks so the belt shows | Merged | [#50](https://github.com/Phillip-Com/Nothic-Worlds/pull/50) · `5fa8e1d` | Claude's choices. Format version 18. VISION.md `BOD-03` |
 | 2026-10-03 | Milestone 20: **astral features** (`BOD-03`) and **asteroid events** (`EVT-02`), in **four PRs**: rings, belts, nebulas, events | Merged | [#49](https://github.com/Phillip-Com/Nothic-Worlds/pull/49) · `d1edb24` | VISION.md §3 |
 | 2026-10-03 | Rings are **banded, in your color, with shadows** both ways; measured in the body's radii | Merged | [#49](https://github.com/Phillip-Com/Nothic-Worlds/pull/49) · `d1edb24` | Format version 17. VISION.md `BOD-03` |

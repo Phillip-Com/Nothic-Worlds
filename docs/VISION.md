@@ -119,7 +119,7 @@ Owner's decisions:
 - **Asteroid events:** worked out from the belts (planets in or near dense belts get more close
   passes, and rarely an impact), the same every time for a given world; impacts are listed
   only, with no change to the map.
-- **Four PRs:** rings (PR #49), belts (PR #50), nebulas (PR #51), asteroid events.
+- **Four PRs:** rings (PR #49), belts (PR #50), nebulas (PR #51), asteroid events (PR #52).
 
 **Milestone 19: Flat Worlds** · Complete (PR #48 merged 2026-10-03; owner's choice, 2026-10-03)
 Non-standard bodies (`BOD-02`), starting with flat worlds. Owner's decisions:
@@ -1045,7 +1045,7 @@ the body as a sphere of its radius. World trees and other shapes are still open.
   measured across the face. Verified in the running app at both sizes: the time bar, season
   list, and a weather pin's window on a flat world.
 
-**BOD-03 — Other astral features** · In progress (M20) · Base
+**BOD-03 — Other astral features** · Implemented (M20: rings, belts, nebulas) · Base
 **Intent:** Asteroids, nebulas, and similar features.
 **Implementation (planetary rings, PR #49):**
 - **Model:** `Model/PlanetRings.cs` (`InnerRadii`, `OuterRadii`, `Color`), `Body.Rings` for
@@ -1081,7 +1081,9 @@ the body as a sphere of its radius. World trees and other shapes are still open.
   star. `belt_rocks.gdshader` moves every rock on the GPU at its natural speed (inner rocks
   overtake outer ones) and applies the view's distance compression, so nothing is updated
   rock by rock. Rocks are drawn far bigger than real ones (1.2% of the belt's drawn width), so
-  the belt reads as a band from afar.
+  the belt reads as a band from afar; up close none may look bigger than about 4 pixels (0.004
+  radians from the camera, owner's request in PR #52), so a planet inside a belt isn't swarmed
+  by moon-sized rocks.
 - **App:** stars get an **Asteroid Belts** section in the System panel
   (`godot/UI/BeltsSection.cs`): each belt's name, **From** and **To** (AU), **Thickness**,
   **Density**, **Color**, and **Delete**, plus **Add Belt**; `WorldSession.AddBelt`,
@@ -1448,7 +1450,7 @@ without the world being changed to fit.
   "working it out…" otherwise; hidden for stars.
 - Wording in one place: `godot/UI/EclipseText.cs`.
 
-**EVT-02 — Meteor showers and asteroid events** · Implemented (M18; asteroid events later) · Base
+**EVT-02 — Meteor showers and asteroid events** · Implemented (M18, M20) · Base
 **Intent:** Simulated celestial events.
 **Implementation (comets, PR #44):**
 - **Model:** `BodyKind.Comet`. `Body.HasSurface` (planets and moons) now gates everything that
@@ -1501,6 +1503,30 @@ without the world being changed to fit.
   see their planet's; the same after Make Center; none for stars and comets; deterministic.
   Verified in the running app with real clicks, maximized and at 1152 × 648: the list, Go to,
   the time bar line, the markers, and the View menu switch. Benchmark: no change.
+
+**Implementation (asteroid events, M20, PR #52):**
+- `Simulation/AsteroidEvents.cs` (Core; owner's choice: worked out from the belts, the same
+  every time for a given world, impacts only listed). A belt's rocks aren't tracked, so its
+  events are drawn by chance at a rate the system sets: **24 close passes a year** for a body
+  whose year's orbit lies inside a full-density belt, scaled by the belt's density and by
+  `Exposure` (the time-weighted share of the orbit inside the belt; stretches outside count
+  less, fading over a quarter of the belt's width). **0.4% of passes are impacts** for an
+  Earth-sized body, scaling with its area: about one every ten years deep in a dense belt. A
+  moon shares its planet's orbit.
+- Each year's events come from a fixed recipe (SplitMix64, not `System.Random`, whose numbers
+  may change between .NET versions) seeded by the body, belt, and year, so the same world
+  always has the same events and only edits change them. Sizes follow a power law (mostly
+  small, a few up to kilometers); passes come from about 3 to 1,000 of the body's radii;
+  impacts land anywhere, evenly.
+- **App:** an **Asteroid Events** section in the System panel (`godot/UI/AsteroidEventsSection.cs`,
+  under Meteor Showers): the coming year's close passes and impacts (up to 12), each with its
+  date, the asteroid's size, how close it comes (three significant figures) or where it hits,
+  the belt in the tooltip, **Go to**, and **Zoom to** for an impact's spot.
+- Tested: about 24 passes a year inside a dense belt, none far from any belt, half the
+  density giving about half the passes, impacts rare and placed, sizes and distances in range,
+  the same events however the time is asked for, a moon's events, and the exposure inside and
+  outside a belt. Verified in the running app with real clicks, maximized and at 1152 × 648:
+  the list, Go to, and Zoom to landing on an impact's spot.
 
 ### 4.8 Weather & Climate (`WTH`)
 
