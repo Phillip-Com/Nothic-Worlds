@@ -439,6 +439,7 @@ public partial class SystemView : Node3D
         {
             surface.ReliefScale = (float)(ReliefExaggeration / (body.RadiusKm * 1000));
             surface.ReliefDetail = ReliefDetail;
+            surface.SetShapes(body.Surface.Shapes, body.RadiusKm);
             surface.MapShading = MapStyleShading;
         }
         if (visual.Light is OmniLight3D light)

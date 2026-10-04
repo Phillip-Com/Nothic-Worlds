@@ -60,6 +60,12 @@ public partial class PlanetSurface : MeshInstance3D
     private HeightGrid _shownHeights = HeightGrid.Empty;
     private float _reliefScale;
     private ReliefDetail _reliefDetail = ReliefDetail.Standard;
+
+    // Shapes added or cut (VISION.md BOD-04): the body's shapes and radius, and the carved
+    // globe drawn instead of the plain one while there are any.
+    private IReadOnlyList<ShapeEdit> _shapes = [];
+    private double _radiusKm = 6371;
+    private ShapedGlobe? _carved;
     private bool _mapShading;
 
     // The globe mesh, kept while the body is flat, and the flat world's rock.
@@ -377,6 +383,11 @@ public partial class PlanetSurface : MeshInstance3D
             {
                 _reliefScale = value;
                 SurfaceMaterial.SetShaderParameter("relief_scale", value);
+                if (_carved is not null)
+                {
+                    ChooseMesh();
+                }
+
                 UpdateBounds();
             }
         }
@@ -419,6 +430,24 @@ public partial class PlanetSurface : MeshInstance3D
     public int ReliefVersion { get; private set; }
 
     /// <summary>
+    /// Shows the shapes added to or cut out of the body (VISION.md BOD-04), on a body of
+    /// <paramref name="radiusKm"/>. With any, the globe is drawn carved
+    /// (<see cref="ShapedGlobe"/>).
+    /// </summary>
+    public void SetShapes(IReadOnlyList<ShapeEdit> shapes, double radiusKm)
+    {
+        if (shapes.SequenceEqual(_shapes) && radiusKm == _radiusKm)
+        {
+            return;
+        }
+
+        _shapes = [.. shapes];
+        _radiusKm = radiusKm;
+        ChooseMesh();
+        UpdateBounds();
+    }
+
+    /// <summary>
     /// How far out the drawn surface is at a direction, in the globe's radii: 1 on an unsculpted
     /// globe (or a flat world), more on a sculpted hill, less in a basin. Overlays sit on it.
     /// </summary>
@@ -430,9 +459,9 @@ public partial class PlanetSurface : MeshInstance3D
     /// <summary>
     /// The highest the surface reaches anywhere, in the globe's radii above it (0 unsculpted).
     /// </summary>
-    public float HighestRelief => _shownHeights.IsEmpty || Shape == BodyShape.FlatDisc
+    public float HighestRelief => Shape == BodyShape.FlatDisc
         ? 0
-        : Math.Max(0, _reliefScale * _shownHeights.Highest);
+        : Math.Max(Math.Max(0, _reliefScale * _shownHeights.Highest), _carved?.HighestTop ?? 0);
 
     /// <summary>Sets the color each terrain code is drawn in (others stay unpainted).</summary>
     public void SetTerrainColors(IEnumerable<TerrainType> types)
@@ -621,13 +650,32 @@ public partial class PlanetSurface : MeshInstance3D
         return image;
     }
 
-    // A flat world's disc, a sculpted globe's cube-sphere, or the plain sphere.
+    // A flat world's disc, a carved globe (drawn by its own child node), a sculpted globe's
+    // cube-sphere, or the plain sphere.
     private void ChooseMesh()
     {
         _sphereMesh ??= Mesh;
+        bool carved = Shape == BodyShape.Sphere && _shapes.Count > 0;
         Mesh = Shape == BodyShape.FlatDisc ? FlatDiscMeshes.Top
+            : carved ? null
             : _shownHeights.IsEmpty ? _sphereMesh
             : CubeSphereMesh.For(_reliefDetail);
+        SurfaceMaterial.SetShaderParameter("lifted_on_cpu", carved);
+        if (carved)
+        {
+            _carved ??= new ShapedGlobe { Name = "Shaped" };
+            if (_carved.GetParent() is null)
+            {
+                AddChild(_carved);
+            }
+
+            _carved.Show(_shapes, _shownHeights, _radiusKm, _reliefScale, SurfaceMaterial);
+        }
+        else if (_carved is not null)
+        {
+            _carved.QueueFree();
+            _carved = null;
+        }
     }
 
     // The engine skips drawing what's outside a mesh's bounds, and doesn't know the shader
