@@ -108,7 +108,21 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 23: Physics Mode** · In progress (owner's choice, 2026-10-04)
+**Milestone 24: Body Sculpting (Heights)** · In progress (owner's choice, 2026-10-04)
+Mold bodies like clay (`BOD-04`), starting with heights. Owner's decisions (the design review
+`BOD-04` asked for):
+- **Heights + shape edits:** a height per cell on the cube-sphere grid painted terrain uses,
+  plus (next milestone) a list of shapes added or cut away, which makes holes through a world
+  and hollow worlds possible without a full 3D voxel model.
+- **Heights first:** this milestone sculpts heights on globes, with **Raise**, **Lower**,
+  **Smooth**, and **Flatten** brushes; shapes, holes, and hollows come next.
+- **±32 km in 1 m steps,** true to scale; a **View** setting exaggerates the relief so it shows
+  from orbit, and shading always shows slopes.
+- **Tools in the Terrain panel:** a Sculpt mode beside Paint/Erase, with the same brush plus a
+  strength.
+- **Three PRs:** heights in Core (PR #60), drawing the relief, then the Sculpt tools.
+
+**Milestone 23: Physics Mode** · Complete (PR #59 merged 2026-10-04; owner's choice, 2026-10-04)
 An optional switch that moves the system by real gravity (`SIM-03`), from the masses of
 Milestone 22. Owner's decisions:
 - **Start speeds from gravity:** each body starts where its design puts it, moving at the speed
@@ -1231,14 +1245,36 @@ the body as a sphere of its radius. World trees (M21) hold realms on their branc
   the planet when looking toward its direction and absent looking away, a bigger and brighter
   one, the background unchanged without nebulas, and undo. Benchmark: no change.
 
-**BOD-04 — Body sculpting (digital clay)** · Idea · —
+**BOD-04 — Body sculpting (digital clay)** · In Progress (M24: heights in Core, PR #60) · Base
 **Intent:** Mold bodies like digital clay with brush tools. Tools include:
 - Raise and lower terrain brushes
 - Basic shape tools to add and subtract terrain, which are also useful for artificial structures
 - Extreme shapes: hollow planets, planets with holes through them
 **Notes:** Holes and hollows rule out simple heightmap-on-a-sphere approaches and have major
 architecture implications. This needs a design review before any related data format is fixed.
-**Implementation:** —
+**Design (owner's choice, 2026-10-04):** heights on the cube-sphere grid plus a list of shape
+edits (added or cut spheres, boxes, cylinders) for holes, hollows, and structures; the surface is
+built from both. Heights come first (M24), shapes next.
+**Implementation (heights in Core, M24, PR #60):**
+- **`Model/HeightGrid.cs`:** one height per cell of the terrain grid (1,024² a face, about 10 km
+  on an Earth-sized world), in whole meters, ±32,767. Immutable, in 64 × 64 tiles shared with
+  the grid it came from (flat tiles take no memory), like `TerrainGrid`.
+- **Brushes,** each along a stroke with a soft edge (a cosine bump: full strength at the middle,
+  nothing at the radius); along a stroke the strongest stamp counts, so a stroke has the same
+  effect however its stamps fall, and strokes add up. **Raise** (negative lowers) by up to so
+  many meters; **Flatten** toward a target height (e.g. where the stroke began) by an amount;
+  **Smooth** toward the average of the cell and 8 points round it an eighth of the radius away
+  (at least the next cell; across face edges too), from the heights before the stroke. Heights
+  are rounded to whole meters and clamped. Deterministic (tested). In a release build a brush a
+  few degrees across takes a few milliseconds; a hemisphere about 0.1 s to raise and 0.5 s to
+  smooth.
+- **Shared with painted terrain:** `CubeGridBrush` (the grid's tiles, cell positions, and
+  stroke stamps, moved out of `TerrainGrid`) and `Storage/GreyscalePng` (the PNG reader and
+  writer, moved out of `TerrainImage` and extended to 16-bit).
+- **Saving:** format **version 23**: `surface.heights` names a 16-bit greyscale PNG
+  (`heights/<body id>.png`, laid out like the terrain image, height + 32,768). Planets and moons
+  only. Tested: golden file, round trip, every PNG row filter from an independent writer, and
+  refusing an 8-bit image, an out-of-range height, and heights on a star.
 
 **BOD-05 — Terrain/biome painting** · Implemented (M11: PR #33, #34, #35) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.

@@ -214,6 +214,7 @@ internal sealed class SurfaceDocument
     public List<PieceDocument>? Pieces { get; init; }  // Added in format version 3
     public required string FillColor { get; init; }
     public string? Terrain { get; init; }  // Added in format version 10
+    public string? Heights { get; init; }  // Added in format version 23
 }
 
 internal sealed class PieceDocument

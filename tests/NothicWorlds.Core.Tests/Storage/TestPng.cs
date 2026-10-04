@@ -5,36 +5,40 @@ using System.Text;
 namespace NothicWorlds.Core.Tests.Storage;
 
 /// <summary>
-/// Writes 8-bit greyscale PNG images the way other image tools might, with any of the five PNG
-/// row filters. Written separately from the app's own encoder, so tests can check that the app
-/// reads images it didn't write itself.
+/// Writes 8- or 16-bit greyscale PNG images the way other image tools might, with any of the
+/// five PNG row filters. Written separately from the app's own encoder, so tests can check
+/// that the app reads images it didn't write itself.
 /// </summary>
 internal static class TestPng
 {
     /// <summary>
-    /// Encodes <paramref name="pixels"/> (row by row) as a PNG, filtering every row with
-    /// <paramref name="filter"/> (0 none, 1 sub, 2 up, 3 average, 4 Paeth).
+    /// Encodes <paramref name="pixels"/> (row by row; 16-bit pixels big-endian) as a PNG,
+    /// filtering every row with <paramref name="filter"/> (0 none, 1 sub, 2 up, 3 average,
+    /// 4 Paeth).
     /// </summary>
-    public static byte[] Greyscale(int width, int height, byte[] pixels, byte filter)
+    public static byte[] Greyscale(
+        int width, int height, byte[] pixels, byte filter, int bitDepth = 8)
     {
+        int rowBytes = width * bitDepth / 8;
+        int back = bitDepth / 8;  // Filters predict from the same byte of the pixel to the left
         using var file = new MemoryStream();
         file.Write([137, 80, 78, 71, 13, 10, 26, 10]);
 
         var header = new byte[13];
         BinaryPrimitives.WriteInt32BigEndian(header, width);
         BinaryPrimitives.WriteInt32BigEndian(header.AsSpan(4), height);
-        header[8] = 8;
+        header[8] = (byte)bitDepth;
         WriteChunk(file, "IHDR", header);
 
-        var filtered = new byte[height * (width + 1)];
+        var filtered = new byte[height * (rowBytes + 1)];
         for (int y = 0; y < height; y++)
         {
-            filtered[y * (width + 1)] = filter;
-            for (int x = 0; x < width; x++)
+            filtered[y * (rowBytes + 1)] = filter;
+            for (int x = 0; x < rowBytes; x++)
             {
-                int left = x == 0 ? 0 : pixels[y * width + x - 1];
-                int up = y == 0 ? 0 : pixels[(y - 1) * width + x];
-                int upLeft = x == 0 || y == 0 ? 0 : pixels[(y - 1) * width + x - 1];
+                int left = x < back ? 0 : pixels[y * rowBytes + x - back];
+                int up = y == 0 ? 0 : pixels[(y - 1) * rowBytes + x];
+                int upLeft = x < back || y == 0 ? 0 : pixels[(y - 1) * rowBytes + x - back];
                 int prediction = filter switch
                 {
                     1 => left,
@@ -43,7 +47,8 @@ internal static class TestPng
                     4 => Paeth(left, up, upLeft),
                     _ => 0,
                 };
-                filtered[y * (width + 1) + 1 + x] = (byte)(pixels[y * width + x] - prediction);
+                filtered[y * (rowBytes + 1) + 1 + x] =
+                    (byte)(pixels[y * rowBytes + x] - prediction);
             }
         }
 

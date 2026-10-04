@@ -110,8 +110,11 @@ public static class WorldPackage
         try
         {
             using ZipArchive archive = ZipFile.OpenRead(fullPath);
-            World world = WorldMapper.ToWorld(
-                ReadDocument(archive), name => ReadTerrain(archive, name));
+            World world = WorldMapper.ToWorld(ReadDocument(archive),
+                name => ReadImage(archive, name, "terrain", TerrainImage.MaxFileBytes,
+                    TerrainImage.Decode),
+                name => ReadImage(archive, name, "height", HeightImage.MaxFileBytes,
+                    HeightImage.Decode));
 
             var assets = new Dictionary<string, IAssetSource>();
             foreach (string name in ReferencedAssetNames(world))
@@ -153,14 +156,16 @@ public static class WorldPackage
         }
     }
 
-    private static TerrainGrid ReadTerrain(ZipArchive archive, string name)
+    // Reads one of a body's images (its terrain or heights) from the file.
+    private static T ReadImage<T>(ZipArchive archive, string name, string kind, long maxBytes,
+        Decoder<T> decode)
     {
         ZipArchiveEntry entry = archive.GetEntry(name) ?? throw new WorldFileException(
-            $"The world file is damaged: its terrain image '{name}' is missing.");
-        if (entry.Length > TerrainImage.MaxFileBytes)
+            $"The world file is damaged: its {kind} image '{name}' is missing.");
+        if (entry.Length > maxBytes)
         {
             throw new WorldFileException(
-                $"The world file is damaged: the terrain image '{name}' is too large.");
+                $"The world file is damaged: the {kind} image '{name}' is too large.");
         }
 
         var bytes = new byte[entry.Length];
@@ -171,15 +176,17 @@ public static class WorldPackage
                 stream.ReadExactly(bytes);
             }
 
-            return TerrainImage.Decode(bytes);
+            return decode(bytes);
         }
         catch (Exception error) when (error is InvalidDataException or EndOfStreamException)
         {
             throw new WorldFileException(
-                $"The world file is damaged: the terrain image '{name}' can't be read " +
+                $"The world file is damaged: the {kind} image '{name}' can't be read " +
                 $"({error.Message}).", error);
         }
     }
+
+    private delegate T Decoder<T>(ReadOnlySpan<byte> file);
 
     private static WorldDocument ReadDocument(ZipArchive archive)
     {
@@ -234,6 +241,14 @@ public static class WorldPackage
                     WorldFormat.TerrainEntryName(body.Id), CompressionLevel.NoCompression);
                 using Stream target = entry.Open();
                 target.Write(TerrainImage.Encode(body.Surface.Terrain));
+            }
+
+            foreach (Body body in world.Bodies.Where(body => !body.Surface.Heights.IsEmpty))
+            {
+                ZipArchiveEntry entry = archive.CreateEntry(
+                    WorldFormat.HeightsEntryName(body.Id), CompressionLevel.NoCompression);
+                using Stream target = entry.Open();
+                target.Write(HeightImage.Encode(body.Surface.Heights));
             }
         }
 

@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 22;
+    public const int CurrentVersion = 23;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -176,6 +176,9 @@ internal static partial class WorldFormat
 
         // 21 → 22: bodies gained an optional "density" (M22, the stable orbit guide). Older
         // bodies have the typical density of their kind and size.
+        document => document,
+
+        // 22 → 23: surfaces gained optional sculpted "heights" (M24). Older bodies are flat.
         document => document,
     ];
 
@@ -360,6 +363,18 @@ internal static partial class WorldFormat
     }
 
     /// <summary>
+    /// The name of a body's height image inside the world file, e.g.
+    /// <c>heights/1a2b….png</c> (named after the body).
+    /// </summary>
+    public static string HeightsEntryName(Guid bodyId) => $"heights/{bodyId:N}.png";
+
+    /// <summary>True if a height image name has the expected safe form.</summary>
+    public static bool IsValidHeightsName(string? name)
+    {
+        return name is not null && HeightsNamePattern().IsMatch(name);
+    }
+
+    /// <summary>
     /// Checks a document's format version and upgrades it to <see cref="CurrentVersion"/>.
     /// </summary>
     /// <exception cref="WorldFileException">
@@ -414,4 +429,8 @@ internal static partial class WorldFormat
     // The same safety rule for terrain images, which are always PNG.
     [GeneratedRegex(@"^terrain/[0-9a-f]{32}\.png$")]
     private static partial Regex TerrainNamePattern();
+
+    // The same for height images.
+    [GeneratedRegex(@"^heights/[0-9a-f]{32}\.png$")]
+    private static partial Regex HeightsNamePattern();
 }

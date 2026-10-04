@@ -49,8 +49,10 @@ internal static class WorldMapper
     /// <param name="readTerrain">
     /// Reads a body's terrain image from the file, given its (already validated) name.
     /// </param>
+    /// <param name="readHeights">Reads a body's height image, likewise.</param>
     /// <exception cref="WorldFileException">The document has missing or invalid data.</exception>
-    public static World ToWorld(WorldDocument document, Func<string, TerrainGrid> readTerrain)
+    public static World ToWorld(WorldDocument document, Func<string, TerrainGrid> readTerrain,
+        Func<string, HeightGrid> readHeights)
     {
         Require(document.Bodies is { Count: > 0 }, "it has no bodies");
         Require(document.TimeDays is null || double.IsFinite(document.TimeDays.Value),
@@ -65,7 +67,8 @@ internal static class WorldMapper
             View = document.View is null ? null : ToView(document.View),
             TimeDays = document.TimeDays ?? 0,
         };
-        world.Bodies.AddRange(document.Bodies.Select(body => ToBody(body, readTerrain)));
+        world.Bodies.AddRange(
+            document.Bodies.Select(body => ToBody(body, readTerrain, readHeights)));
         RequireNoProblem(Simulation.SystemHierarchy.Problem(world.Bodies));
         RequireNoProblem(Simulation.Realms.Problem(world.Bodies));
         Simulation.Realms.Apply(world.Bodies);
@@ -375,6 +378,9 @@ internal static class WorldMapper
                 Terrain = body.Surface.Terrain.IsEmpty
                     ? null
                     : WorldFormat.TerrainEntryName(body.Id),
+                Heights = body.Surface.Heights.IsEmpty
+                    ? null
+                    : WorldFormat.HeightsEntryName(body.Id),
             },
         };
     }
@@ -579,7 +585,8 @@ internal static class WorldMapper
         };
     }
 
-    private static Body ToBody(BodyDocument document, Func<string, TerrainGrid> readTerrain)
+    private static Body ToBody(BodyDocument document, Func<string, TerrainGrid> readTerrain,
+        Func<string, HeightGrid> readHeights)
     {
         Require(document is not null, "a planet entry is empty");
         Require(document!.Surface is not null, "a planet has no surface data");
@@ -618,6 +625,14 @@ internal static class WorldMapper
             Require(WorldFormat.IsValidTerrainName(terrain),
                 $"invalid terrain image name '{terrain}'");
             body.Surface.Terrain = readTerrain(terrain);
+        }
+
+        if (document.Surface.Heights is string heights)
+        {
+            Require(WorldFormat.IsValidHeightsName(heights),
+                $"invalid height image name '{heights}'");
+            Require(body.HasSurface, "only planets and moons can be sculpted");
+            body.Surface.Heights = readHeights(heights);
         }
 
         if (document.Surface.Pieces is List<PieceDocument> pieces)

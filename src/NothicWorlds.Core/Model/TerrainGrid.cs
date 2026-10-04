@@ -21,39 +21,25 @@ namespace NothicWorlds.Core.Model;
 public sealed class TerrainGrid
 {
     /// <summary>Cells along each edge of a face (owner's choice: the "medium" detail).</summary>
-    public const int FaceSize = 1024;
+    public const int FaceSize = CubeGridBrush.FaceSize;
 
     /// <summary>Cells on one face.</summary>
-    public const int CellsPerFace = FaceSize * FaceSize;
+    public const int CellsPerFace = CubeGridBrush.CellsPerFace;
 
     /// <summary>Cells on the whole body.</summary>
-    public const int CellCount = CubeSphere.FaceCount * CellsPerFace;
+    public const int CellCount = CubeGridBrush.CellCount;
 
     /// <summary>The smallest brush radius, in degrees of arc.</summary>
-    public const double MinBrushRadiusDegrees = 0.01;
+    public const double MinBrushRadiusDegrees = CubeGridBrush.MinRadiusDegrees;
 
     /// <summary>The largest brush radius, in degrees of arc (a whole hemisphere).</summary>
-    public const double MaxBrushRadiusDegrees = 90;
+    public const double MaxBrushRadiusDegrees = CubeGridBrush.MaxRadiusDegrees;
 
-    // Tiles are TileSize × TileSize cells. 64 × 64 = 4 KB each: small enough that a brush
-    // stroke copies little, and few enough (1,536) to scan quickly.
-    private const int TileSize = 64;
-    private const int TilesPerSide = FaceSize / TileSize;
-    private const int TilesPerFace = TilesPerSide * TilesPerSide;
-    private const int TileCount = CubeSphere.FaceCount * TilesPerFace;
-    private const int CellsPerTile = TileSize * TileSize;
-
-    // A long stroke is painted as a row of brush stamps; this caps how many, so even an absurd
-    // stroke (a tiny brush dragged halfway round) stays quick.
-    private const int MaxStampsPerStroke = 2048;
-
-    // Where each cell's center sits on the flat cube, from the face's middle (-1..1), indexed by
-    // column (across) or row (down). The same for every face. See CubeSphere.Direction.
-    private static readonly double[] _cellOffsets = CreateCellOffsets();
-
-    // Each tile's middle and how far its farthest corner is from it (radians), for skipping
-    // tiles the brush can't reach.
-    private static readonly (Vector3D Center, double Reach)[] _tileBounds = CreateTileBounds();
+    private const int TileSize = CubeGridBrush.TileSize;
+    private const int TilesPerSide = CubeGridBrush.TilesPerSide;
+    private const int TilesPerFace = CubeGridBrush.TilesPerFace;
+    private const int TileCount = CubeGridBrush.TileCount;
+    private const int CellsPerTile = CubeGridBrush.CellsPerTile;
 
     // Null for a tile with nothing painted. Never modified once the grid is created.
     private readonly byte[]?[] _tiles;
@@ -110,7 +96,7 @@ public sealed class TerrainGrid
     /// </exception>
     public TerrainGrid Paint(Vector3D center, double radiusDegrees, byte code)
     {
-        return PaintStamps([Normalized(center)], radiusDegrees, code);
+        return PaintStamps([CubeGridBrush.Normalized(center)], radiusDegrees, code);
     }
 
     /// <summary>
@@ -123,21 +109,7 @@ public sealed class TerrainGrid
     /// </exception>
     public TerrainGrid PaintStroke(Vector3D from, Vector3D to, double radiusDegrees, byte code)
     {
-        Vector3D start = Normalized(from);
-        Vector3D end = Normalized(to);
-        RequireRadius(radiusDegrees);
-
-        // Stamps a quarter of a radius apart, so the stroke's edges look straight.
-        double arc = Math.Acos(Math.Clamp(start.Dot(end), -1, 1));
-        double spacing = double.DegreesToRadians(radiusDegrees) / 4;
-        int steps = (int)Math.Clamp(Math.Ceiling(arc / spacing), 1, MaxStampsPerStroke);
-        var stamps = new List<Vector3D>(steps + 1);
-        for (int step = 0; step <= steps; step++)
-        {
-            stamps.Add(Between(start, end, arc, (double)step / steps));
-        }
-
-        return PaintStamps(stamps, radiusDegrees, code);
+        return PaintStamps(CubeGridBrush.Stamps(from, to, radiusDegrees), radiusDegrees, code);
     }
 
     /// <summary>
@@ -303,7 +275,7 @@ public sealed class TerrainGrid
     private TerrainGrid PaintStamps(
         IReadOnlyList<Vector3D> stamps, double radiusDegrees, byte code)
     {
-        RequireRadius(radiusDegrees);
+        CubeGridBrush.RequireRadius(radiusDegrees);
         double radius = double.DegreesToRadians(radiusDegrees);
         double minimumDot = Math.Cos(radius);
         byte[]?[]? changed = null;
@@ -317,7 +289,7 @@ public sealed class TerrainGrid
                 continue;  // Nothing to erase.
             }
 
-            (Vector3D tileCenter, double reach) = _tileBounds[index];
+            (Vector3D tileCenter, double reach) = CubeGridBrush.TileBounds[index];
             nearStamps.Clear();
             bool covered = false;
             foreach (Vector3D stamp in stamps)
@@ -379,7 +351,7 @@ public sealed class TerrainGrid
 
         for (int row = 0; row < TileSize; row++)
         {
-            Vector3D rowPoint = normal - up * _cellOffsets[firstRow + row];
+            Vector3D rowPoint = normal - up * CubeGridBrush.CellOffsets[firstRow + row];
             for (int column = 0; column < TileSize; column++)
             {
                 int cell = row * TileSize + column;
@@ -390,7 +362,8 @@ public sealed class TerrainGrid
 
                 // The cell's center on the flat cube; it's inside a stamp if the angle to the
                 // stamp is small enough, i.e. its dot product is big enough for its length.
-                Vector3D point = rowPoint + right * _cellOffsets[firstColumn + column];
+                Vector3D point =
+                    rowPoint + right * CubeGridBrush.CellOffsets[firstColumn + column];
                 double limit = minimumDot * point.Length;
                 foreach (Vector3D stamp in stamps)
                 {
@@ -405,52 +378,6 @@ public sealed class TerrainGrid
         }
 
         return copy;
-    }
-
-    // The point a fraction of the way along the arc between two unit directions.
-    private static Vector3D Between(Vector3D start, Vector3D end, double arc, double fraction)
-    {
-        if (arc < 1e-9)
-        {
-            return start;
-        }
-
-        if (Math.PI - arc < 1e-9)
-        {
-            // Opposite points: any path is shortest. Go over the start's own "east".
-            Vector3D side = Math.Abs(start.Y) < 0.9 ? new(start.Z, 0, -start.X) : new(1, 0, 0);
-            side = side - start * side.Dot(start);
-            side = side * (1 / side.Length);
-            double angle = arc * fraction;
-            return start * Math.Cos(angle) + side * Math.Sin(angle);
-        }
-
-        double sin = Math.Sin(arc);
-        return start * (Math.Sin((1 - fraction) * arc) / sin)
-            + end * (Math.Sin(fraction * arc) / sin);
-    }
-
-    private static Vector3D Normalized(Vector3D direction)
-    {
-        double length = direction.Length;
-        if (length == 0 || !double.IsFinite(length))
-        {
-            throw new ArgumentException(
-                "Direction must be a finite, non-zero vector.", nameof(direction));
-        }
-
-        return direction * (1 / length);
-    }
-
-    private static void RequireRadius(double radiusDegrees)
-    {
-        if (!double.IsFinite(radiusDegrees)
-            || radiusDegrees is < MinBrushRadiusDegrees or > MaxBrushRadiusDegrees)
-        {
-            throw new ArgumentException(
-                $"The brush radius must be {MinBrushRadiusDegrees}° to " +
-                $"{MaxBrushRadiusDegrees}°.", nameof(radiusDegrees));
-        }
     }
 
     private static byte[]? Filled(byte code)
@@ -471,47 +398,7 @@ public sealed class TerrainGrid
     }
 
     private static int TileIndex(int face, int tileColumn, int tileRow) =>
-        face * TilesPerFace + tileRow * TilesPerSide + tileColumn;
+        CubeGridBrush.TileIndex(face, tileColumn, tileRow);
 
-    private static int CellIndex(int column, int row) =>
-        row % TileSize * TileSize + column % TileSize;
-
-    private static double[] CreateCellOffsets()
-    {
-        var offsets = new double[FaceSize];
-        for (int index = 0; index < FaceSize; index++)
-        {
-            double spread = (index + 0.5) / FaceSize * 2 - 1;
-            offsets[index] = Math.Tan(spread * Math.PI / 4);
-        }
-
-        return offsets;
-    }
-
-    private static (Vector3D, double)[] CreateTileBounds()
-    {
-        const double margin = 1e-6;  // Guards against rounding at the very edge.
-        var bounds = new (Vector3D, double)[TileCount];
-        for (int index = 0; index < TileCount; index++)
-        {
-            int face = index / TilesPerFace;
-            double top = (double)(index % TilesPerFace / TilesPerSide) / TilesPerSide;
-            double left = (double)(index % TilesPerSide) / TilesPerSide;
-            double size = 1.0 / TilesPerSide;
-            Vector3D center = CubeSphere.Direction(face, left + size / 2, top + size / 2);
-
-            // Tile edges are great circles, so the farthest point from the middle is a corner.
-            double reach = 0;
-            foreach ((double across, double down) in new[]
-                { (left, top), (left + size, top), (left, top + size), (left + size, top + size) })
-            {
-                Vector3D corner = CubeSphere.Direction(face, across, down);
-                reach = Math.Max(reach, Math.Acos(Math.Clamp(corner.Dot(center), -1, 1)));
-            }
-
-            bounds[index] = (center, reach + margin);
-        }
-
-        return bounds;
-    }
+    private static int CellIndex(int column, int row) => CubeGridBrush.CellIndex(column, row);
 }
