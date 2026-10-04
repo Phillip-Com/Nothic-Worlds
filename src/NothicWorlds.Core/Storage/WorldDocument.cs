@@ -12,6 +12,7 @@ internal sealed class WorldDocument
     public required DateTimeOffset CreatedUtc { get; init; }
     public required DateTimeOffset ModifiedUtc { get; init; }
     public double? TimeDays { get; init; }  // Added in format version 5
+    public string? Style { get; init; }  // Added in format version 25
     public required List<BodyDocument> Bodies { get; init; }
     public List<TerrainTypeDocument>? TerrainTypes { get; init; }  // Added in format version 10
     public List<RegionDocument>? Regions { get; init; }  // Added in format version 8

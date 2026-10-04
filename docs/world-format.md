@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 24** (see **Version history** at the end)
+**Current format version: 25** (see **Version history** at the end)
 
 ## Container
 
@@ -188,6 +188,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `name` | yes | World name, not empty |
 | `createdUtc`, `modifiedUtc` | yes | ISO 8601 timestamps |
 | `timeDays` | no | The world clock: standard (24-hour) days since time 0. Default 0. |
+| `style` | no | How the world is drawn (`REN-05`): `"painterly"`, `"realistic"`, or `"simple"`. Always written; omitted (files before version 25) means `"painterly"`. Only the look changes, never the world. |
 | `bodies` | yes, 1 or more | Celestial bodies: suns, planets, and moons. |
 | `bodies[].id` | yes | GUID, unique within the world |
 | `bodies[].name` | yes | Not empty |
@@ -454,6 +455,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 25 | Visual styles (M26): worlds gain a `style` | Nothing to change: version 24 worlds are painterly, which a missing `style` means |
 | 24 | Shapes (M25): surfaces gain optional `shapes` added or cut | Nothing to change: version 23 bodies have none |
 | 23 | Body sculpting (M24): surfaces gain optional `heights` (a 16-bit height image) | Nothing to change: version 22 bodies are unsculpted |
 | 22 | Stable orbit guide (M22): bodies gain an optional `density` | Nothing to change: version 21 bodies have the typical density for their kind and size |
