@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 22: Stable Orbit Guide** · In progress (owner's choice, 2026-10-04)
+**Milestone 22: Stable Orbit Guide** · Complete (PR #57 merged 2026-10-04; owner's choice, 2026-10-04)
 Where gravity would keep orbits steady (`SIM-04`). Orbits stay designed and free; this only
 guides. Owner's decisions:
 - **Mass from density:** each body has a **Density** (g/cm³), typical for its kind and size
