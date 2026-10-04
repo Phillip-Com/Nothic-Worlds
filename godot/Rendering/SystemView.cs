@@ -190,6 +190,12 @@ public partial class SystemView : Node3D
     public ReliefDetail ReliefDetail { get; set; } = AppSettings.ReliefDetail;
 
     /// <summary>
+    /// Whether sculpted relief is shaded map-style, lit from the northwest so it always shows,
+    /// or by the sunlight (View ▸ Relief Shading; owner's choice; remembered on this computer).
+    /// </summary>
+    public bool MapStyleShading { get; set; } = AppSettings.MapStyleShading;
+
+    /// <summary>
     /// True while physics mode moves the bodies (VISION.md SIM-03): markers on the designed
     /// orbits are hidden then.
     /// </summary>
@@ -433,6 +439,7 @@ public partial class SystemView : Node3D
         {
             surface.ReliefScale = (float)(ReliefExaggeration / (body.RadiusKm * 1000));
             surface.ReliefDetail = ReliefDetail;
+            surface.MapShading = MapStyleShading;
         }
         if (visual.Light is OmniLight3D light)
         {

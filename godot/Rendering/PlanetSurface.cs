@@ -60,6 +60,7 @@ public partial class PlanetSurface : MeshInstance3D
     private HeightGrid _shownHeights = HeightGrid.Empty;
     private float _reliefScale;
     private ReliefDetail _reliefDetail = ReliefDetail.Standard;
+    private bool _mapShading;
 
     // The globe mesh, kept while the body is flat, and the flat world's rock.
     private Mesh? _sphereMesh;
@@ -377,6 +378,22 @@ public partial class PlanetSurface : MeshInstance3D
                 _reliefScale = value;
                 SurfaceMaterial.SetShaderParameter("relief_scale", value);
                 UpdateBounds();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether relief is shaded map-style, from a fixed direction (true), or by the sunlight.
+    /// </summary>
+    public bool MapShading
+    {
+        get => _mapShading;
+        set
+        {
+            if (value != _mapShading)
+            {
+                _mapShading = value;
+                SurfaceMaterial.SetShaderParameter("map_shading", value);
             }
         }
     }
