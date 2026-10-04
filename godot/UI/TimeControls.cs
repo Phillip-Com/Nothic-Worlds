@@ -245,10 +245,9 @@ public partial class TimeControls : CanvasLayer
         {
             _seasons.Text = $"{SeasonText.Current(current)}  ·  " +
                 $"{SeasonText.Name(next.Kind)} {SeasonText.HowFar(body, now, next.TimeDays)}";
-            _seasons.TooltipText = $"The seasons in each hemisphere, from where the star " +
-                $"stands.\nNext: {SeasonText.Name(next.Kind)}, " +
-                $"{BodyClock.Describe(body, next.TimeDays)} " +
-                $"({SeasonText.SouthernNote(next.Kind)}).";
+            _seasons.TooltipText = $"{SeasonText.Explanation(body)}\n" +
+                $"Next: {SeasonText.Name(next.Kind)}, " +
+                $"{BodyClock.Describe(body, next.TimeDays)} ({SeasonText.Note(next.Kind)}).";
             _seasons.Visible = true;
         }
         else

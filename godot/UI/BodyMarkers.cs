@@ -400,7 +400,8 @@ public partial class BodyMarkers : CanvasLayer
     }
 
     private static bool IsSolstice(SeasonEventKind kind) =>
-        kind is SeasonEventKind.NorthernSummerSolstice or SeasonEventKind.NorthernWinterSolstice;
+        kind is SeasonEventKind.NorthernSummerSolstice or SeasonEventKind.NorthernWinterSolstice
+            or SeasonEventKind.Midwinter;
 
     // Each body in front of the camera: where its center is on screen and its radius in pixels.
     private IEnumerable<(Body Body, Vector2 Center, float Radius)> OnScreen()
