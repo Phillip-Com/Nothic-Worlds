@@ -1,0 +1,143 @@
+using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Model;
+
+namespace NothicWorlds.Core.Tests.Model;
+
+public sealed class HeightGridTests
+{
+    private static readonly Vector3D _spot = At(20, 30);
+
+    [Fact]
+    public void Raising_LiftsTheMiddleFully_EasingToNothingAtTheEdge()
+    {
+        // On the equator, degrees of longitude are degrees of arc. Cells are about 0.09°
+        // across, so a cell's middle can be a little off the point asked about.
+        HeightGrid grid = HeightGrid.Empty.Raise(At(0, 30), At(0, 30), 2, 1000);
+
+        Assert.InRange(grid.HeightAt(At(0, 30)), 990, 1000);
+        Assert.InRange(grid.HeightAt(At(0, 31)), 450, 550);  // Halfway out: about half
+        Assert.InRange(grid.HeightAt(At(0, 31.9)), 0, 30);
+        Assert.Equal(0, grid.HeightAt(At(0, 32.2)));
+        Assert.True(HeightGrid.Empty.IsEmpty);  // Immutable
+    }
+
+    [Fact]
+    public void AStroke_RaisesAnEvenRidge_AndStrokesAddUp()
+    {
+        Vector3D from = At(0, 10);
+        Vector3D to = At(0, 30);
+
+        HeightGrid once = HeightGrid.Empty.Raise(from, to, 1, 500);
+        HeightGrid twice = once.Raise(from, to, 1, 500);
+
+        foreach (double longitude in new[] { 12.0, 17.3, 20.0, 26.1 })
+        {
+            // Even along the ridge, give or take a cell's middle being off the stroke's line.
+            Assert.InRange(once.HeightAt(At(0, longitude)), 475, 500);
+            Assert.InRange(twice.HeightAt(At(0, longitude)), 950, 1000);
+        }
+    }
+
+    [Fact]
+    public void Lowering_DigsDown_AndHeightsStayInRange()
+    {
+        HeightGrid dug = HeightGrid.Empty.Raise(_spot, _spot, 1, -800);
+        HeightGrid tall = HeightGrid.Empty.Raise(_spot, _spot, 1, 50_000);
+        HeightGrid deep = HeightGrid.Empty.Raise(_spot, _spot, 1, -50_000);
+
+        Assert.InRange(dug.HeightAt(_spot), -800, -790);
+        Assert.Equal(HeightGrid.MaxHeightMeters, tall.HeightAt(_spot));
+        Assert.Equal(HeightGrid.MinHeightMeters, deep.HeightAt(_spot));
+    }
+
+    [Fact]
+    public void Flattening_LevelsTowardTheTarget()
+    {
+        HeightGrid hill = HeightGrid.Empty.Raise(_spot, _spot, 3, 2000);
+
+        HeightGrid fully = hill.Flatten(_spot, _spot, 3, 500, amount: 1);
+        HeightGrid half = hill.Flatten(_spot, _spot, 3, 500, amount: 0.5);
+
+        Assert.InRange(fully.HeightAt(_spot), 500, 520);
+        Assert.InRange(half.HeightAt(_spot), 1240, 1260);
+    }
+
+    [Fact]
+    public void Smoothing_WearsDownASpike_AndLeavesFlatGroundAlone()
+    {
+        HeightGrid spike = HeightGrid.Empty.Raise(_spot, _spot, 0.1, 3000);
+
+        HeightGrid smoothed = spike.Smooth(_spot, _spot, 1, amount: 1);
+
+        Assert.True(smoothed.HeightAt(_spot) < spike.HeightAt(_spot) / 2);
+        Assert.True(smoothed.HeightAt(At(20, 30.15)) > spike.HeightAt(At(20, 30.15)));
+        Assert.Same(HeightGrid.Empty, HeightGrid.Empty.Smooth(_spot, _spot, 5, 1));
+    }
+
+    [Fact]
+    public void Smoothing_ReachesAcrossFaceEdges()
+    {
+        // A face's corner: the +X face meets +Y and +Z there.
+        Vector3D corner = new Vector3D(1, 1, 1) * (1 / Math.Sqrt(3));
+        HeightGrid spike = HeightGrid.Empty.Raise(corner, corner, 0.1, 3000);
+
+        HeightGrid smoothed = spike.Smooth(corner, corner, 1, amount: 1);
+
+        Assert.True(smoothed.HeightAt(corner) < spike.HeightAt(corner));
+        Assert.Equal(3, smoothed.FacesChangedFrom(HeightGrid.Empty).Count);
+    }
+
+    [Fact]
+    public void AStroke_SharesEverythingItDidntTouch()
+    {
+        HeightGrid before = HeightGrid.Empty.Raise(At(0, 0), At(0, 0), 1, 100);
+
+        HeightGrid after = before.Raise(_spot, _spot, 1, 100);
+
+        Assert.Single(after.FacesChangedFrom(before));
+        Assert.Equal(before.HeightAt(At(0, 0)), after.HeightAt(At(0, 0)));
+        Assert.False(after.HasSameCells(before));
+        Assert.Same(after, after.Raise(_spot, _spot, 1, 0));  // Nothing changed
+    }
+
+    [Fact]
+    public void TheSameStrokes_GiveTheSameHeights()
+    {
+        HeightGrid Sculpt() => HeightGrid.Empty
+            .Raise(At(10, 10), At(15, 25), 2, 1234)
+            .Smooth(At(12, 15), At(12, 20), 1.5, 0.7)
+            .Flatten(At(10, 10), At(10, 30), 1, 300, 0.8);
+
+        Assert.True(Sculpt().HasSameCells(Sculpt()));
+    }
+
+    [Fact]
+    public void Cells_CopyOutAndBackIn()
+    {
+        HeightGrid grid = HeightGrid.Empty.Raise(At(-40, 100), At(50, -60), 3, -2500);
+        var cells = new short[HeightGrid.CellCount];
+        for (int face = 0; face < CubeSphere.FaceCount; face++)
+        {
+            grid.CopyFace(face, cells.AsSpan(face * HeightGrid.CellsPerFace));
+        }
+
+        Assert.True(HeightGrid.FromCells(cells).HasSameCells(grid));
+        cells[7] = short.MinValue;
+        Assert.Throws<ArgumentException>(() => HeightGrid.FromCells(cells));
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(91.0)]
+    public void ABrushOutOfRange_IsRefused(double radius)
+    {
+        Assert.Throws<ArgumentException>(() => HeightGrid.Empty.Raise(_spot, _spot, radius, 1));
+    }
+
+    private static Vector3D At(double latitude, double longitude)
+    {
+        System.Numerics.Vector3 direction =
+            SphericalCoordinates.ToDirection(new GeoCoordinate(latitude, longitude));
+        return new Vector3D(direction.X, direction.Y, direction.Z);
+    }
+}

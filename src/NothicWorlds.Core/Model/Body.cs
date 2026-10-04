@@ -170,6 +170,11 @@ public sealed class Body
             return "only planets and moons can be flat";
         }
 
+        if (!HasSurface && !Surface.Heights.IsEmpty)
+        {
+            return "only planets and moons can be sculpted";
+        }
+
         if (Rings is PlanetRings rings && (!HasSurface || rings.Problem() is not null))
         {
             return HasSurface ? rings.Problem() : "only planets and moons can have rings";
