@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 26: Visual Styles** · In progress (owner's choice, 2026-10-04)
+**Milestone 26: Visual Styles** · Complete (PR #70 merged 2026-10-04; owner's choice, 2026-10-04)
 Let each world choose how it's drawn (`REN-05`). Owner's decisions:
 - **Three styles:** **Painterly** (soft bands of light, brushy surfaces, gentle outlines),
   **Realistic** (today's lighting, unchanged), and **Simple** (flat colors, a crisp day and night,
