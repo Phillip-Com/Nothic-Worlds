@@ -108,6 +108,18 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 26: Visual Styles** · In progress (owner's choice, 2026-10-04)
+Let each world choose how it's drawn (`REN-05`). Owner's decisions:
+- **Three styles:** **Painterly** (soft bands of light, brushy surfaces, gentle outlines),
+  **Realistic** (today's lighting, unchanged), and **Simple** (flat colors, a crisp day and night,
+  clean outlines).
+- **Made in the surface shaders,** not a whole-screen filter: cheap on the baseline laptop
+  (Base tier), and labels, grid lines, and handles stay sharp.
+- **Stored per world,** in the file (format version 25), so a world keeps its look when it's
+  saved or shared.
+- **Painterly is the default for every world,** new and existing; Realistic is one click away.
+- **Two PRs:** the style in Core and the file (PR #69), then the looks and the picker.
+
 **Milestone 25: Shapes, Holes, and Hollow Worlds** · Complete (PR #67 merged 2026-10-04; owner's choice, 2026-10-04)
 The rest of body sculpting (`BOD-04`): shapes added to or cut out of a world. Owner's decisions:
 - **Sphere, box, cylinder, and cone,** each **added** or **cut**: domes and craters, walls and
@@ -534,10 +546,16 @@ folder (`user://settings.cfg`); a missing or damaged file gives the defaults.
   off); the aids readable, the region name under the mouse, and the aids beside the open System
   panel. Benchmark unchanged (~197 fps both).
 
-**REN-05 — Visual styles** · Idea · Base
+**REN-05 — Visual styles** · In Progress (M26: PR #69) · Base
 **Intent:** Painterly is the default style. The goal is to let users choose other styles, such
 as realistic or simple.
-**Implementation:** —
+**Implementation (the style in Core, M26, PR #69):**
+- **`Model/VisualStyle.cs`:** `Painterly` (the default), `Realistic`, `Simple`; `World.Style`
+  (copied by `World.Clone`).
+- **Saving:** format **version 25**, a top-level `style` (world-format.md), always written;
+  older files have none and load as Painterly (owner's choice: painterly for all). Tested: the
+  golden file, each style written by name and read back, version 24 files, and refusing an
+  unknown style.
 
 **REN-06 — First-person surface view** · Future · Advanced (probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.

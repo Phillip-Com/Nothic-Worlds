@@ -7,6 +7,7 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-04 | Milestone 26: **visual styles** Painterly, Realistic, and Simple, made **in the surface shaders**, **stored per world** (format v25), **Painterly the default for every world**, two PRs | In PR | [#69](https://github.com/Phillip-Com/Nothic-Worlds/pull/69) | VISION.md §3, `REN-05` |
 | 2026-10-04 | Shapes are placed in the Terrain panel's **Shapes** mode: a click places one (5% of the radius across; added boxes, cylinders, and cones sit on the ground), handles move, resize, and turn it, and a list with fields gives exact values | Merged | [#67](https://github.com/Phillip-Com/Nothic-Worlds/pull/67) · `4e0788d` | Owner's choice of placing; sizes and fields are Claude's design within the plan. VISION.md `BOD-04` |
 | 2026-10-04 | Live number fields apply typed text only once it's a whole number, so negative values can be typed | Merged | [#67](https://github.com/Phillip-Com/Nothic-Worlds/pull/67) · `4e0788d` | Bug found in testing (a lone "-" became 0). VISION.md `BOD-04` |
 | 2026-10-04 | Shaped worlds carve a **coarser globe** (32 squares a face, ~0.25 s a change) and show a dragged shape as a **see-through preview, carved on release** | Merged | [#66](https://github.com/Phillip-Com/Nothic-Worlds/pull/66) · `8ff357a` | Owner's choice after measuring CSG (1.5 s at the Standard mesh). VISION.md `BOD-04` |
