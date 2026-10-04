@@ -89,6 +89,7 @@ public partial class ViewMenu : Node
             "body (and around what it circles) would stay steady, red where they wouldn't.");
         menu.AddSubmenuNodeItem("Relief", BuildReliefMenu());
         menu.AddSubmenuNodeItem("Relief Detail", BuildReliefDetailMenu());
+        menu.AddSubmenuNodeItem("Relief Shading", BuildReliefShadingMenu());
         menu.AboutToPopup += () => ShowChecks(menu);
         menu.IdPressed += id => Toggle((MenuItem)(int)id);
         Toolbar.MenuArea.AddChild(_button);
@@ -205,5 +206,34 @@ public partial class ViewMenu : Node
             }
         };
         return detail;
+    }
+
+    // How relief is shaded: by the sunlight, or map-style from a fixed direction.
+    private PopupMenu BuildReliefShadingMenu()
+    {
+        const int sunlight = 0;
+        const int mapStyle = 1;
+        var shading = new PopupMenu();
+        shading.AddRadioCheckItem("Sunlight", sunlight);
+        shading.SetItemTooltip(0, "Lit by the star, as it really would be: relief shows best " +
+            "near sunrise and sunset");
+        shading.AddRadioCheckItem("Map-style", mapStyle);
+        shading.SetItemTooltip(1, "Lit from the northwest as on printed maps, so relief always " +
+            "shows (the star still makes day and night)");
+        shading.AboutToPopup += () =>
+        {
+            bool map = System?.MapStyleShading ?? false;
+            shading.SetItemChecked(shading.GetItemIndex(sunlight), !map);
+            shading.SetItemChecked(shading.GetItemIndex(mapStyle), map);
+        };
+        shading.IdPressed += id =>
+        {
+            if (System is not null)
+            {
+                System.MapStyleShading = id == mapStyle;
+                AppSettings.MapStyleShading = System.MapStyleShading;
+            }
+        };
+        return shading;
     }
 }

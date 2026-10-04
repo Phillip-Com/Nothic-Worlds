@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 24: Body Sculpting (Heights)** · In progress (owner's choice, 2026-10-04)
+**Milestone 24: Body Sculpting (Heights)** · Complete (PR #63 merged 2026-10-04; owner's choice, 2026-10-04)
 Mold bodies like clay (`BOD-04`), starting with heights. Owner's decisions (the design review
 `BOD-04` asked for):
 - **Heights + shape edits:** a height per cell on the cube-sphere grid painted terrain uses,
@@ -1330,6 +1330,14 @@ built from both. Heights come first (M24), shapes next.
   each stroke as one step back to flat, and the flat-world note. In full sunlight relief shows
   only faintly (it's shaded by real light, and the ambient light softens it), strongest near
   sunrise and sunset or exaggerated further.
+**Implementation (map-style shading, PR #64; owner's choice, a View option):**
+- **View ▸ Relief Shading:** **Sunlight** (true lighting, the default) or **Map-style**: relief
+  lit from the northwest, 45° up, as on printed maps, so it shows at any time of day; the star
+  still makes day and night. The shader multiplies the surface color by how much each slope
+  faces that light, with the slopes steepened 5× for shading and the result softened (between
+  40% and 150% brightness) so steep sides darken without going black. Remembered on this
+  computer (`AppSettings`). Verified in the running app at midday: ridges and a basin that
+  sunlight barely shows stand out. Benchmark: no change.
 
 **BOD-05 — Terrain/biome painting** · Implemented (M11: PR #33, #34, #35) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.

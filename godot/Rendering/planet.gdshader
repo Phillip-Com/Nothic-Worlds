@@ -99,6 +99,9 @@ const int TERRAIN_FAR_SIZE = 256;
 uniform bool has_heights = false;
 uniform sampler2DArray heights : filter_linear_mipmap, repeat_disable;
 uniform float relief_scale = 0.0;
+// Map-style shading (owner's choice, a View option): relief lit from a fixed direction, the
+// northwest 45° up as on printed maps, so it always shows; the sun still makes day and night.
+uniform bool map_shading = false;
 
 // The softest edge between terrains up close, in cells (edges sharpen to about a pixel as
 // cells get bigger on screen, and never go softer than this).
@@ -648,6 +651,23 @@ vec3 surface_look(vec3 unit_direction) {
 	return color;
 }
 
+// How bright map-style shading makes ground facing `normal` at `direction`: 1 on level ground,
+// brighter on slopes facing the northwest light, darker on those facing away. Like printed
+// relief maps, it steepens the slopes for shading (MAP_SHADE_STEEPENING times), so gentle
+// relief still shows.
+const float MAP_SHADE_STEEPENING = 5.0;
+
+float map_shade(vec3 normal, vec3 direction) {
+	normal = normalize(direction + (normal - direction) * MAP_SHADE_STEEPENING);
+	vec3 toward_pole = vec3(0.0, 1.0, 0.0) - direction * direction.y;
+	vec3 north = length(toward_pole) > 1e-4 ? normalize(toward_pole) : vec3(0.0, 0.0, 1.0);
+	vec3 east = cross(north, direction);
+	vec3 light = normalize(direction + north - east);  // From the northwest, 45° up
+	// Softened, as printed relief is: steep slopes darken without going black.
+	float facing = dot(normal, light) / dot(direction, light);
+	return clamp(1.0 + 0.6 * (facing - 1.0), 0.4, 1.5);
+}
+
 void vertex() {
 	local_direction = VERTEX;
 	if (has_heights && !flat_disc) {
@@ -707,6 +727,10 @@ void fragment() {
 	ROUGHNESS = 0.9;
 	if (has_heights && !flat_disc) {
 		vec3 normal = relief_normal(direction, pixel_angle);
-		NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(normal, 0.0)).xyz);
+		if (map_shading) {
+			ALBEDO *= map_shade(normal, direction);
+		} else {
+			NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(normal, 0.0)).xyz);
+		}
 	}
 }

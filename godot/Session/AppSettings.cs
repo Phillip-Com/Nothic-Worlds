@@ -16,6 +16,7 @@ public static class AppSettings
     private const string FilePath = "user://settings.cfg";
     private const string DisplaySection = "display";
     private const string ReliefDetailKey = "relief_detail";
+    private const string MapShadingKey = "map_style_shading";
 
     /// <summary>How finely sculpted globes are drawn (View ▸ Relief Detail).</summary>
     public static ReliefDetail ReliefDetail
@@ -29,17 +30,14 @@ public static class AppSettings
                 ? detail
                 : ReliefDetail.Standard;
         }
-        set
-        {
-            ConfigFile file = Load();
-            file.SetValue(DisplaySection, ReliefDetailKey, value.ToString());
-            Error error = file.Save(FilePath);
-            if (error != Error.Ok)
-            {
-                // Not worth stopping for: the setting still applies until the app closes.
-                GD.PushWarning($"Couldn't save the settings ({error}).");
-            }
-        }
+        set => Save(ReliefDetailKey, value.ToString());
+    }
+
+    /// <summary>Whether relief is shaded map-style (View ▸ Relief Shading).</summary>
+    public static bool MapStyleShading
+    {
+        get => Load().GetValue(DisplaySection, MapShadingKey, false).AsBool();
+        set => Save(MapShadingKey, value);
     }
 
     private static ConfigFile Load()
@@ -47,5 +45,17 @@ public static class AppSettings
         var file = new ConfigFile();
         file.Load(FilePath);  // A missing or unreadable file leaves it empty: the defaults.
         return file;
+    }
+
+    private static void Save(string key, Variant value)
+    {
+        ConfigFile file = Load();
+        file.SetValue(DisplaySection, key, value);
+        Error error = file.Save(FilePath);
+        if (error != Error.Ok)
+        {
+            // Not worth stopping for: the setting still applies until the app closes.
+            GD.PushWarning($"Couldn't save the settings ({error}).");
+        }
     }
 }
