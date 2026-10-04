@@ -12,9 +12,9 @@ namespace NothicWorlds.Core.Simulation;
 /// set by the system: a body whose year's orbit runs through a dense belt has many close passes,
 /// fewer the farther its orbit stays from the belt, and very rarely an impact (more likely for
 /// a bigger body). A moon shares its planet's orbit, and so its belt.</para>
-/// <para>The chances are rolled with a fixed recipe seeded by the body, the belt, and the year
-/// (counted from the world's time 0), so the same world always has the same events, and only
-/// edits change them.</para>
+/// <para>The chances are rolled with a fixed recipe (<see cref="SeededRandom"/>) seeded by the
+/// body, the belt, and the year (counted from the world's time 0), so the same world always has
+/// the same events, and only edits change them.</para>
 /// </remarks>
 public static class AsteroidEvents
 {
@@ -93,7 +93,11 @@ public static class AsteroidEvents
     private static IEnumerable<AsteroidEvent> YearOf(
         Body body, AsteroidBelt belt, long index, double year, double passesPerYear)
     {
-        var dice = new Dice(body.Id, belt.Id, index);
+        // Seeded exactly as when asteroid events were first added, so worlds keep their dates.
+        var dice = SeededRandom.FromState(
+            SeededRandom.Mix(BitConverter.ToUInt64(body.Id.ToByteArray(), 0))
+            ^ SeededRandom.Mix(BitConverter.ToUInt64(belt.Id.ToByteArray(), 8))
+            ^ SeededRandom.Mix(unchecked((ulong)index + 0x9E3779B97F4A7C15)));
         double impactShare = Math.Min(1,
             ImpactShare * Math.Pow(body.RadiusKm / EarthRadiusKm, 2));
         int passes = dice.Poisson(passesPerYear);
@@ -121,50 +125,4 @@ public static class AsteroidEvents
     // Sizes follow a power law, as real asteroids' do: most are small, a few are large.
     private static double Size(double roll, double smallest, double largest) =>
         Math.Min(largest, smallest * Math.Pow(Math.Max(roll, 1e-9), -0.7));
-
-    // A fixed recipe for chances (SplitMix64), seeded by the body, belt, and year, so the same
-    // world always rolls the same numbers (unlike System.Random, whose numbers may change
-    // between .NET versions).
-    private sealed class Dice
-    {
-        private ulong _state;
-
-        public Dice(Guid body, Guid belt, long year)
-        {
-            _state = Mix(BitConverter.ToUInt64(body.ToByteArray(), 0))
-                ^ Mix(BitConverter.ToUInt64(belt.ToByteArray(), 8))
-                ^ Mix(unchecked((ulong)year) + 0x9E3779B97F4A7C15);
-        }
-
-        // A number from 0 (included) to 1 (not included).
-        public double Next()
-        {
-            _state = unchecked(_state + 0x9E3779B97F4A7C15);
-            return (Mix(_state) >> 11) * (1.0 / (1UL << 53));
-        }
-
-        // How many of something that happens `mean` times on average (Knuth's method; the
-        // means here are small).
-        public int Poisson(double mean)
-        {
-            double limit = Math.Exp(-mean);
-            int count = 0;
-            for (double product = Next(); product > limit && count < 1000; product *= Next())
-            {
-                count++;
-            }
-
-            return count;
-        }
-
-        private static ulong Mix(ulong value)
-        {
-            unchecked
-            {
-                value = (value ^ (value >> 30)) * 0xBF58476D1CE4E5B9;
-                value = (value ^ (value >> 27)) * 0x94D049BB133111EB;
-                return value ^ (value >> 31);
-            }
-        }
-    }
 }
