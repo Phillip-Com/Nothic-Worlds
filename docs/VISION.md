@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 24: Body Sculpting (Heights)** · In progress (owner's choice, 2026-10-04)
+**Milestone 24: Body Sculpting (Heights)** · Complete (PR #63 merged 2026-10-04; owner's choice, 2026-10-04)
 Mold bodies like clay (`BOD-04`), starting with heights. Owner's decisions (the design review
 `BOD-04` asked for):
 - **Heights + shape edits:** a height per cell on the cube-sphere grid painted terrain uses,
