@@ -120,7 +120,7 @@ More world shapes (`BOD-02`): a world tree. Owner's decisions:
 - **It turns:** each realm circles the trunk once per turn, its year, so seasons work as for a
   planet around a star.
 - **Three PRs:** the tree itself (PR #53), realms on its branches (PR #54), and its glow as
-  their sun.
+  their sun (PR #55).
 
 **Milestone 20: Astral Features** · Complete (PR #52 merged 2026-10-04; owner's choice, 2026-10-03)
 Rings, asteroid belts, and nebulas (`BOD-03`), and asteroid events (the rest of `EVT-02`).
@@ -982,7 +982,7 @@ place).
   then undid it; undid and redid the whole session (back to "saved" at the start); and save →
   reopen kept the system. Benchmark: same as `main` back to back (~141 fps).
 
-**BOD-02 — Non-standard bodies** · Implemented (M19: flat worlds); world tree in progress (M21) · Base
+**BOD-02 — Non-standard bodies** · Implemented (M19: flat worlds; M21: world tree) · Base
 **Intent:** Support bodies that aren't spheres, such as flat worlds and world trees.
 **Notes / open questions:** How these interact with physics, orbits, and light/shadow. Flat
 worlds (M19): orbits are unchanged; light is physical (the disc tumbles); eclipses still treat
@@ -1108,6 +1108,28 @@ the body as a sphere of its radius. World trees (M21) hold realms on their branc
   planet on branch 1, the locked fields, the realm on the tip and carried round a quarter turn
   later, a reshaped tree moving it, the refused branch removal, letting it go, and undo.
   Benchmark: no change.
+
+**Implementation (its glow as the realms' sun, M21, PR #55):**
+- **Model:** `Body.GivesLight`: a star, or a world tree whose glow is above zero. Everything that
+  looked for "the star" (seasons, years, weather, eclipses, meteor showers, asteroid events)
+  now looks for a body that gives light, so a glowing tree is its realms' sun and a dark one
+  leaves them to the star the tree circles. No format change.
+- **Where the light comes from** (`Seasons.SunPath`, Core): a tree glows all over, so a realm is
+  lit by the trunk level with it, not the tree's middle (which, for a high branch, would put
+  the sun far below and give odd seasons). The realm circles that point once a turn, as a
+  planet circles a star, so its day, seasons (four a turn with axial tilt), weather, and
+  eclipses work out the same way. Moons of a realm share its sun.
+- **Calendars:** a realm's year is held to one turn, so fitting the year to a realm's calendar
+  is refused with a reason (change the tree's turn, or fit the day instead); fitting the day
+  still works. A tree's own time reads "Turn 3, day 41" (`BodyClock.Describe`).
+- **App:** a realm's orbit line is drawn again (its path round the trunk), with its season
+  markers on it (`SystemLayout.OrbitPoint` follows the drawn branch). The seasons note mentions
+  a glowing tree. The tree's light in the 3D view still shines from its middle, so a high
+  realm looks lit a little from below; the simulation uses the trunk beside it.
+- **Verified in the running app,** maximized and at 1152 × 648: a planet hung on a glowing tree
+  shows its season and next equinox in the time bar, four season markers round the trunk, and
+  the season list in the calendar section; the tree selected reads "Turn 1, day 1". Weather,
+  the refused year fit, moons, and a dark tree are covered by tests. Benchmark: no change.
 
 **BOD-03 — Other astral features** · Implemented (M20: rings, belts, nebulas) · Base
 **Intent:** Asteroids, nebulas, and similar features.

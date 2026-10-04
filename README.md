@@ -127,7 +127,9 @@ make it the center). Its **World Tree** settings grow its shape: how many great 
 and how far they spread, a shape number, bark and leaf colors, and its glow. Its size is half its
 height, and its day is how long it takes to turn. Any planet or moon can then **hang on** one of
 its branches as a realm (in the System panel's orbit section): it rides the turning tree, one
-turn being its year, and keeps its own maps, terrain, calendar, and weather.
+turn being its year, and keeps its own maps, terrain, calendar, and weather. A glowing tree is
+its realms' sun: their days, seasons, and weather come from its light (a dark tree leaves them to
+the star). Selecting the tree shows its time in turns.
 
 Comets make **meteor showers**: wherever a planet's orbit passes close to a comet's orbit, the
 planet runs into the comet's dust at the same time every year. The panel lists the coming year's
