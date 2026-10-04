@@ -177,6 +177,12 @@ public partial class SystemView : Node3D
     public bool ShowOrbitGuide { get; set; } = true;
 
     /// <summary>
+    /// True while physics mode moves the bodies (VISION.md SIM-03): markers on the designed
+    /// orbits are hidden then.
+    /// </summary>
+    public bool FollowsPhysics => Session?.Physics.IsOn ?? false;
+
+    /// <summary>
     /// Whether painted terrain shows on the globes (View ▸ Terrain), for every globe at once,
     /// including ones added later.
     /// </summary>
@@ -337,7 +343,9 @@ public partial class SystemView : Node3D
         World world = Session.World;
         try
         {
-            _layout = SystemLayout.At(world.Bodies, world.TimeDays, _scale);
+            _layout = PhysicsPositions(world) is { } physics
+                ? SystemLayout.At(world.Bodies, physics, _scale)
+                : SystemLayout.At(world.Bodies, world.TimeDays, _scale);
         }
         catch (ArgumentException error)
         {
@@ -346,7 +354,7 @@ public partial class SystemView : Node3D
             return;
         }
 
-        if (!_layout.TryGetValue(_focusId, out DisplayBody focus))
+        if (!_layout.TryGetValue(FollowMerges(_focusId), out DisplayBody focus))
         {
             return;
         }
@@ -369,6 +377,10 @@ public partial class SystemView : Node3D
             {
                 PlaceBody(visual, body, place, world.TimeDays);
                 anyStar |= body.Kind == BodyKind.Star || body.Tree?.GlowStrength > 0;
+            }
+            else if (_visuals.TryGetValue(body.Id, out BodyVisual? merged))
+            {
+                Hide(merged);  // Merged into another body in physics mode
             }
         }
 
@@ -395,6 +407,12 @@ public partial class SystemView : Node3D
 
     private void PlaceBody(BodyVisual visual, Body body, DisplayBody place, double timeDays)
     {
+        visual.Root.Visible = true;
+        if (visual.Light is not null)
+        {
+            visual.Light.Visible = true;
+        }
+
         visual.Root.Transform = new Transform3D(
             Orientation(body, timeDays).Scaled(Vector3.One * (float)place.Radius),
             ToScene(place.Position));
@@ -434,9 +452,57 @@ public partial class SystemView : Node3D
             line.Position = ToScene(parent.Position);
             bool highlighted = body.Id == HighlightedOrbit;
             line.MaterialOverride = highlighted ? _highlightMaterial : null;
-            line.Visible = highlighted || body.Id != _focusId
-                || (Camera?.CurrentAltitude ?? float.MaxValue) > OwnOrbitLineAltitude;
+            // In physics mode bodies leave their designed orbits, so the lines would mislead.
+            line.Visible = !FollowsPhysics && (highlighted || body.Id != _focusId
+                || (Camera?.CurrentAltitude ?? float.MaxValue) > OwnOrbitLineAltitude);
         }
+    }
+
+    private static void Hide(BodyVisual visual)
+    {
+        visual.Root.Visible = false;
+        if (visual.Light is not null)
+        {
+            visual.Light.Visible = false;
+        }
+
+        if (visual.OrbitLine is not null)
+        {
+            visual.OrbitLine.Visible = false;
+        }
+
+        if (visual.Tail is not null)
+        {
+            visual.Tail.Mesh.Visible = false;
+        }
+    }
+
+    // Physics mode's latest positions, once it has any (VISION.md SIM-03); null to draw the
+    // designed orbits. Asks it to work out the clock's time next.
+    private IReadOnlyDictionary<Guid, Vector3D>? PhysicsPositions(World world)
+    {
+        if (Session?.Physics is not { IsOn: true } physics)
+        {
+            return null;
+        }
+
+        physics.Follow(world.TimeDays);
+        return physics.Latest?.Positions;
+    }
+
+    // The body a body ended up in, after any merges in physics mode (itself if none).
+    private Guid FollowMerges(Guid bodyId)
+    {
+        IReadOnlyList<Collision> collisions = Session?.Physics.Latest?.Collisions ?? [];
+        for (int i = 0; i < collisions.Count && !_layout.ContainsKey(bodyId); i++)
+        {
+            if (collisions[i].AbsorbedId == bodyId)
+            {
+                bodyId = collisions[i].IntoId;
+            }
+        }
+
+        return bodyId;
     }
 
     // Draws every star's belts around it, making a belt's rocks anew when it's added or edited

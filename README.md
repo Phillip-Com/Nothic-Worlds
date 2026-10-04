@@ -89,6 +89,14 @@ warns about orbits gravity wouldn't keep, and shows the period gravity would giv
 to set it. Your orbits never change on their own. Switch the rings off with **View ▸ Orbit
 Guide**.
 
+**Physics** (the switch in the time bar) moves the bodies by real gravity from that moment, each
+starting at its orbit's natural speed, so you can watch whether your system holds together.
+Only the view follows it: seasons, calendars, eclipses, and weather stay on your designed
+orbits, and the orbit lines hide while it's on. Bodies that meet merge, the smaller into the
+bigger, and the System panel lists each collision (with **Go to**). **Keep as Orbits** makes the
+paths gravity has the bodies on your designed orbits (Ctrl+Z undoes it); switching physics off
+goes back to your design.
+
 Planets and moons can have their own calendar: **Calendar · Edit…** in the panel sets its months,
 weekdays, year numbering (with an optional era), and the date the clock starts on. **Leap
 Years** adds days to a month on a rule like ours ("every 4 years, except every 100, but every

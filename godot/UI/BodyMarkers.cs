@@ -231,12 +231,13 @@ public partial class BodyMarkers : CanvasLayer
             }
         }
 
-        if (_showSeasons)
+        // In physics mode the bodies leave the designed orbits these markers sit on.
+        if (_showSeasons && !System!.FollowsPhysics)
         {
             DrawSeasonMarkers(font);
         }
 
-        if (_showShowers)
+        if (_showShowers && !System!.FollowsPhysics)
         {
             DrawShowerMarkers(font);
         }
