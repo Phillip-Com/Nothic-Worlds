@@ -106,6 +106,20 @@ public sealed class Body
     /// </summary>
     public double AverageTemperatureC { get; set; } = 15.0;
 
+    /// <summary>The lowest density a body can have, in g/cm³ (thinner than giant stars).</summary>
+    public const double MinDensityGramsPerCm3 = 1e-6;
+
+    /// <summary>The highest density a body can have, in g/cm³ (about a white dwarf's).</summary>
+    public const double MaxDensityGramsPerCm3 = 1e7;
+
+    /// <summary>
+    /// How dense the body is, in g/cm³ (Earth: 5.5), which with its size gives its mass
+    /// (VISION.md SIM-04; owner's choice: set as density). Null for the typical density of its
+    /// kind and size, worked out by <c>Simulation.BodyMass</c>, which follows the body as it's
+    /// resized.
+    /// </summary>
+    public double? DensityGramsPerCm3 { get; set; }
+
     /// <summary>The body's own calendar (VISION.md CAL-01), or null to count plain days.</summary>
     public Calendar? Calendar { get; set; }
 
@@ -142,6 +156,13 @@ public sealed class Body
         {
             return $"a body's average temperature must be {MinAverageTemperatureC} °C to " +
                 $"{MaxAverageTemperatureC} °C";
+        }
+
+        if (DensityGramsPerCm3 is double density && (!double.IsFinite(density)
+            || density is < MinDensityGramsPerCm3 or > MaxDensityGramsPerCm3))
+        {
+            return $"a body's density must be {MinDensityGramsPerCm3:g} to " +
+                $"{MaxDensityGramsPerCm3:g} g/cm³";
         }
 
         if (!HasSurface && Shape != BodyShape.Sphere)
@@ -195,8 +216,8 @@ public sealed class Body
 
     /// <summary>
     /// True if <paramref name="other"/> would save exactly the same body: the same name, kind,
-    /// shape, size, day, tilt, orbit, branch, appearance, rings, belts, tree, and surface. Used
-    /// to tell whether the world still matches its saved file.
+    /// shape, size, day, tilt, density, orbit, branch, appearance, rings, belts, tree, and
+    /// surface. Used to tell whether the world still matches its saved file.
     /// </summary>
     public bool HasSameContent(Body other)
     {
@@ -206,6 +227,7 @@ public sealed class Body
             && AxialTiltDegrees == other.AxialTiltDegrees
             && AxialTiltDirectionDegrees == other.AxialTiltDirectionDegrees
             && AverageTemperatureC == other.AverageTemperatureC
+            && DensityGramsPerCm3 == other.DensityGramsPerCm3
             && Orbit == other.Orbit && Calendar == other.Calendar
             && Appearance == other.Appearance && Rings == other.Rings
             && Belts.SequenceEqual(other.Belts) && Tree == other.Tree && Branch == other.Branch
@@ -226,6 +248,7 @@ public sealed class Body
             AxialTiltDegrees = AxialTiltDegrees,
             AxialTiltDirectionDegrees = AxialTiltDirectionDegrees,
             AverageTemperatureC = AverageTemperatureC,
+            DensityGramsPerCm3 = DensityGramsPerCm3,
             Orbit = Orbit,  // Immutable, safe to share.
             Calendar = Calendar,  // Immutable, safe to share.
             Appearance = Appearance,  // Immutable, safe to share.

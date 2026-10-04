@@ -5965,6 +5965,516 @@ public sealed class WorldPackageTests : IDisposable
         }
         """;
 
+    private const string GoldenV22Json = """
+        {
+          "formatVersion": 22,
+          "id": "11111111-2222-3333-4444-555555555555",
+          "name": "Aerth",
+          "createdUtc": "2026-09-30T12:00:00+00:00",
+          "modifiedUtc": "2026-09-30T13:30:00+00:00",
+          "timeDays": 400.5,
+          "bodies": [
+            {
+              "id": "51515151-5151-5151-5151-515151515151",
+              "name": "Sol",
+              "kind": "star",
+              "radiusKm": 696000,
+              "dayLengthHours": 609.5,
+              "axialTilt": 0,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "appearance": {
+                "starType": "orange"
+              },
+              "belts": [
+                {
+                  "id": "b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1",
+                  "name": "Main Belt",
+                  "innerKm": 329000000,
+                  "outerKm": 494000000,
+                  "thickness": 12,
+                  "density": 0.6,
+                  "color": "#8A7F72"
+                }
+              ],
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aerth",
+              "kind": "planet",
+              "radiusKm": 6000,
+              "dayLengthHours": 26.5,
+              "axialTilt": 23.5,
+              "axialTiltDirection": 45,
+              "averageTemperature": 12.5,
+              "orbit": {
+                "parent": "51515151-5151-5151-5151-515151515151",
+                "distanceKm": 149600000,
+                "periodDays": 365.25,
+                "startAngle": 90
+              },
+              "calendar": {
+                "months": [
+                  {
+                    "name": "Frost",
+                    "days": 30
+                  },
+                  {
+                    "name": "Highsun",
+                    "days": 31
+                  }
+                ],
+                "weekdays": [
+                  "Moonday",
+                  "Starday"
+                ],
+                "firstYear": 1203,
+                "era": "of the Third Age",
+                "start": {
+                  "month": 1,
+                  "day": 5,
+                  "weekday": 1
+                },
+                "fit": "year-length",
+                "monthMoon": "70707070-7070-7070-7070-707070707070",
+                "leap": {
+                  "every": 4,
+                  "except": 100,
+                  "exceptAgain": 400,
+                  "month": 1,
+                  "days": 1
+                }
+              },
+              "appearance": {
+                "color": "#336699",
+                "pattern": "banded"
+              },
+              "rings": {
+                "inner": 1.25,
+                "outer": 2.3,
+                "color": "#D8C8A8"
+              },
+              "surface": {
+                "map": {
+                  "asset": "assets/0123456789abcdef0123456789abcdef.png",
+                  "projection": "winkel-tripel",
+                  "calibration": {
+                    "latitudes": [
+                      {
+                        "latitude": 30,
+                        "drawnAs": 33.5
+                      }
+                    ],
+                    "longitudes": [
+                      {
+                        "longitude": -180,
+                        "drawnAs": -185
+                      },
+                      {
+                        "longitude": 0,
+                        "drawnAs": 2
+                      }
+                    ]
+                  }
+                },
+                "pieces": [
+                  {
+                    "id": "99999999-8888-7777-6666-555555555555",
+                    "name": "Northern Isles",
+                    "asset": "assets/fedcba9876543210fedcba9876543210.png",
+                    "outline": {
+                      "sourceAspectRatio": 1.5,
+                      "points": [
+                        [
+                          0.25,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.5
+                        ],
+                        [
+                          0.25,
+                          0.5
+                        ]
+                      ]
+                    },
+                    "latitude": 55,
+                    "longitude": -20.5,
+                    "rotation": 15,
+                    "width": 12.5,
+                    "warp": [
+                      [
+                        0,
+                        0
+                      ],
+                      [
+                        1.25,
+                        -0.125
+                      ],
+                      [
+                        1,
+                        1
+                      ],
+                      [
+                        0,
+                        1
+                      ]
+                    ]
+                  }
+                ],
+                "fillColor": "#112233",
+                "terrain": "terrain/aaaaaaaabbbbccccddddeeeeeeeeeeee.png"
+              }
+            },
+            {
+              "id": "70707070-7070-7070-7070-707070707070",
+              "name": "Luna",
+              "kind": "moon",
+              "shape": "flat-disc",
+              "radiusKm": 1737.5,
+              "dayLengthHours": 660,
+              "axialTilt": 1.5,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "orbit": {
+                "parent": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "distanceKm": 384400,
+                "periodDays": 27.5,
+                "startAngle": 0,
+                "eccentricity": 0.25,
+                "closestApproach": 45,
+                "tilt": 5.25,
+                "tiltDirection": 120
+              },
+              "appearance": {
+                "color": "#8A8A8A",
+                "pattern": "rocky"
+              },
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "c0c0c0c0-c0c0-c0c0-c0c0-c0c0c0c0c0c0",
+              "name": "Halley",
+              "kind": "comet",
+              "radiusKm": 5.5,
+              "dayLengthHours": 52.8,
+              "axialTilt": 0,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "orbit": {
+                "parent": "51515151-5151-5151-5151-515151515151",
+                "distanceKm": 2667950000,
+                "periodDays": 27510,
+                "startAngle": 200,
+                "eccentricity": 0.95,
+                "closestApproach": 111,
+                "tilt": 162,
+                "tiltDirection": 58
+              },
+              "appearance": {
+                "color": "#C8C4BC",
+                "pattern": "rocky"
+              },
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "77777777-7777-7777-7777-777777777777",
+              "name": "Yggdrasil",
+              "kind": "world-tree",
+              "radiusKm": 150000,
+              "dayLengthHours": 8766,
+              "axialTilt": 0,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "orbit": {
+                "parent": "51515151-5151-5151-5151-515151515151",
+                "distanceKm": 300000000,
+                "periodDays": 1000,
+                "startAngle": 90
+              },
+              "appearance": {
+                "color": "#214573",
+                "pattern": "plain"
+              },
+              "tree": {
+                "branches": 9,
+                "spread": 0.9,
+                "seed": 7,
+                "bark": "#5A4230",
+                "leaves": "#4F8A4A",
+                "glow": "#FFD98A",
+                "glowStrength": 1.5
+              },
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "88888888-8888-8888-8888-888888888888",
+              "name": "Asgard",
+              "kind": "planet",
+              "radiusKm": 6371,
+              "dayLengthHours": 24,
+              "axialTilt": 0,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "density": 2.5,
+              "orbit": {
+                "parent": "77777777-7777-7777-7777-777777777777",
+                "distanceKm": 73069.76232989965,
+                "periodDays": 365.25,
+                "startAngle": 92.78477261611476,
+                "tiltDirection": 90,
+                "height": 53888.88141821377
+              },
+              "appearance": {
+                "color": "#214573",
+                "pattern": "plain"
+              },
+              "branch": 0,
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            }
+          ],
+          "terrainTypes": [
+            {
+              "code": 1,
+              "name": "Ocean",
+              "color": "#1F4E79",
+              "climate": "water"
+            },
+            {
+              "code": 2,
+              "name": "Shallow Water",
+              "color": "#3A86B8",
+              "climate": "water"
+            },
+            {
+              "code": 3,
+              "name": "Plains",
+              "color": "#A8C66C",
+              "climate": "open-land"
+            },
+            {
+              "code": 4,
+              "name": "Fields",
+              "color": "#D8C878",
+              "climate": "open-land"
+            },
+            {
+              "code": 5,
+              "name": "Forest",
+              "color": "#2F6B35",
+              "climate": "forest"
+            },
+            {
+              "code": 6,
+              "name": "Jungle",
+              "color": "#1E5631",
+              "climate": "forest"
+            },
+            {
+              "code": 7,
+              "name": "Hills",
+              "color": "#8C9A5B",
+              "climate": "open-land"
+            },
+            {
+              "code": 8,
+              "name": "Mountains",
+              "color": "#7D6E62",
+              "climate": "mountains"
+            },
+            {
+              "code": 9,
+              "name": "Desert",
+              "color": "#E3C78F",
+              "climate": "desert"
+            },
+            {
+              "code": 10,
+              "name": "Swamp",
+              "color": "#4F6B4A",
+              "climate": "wetland"
+            },
+            {
+              "code": 11,
+              "name": "Tundra",
+              "color": "#A3A88E",
+              "climate": "open-land"
+            },
+            {
+              "code": 12,
+              "name": "Glacier",
+              "color": "#EEF3F7",
+              "climate": "ice"
+            },
+            {
+              "code": 13,
+              "name": "Crystal Wastes",
+              "color": "#B0E0E6",
+              "climate": "desert"
+            }
+          ],
+          "regions": [
+            {
+              "id": "4e4e4e4e-4e4e-4e4e-4e4e-4e4e4e4e4e4e",
+              "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "The Western Coast",
+              "notes": "Fishing towns.",
+              "color": "#5090D0",
+              "corners": [
+                [
+                  10,
+                  -35
+                ],
+                [
+                  10,
+                  -25
+                ],
+                [
+                  16,
+                  -25
+                ],
+                [
+                  16.5,
+                  -35
+                ]
+              ]
+            },
+            {
+              "id": "4f4f4f4f-4f4f-4f4f-4f4f-4f4f4f4f4f4f",
+              "body": "70707070-7070-7070-7070-707070707070",
+              "name": "Sea of Rain",
+              "color": "#E6C878",
+              "corners": [
+                [
+                  20,
+                  10
+                ],
+                [
+                  25,
+                  30
+                ],
+                [
+                  35,
+                  15
+                ]
+              ]
+            }
+          ],
+          "weatherPins": [
+            {
+              "id": "3c3c3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c",
+              "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aster Bay",
+              "latitude": 42.5,
+              "longitude": -71.25
+            }
+          ],
+          "journal": [
+            {
+              "id": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+              "title": "The Founding",
+              "text": "First line.\nSecond line.",
+              "location": {
+                "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "region": "4e4e4e4e-4e4e-4e4e-4e4e-4e4e4e4e4e4e",
+                "latitude": 12.5,
+                "longitude": -30.25
+              },
+              "createdUtc": "2026-10-02T09:00:00+00:00",
+              "editedUtc": "2026-10-02T10:15:00+00:00"
+            },
+            {
+              "id": "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2",
+              "title": "Notes on Luna",
+              "location": {
+                "body": "70707070-7070-7070-7070-707070707070"
+              },
+              "createdUtc": "2026-10-02T11:00:00+00:00",
+              "editedUtc": "2026-10-02T11:00:00+00:00"
+            }
+          ],
+          "timelines": [
+            {
+              "id": "7e7e7e7e-7e7e-7e7e-7e7e-7e7e7e7e7e7e",
+              "name": "The Empire",
+              "color": "#C04040"
+            },
+            {
+              "id": "7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f",
+              "name": "House Vael",
+              "color": "#40A060",
+              "hidden": true
+            }
+          ],
+          "events": [
+            {
+              "id": "0e0e0e0e-0e0e-0e0e-0e0e-0e0e0e0e0e0e",
+              "timeline": "7e7e7e7e-7e7e-7e7e-7e7e-7e7e7e7e7e7e",
+              "title": "Coronation",
+              "start": 120.5,
+              "location": {
+                "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "latitude": 12.5,
+                "longitude": -30.25
+              },
+              "entries": [
+                "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1"
+              ]
+            },
+            {
+              "id": "0f0f0f0f-0f0f-0f0f-0f0f-0f0f0f0f0f0f",
+              "timeline": "7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f",
+              "title": "The Long War",
+              "description": "Twelve years of war.",
+              "start": 400,
+              "end": 4783.25,
+              "entries": [
+                "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+                "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2"
+              ]
+            }
+          ],
+          "nebulas": [
+            {
+              "id": "ebebebeb-ebeb-ebeb-ebeb-ebebebebebeb",
+              "name": "Veil",
+              "latitude": 20,
+              "longitude": 135,
+              "size": 30,
+              "brightness": 0.6,
+              "color": "#B04080",
+              "secondColor": "#4060C0"
+            }
+          ],
+          "view": {
+            "latitude": 20,
+            "longitude": -45.5,
+            "altitude": 1.25,
+            "focusOffset": [
+              0.5,
+              0,
+              -0.25
+            ]
+          }
+        }
+        """;
+
     private const string GoldenV21Json = """
         {
           "formatVersion": 21,
@@ -6557,13 +7067,51 @@ public sealed class WorldPackageTests : IDisposable
     // ----- The file format itself -----
 
     [Fact]
-    public void WrittenJson_MatchesTheGoldenVersion21File()
+    public void WrittenJson_MatchesTheGoldenVersion22File()
     {
         string path = PathFor("golden.nworld");
 
-        WorldPackage.Save(path, RealmGoldenWorld(), AssetsWithPiece());
+        WorldPackage.Save(path, DensityGoldenWorld(), AssetsWithPiece());
 
-        Assert.Equal(Normalize(GoldenV21Json), Normalize(ReadEntry(path, "world.json")));
+        Assert.Equal(Normalize(GoldenV22Json), Normalize(ReadEntry(path, "world.json")));
+    }
+
+    [Fact]
+    public void GoldenVersion22File_LoadsAsExpected()
+    {
+        string path = WriteRawPackage("golden-v22.nworld", GoldenV22Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes),
+            (TerrainEntryName, TerrainImageBytes(TerrainGoldenWorld())));
+
+        AssertSameWorld(DensityGoldenWorld(), WorldPackage.Load(path).World);
+    }
+
+    [Fact]
+    public void Version21Files_HaveTypicalDensities()
+    {
+        string path = WriteRawPackage("golden-v21-upgrade.nworld", GoldenV21Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes),
+            (TerrainEntryName, TerrainImageBytes(TerrainGoldenWorld())));
+
+        Assert.All(WorldPackage.Load(path).World.Bodies,
+            body => Assert.Null(body.DensityGramsPerCm3));
+    }
+
+    [Theory]
+    [InlineData("\"density\": 0")]
+    [InlineData("\"density\": -2.5")]
+    [InlineData("\"density\": 1e9")]
+    public void Load_InvalidDensities_AreRefused(string replace)
+    {
+        string json = Normalize(GoldenV22Json).Replace("\"density\": 2.5", replace);
+        Assert.NotEqual(Normalize(GoldenV22Json), json);  // The edit really applied.
+        string path = WriteRawPackage("bad-density.nworld", json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes),
+            (TerrainEntryName, TerrainImageBytes(TerrainGoldenWorld())));
+
+        WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
+
+        Assert.Contains("is damaged", error.Message);
     }
 
     [Fact]
@@ -7398,7 +7946,7 @@ public sealed class WorldPackageTests : IDisposable
 
         WorldPackage.Save(newPath, loaded.World, loaded.Assets);
 
-        Assert.Contains("\"formatVersion\": 21", ReadEntry(newPath, "world.json"));
+        Assert.Contains("\"formatVersion\": 22", ReadEntry(newPath, "world.json"));
         AssertSameWorld(GoldenWorld(), WorldPackage.Load(newPath).World);
     }
 
@@ -7504,7 +8052,7 @@ public sealed class WorldPackageTests : IDisposable
     {
         string path = WriteRawPackage(
             "future.nworld",
-            GoldenV21Json.Replace("\"formatVersion\": 21", "\"formatVersion\": 22"),
+            GoldenV22Json.Replace("\"formatVersion\": 22", "\"formatVersion\": 23"),
             (AssetName, _imageBytes));
 
         WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
@@ -7781,6 +8329,14 @@ public sealed class WorldPackageTests : IDisposable
 
     // A version 9 world: the version 8 world with the planet's average temperature set to
     // 12.5 °C (the others keep the default 15) and one weather pin on it.
+    // A version 22 world: the version 21 world with Asgard given a density.
+    private static World DensityGoldenWorld()
+    {
+        World world = RealmGoldenWorld();
+        world.Bodies.Single(b => b.Name == "Asgard").DensityGramsPerCm3 = 2.5;
+        return world;
+    }
+
     // A version 21 world: the version 20 world with Asgard hung on Yggdrasil's first branch.
     private static World RealmGoldenWorld()
     {
@@ -8198,6 +8754,7 @@ public sealed class WorldPackageTests : IDisposable
             Assert.Equal(e.AxialTiltDegrees, a.AxialTiltDegrees);
             Assert.Equal(e.AxialTiltDirectionDegrees, a.AxialTiltDirectionDegrees);
             Assert.Equal(e.AverageTemperatureC, a.AverageTemperatureC);
+            Assert.Equal(e.DensityGramsPerCm3, a.DensityGramsPerCm3);
             Assert.Equal(e.Calendar, a.Calendar);
             Assert.Equal(e.Orbit, a.Orbit);
             Assert.Equal(e.Appearance, a.Appearance);
