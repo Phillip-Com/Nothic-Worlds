@@ -309,6 +309,18 @@ internal static class WorldMapper
                     Color = body.Appearance.Color.ToHex(),
                     Pattern = WorldFormat.PatternName(body.Appearance.Pattern),
                 },
+            Belts = body.Belts.Count == 0
+                ? null
+                : [.. body.Belts.Select(belt => new BeltDocument
+                {
+                    Id = belt.Id,
+                    Name = belt.Name,
+                    InnerKm = belt.InnerKm,
+                    OuterKm = belt.OuterKm,
+                    Thickness = belt.ThicknessDegrees,
+                    Density = belt.Density,
+                    Color = belt.Color.ToHex(),
+                })],
             Rings = body.Rings is PlanetRings rings
                 ? new RingsDocument
                 {
@@ -560,6 +572,7 @@ internal static class WorldMapper
                 ? ToCalendar(calendar)
                 : null,
             Rings = document.Rings is RingsDocument rings ? ToRings(rings) : null,
+            Belts = [.. (document.Belts ?? []).Select(ToBelt)],
         };
         RequireNoProblem(body.Problem());
         body.Appearance = ToAppearance(document.Appearance, body.Kind);
@@ -589,6 +602,15 @@ internal static class WorldMapper
         }
 
         return body;
+    }
+
+    private static AsteroidBelt ToBelt(BeltDocument? document)
+    {
+        Require(document is not null, "an asteroid belt is empty");
+        Require(RgbColor.TryParseHex(document!.Color, out RgbColor color),
+            $"invalid belt color '{document.Color}'");
+        return new AsteroidBelt(document.Id, document.Name ?? "", document.InnerKm,
+            document.OuterKm, document.Thickness, document.Density, color);
     }
 
     private static PlanetRings ToRings(RingsDocument document)
