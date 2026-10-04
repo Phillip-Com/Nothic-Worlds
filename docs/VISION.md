@@ -452,6 +452,10 @@ retuned zoom limits, or rotating the camera toward the slid planet instead of sl
 **Intent:** Keep requirements low with level-of-detail, quality settings, and rendering only what's
 visible. Heavier features go in an opt-in **Advanced** section.
 **Implementation (M1, PR #3):** measurement tools only. The tiers themselves aren't built yet.
+**Quality settings (M24, PR #61):** the first one, **View ▸ Relief Detail** (Low, Standard,
+High: how finely sculpted globes' shapes are drawn, `BOD-04`). Settings that belong to the
+computer, not the world, live in `godot/Session/AppSettings.cs`, kept in Godot's per-user data
+folder (`user://settings.cfg`); a missing or damaged file gives the defaults.
 - `godot/Diagnostics/PerformanceOverlay.cs`: F3 shows FPS, video memory, app memory, and draw calls.
 - `godot/Diagnostics/Benchmark.cs`: run with `-- --benchmark`. It orbits and zooms for 10 s
   with VSync off, then prints the results. Use it to catch performance regressions.
@@ -1281,9 +1285,11 @@ built from both. Heights come first (M24), shapes next.
   round stamps along it, whose 4% dips between stamps showed as ripples once exaggerated.
   `HeightGrid.SampleAt` blends between the four nearest cells' middles (tested smooth, as the
   shader draws it) and `Highest` gives the tallest cell.
-- **Mesh** (`Rendering/CubeSphereMesh.cs`): a sculpted globe is drawn as a cube-sphere of 96 × 96
-  squares a face (about 11 cells each), its vertices on the height grid's spacing and welded
-  along the faces' edges so the surface can't crack. Unsculpted globes keep the plain sphere.
+- **Mesh** (`Rendering/CubeSphereMesh.cs`): a sculpted globe is drawn as a cube-sphere, its
+  vertices on the height grid's spacing and welded along the faces' edges so the surface can't
+  crack. Unsculpted globes keep the plain sphere. How many squares a face is a quality setting
+  (owner's choice), **View ▸ Relief Detail**: Low 64 (about 158 fps with a sculpted planet
+  filling the screen), Standard 96 (the default, about 148), High 128 (about 140); see `REN-03`.
 - **Shader** (`planet.gdshader`): the heights are a six-layer texture of half-precision floats
   in meters with smaller copies (about 16 MB; drawn heights round by at most 16 m at 32 km,
   saved ones are exact), blended by the graphics card. The vertex stage lifts each vertex by

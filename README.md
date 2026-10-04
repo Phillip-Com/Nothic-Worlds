@@ -92,7 +92,8 @@ Guide**.
 Sculpted planets and moons show their relief: mountains rise and basins sink, shaded by the
 light on their slopes. Real relief is tiny next to a planet, so **View ▸ Relief** exaggerates it
 (10× by default; True Scale shows it as it is). Pins, regions, and the camera keep to the raised
-ground.
+ground. **View ▸ Relief Detail** trades sharper mountain outlines for speed (Low, Standard,
+High); it's remembered on this computer.
 
 **Physics** (the switch in the time bar) moves the bodies by real gravity from that moment, each
 starting at its orbit's natural speed, so you can watch whether your system holds together.
