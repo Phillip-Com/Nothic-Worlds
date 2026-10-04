@@ -321,6 +321,7 @@ internal static class WorldMapper
             AxialTilt = body.AxialTiltDegrees,
             AxialTiltDirection = body.AxialTiltDirectionDegrees,
             AverageTemperature = body.AverageTemperatureC,
+            Atmosphere = body.HasSurface ? body.HasAtmosphere : null,
             Orbit = body.Orbit is Orbit orbit ? ToDocument(orbit) : null,
             Calendar = body.Calendar is Calendar calendar ? ToDocument(calendar) : null,
             Appearance = body.Kind == BodyKind.Star
@@ -651,6 +652,16 @@ internal static class WorldMapper
             DensityGramsPerCm3 = document.Density,
         };
         RequireNoProblem(body.Problem());
+        Require(body.HasSurface || document.Atmosphere is null,
+            "only planets and moons can have an atmosphere");
+
+        if (body.HasSurface)
+        {
+            // Missing in files before version 26: planets have air, moons don't (owner's
+            // choice).
+            body.HasAtmosphere = document.Atmosphere ?? body.Kind == BodyKind.Planet;
+        }
+
         body.Appearance = ToAppearance(document.Appearance, body.Kind);
         body.Surface.FillColor = fillColor;
         if (document.Surface.Terrain is string terrain)

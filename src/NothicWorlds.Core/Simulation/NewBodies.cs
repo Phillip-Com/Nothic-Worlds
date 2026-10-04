@@ -53,6 +53,7 @@ public static class NewBodies
             Name = NextName(bodies, "Moon"),
             Kind = BodyKind.Moon,
             Appearance = BodyAppearance.DefaultFor(BodyKind.Moon),
+            HasAtmosphere = false,  // Owner's choice: moons start airless, like ours
             RadiusKm = 1737.4,
             DayLengthHours = period * 24,
             Orbit = OrbitAround(bodies, parent, distance, period),

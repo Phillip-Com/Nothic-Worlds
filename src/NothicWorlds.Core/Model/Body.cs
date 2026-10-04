@@ -106,6 +106,13 @@ public sealed class Body
     /// </summary>
     public double AverageTemperatureC { get; set; } = 15.0;
 
+    /// <summary>
+    /// Whether a planet or moon has air, and so live weather: clouds, rain and snow, and wind
+    /// (VISION.md WTH-02; owner's choice: a switch per body, on for planets and off for moons
+    /// by default). Ignored for other kinds of body.
+    /// </summary>
+    public bool HasAtmosphere { get; set; } = true;
+
     /// <summary>The lowest density a body can have, in g/cm³ (thinner than giant stars).</summary>
     public const double MinDensityGramsPerCm3 = 1e-6;
 
@@ -248,6 +255,7 @@ public sealed class Body
             && AxialTiltDegrees == other.AxialTiltDegrees
             && AxialTiltDirectionDegrees == other.AxialTiltDirectionDegrees
             && AverageTemperatureC == other.AverageTemperatureC
+            && HasAtmosphere == other.HasAtmosphere
             && DensityGramsPerCm3 == other.DensityGramsPerCm3
             && Orbit == other.Orbit && Calendar == other.Calendar
             && Appearance == other.Appearance && Rings == other.Rings
@@ -269,6 +277,7 @@ public sealed class Body
             AxialTiltDegrees = AxialTiltDegrees,
             AxialTiltDirectionDegrees = AxialTiltDirectionDegrees,
             AverageTemperatureC = AverageTemperatureC,
+            HasAtmosphere = HasAtmosphere,
             DensityGramsPerCm3 = DensityGramsPerCm3,
             Orbit = Orbit,  // Immutable, safe to share.
             Calendar = Calendar,  // Immutable, safe to share.
