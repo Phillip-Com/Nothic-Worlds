@@ -39,6 +39,23 @@ public sealed class HeightGridTests
     }
 
     [Fact]
+    public void AStrokeAlongSeveralPoints_HasNoBumpsAtItsJoins()
+    {
+        Vector3D[] path = [At(0, 10), At(0, 14), At(5, 18), At(5, 25)];
+
+        HeightGrid whole = HeightGrid.Empty.Raise(path, 1, 500);
+
+        // At most the stroke's height anywhere, and the full height all along it.
+        Assert.Equal(500, whole.Highest);
+        foreach (Vector3D point in path)
+        {
+            Assert.InRange(whole.HeightAt(point), 490, 500);
+        }
+
+        Assert.InRange(whole.HeightAt(At(2.5, 16)), 490, 500);  // Between two points
+    }
+
+    [Fact]
     public void Lowering_DigsDown_AndHeightsStayInRange()
     {
         HeightGrid dug = HeightGrid.Empty.Raise(_spot, _spot, 1, -800);

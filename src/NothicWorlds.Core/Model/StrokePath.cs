@@ -3,9 +3,9 @@ using NothicWorlds.Core.Geometry;
 namespace NothicWorlds.Core.Model;
 
 /// <summary>
-/// The path of a brush stroke over a sphere (the shortest way from its start to its end), for
-/// measuring how far any point is from it. Measuring from the path itself, rather than from
-/// round stamps along it, keeps a stroke's edges and ridge perfectly even.
+/// The path of a brush stroke over a sphere (the shortest way from each of its points to the
+/// next), for measuring how far any point is from it. Measuring from the path itself, rather
+/// than from round stamps along it, keeps a stroke's edges and ridge perfectly even.
 /// </summary>
 public sealed class StrokePath
 {
@@ -15,20 +15,27 @@ public sealed class StrokePath
     /// <summary>The path from <paramref name="from"/> to <paramref name="to"/>.</summary>
     /// <exception cref="ArgumentException">An end isn't a finite, non-zero direction.</exception>
     public StrokePath(Vector3D from, Vector3D to)
+        : this([from, to])
     {
-        // In pieces of at most 22.5° (stamps for the widest brush), so no piece is ever half a
-        // circle or more, where "between the ends" stops meaning one thing.
-        List<Vector3D> points = CubeGridBrush.Stamps(from, to, CubeGridBrush.MaxRadiusDegrees);
-        _pieces = [];
-        for (int index = 1; index < points.Count; index++)
+    }
+
+    /// <summary>
+    /// The path through <paramref name="points"/> in order (one point for a single dab).
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// There are no points, or one isn't a finite, non-zero direction.
+    /// </exception>
+    public StrokePath(IReadOnlyList<Vector3D> points)
+    {
+        if (points.Count == 0)
         {
-            Vector3D start = points[index - 1];
-            Vector3D end = points[index];
-            Vector3D axis = Cross(start, end);
-            double length = axis.Length;
-            _pieces.Add(length < 1e-12
-                ? (start, end, Vector3D.Zero, true)
-                : (start, end, axis * (1 / length), false));
+            throw new ArgumentException("A stroke needs at least one point.", nameof(points));
+        }
+
+        _pieces = [];
+        for (int index = 0; index < Math.Max(points.Count - 1, 1); index++)
+        {
+            AddLeg(points[index], points[Math.Min(index + 1, points.Count - 1)]);
         }
     }
 
@@ -58,6 +65,23 @@ public sealed class StrokePath
         }
 
         return nearest;
+    }
+
+    // One leg of the path, in pieces of at most 22.5° (stamps for the widest brush), so no
+    // piece is ever half a circle or more, where "between the ends" stops meaning one thing.
+    private void AddLeg(Vector3D from, Vector3D to)
+    {
+        List<Vector3D> points = CubeGridBrush.Stamps(from, to, CubeGridBrush.MaxRadiusDegrees);
+        for (int index = 1; index < points.Count; index++)
+        {
+            Vector3D start = points[index - 1];
+            Vector3D end = points[index];
+            Vector3D axis = Cross(start, end);
+            double length = axis.Length;
+            _pieces.Add(length < 1e-12
+                ? (start, end, Vector3D.Zero, true)
+                : (start, end, axis * (1 / length), false));
+        }
     }
 
     private static double Angle(Vector3D a, Vector3D b) => Math.Acos(Math.Clamp(a.Dot(b), -1, 1));
