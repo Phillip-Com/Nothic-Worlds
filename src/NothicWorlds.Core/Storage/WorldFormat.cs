@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 23;
+    public const int CurrentVersion = 24;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -64,6 +64,20 @@ internal static partial class WorldFormat
         [ClimateKind.Wetland] = "wetland",
         [ClimateKind.Mountains] = "mountains",
         [ClimateKind.Ice] = "ice",
+    };
+
+    private static readonly Dictionary<ShapeKind, string> _shapeKindNames = new()
+    {
+        [ShapeKind.Sphere] = "sphere",
+        [ShapeKind.Box] = "box",
+        [ShapeKind.Cylinder] = "cylinder",
+        [ShapeKind.Cone] = "cone",
+    };
+
+    private static readonly Dictionary<ShapeOperation, string> _shapeOperationNames = new()
+    {
+        [ShapeOperation.Add] = "add",
+        [ShapeOperation.Cut] = "cut",
     };
 
     private static readonly Dictionary<BodyShape, string> _shapeNames = new()
@@ -179,6 +193,9 @@ internal static partial class WorldFormat
         document => document,
 
         // 22 → 23: surfaces gained optional sculpted "heights" (M24). Older bodies are flat.
+        document => document,
+
+        // 23 → 24: surfaces gained optional "shapes" added or cut (M25). Older bodies have none.
         document => document,
     ];
 
@@ -305,6 +322,16 @@ internal static partial class WorldFormat
     public static string ShapeName(BodyShape shape) => _shapeNames[shape];
 
     public static BodyShape ParseShape(string? name) => Parse(_shapeNames, name, "body shape");
+
+    public static string ShapeKindName(ShapeKind kind) => _shapeKindNames[kind];
+
+    public static ShapeKind ParseShapeKind(string? name) => Parse(_shapeKindNames, name, "shape");
+
+    public static string ShapeOperationName(ShapeOperation operation) =>
+        _shapeOperationNames[operation];
+
+    public static ShapeOperation ParseShapeOperation(string? name) =>
+        Parse(_shapeOperationNames, name, "shape operation");
 
     public static string PatternName(SurfacePattern pattern) => _patternNames[pattern];
 

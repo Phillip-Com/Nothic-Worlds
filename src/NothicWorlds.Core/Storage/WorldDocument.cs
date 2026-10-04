@@ -215,6 +215,21 @@ internal sealed class SurfaceDocument
     public required string FillColor { get; init; }
     public string? Terrain { get; init; }  // Added in format version 10
     public string? Heights { get; init; }  // Added in format version 23
+    public List<ShapeDocument?>? Shapes { get; init; }  // Added in format version 24
+}
+
+internal sealed class ShapeDocument
+{
+    public required Guid Id { get; init; }
+    public required string Kind { get; init; }
+    public required string Operation { get; init; }
+    public required double Latitude { get; init; }
+    public required double Longitude { get; init; }
+    public required double DepthKm { get; init; }
+    public required double WidthKm { get; init; }
+    public required double HeightKm { get; init; }
+    public required double LengthKm { get; init; }
+    public double? Turn { get; init; }  // Omitted when 0
 }
 
 internal sealed class PieceDocument

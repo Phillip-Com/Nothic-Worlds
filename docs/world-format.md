@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 23** (see **Version history** at the end)
+**Current format version: 24** (see **Version history** at the end)
 
 ## Container
 
@@ -240,6 +240,14 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…pieces[].warp` | no | Edit Points (`MAP-02`): where each outline point has been dragged to, as `[u, v]` in the piece's box (0–1 from its top-left before warping; may go beyond). Exactly one per `outline.points`, in the same order. Omitted when the piece isn't warped. |
 | `bodies[].surface.fillColor` | yes | `#RRGGBB`. Color where the map doesn't cover the globe |
 | `bodies[].surface.terrain` | no | The body's terrain image entry name (see Container and **Terrain**). Omitted when nothing is painted. |
+| `bodies[].surface.shapes` | no | Shapes added to or cut out of the body (`BOD-04`, see **Shapes**), applied in order. Planets and moons only, up to 64; omitted when there are none. |
+| `bodies[].surface.shapes[].id` | yes | Stable identity (GUID), unique on the body. |
+| `bodies[].surface.shapes[].kind` | yes | `"sphere"`, `"box"`, `"cylinder"`, or `"cone"`. |
+| `bodies[].surface.shapes[].operation` | yes | `"add"` or `"cut"`. |
+| `bodies[].surface.shapes[].latitude`, `.longitude` | yes | Degrees: the spot on the surface it's placed at (latitude −90 to 90). |
+| `bodies[].surface.shapes[].depthKm` | yes | km: how far its middle is above the body's radius at that spot (negative: below), at most 4 radii either way. |
+| `bodies[].surface.shapes[].widthKm`, `.heightKm`, `.lengthKm` | yes | km, above 0 and at most 4 radii: see **Shapes** for which each kind uses. All three are kept. |
+| `bodies[].surface.shapes[].turn` | no | Degrees: how far it's turned about its height, clockwise from north seen from above. Omitted when 0. |
 | `bodies[].surface.heights` | no | The body's height image entry name (see Container and **Heights**). Planets and moons only; omitted when nothing is sculpted. |
 | `terrainTypes` | no | The kinds of terrain that can be painted (`BOD-05`), in list order. Omitted when there are none. Up to 255. New worlds start with 12 defaults. |
 | `…terrainTypes[].code` | yes | 1 to 255, unique among terrain types: the value painted cells store. 0 means unpainted. |
@@ -325,6 +333,17 @@ below it), from −32,767 to 32,767. The height image is an ordinary **16-bit gr
 plus 32,768 (so 0 m is 32,768; a stored 0 is refused). Readers accept any PNG row filter, but
 not interlacing, other bit depths, or colors. Heights are true to scale; how much the view
 exaggerates them isn't stored.
+
+**Shapes** (`ShapeEdit` in Core). Each shape has its own frame, in the body's radii (the globe
+is a unit sphere, as in **Terrain**): with *u* the unit direction to its spot (from `latitude`
+and `longitude`, as for pins), its middle is at *u* · (1 + `depthKm` / `radiusKm`); its height
+runs along *u*; its length runs north along the surface (*n*, the direction toward +y with *u*'s
+part taken out; at a pole, +z) turned by `turn` toward east (*e* = *n* × *u*); its width runs at
+right angles, east turned the same way. A **sphere** is `widthKm` across; a **box** is `widthKm`
+× `heightKm` × `lengthKm`; a **cylinder** and a **cone** (point up) are `widthKm` across at the
+base and `heightKm` tall. The body is the sculpted globe, then each shape in turn added to it or
+cut out of it; the faces a shape makes are bare rock. A cylinder 2 radii tall with its middle a
+radius down goes right through the world; a sphere with its middle a radius down hollows it.
 
 Names written for enums (`kind`, `projection`) are fixed strings. They're not the code's enum
 names, so renaming code never changes the format.
@@ -435,6 +454,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 24 | Shapes (M25): surfaces gain optional `shapes` added or cut | Nothing to change: version 23 bodies have none |
 | 23 | Body sculpting (M24): surfaces gain optional `heights` (a 16-bit height image) | Nothing to change: version 22 bodies are unsculpted |
 | 22 | Stable orbit guide (M22): bodies gain an optional `density` | Nothing to change: version 21 bodies have the typical density for their kind and size |
 | 21 | Realms (M21): bodies gain an optional `branch`, orbits an optional `height` | Nothing to change: version 20 bodies hang on nothing, and their orbits aren't lifted |
