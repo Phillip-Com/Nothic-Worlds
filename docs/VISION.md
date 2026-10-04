@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 23: Physics Mode** · In progress (owner's choice, 2026-10-04)
+**Milestone 23: Physics Mode** · Complete (PR #59 merged 2026-10-04; owner's choice, 2026-10-04)
 An optional switch that moves the system by real gravity (`SIM-03`), from the masses of
 Milestone 22. Owner's decisions:
 - **Start speeds from gravity:** each body starts where its design puts it, moving at the speed
