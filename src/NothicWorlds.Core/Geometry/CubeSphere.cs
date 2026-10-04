@@ -66,6 +66,20 @@ public static class CubeSphere
     }
 
     /// <summary>
+    /// Where a direction meets a face, as positions across (left edge 0, right edge 1) and down
+    /// (top edge 0, bottom edge 1) it: the inverse of <see cref="Direction"/>. The direction
+    /// should point into that face (as <see cref="CellAt"/> picks it).
+    /// </summary>
+    internal static (double Across, double Down) FacePosition(int face, Vector3D direction)
+    {
+        (Vector3D normal, Vector3D right, Vector3D up) = _faces[face];
+        double forward = direction.Dot(normal);
+        double across = ToFaceCoordinate(direction.Dot(right) / forward);
+        double down = -ToFaceCoordinate(direction.Dot(up) / forward);
+        return ((across + 1) / 2, (down + 1) / 2);
+    }
+
+    /// <summary>
     /// The unit direction from the sphere's center to the middle of a cell, on a grid of
     /// <paramref name="size"/> × <paramref name="size"/> cells per face.
     /// </summary>
