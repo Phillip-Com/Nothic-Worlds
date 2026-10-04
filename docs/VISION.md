@@ -1081,7 +1081,9 @@ the body as a sphere of its radius. World trees and other shapes are still open.
   star. `belt_rocks.gdshader` moves every rock on the GPU at its natural speed (inner rocks
   overtake outer ones) and applies the view's distance compression, so nothing is updated
   rock by rock. Rocks are drawn far bigger than real ones (1.2% of the belt's drawn width), so
-  the belt reads as a band from afar.
+  the belt reads as a band from afar; up close none may look bigger than about 4 pixels (0.004
+  radians from the camera, owner's request in PR #52), so a planet inside a belt isn't swarmed
+  by moon-sized rocks.
 - **App:** stars get an **Asteroid Belts** section in the System panel
   (`godot/UI/BeltsSection.cs`): each belt's name, **From** and **To** (AU), **Thickness**,
   **Density**, **Color**, and **Delete**, plus **Add Belt**; `WorldSession.AddBelt`,
