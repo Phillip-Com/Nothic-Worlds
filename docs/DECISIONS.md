@@ -7,6 +7,8 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-04 | A realm hangs on a branch through a **locked orbit worked out from the tip** (orbits gain an optional height), so everything orbit-based works for it | In PR | [#54](https://github.com/Phillip-Com/Nothic-Worlds/pull/54) | Claude's design within the plan. Format version 21. VISION.md `BOD-02` |
+| 2026-10-04 | One realm to a branch; a tree can't lose a branch that holds a realm (the edit is refused) | In PR | [#54](https://github.com/Phillip-Com/Nothic-Worlds/pull/54) | Claude's choice: no silent changes. VISION.md `BOD-02` |
 | 2026-10-04 | Milestone 21: a **world tree** that **holds realms** on its branches, **grown from settings**, **glowing**, and **turning** (one turn is its realms' year); **three PRs** | Merged | [#53](https://github.com/Phillip-Com/Nothic-Worlds/pull/53) · `80e13ac` | VISION.md §3, `BOD-02` |
 | 2026-10-04 | A tree's **radius is half its height** and its **day is one turn**; a new tree is 300,000 km tall and turns once a year | Merged | [#53](https://github.com/Phillip-Com/Nothic-Worlds/pull/53) · `80e13ac` | Claude's choices. Format version 20 |
 | 2026-10-04 | Repeatable chance is shared as **`SeededRandom`**; asteroid events keep their exact dates | Merged | [#53](https://github.com/Phillip-Com/Nothic-Worlds/pull/53) · `80e13ac` | Claude's refactor (now used by two features) |

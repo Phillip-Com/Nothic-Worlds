@@ -119,7 +119,8 @@ More world shapes (`BOD-02`): a world tree. Owner's decisions:
   counts as their sun.
 - **It turns:** each realm circles the trunk once per turn, its year, so seasons work as for a
   planet around a star.
-- **Three PRs:** the tree itself (PR #53), realms on its branches, and its glow as their sun.
+- **Three PRs:** the tree itself (PR #53), realms on its branches (PR #54), and its glow as
+  their sun.
 
 **Milestone 20: Astral Features** · Complete (PR #52 merged 2026-10-04; owner's choice, 2026-10-03)
 Rings, asteroid belts, and nebulas (`BOD-03`), and asteroid events (the rest of `EVT-02`).
@@ -1082,6 +1083,31 @@ the body as a sphere of its radius. World trees (M21) hold realms on their branc
 - **Verified in the running app** with real clicks, maximized: Add World Tree, the panel and its
   fields, the tree from the side and above and in the system, a changed look (more branches,
   blue glow), and undo. Benchmark: no change.
+
+**Implementation (realms on its branches, M21, PR #54):**
+- **Model:** `Body.Branch` (which great branch a planet or moon hangs on); `Orbit.HeightKm`, an
+  optional lift of the whole orbit along its own axis. Format **version 21** (`branch`, orbit
+  `height`).
+- **Locked orbits** (`Simulation/Realms.cs`, Core): a hung realm's orbit is worked out from its
+  branch tip: round the trunk at the tip's distance, lifted to its height, tilted with the tree
+  (tilt direction 90° past its lean, the same rotation it's drawn with), starting where the tip
+  is and taking one of the tree's turns to go round. So the realm rides exactly on the drawn tip
+  (tested against the drawing's spin-then-tilt rotations, tilted trees included), and positions,
+  seasons, eclipses, and events work for it unchanged. `Apply` re-places realms after every
+  change to the system (before calendar fitting), and on loading. One realm to a branch; only
+  planets and moons; a hung realm can't be made the center, and Make Center keeps lifted orbits
+  right.
+- **Drawing:** a realm is drawn at its branch tip scaled with its tree (whose drawn size the
+  readable view squeezes), nudged out by its own radius; its orbit line is left out.
+- **App:** a **Hangs on** choice in the System panel's orbit section for planets and moons when
+  a world tree exists (free branches only); while hung, the orbit fields are locked and say
+  why. `WorldSession.HangOnBranch` (null lets it go: it keeps circling the tree, freely).
+  Changing the tree moves its realms; a change that would remove a branch holding a realm is
+  refused ("a realm hangs on branch 9: move it first").
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: hanging the
+  planet on branch 1, the locked fields, the realm on the tip and carried round a quarter turn
+  later, a reshaped tree moving it, the refused branch removal, letting it go, and undo.
+  Benchmark: no change.
 
 **BOD-03 — Other astral features** · Implemented (M20: rings, belts, nebulas) · Base
 **Intent:** Asteroids, nebulas, and similar features.
