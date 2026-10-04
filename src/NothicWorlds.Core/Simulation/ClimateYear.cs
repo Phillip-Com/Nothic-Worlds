@@ -129,7 +129,7 @@ public sealed class ClimateYear
         double step = year / SamplesPerYear;
         var byId = bodies.ToDictionary(b => b.Id);
         OrbitChain bodyChain = OrbitChain.Of(body, byId);
-        OrbitChain starChain = OrbitChain.Of(star, byId);
+        Func<double, Vector3D> sun = Seasons.SunPath(bodies, body, star, byId);
         Vector3D pole = BodyOrientation.NorthPole(body);
         double latitude = double.DegreesToRadians(spot.LatitudeDegrees);
 
@@ -139,7 +139,7 @@ public sealed class ClimateYear
         for (int i = 0; i < SamplesPerYear; i++)
         {
             double time = fromDays + (i + 0.5) * step;
-            Vector3D toStar = starChain.PositionAt(time) - bodyChain.PositionAt(time);
+            Vector3D toStar = sun(time) - bodyChain.PositionAt(time);
             distances[i] = toStar.Length;
             declinations[i] = Math.Asin(Math.Clamp(toStar.Dot(pole) / toStar.Length, -1, 1));
         }

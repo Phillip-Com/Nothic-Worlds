@@ -19,7 +19,8 @@ public static class Seasons
 
     /// <summary>
     /// The star a body's seasons come from: the nearest star up its chain of parents, or (in a
-    /// planet-centered system) a star circling it or its planet. Null if there's none.
+    /// planet-centered system) a star circling it or its planet. A glowing world tree counts as
+    /// a star here (see <see cref="Body.GivesLight"/>). Null if there's none.
     /// </summary>
     public static Body? StarFor(IReadOnlyList<Body> bodies, Body body)
     {
@@ -27,13 +28,13 @@ public static class Seasons
         var seen = new HashSet<Guid>();
         for (Body? current = body; current is not null && seen.Add(current.Id);)
         {
-            if (current.Id != body.Id && current.Kind == BodyKind.Star)
+            if (current.Id != body.Id && current.GivesLight)
             {
                 return current;
             }
 
             Body? circling = bodies.FirstOrDefault(b =>
-                b.Kind == BodyKind.Star && b.Orbit?.ParentId == current.Id);
+                b.GivesLight && b.Orbit?.ParentId == current.Id);
             if (circling is not null)
             {
                 return circling;
@@ -91,7 +92,8 @@ public static class Seasons
         IReadOnlyList<Body> bodies, Body body, Body star, double timeDays)
     {
         Dictionary<Guid, Vector3D> positions = SystemPositions.At(bodies, timeDays);
-        Vector3D toStar = positions[star.Id] - positions[body.Id];
+        var byId = bodies.ToDictionary(b => b.Id);
+        Vector3D toStar = SunPath(bodies, body, star, byId)(timeDays) - positions[body.Id];
         double sine = toStar.Dot(BodyOrientation.NorthPole(body)) / toStar.Length;
         return double.RadiansToDegrees(Math.Asin(Math.Clamp(sine, -1, 1)));
     }
@@ -213,6 +215,28 @@ public static class Seasons
         return (northern, southern);
     }
 
+    /// <summary>
+    /// Where a body's sun (from <see cref="StarFor"/>) is over time, in km from the system's
+    /// center: the star itself, or, for a realm on a glowing world tree (VISION.md BOD-02), the
+    /// tree's trunk level with the realm. A tree glows all over, so a realm is lit by the trunk
+    /// beside it, not from the tree's middle far below it; it circles that point as a planet
+    /// circles a star, so its days, seasons, and weather work out the same way.
+    /// </summary>
+    public static Func<double, Vector3D> SunPath(IReadOnlyList<Body> bodies, Body body,
+        Body star, IReadOnlyDictionary<Guid, Body> byId)
+    {
+        OrbitChain starChain = OrbitChain.Of(star, byId);
+        if (star.Kind == BodyKind.WorldTree && BodyClock.YearOrbitOf(bodies, body) is
+            { Branch: not null, Orbit: Orbit hung } && hung.ParentId == star.Id)
+        {
+            Orbit trunk = hung with { DistanceKm = 0 };  // The point on its axis, level with it
+            return timeDays =>
+                starChain.PositionAt(timeDays) + OrbitMath.OffsetFromParent(trunk, timeDays);
+        }
+
+        return starChain.PositionAt;
+    }
+
     // The star's declination over time, made quick to evaluate thousands of times: it works out
     // the two chains of orbits once (instead of every body's position at every step).
     private static Func<double, double> DeclinationFunction(
@@ -225,11 +249,11 @@ public static class Seasons
 
         var byId = bodies.ToDictionary(b => b.Id);
         OrbitChain bodyChain = OrbitChain.Of(body, byId);
-        OrbitChain starChain = OrbitChain.Of(star, byId);
+        Func<double, Vector3D> sun = SunPath(bodies, body, star, byId);
         Vector3D pole = BodyOrientation.NorthPole(body);
         return timeDays =>
         {
-            Vector3D toStar = starChain.PositionAt(timeDays) - bodyChain.PositionAt(timeDays);
+            Vector3D toStar = sun(timeDays) - bodyChain.PositionAt(timeDays);
             double sine = toStar.Dot(pole) / toStar.Length;
             return double.RadiansToDegrees(Math.Asin(Math.Clamp(sine, -1, 1)));
         };

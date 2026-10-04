@@ -46,7 +46,7 @@ public static class AsteroidEvents
         }
 
         // The star whose belts the year's orbit runs through (the orbit's other end).
-        Body star = bodies.First(b => b.Id == orbit.ParentId) is { Kind: BodyKind.Star } parent
+        Body star = bodies.First(b => b.Id == orbit.ParentId) is { GivesLight: true } parent
             ? parent
             : BodyClock.YearOrbitOf(bodies, body)!;
         double year = orbit.PeriodDays;

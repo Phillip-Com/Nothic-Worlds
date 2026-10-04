@@ -35,7 +35,7 @@ public partial class CalendarSection : VBoxContainer
         AddChild(new Label { Text = "Seasons" });
         _noSeasons = new Label
         {
-            Text = "None: the body needs a star and some axial tilt.",
+            Text = "None: the body needs a star (or a glowing world tree) and some axial tilt.",
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
         };
         AddChild(_noSeasons);

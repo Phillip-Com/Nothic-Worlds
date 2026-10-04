@@ -97,8 +97,12 @@ public static class SystemLayout
             return Vector3D.Zero;
         }
 
-        return DisplayOffset(OrbitMath.OffsetFromParent(orbit, timeDays),
-            DisplayRadius(parent.RadiusKm, scale), DisplayRadius(body.RadiusKm, scale), scale);
+        Vector3D offset = OrbitMath.OffsetFromParent(orbit, timeDays);
+        double parentRadius = DisplayRadius(parent.RadiusKm, scale);
+        double bodyRadius = DisplayRadius(body.RadiusKm, scale);
+        return body.Branch is not null && parent.Tree is not null
+            ? OnBranch(offset, parent, parentRadius, bodyRadius)
+            : DisplayOffset(offset, parentRadius, bodyRadius, scale);
     }
 
     // A realm is drawn at its branch tip, scaled with its tree (whose drawn size the readable

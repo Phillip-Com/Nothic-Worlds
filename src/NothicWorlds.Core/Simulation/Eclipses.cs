@@ -66,9 +66,10 @@ public static class Eclipses
 
         var byId = bodies.ToDictionary(b => b.Id);
         double yearDays = BodyClock.YearDays(bodies, body);
+        Func<double, Vector3D> sun = Seasons.SunPath(bodies, body, star, byId);
         foreach ((Body blocker, Body shadowed, EclipseKind kind) in PairsFor(bodies, body, byId))
         {
-            var shadow = new Shadow(star, blocker, shadowed, byId);
+            var shadow = new Shadow(sun, star.RadiusKm, blocker, shadowed, byId);
             double period = (blocker.Orbit?.ParentId == shadowed.Id ? blocker : shadowed)
                 .Orbit!.PeriodDays;
             double step = Math.Max(Math.Min(period, yearDays) / SamplesPerPeriod,
@@ -260,16 +261,17 @@ public static class Eclipses
     // One blocker's shadow (cast by the star) and the body it may fall on.
     private sealed class Shadow
     {
-        private readonly OrbitChain _star;
+        private readonly Func<double, Vector3D> _star;
         private readonly OrbitChain _blocker;
         private readonly OrbitChain _shadowed;
 
-        public Shadow(Body star, Body blocker, Body shadowed, Dictionary<Guid, Body> byId)
+        public Shadow(Func<double, Vector3D> star, double starRadius, Body blocker, Body shadowed,
+            Dictionary<Guid, Body> byId)
         {
-            _star = OrbitChain.Of(star, byId);
+            _star = star;
             _blocker = OrbitChain.Of(blocker, byId);
             _shadowed = OrbitChain.Of(shadowed, byId);
-            StarRadius = star.RadiusKm;
+            StarRadius = starRadius;
             BlockerRadius = blocker.RadiusKm;
             ShadowedRadius = shadowed.RadiusKm;
             BlockerId = blocker.Id;
@@ -296,7 +298,7 @@ public static class Eclipses
 
         public ShadowGeometry At(double timeDays)
         {
-            Vector3D star = _star.PositionAt(timeDays);
+            Vector3D star = _star(timeDays);
             Vector3D blocker = _blocker.PositionAt(timeDays);
             Vector3D fromStar = blocker - star;
             double starDistance = fromStar.Length;
