@@ -120,7 +120,8 @@ Mold bodies like clay (`BOD-04`), starting with heights. Owner's decisions (the 
   from orbit, and shading always shows slopes.
 - **Tools in the Terrain panel:** a Sculpt mode beside Paint/Erase, with the same brush plus a
   strength.
-- **Three PRs:** heights in Core (PR #60), drawing the relief (PR #61, with its quality setting in PR #62), then the Sculpt tools.
+- **Three PRs:** heights in Core (PR #60), drawing the relief (PR #61, with its quality setting
+  in PR #62), then the Sculpt tools.
 
 **Milestone 23: Physics Mode** · Complete (PR #59 merged 2026-10-04; owner's choice, 2026-10-04)
 An optional switch that moves the system by real gravity (`SIM-03`), from the masses of
