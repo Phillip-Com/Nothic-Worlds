@@ -73,6 +73,7 @@ public partial class SystemPanel : CanvasLayer
     private SpinBox _tiltDirection = null!;
     private CalendarSection? _calendar;
     private EclipseSection? _eclipses;
+    private OrbitGuideSection? _orbitGuide;
     private MeteorShowerSection? _showers;
     private RingsSection? _rings;
     private BeltsSection? _belts;
@@ -161,6 +162,9 @@ public partial class SystemPanel : CanvasLayer
             return;
         }
 
+        layout.AddChild(new HSeparator());
+        _orbitGuide = new OrbitGuideSection { Session = Session, ReportProblem = ReportProblem };
+        layout.AddChild(_orbitGuide);
         layout.AddChild(new HSeparator());
         _calendar = new CalendarSection { Session = Session, Time = Time };
         layout.AddChild(_calendar);
@@ -500,6 +504,7 @@ public partial class SystemPanel : CanvasLayer
         }
 
         _calendar?.Refresh();
+        _orbitGuide?.Refresh();
         if (_eclipses is not null)
         {
             _eclipses.Visible = body.HasSurface;  // Stars and comets have no eclipses.

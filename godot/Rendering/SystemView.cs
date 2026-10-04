@@ -70,6 +70,7 @@ public partial class SystemView : Node3D
         AlbedoColor = new Color(1.0f, 0.85f, 0.2f),
     };
 
+    private OrbitGuideVisual? _guide;
     private SystemScale _scale = SystemScale.Readable;
     private bool _showTerrain = true;
     private Dictionary<Guid, DisplayBody> _layout = [];
@@ -133,7 +134,11 @@ public partial class SystemView : Node3D
         {
             GD.PushError("SystemView needs a world session, a camera, and a planet material.");
             SetProcess(false);
+            return;
         }
+
+        _guide = new OrbitGuideVisual { Name = "Orbit guide", Session = Session };
+        AddChild(_guide);
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -164,6 +169,12 @@ public partial class SystemView : Node3D
             }
         }
     }
+
+    /// <summary>
+    /// Whether the stable orbit guide (VISION.md SIM-04) shows around the highlighted body
+    /// (View ▸ Orbit Guide; on by default).
+    /// </summary>
+    public bool ShowOrbitGuide { get; set; } = true;
 
     /// <summary>
     /// Whether painted terrain shows on the globes (View ▸ Terrain), for every globe at once,
@@ -369,6 +380,7 @@ public partial class SystemView : Node3D
             FallbackLight.Visible = !anyStar;
         }
 
+        _guide?.Update(ShowOrbitGuide ? HighlightedOrbit : null, _layout, _scale, ToScene);
         FitCamera(radius);
         if (_flightProgress < 1.0 && Camera is not null)
         {
