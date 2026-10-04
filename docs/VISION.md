@@ -118,9 +118,11 @@ The rest of body sculpting (`BOD-04`): shapes added to or cut out of a world. Ow
 - **Bare rock** on the faces a shape makes; the original surface keeps its map and terrain.
 - **Built with Godot's own CSG** (its Manifold library) from the sculpted globe's mesh, only for
   bodies that have shapes. No new dependency.
-- **Base tier, measured first:** drawing a shaped world and how long an edit takes are
-  benchmarked on the baseline laptop before the tools.
-- **Three PRs:** shapes in Core (PR #65), drawing worlds with shapes, then the tools.
+- **Base tier, measured first:** Godot's CSG re-carves the whole globe on every change, on the
+  main thread: 1.5 s at the Standard mesh. So (owner's choice) shaped worlds carve a coarser
+  globe, 32 squares a face (about 0.25 s), and while a handle is dragged the shape shows as a
+  see-through preview, carved when it's let go.
+- **Three PRs:** shapes in Core (PR #65), drawing worlds with shapes (PR #66), then the tools.
 
 **Milestone 24: Body Sculpting (Heights)** · Complete (PR #63 merged 2026-10-04; owner's choice, 2026-10-04)
 Mold bodies like clay (`BOD-04`), starting with heights. Owner's decisions (the design review
@@ -1264,7 +1266,7 @@ the body as a sphere of its radius. World trees (M21) hold realms on their branc
   the planet when looking toward its direction and absent looking away, a bigger and brighter
   one, the background unchanged without nebulas, and undo. Benchmark: no change.
 
-**BOD-04 — Body sculpting (digital clay)** · In Progress (M24: heights, PRs #60–#63; M25: shapes, PR #65) · Base
+**BOD-04 — Body sculpting (digital clay)** · In Progress (M24: heights, PRs #60–#63; M25: shapes, PRs #65–#66) · Base
 **Intent:** Mold bodies like digital clay with brush tools. Tools include:
 - Raise and lower terrain brushes
 - Basic shape tools to add and subtract terrain, which are also useful for artificial structures
@@ -1368,6 +1370,30 @@ built from both. Heights come first (M24), shapes next.
   ID. Saving: format **version 24**, `surface.shapes` (world-format.md **Shapes**). Tested:
   golden file, older files have none, and refusing an unknown kind or operation, a size of 0, a
   middle too far away, and a latitude out of range.
+**Implementation (drawing worlds with shapes, M25, PR #66):**
+- **`Rendering/ShapedGlobe.cs`** (under the body's `PlanetSurface`, which hides its own mesh while
+  there are shapes): a hidden `CsgCombiner3D` holds the sculpted globe as a `CsgMesh3D` (the
+  cube-sphere lifted on the CPU by `HeightGrid.SampleAt` × the relief scale, wearing the planet
+  material) and each shape in order as a `CsgSphere3D`, `CsgBox3D`, or `CsgCylinder3D` (a cone
+  is a cylinder with `Cone`), added (union) or cut (subtraction), in bare-rock material, placed
+  by `ShapeEdit.FrameOn`. A shape's middle rises with the drawn ground under its spot (the
+  relief is exaggerated, the shapes aren't), so one sitting on a hill still sits on it. Once
+  Godot has carved (the next frame), the result is copied into a plain mesh and drawn, so the
+  last carving stays on show meanwhile. Rebuilt only when the shapes, heights, radius, or
+  relief exaggeration change.
+- **Measured** (baseline laptop): carving the whole globe takes 0.87 / 2.0 / 3.7 s at 64 / 96 /
+  128 squares a face (1.5 s to re-carve at 96), so the carved globe uses 32 (owner's choice):
+  about 0.25 s to re-carve. Slopes are still shaded per height cell (the shader reads the
+  heights; `lifted_on_cpu` tells it the mesh is already lifted and to shade the round globe).
+- **Found in testing:** east, up, and north make a mirror-image frame, which turned shapes
+  inside out for the CSG (cuts added volume). The width axis is flipped (every shape is the
+  same either side of it); checked by the carved volume (a hole through the world removes
+  exactly its cylinder).
+- **Verified in the running app,** maximized and at 1152 × 648: a hole right through a hollow
+  world (its rock walls, and the hollow seen through it), a crater bowl, a fortress block, and
+  a cone, on a sculpted planet. The camera keeps above the tallest added shape.
+- **Benchmark:** unshaped worlds unchanged against `main` (197/201 vs 201/200 fps); a shaped,
+  sculpted planet filling the screen: 168 fps, 18 MB more video memory.
 
 **BOD-05 — Terrain/biome painting** · Implemented (M11: PR #33, #34, #35) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.

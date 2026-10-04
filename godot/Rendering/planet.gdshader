@@ -102,6 +102,9 @@ uniform float relief_scale = 0.0;
 // Map-style shading (owner's choice, a View option): relief lit from a fixed direction, the
 // northwest 45° up as on printed maps, so it always shows; the sun still makes day and night.
 uniform bool map_shading = false;
+// True when the globe is carved by shapes (ShapedGlobe): its mesh comes already lifted (and
+// flat-faced, from the carving), so the shader neither lifts it nor uses its faces' normals.
+uniform bool lifted_on_cpu = false;
 
 // The softest edge between terrains up close, in cells (edges sharpen to about a pixel as
 // cells get bigger on screen, and never go softer than this).
@@ -670,7 +673,7 @@ float map_shade(vec3 normal, vec3 direction) {
 
 void vertex() {
 	local_direction = VERTEX;
-	if (has_heights && !flat_disc) {
+	if (has_heights && !flat_disc && !lifted_on_cpu) {
 		vec3 direction = normalize(VERTEX);
 		VERTEX = direction * (1.0 + height_at(direction, 0.0) * relief_scale);
 	}
@@ -725,6 +728,11 @@ void fragment() {
 
 	ALBEDO = color;
 	ROUGHNESS = 0.9;
+	if (lifted_on_cpu && !has_heights) {
+		// The carved globe's faces are flat: shade it as the round globe it is.
+		NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(direction, 0.0)).xyz);
+	}
+
 	if (has_heights && !flat_disc) {
 		vec3 normal = relief_normal(direction, pixel_angle);
 		if (map_shading) {

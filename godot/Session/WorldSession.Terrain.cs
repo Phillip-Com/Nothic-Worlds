@@ -197,6 +197,7 @@ public partial class WorldSession
             surface.SetTerrainColors(World.TerrainTypes);
             surface.SetTerrain(body.Surface.Terrain);
             surface.SetHeights(body.Surface.Heights);
+            surface.SetShapes(body.Surface.Shapes, body.RadiusKm);
         }
     }
 
