@@ -1330,6 +1330,14 @@ built from both. Heights come first (M24), shapes next.
   each stroke as one step back to flat, and the flat-world note. In full sunlight relief shows
   only faintly (it's shaded by real light, and the ambient light softens it), strongest near
   sunrise and sunset or exaggerated further.
+**Implementation (map-style shading, PR #64; owner's choice, a View option):**
+- **View ▸ Relief Shading:** **Sunlight** (true lighting, the default) or **Map-style**: relief
+  lit from the northwest, 45° up, as on printed maps, so it shows at any time of day; the star
+  still makes day and night. The shader multiplies the surface color by how much each slope
+  faces that light, with the slopes steepened 5× for shading and the result softened (between
+  40% and 150% brightness) so steep sides darken without going black. Remembered on this
+  computer (`AppSettings`). Verified in the running app at midday: ridges and a basin that
+  sunlight barely shows stand out. Benchmark: no change.
 
 **BOD-05 — Terrain/biome painting** · Implemented (M11: PR #33, #34, #35) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.
