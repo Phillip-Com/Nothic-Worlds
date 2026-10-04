@@ -121,7 +121,7 @@ Milestone 22. Owner's decisions:
 - **Collisions merge** the smaller body into the bigger (in the simulation only) and are listed.
 - **Base tier**, behind its own switch (off by default): a few dozen bodies' gravity is light.
 - **Two PRs:** the simulation in Core (PR #58), then the switch, drawing, collision list, and
-  Keep button in the app.
+  Keep button in the app (PR #59).
 
 **Milestone 22: Stable Orbit Guide** · Complete (PR #57 merged 2026-10-04; owner's choice, 2026-10-04)
 Where gravity would keep orbits steady (`SIM-04`). Orbits stay designed and free; this only
@@ -1371,7 +1371,7 @@ own day length, and a year is one trip around its star, or its planet's trip for
 over 0.8 s with a smooth start and stop, so bodies sweep along their real orbits instead of
 popping into place. Clicking again mid-glide adds to where it's heading. Stepping pauses Play.
 
-**SIM-03 — Physics mode (toggle)** · In Progress (M23: the simulation, PR #58) · Base (owner's choice, 2026-10-04: light enough, behind its own switch)
+**SIM-03 — Physics mode (toggle)** · Implemented (M23) · Base (owner's choice, 2026-10-04: light enough, behind its own switch)
 **Intent:** An optional toggle that simulates the system with real-world physics, so the user can
 see how their system might fall apart.
 **Implementation (the simulation, M23, PR #58):**
@@ -1405,6 +1405,35 @@ see how their system might fall apart.
 - **`SystemLayout.At(bodies, truePositions, scale)`** draws any true positions as the designed
   ones are (tested identical); a body whose parent merged away is drawn from its nearest
   remaining parent.
+
+**Implementation (the app, M23, PR #59):**
+- **`Session/PhysicsMode.cs`** (`WorldSession.Physics`): starts a `GravitySimulation` from copies
+  of the bodies (the world can be edited meanwhile) and runs it on its own thread, 2,000 steps
+  at a time toward the clock's latest time, publishing each answer (`PhysicsSnapshot`:
+  positions, whether it has caught up, collisions). The main thread never waits on it: it reads
+  the latest answer, and only **Keep** waits for the simulation. Any change to the system's
+  design (kinds, shapes, sizes, densities, orbits, branches, trees) restarts it from the new
+  design at the current time; painting, journals, and the like don't. Closing or opening a
+  world switches it off.
+- **Drawing** (`Rendering/SystemView.cs`): while it's on, the layout comes from the latest
+  positions (`SystemLayout.At` with true positions); a body that merged away is hidden, and the
+  view follows the body that swallowed the focused one. The designed orbit lines are hidden,
+  and so are the season, meteor shower, and eclipse markers on them (`FollowsPhysics`); the
+  orbit guide's rings stay, around the bodies where they are.
+- **Switch:** **Physics** in the time bar, an on/off switch (`TimeControls`).
+- **Panel** (`UI/PhysicsSection.cs`, shown while it's on): "Real gravity since" the start, "Working
+  out the jump…" while catching up, the collisions (the latest 12) with **Go to**, and **Keep as
+  Orbits** (`WorldSession.KeepPhysicsOrbits`): the current paths become the designed orbits in
+  one undo step and physics switches off, so the view carries on from the same places; bodies
+  that merged away or are escaping keep their designs, named on the message line.
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: the switch on,
+  the planet holding its orbit and the Moon with it after 60 days, a giant planet placed head
+  on swallowing the Moon on day 91 and flinging the planet out, the collision listed, **Keep as
+  Orbits** (the giant's new path kept; the planet "escaping from Sun" and the Moon "merged into
+  Giant" named), undo, and the switch off and on. Identical results on every run.
+- **Benchmark:** physics off, against `main`: no change (196–202 fps). With 10 bodies, the
+  clock moving 2 days a frame (about 400 days a second), physics off 188–189 fps, on 200–210
+  fps (the orbit lines are hidden), and the simulation caught up on every frame.
 
 **SIM-04 — Stable orbit guide** · Implemented (M22) · Base
 **Intent:** For a selected body, show a guiding path for where stable orbits would be.
