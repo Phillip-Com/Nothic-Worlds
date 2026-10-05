@@ -202,6 +202,29 @@ public partial class PlanetSurface : MeshInstance3D
         material.SetShaderParameter("cloud_detail", detail == CloudDetail.High ? 1f : 0f);
     }
 
+    /// <summary>
+    /// Copies the live weather's clouds as drawn now (the snapshots, the blend between them,
+    /// the clock, and the detail) to <paramref name="target"/>, a material with the same
+    /// uniforms; false, copying nothing, if no clouds are shown.
+    /// </summary>
+    public bool CopyCloudsTo(ShaderMaterial target)
+    {
+        ShaderMaterial material = SurfaceMaterial;
+        if (!material.GetShaderParameter("has_weather").AsBool()
+            || !material.GetShaderParameter("show_clouds").AsBool())
+        {
+            return false;
+        }
+
+        foreach (string name in (string[])["weather_old", "weather_new", "weather_blend",
+            "weather_clock", "cloud_detail"])
+        {
+            target.SetShaderParameter(name, material.GetShaderParameter(name));
+        }
+
+        return true;
+    }
+
     /// <summary>Stops drawing live weather.</summary>
     public void HideWeather() => SurfaceMaterial.SetShaderParameter("has_weather", false);
 

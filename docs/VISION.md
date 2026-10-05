@@ -117,7 +117,11 @@ Stand on a world and look up (`REN-06`). Owner's decisions:
   overhead, the ground and horizon, and a compass with readouts (names and heights on hover).
 - **Base tier** (measured on the baseline laptop; `REN-06` was "Advanced, probably").
 - **Three PRs:** the sky in Core (PR #77), the first-person view with walking, flying, and the
-  sky (PR #78), then the ground, weather overhead, and readouts.
+  sky (PR #78), then the ground, weather overhead, and readouts (PR #79).
+- **Part 3's choices:** clouds overhead from the **live weather** (matching the globe's);
+  rain and snow as **light streaks and flakes** over the view; a **compass, readouts on
+  hover, and a panel** with the time and local weather; **haze toward the horizon** on worlds
+  with air.
 - Known limit: the ground from eye level is only as sharp as the map (an 8k map is about 5 km
   a pixel on an Earth-sized planet).
 
@@ -675,7 +679,7 @@ as realistic or simple.
   an added block. Benchmark (Painterly against `main`, back to back): 193/193 vs 192/200 fps,
   same memory.
 
-**REN-06 — First-person surface view** · In Progress (M30: PRs #77, #78) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Implementation (the sky in Core, M30, PR #77):**
 - **`BodyOrientation.ToSystem(body, time, direction)`:** turns a direction on the body (its map's
@@ -712,16 +716,58 @@ as realistic or simple.
   and spreading out geometrically to beyond the horizon), kept relative to the spot so they
   stay sharp, drawn with the globe's own material; each point's direction from the globe's
   middle rides in `CUSTOM0`, which `planet_surface.gdshaderinc` reads in place of the vertex
-  for this mesh. Rebuilt only after moving a quarter of the eye's height or when the relief
-  changes.
+  for this mesh. Rebuilt only after moving a quarter of the eye's height, rising or sinking
+  by half (it reaches past the horizon, which moves out as the eye rises; since PR #79), or
+  when the relief changes.
 - **`Rendering/surface_sky.gdshader`** (a sky shader, filled each frame from Core's `SkyView`):
   a day gradient with a sunset glow by the sun's height (full a little after sunrise, a
   quarter as it touches the horizon, gone 3° below), then space (the nebula backdrop through
   `NebulaBackdrop.SkyTexture`, or the background, plus stars fixed to the system) once the sun
   is 2° down; up to 12 bodies as discs at true size, lit on the side toward their star so
-  moons show phases (magnified to at least 0.8° across); the sun's disc and its glare.
+  moons show phases (magnified to at least 0.8° across, 3° since PR #79); the sun's disc and
+  its glare.
 - **Performance** (this machine, fullscreen, uncapped): 94–106 fps standing, against
   121–186 fps on the globe; the regular benchmark is unchanged.
+
+**Implementation (weather overhead and readouts, M30, PR #79):**
+- **`Rendering/SurfaceSky.cs`:** the sky's side of `FirstPersonMode`, moved out of it. While
+  standing it swaps in a **copy of the scene's environment** (put back on leaving, so nothing
+  of the globe's look is restored piece by piece) with the sky as background, sky reflections
+  off (they'd have the changing sky filtered into a lighting map every frame), and fog for
+  the haze. `ShowBodies` fills the sky from `SkyView`; `ShowClouds` and `ShowHaze` below.
+- **Clouds overhead** (`surface_sky.gdshader`): each line of sight is followed up to a layer
+  of cloud 5 km above the ground, and the live weather's snapshots are read where it meets
+  it: the same images `planet_weather.gdshaderinc` draws on the globe, copied across by
+  `PlanetSurface.CopyCloudsTo`, so the clouds overhead are the globe's. The eye's distance and
+  the layer's are passed as their difference (a float can't hold both apart). Fine detail
+  comes from a tiling noise image (Godot's `NoiseTexture2D`, made once) laid along the ground,
+  fading out beyond 20–120 km; it's skipped when the Cloud detail setting is low. Thick cloud
+  hides the stars; clouds darken by night, warm toward a low sun, and grey where it rains.
+  From above the layer they aren't drawn (a known limit: they'd lie over the ground).
+  `WeatherDisplay` keeps the weather of the body stood on, whose globe its camera no longer
+  sees; the ground around the eye leaves the clouds and grid out (`eye_level_ground` in
+  `planet_surface.gdshaderinc`), as from below they aren't on the ground.
+- **Haze:** exponential fog, half gone at 40 km in clear air, shorter in rain and shorter
+  still in snow (down to 1.5 km), colored like the sky at the horizon (pale blue, greyer
+  under cloud, dark by night).
+- **`Rendering/falling_weather.gdshader`:** rain as three layers of streaks, snow as three of
+  drifting flakes, over the whole view, with a grey veil in heavy falls; as heavy as the live
+  weather at the spot says (`WeatherMoment.SampleAt`, looked up twice a second) and slanted
+  by the wind across the view. None above the cloud layer.
+- **`UI/FirstPersonHud.cs`** with **`UI/CompassStrip.cs`:** the controls, a compass along the
+  top (a tick every 5°, the points of the compass, the heading under the middle mark), the
+  readout for the body under the mouse (name, height, compass direction, distance, how much
+  is lit), and a panel with the date (`BodyClock.Describe`), the time by the sun and its
+  height, the weather (`LiveWeatherText`) with the temperature, and the height when flying.
+- **Core:** `SkyView.SolarTimeHours` (the star's hour angle as a 24-hour time: 12 at its
+  highest; none at a pole) and `SkyView.BodyAt` (the body whose disc, at least a set size,
+  lies at a direction; where discs overlap, the nearest), with 7 more tests in
+  `SkyViewTests`: noon at the highest sun (three latitudes), 6 and 18 at sunrise and sunset,
+  none at a pole, picking a disc and missing it, and a moon in front of the sun.
+- **Performance** (this machine, fullscreen, uncapped, looking up into partial cloud): about
+  72 fps with clouds against 88 without (about 61 with the noise worked out per pixel;
+  Godot's half-resolution sky pass would be cheaper still, but doesn't work in the Mobile
+  renderer); the regular benchmark is unchanged.
 
 
 ### 4.2 Interface Layout (`UI`)

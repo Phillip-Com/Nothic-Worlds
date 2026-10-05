@@ -310,12 +310,13 @@ Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 LiveWeather = NodePath("../WeatherDisplay")
 
-[node name="FirstPersonMode" type="Node" parent="." node_paths=PackedStringArray("Session", "System", "GlobeCamera", "Environment", "Nebulas", "Toolbar", "HideWhileStanding")]
+[node name="FirstPersonMode" type="Node" parent="." node_paths=PackedStringArray("Session", "System", "GlobeCamera", "Environment", "Nebulas", "Weather", "Toolbar", "HideWhileStanding")]
 script = ExtResource("38_first_person")
 Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 GlobeCamera = NodePath("../PlanetCamera")
 Environment = NodePath("../WorldEnvironment")
 Nebulas = NodePath("../NebulaBackdrop")
+Weather = NodePath("../WeatherDisplay")
 Toolbar = NodePath("../MapToolbar")
 HideWhileStanding = [NodePath("../MapToolbar"), NodePath("../CameraModeIndicator"), NodePath("../TimelineStrip"), NodePath("../RegionsPanel"), NodePath("../JournalPanel"), NodePath("../MapPanel"), NodePath("../LocalViewAids"), NodePath("../TerrainPanel"), NodePath("../CutEditor"), NodePath("../PieceHandles"), NodePath("../BodyMarkers"), NodePath("../EclipseMarkers"), NodePath("../RegionMarkers"), NodePath("../PinMarkers"), NodePath("../WeatherMarkers"), NodePath("../SystemPanel"), NodePath("../RegionEditor"), NodePath("../TerrainBrush"), NodePath("../ShapeHandles")]

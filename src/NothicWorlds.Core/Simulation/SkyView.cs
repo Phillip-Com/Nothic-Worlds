@@ -17,10 +17,11 @@ namespace NothicWorlds.Core.Simulation;
 /// </remarks>
 public sealed class SkyView
 {
-    private SkyView(IReadOnlyList<SkyBody> bodies, SkyBody? star)
+    private SkyView(IReadOnlyList<SkyBody> bodies, SkyBody? star, double? solarTimeHours)
     {
         Bodies = bodies;
         Star = star;
+        SolarTimeHours = solarTimeHours;
     }
 
     /// <summary>Every other body, nearest first.</summary>
@@ -28,6 +29,31 @@ public sealed class SkyView
 
     /// <summary>The body's own star (its sun), or null if it has none.</summary>
     public SkyBody? Star { get; }
+
+    /// <summary>
+    /// The time of day the sun shows at the spot, in hours of a 24-hour clock running over the
+    /// body's own day: 12 when the star crosses the meridian (at its highest), 6 and 18 about
+    /// sunrise and sunset at an equinox. Null without a star, or right at a pole, where the
+    /// sun's time has no meaning.
+    /// </summary>
+    public double? SolarTimeHours { get; }
+
+    /// <summary>
+    /// The body seen at a direction (its shares east, north, and up, a unit vector), or null:
+    /// one whose disc, drawn at least <paramref name="minRadiusDegrees"/> in radius, lies
+    /// within <paramref name="toleranceDegrees"/> of it. Where discs overlap (a moon in front of
+    /// the sun), the nearest body is the one seen.
+    /// </summary>
+    public SkyBody? BodyAt(double east, double north, double up, double minRadiusDegrees,
+        double toleranceDegrees) => Bodies
+        .Where(body =>
+        {
+            double cos = body.East * east + body.North * north + body.Up * up;
+            double apart = double.RadiansToDegrees(Math.Acos(Math.Clamp(cos, -1, 1)));
+            double radius = Math.Max(body.AngularDiameterDegrees / 2, minRadiusDegrees);
+            return apart <= radius + toleranceDegrees;
+        })
+        .MinBy(body => body.DistanceKm);
 
     /// <summary>
     /// The sky from <paramref name="spot"/> on <paramref name="observer"/> (a globe),
@@ -70,8 +96,33 @@ public sealed class SkyView
             }
         }
 
-        return new SkyView([.. seen.OrderBy(b => b.DistanceKm)], star);
+        double? solarTime = star is null ? null
+            : SolarTime(BodyOrientation.NorthPole(observer), up, east, star);
+        return new SkyView([.. seen.OrderBy(b => b.DistanceKm)], star, solarTime);
     }
+
+    // The star's hour angle at the spot (how far west of the meridian it has turned, around
+    // the body's axis) as a time of day: 12 + one hour for every 15 degrees.
+    private static double? SolarTime(Vector3D pole, Vector3D up, Vector3D east, SkyBody star)
+    {
+        Vector3D meridian = up - pole * up.Dot(pole);  // The spot, seen down the axis
+        if (meridian.Length < 1e-9)
+        {
+            return null;
+        }
+
+        meridian *= 1 / meridian.Length;
+        // The star's direction in the system's frame, from its shares in the spot's frame.
+        Vector3D north = Cross(up, east);
+        Vector3D toStar = east * star.East + north * star.North + up * star.Up;
+        double hourAngle = Math.Atan2(-toStar.Dot(east), toStar.Dot(meridian));
+        return ((12 + double.RadiansToDegrees(hourAngle) / 15) % 24 + 24) % 24;
+    }
+
+    private static Vector3D Cross(Vector3D a, Vector3D b) => new(
+        a.Y * b.Z - a.Z * b.Y,
+        a.Z * b.X - a.X * b.Z,
+        a.X * b.Y - a.Y * b.X);
 
     private static SkyBody Seen(Body body, Vector3D at, Vector3D eye, Vector3D east,
         Vector3D north, Vector3D up, double lit)

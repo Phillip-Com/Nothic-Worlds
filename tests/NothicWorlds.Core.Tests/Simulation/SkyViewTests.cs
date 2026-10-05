@@ -72,6 +72,78 @@ public sealed class SkyViewTests
         Assert.InRange(skies[set].Star!.AzimuthDegrees, 225, 315);
     }
 
+    [Theory]
+    [InlineData(0, 10)]
+    [InlineData(45, 10)]
+    [InlineData(-30, 190)]
+    public void TheSolarTime_IsNoonWhenTheSunIsHighest(double latitude, double day)
+    {
+        (World world, Body planet) = EarthLike();
+
+        SkyView noon = DayOfSky(world, planet, new GeoCoordinate(latitude, 0), day)
+            .MaxBy(s => s.Star!.AltitudeDegrees)!;
+
+        Assert.InRange(noon.SolarTimeHours!.Value, 11.9, 12.1);
+    }
+
+    [Fact]
+    public void TheSolarTime_IsAboutSixAtSunrise_AndEighteenAtSunset()
+    {
+        (World world, Body planet) = EarthLike();
+        List<SkyView> skies = DayOfSky(world, planet, new GeoCoordinate(0, 0), 80);
+
+        int rise = Enumerable.Range(1, skies.Count - 1).First(
+            i => skies[i - 1].Star!.AltitudeDegrees <= 0 && skies[i].Star!.AltitudeDegrees > 0);
+        int set = Enumerable.Range(1, skies.Count - 1).First(
+            i => skies[i - 1].Star!.AltitudeDegrees > 0 && skies[i].Star!.AltitudeDegrees <= 0);
+
+        Assert.InRange(skies[rise].SolarTimeHours!.Value, 5.75, 6.25);
+        Assert.InRange(skies[set].SolarTimeHours!.Value, 17.75, 18.25);
+    }
+
+    [Fact]
+    public void ThereIsNoSolarTime_AtAPole()
+    {
+        (World world, Body planet) = EarthLike();
+
+        SkyView sky = SkyView.From(world.Bodies, planet, new GeoCoordinate(90, 0), 0, 10)!;
+
+        Assert.Null(sky.SolarTimeHours);
+    }
+
+    [Fact]
+    public void TheBodyAtADirection_IsTheOneWhoseDiscIsThere()
+    {
+        (World world, Body planet) = EarthLike();
+        SkyView sky = SkyView.From(world.Bodies, planet, new GeoCoordinate(0, 0), 0, 10.3)!;
+        SkyBody sun = sky.Star!;
+
+        Assert.Equal(sun.BodyId, sky.BodyAt(sun.East, sun.North, sun.Up, 0, 0.1)?.BodyId);
+        Assert.Null(sky.BodyAt(-sun.East, -sun.North, -sun.Up, 0, 0.1));
+
+        // Two degrees off: missed at true size, caught when drawn at least three degrees wide.
+        (double e, double n, double u) = Tilted(sun, 2);
+        Assert.Null(sky.BodyAt(e, n, u, 0, 0.1));
+        Assert.Equal(sun.BodyId, sky.BodyAt(e, n, u, 1.5, 0.6)?.BodyId);
+    }
+
+    [Fact]
+    public void WhereDiscsOverlap_TheNearestBodyIsSeen()
+    {
+        (World world, Body planet) = EarthLike();
+        Body moon = NewBodies.Moon(world.Bodies, planet);
+        world.Bodies.Add(moon);
+
+        // The moment in a month when the moon passes closest to the sun.
+        SkyView sky = Enumerable.Range(0, 400)
+            .Select(i => SkyView.From(world.Bodies, planet, new GeoCoordinate(0, 0), 0,
+                i * moon.Orbit!.PeriodDays / 400)!)
+            .MinBy(s => Apart(s.Bodies.Single(b => b.BodyId == moon.Id), s.Star!))!;
+        SkyBody sun = sky.Star!;
+
+        Assert.Equal(moon.Id, sky.BodyAt(sun.East, sun.North, sun.Up, 10, 0)?.BodyId);
+    }
+
     [Fact]
     public void TheSun_LooksAboutHalfADegreeAcross()
     {
@@ -132,6 +204,19 @@ public sealed class SkyViewTests
         [.. Enumerable.Range(0, (int)(24 * 60 / StepMinutes))
             .Select(i => SkyView.From(world.Bodies, planet, spot, 0,
                 day + i * StepMinutes / (24 * 60))!)];
+
+    // A direction turned `degrees` away from a body's, toward the zenith (or, for a body
+    // overhead, toward the north).
+    private static (double East, double North, double Up) Tilted(SkyBody body, double degrees)
+    {
+        var at = new Vector3D(body.East, body.North, body.Up);
+        Vector3D toward = Math.Abs(body.Up) < 0.99 ? new Vector3D(0, 0, 1) : new Vector3D(0, 1, 0);
+        Vector3D side = toward - at * toward.Dot(at);
+        side *= 1 / side.Length;
+        double angle = double.DegreesToRadians(degrees);
+        Vector3D turned = at * Math.Cos(angle) + side * Math.Sin(angle);
+        return (turned.X, turned.Y, turned.Z);
+    }
 
     // The angle between two bodies in the sky, in degrees.
     private static double Apart(SkyBody a, SkyBody b) => double.RadiansToDegrees(Math.Acos(

@@ -2,7 +2,6 @@ using Godot;
 using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
-using NothicWorlds.Interop;
 using NothicWorlds.Rendering;
 using NothicWorlds.Session;
 using NothicWorlds.UI;
@@ -11,27 +10,33 @@ namespace NothicWorlds.Controls;
 
 /// <summary>
 /// Standing on a world in first person (VISION.md REN-06; owner's choices: walk or fly, the sky
-/// at true size with a Magnify switch). Drag to look around; W, A, S, D walk (Shift for ten
-/// times faster); the mouse wheel changes the speed; F switches between walking on the ground
-/// and flying, Space and C rise and sink while flying; M magnifies small bodies in the sky; Esc
-/// goes back to the globe. The clock keeps running, so the sun and moons cross the sky.
+/// at true size with a Magnify switch, the live weather overhead, a compass and readouts).
+/// Drag to look around; W, A, S, D walk (Shift for ten times faster); the mouse wheel changes
+/// the speed; F switches between walking on the ground and flying, Space and C rise and sink
+/// while flying; M magnifies small bodies in the sky; Esc goes back to the globe. The clock
+/// keeps running, so the sun and moons cross the sky and the weather passes over.
 /// </summary>
 /// <remarks>
 /// While standing, the scene is centered on the eye (<see cref="SystemView.StandingOn"/>) and
 /// the ground right around it is drawn by a <see cref="FirstPersonGround"/>, both so the
-/// ground near the eye keeps its precision. The sky (<c>surface_sky.gdshader</c>) takes over the
-/// background, drawing the bodies from <see cref="SkyView"/>. Must come last in the scene: it
-/// takes the mouse and keys before the globe's camera and tools.
+/// ground near the eye keeps its precision. A <see cref="SurfaceSky"/> takes over the
+/// background, and a <see cref="FirstPersonHud"/> shows the readouts. Must come last in the
+/// scene: it takes the mouse and keys before the globe's camera and tools.
 /// </remarks>
 public partial class FirstPersonMode : Node
 {
     private const double EyeHeightMeters = 1.7;
     private const float LookDegreesPerPixel = 0.2f;
     private const float FieldOfViewDegrees = 70;
-    private const int MaxSkyBodies = 12;  // Must match MAX_BODIES in surface_sky.gdshader
 
-    // Smallest a body is drawn with Magnify on, as a radius in degrees.
-    private const double MagnifiedRadiusDegrees = 0.4;
+    // How close the mouse must come to a body's disc to read it out, in pixels.
+    private const float HoverPixels = 8;
+
+    // How often the weather at the spot is looked up again, in seconds of real time.
+    private const double WeatherSeconds = 0.5;
+
+    // How far the air's haze reaches: half gone at this distance in clear air, in km.
+    private const double ClearHazeKm = 40;
 
     // Speeds the mouse wheel steps through, in m/s, with their names.
     private static readonly (double MetersPerSecond, string Name)[] _speeds =
@@ -40,15 +45,14 @@ public partial class FirstPersonMode : Node
         (3_000, "rocket speed"), (30_000, "meteor speed"), (300_000, "very fast"),
     ];
 
-    private static readonly Shader _skyShader =
-        GD.Load<Shader>("res://Rendering/surface_sky.gdshader");
+    private static readonly string[] _compass =
+        ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+            "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
 
-    private readonly ShaderMaterial _skyMaterial = new() { Shader = _skyShader };
-    private Sky? _sky;
+    private readonly SurfaceSky _sky = new();
     private Camera3D? _camera;
     private FirstPersonGround? _ground;
-    private CanvasLayer? _hud;
-    private Label? _help;
+    private FirstPersonHud? _hud;
     private Guid? _bodyId;
     private Vector3D _spot;  // Unit direction on the body, its own frame
     private double _heading;  // Radians clockwise from north
@@ -57,12 +61,14 @@ public partial class FirstPersonMode : Node
     private bool _flying;
     private bool _magnify;
     private bool _dragging;
+    private Vector2 _mouse;
     private int _speed;
     private int _groundVersion = -1;
+    private double _groundHeightMeters;  // The eye's height when the ground was built
+    private WeatherSample? _weather;
+    private double _weatherAge = double.PositiveInfinity;
 
     // What standing changed, to put back.
-    private Sky? _savedSky;
-    private Godot.Environment.BGMode _savedBackground;
     private ProcessModeEnum _savedCameraMode;
     private readonly List<(CanvasItem Item, bool Visible)> _hiddenItems = [];
     private readonly List<(CanvasLayer Layer, bool Visible)> _hiddenLayers = [];
@@ -82,6 +88,9 @@ public partial class FirstPersonMode : Node
     /// <summary>The nebulas painted on the sky, for the night sky.</summary>
     [Export] public NebulaBackdrop? Nebulas { get; set; }
 
+    /// <summary>The live weather, for what's overhead and falling.</summary>
+    [Export] public WeatherDisplay? Weather { get; set; }
+
     /// <summary>The message line, for why standing isn't possible.</summary>
     [Export] public MapToolbar? Toolbar { get; set; }
 
@@ -97,6 +106,8 @@ public partial class FirstPersonMode : Node
     {
         // Before the system view, so the eye it centers the scene on is this frame's.
         ProcessPriority = -10;
+        _hud = new FirstPersonHud();
+        AddChild(_hud);
         if (Session is not null)
         {
             Session.WorldClosed += _ => Leave();
@@ -161,12 +172,8 @@ public partial class FirstPersonMode : Node
             GlobeCamera.ProcessMode = _savedCameraMode;
             GlobeCamera.MakeCurrent();
         }
-        if (Environment?.Environment is Godot.Environment environment)
-        {
-            environment.Sky = _savedSky;
-            environment.BackgroundMode = _savedBackground;
-        }
 
+        _sky.Hide();
         foreach ((CanvasItem item, bool visible) in _hiddenItems)
         {
             item.Visible = visible;
@@ -179,10 +186,7 @@ public partial class FirstPersonMode : Node
 
         _hiddenItems.Clear();
         _hiddenLayers.Clear();
-        if (_hud is not null)
-        {
-            _hud.Visible = false;
-        }
+        _hud!.Visible = false;
     }
 
     private void Enter(Guid bodyId, Vector3D spot)
@@ -195,6 +199,8 @@ public partial class FirstPersonMode : Node
         _flying = false;
         _heightMeters = EyeHeightMeters;
         _groundVersion = -1;
+        _weather = null;
+        _weatherAge = double.PositiveInfinity;
 
         _camera = new Camera3D { Fov = FieldOfViewDegrees, Name = "FirstPersonCamera" };
         AddChild(_camera);
@@ -208,17 +214,9 @@ public partial class FirstPersonMode : Node
 
         _ground = new FirstPersonGround();
         AddChild(_ground);
-
-        if (Environment?.Environment is Godot.Environment environment)
+        if (Environment is not null)
         {
-            _savedSky = environment.Sky;
-            _savedBackground = environment.BackgroundMode;
-            _sky ??= new Sky
-            {
-                SkyMaterial = _skyMaterial,
-                RadianceSize = Sky.RadianceSizeEnum.Size32,
-            };
-            _skyMaterial.SetShaderParameter("space_color", environment.BackgroundColor);
+            _sky.Show(Environment);
         }
 
         foreach (Node node in HideWhileStanding)
@@ -235,6 +233,7 @@ public partial class FirstPersonMode : Node
             }
         }
 
+        _hud!.Visible = true;
         ShowHelp();
     }
 
@@ -258,11 +257,13 @@ public partial class FirstPersonMode : Node
                 _speed = Math.Max(_speed - 1, 0);
                 ShowHelp();
                 break;
-            case InputEventMouseMotion motion when _dragging:
-                _heading += double.DegreesToRadians(motion.Relative.X * LookDegreesPerPixel);
-                _pitch = Math.Clamp(
-                    _pitch - double.DegreesToRadians(motion.Relative.Y * LookDegreesPerPixel),
-                    -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
+            case InputEventMouseMotion motion:
+                _mouse = motion.Position;
+                if (_dragging)
+                {
+                    Look(motion.Relative);
+                }
+
                 break;
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.Escape }:
                 Leave();
@@ -310,10 +311,31 @@ public partial class FirstPersonMode : Node
         System.StandingEye = eye;
 
         double time = Session.World.TimeDays;
-        (Vector3D east, Vector3D north, Vector3D up) = Frame(body, time);
-        PlaceCamera(east, north, up, _heightMeters / radiusMeters * place.Radius);
+        (Vector3D East, Vector3D North, Vector3D Up) frame = Frame(body, time);
+        PlaceCamera(frame, _heightMeters / radiusMeters * place.Radius);
         PlaceGround(globe, body, time, eye, place.Radius);
-        ShowSky(body, time, east, north, up, groundRadius);
+        UpdateWeather(id, time, delta);
+
+        double heightKm = (groundRadius - 1) * body.RadiusKm + _heightMeters / 1000;
+        if (SkyView.From(Session.World.Bodies, body, SphericalPolygon.FromUnit(_spot), heightKm,
+            time) is not SkyView sky)
+        {
+            return;
+        }
+
+        _sky.ShowBodies(Session.World.Bodies, body, sky, frame, _magnify, Nebulas?.SkyTexture);
+        _sky.ShowClouds(globe, body, BodyBasis(body, time).Transposed(), eye, groundRadius);
+        _sky.ShowHaze(body.HasAtmosphere, place.Radius / body.RadiusKm, HazeKm(),
+            sky.Star?.AltitudeDegrees ?? -90, _weather?.CloudCover ?? 0);
+        ShowReadouts(body, time, sky, frame);
+    }
+
+    // Turns the view by a drag of the mouse.
+    private void Look(Vector2 drag)
+    {
+        _heading += double.DegreesToRadians(drag.X * LookDegreesPerPixel);
+        _pitch = Math.Clamp(_pitch - double.DegreesToRadians(drag.Y * LookDegreesPerPixel),
+            -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
     }
 
     // Walks or flies by the keys held, over the body's surface along great circles.
@@ -360,11 +382,11 @@ public partial class FirstPersonMode : Node
     }
 
     // The camera at the scene's middle (the eye), looking along the heading and pitch.
-    private void PlaceCamera(Vector3D east, Vector3D north, Vector3D up, double eyeHeight)
+    private void PlaceCamera((Vector3D East, Vector3D North, Vector3D Up) frame,
+        double eyeHeight)
     {
-        Vector3D level = north * Math.Cos(_heading) + east * Math.Sin(_heading);
-        Vector3D look = level * Math.Cos(_pitch) + up * Math.Sin(_pitch);
-        Vector3D right = east * Math.Cos(_heading) - north * Math.Sin(_heading);
+        Vector3D look = Look(frame);
+        Vector3D right = frame.East * Math.Cos(_heading) - frame.North * Math.Sin(_heading);
         Vector3D cameraUp = Cross(right, look);
         _camera!.GlobalTransform = new Transform3D(
             new Basis(ToGodot(right), ToGodot(cameraUp), ToGodot(look * -1)), Vector3.Zero);
@@ -376,8 +398,16 @@ public partial class FirstPersonMode : Node
         _camera.Far = near * 1e6f;
     }
 
+    // The way the view looks, in the scene's frame.
+    private Vector3D Look((Vector3D East, Vector3D North, Vector3D Up) frame)
+    {
+        Vector3D level = frame.North * Math.Cos(_heading) + frame.East * Math.Sin(_heading);
+        return level * Math.Cos(_pitch) + frame.Up * Math.Sin(_pitch);
+    }
+
     // The rings of ground around the eye: built again when the eye has moved a good part of
-    // its height away from their middle, or the ground changed; placed relative to the eye.
+    // its height away from their middle, risen or sunk by half, or the ground changed (they
+    // reach past the horizon, which moves out as the eye rises); placed relative to the eye.
     private void PlaceGround(PlanetSurface globe, Body body, double time, Vector3D eye,
         double displayRadius)
     {
@@ -390,14 +420,16 @@ public partial class FirstPersonMode : Node
 
         double height = _heightMeters / (body.RadiusKm * 1000);
         double moved = Math.Acos(Math.Clamp(ground.Center.Dot(_spot), -1, 1));
+        double risen = _heightMeters / _groundHeightMeters;
         if (ground.Mesh is null || globe.ReliefVersion != _groundVersion
-            || moved > Math.Max(height * 0.25, 1e-7))
+            || moved > Math.Max(height * 0.25, 1e-7) || risen > 1.5 || risen < 1 / 1.5)
         {
             double horizon = Math.Acos(1 / (1 + height));
             ground.Build(globe, _spot, Math.Max(height * 0.5, 2e-7),
                 Math.Clamp(horizon * 4, 0.003, 0.6));
             ground.MaterialOverride = globe.MaterialOverride;
             _groundVersion = globe.ReliefVersion;
+            _groundHeightMeters = _heightMeters;
         }
 
         Basis turn = BodyBasis(body, time);
@@ -407,120 +439,136 @@ public partial class FirstPersonMode : Node
             ToGodot(ToSystem(body, time, offset) * displayRadius));
     }
 
-    // Fills the sky from what's above the spot now.
-    private void ShowSky(Body body, double time, Vector3D east, Vector3D north, Vector3D up,
-        double groundRadius)
+    // Looks up the live weather at the spot now and then (it changes slowly).
+    private void UpdateWeather(Guid id, double time, double delta)
     {
-        if (Environment?.Environment is not Godot.Environment environment || _sky is null)
+        _weatherAge += delta;
+        if (_weatherAge < WeatherSeconds)
         {
             return;
         }
 
-        if (environment.Sky != _sky || environment.BackgroundMode != Godot.Environment.BGMode.Sky)
-        {
-            environment.Sky = _sky;
-            environment.BackgroundMode = Godot.Environment.BGMode.Sky;
-        }
-
-        double heightKm = (groundRadius - 1) * body.RadiusKm + _heightMeters / 1000;
-        if (SkyView.From(Session!.World.Bodies, body, SphericalPolygon.FromUnit(_spot), heightKm,
-            time) is not SkyView sky)
-        {
-            return;
-        }
-
-        Vector3D InScene(SkyBody b) => east * b.East + north * b.North + up * b.Up;
-        _skyMaterial.SetShaderParameter("local_up", ToGodot(up));
-        _skyMaterial.SetShaderParameter("has_air", body.HasAtmosphere);
-        Texture2D? nebulas = Nebulas?.SkyTexture;
-        _skyMaterial.SetShaderParameter("has_nebulas", nebulas is not null);
-        if (nebulas is not null)
-        {
-            _skyMaterial.SetShaderParameter("nebula_sky", nebulas);
-        }
-
-        _skyMaterial.SetShaderParameter("has_star", sky.Star is not null);
-        Vector3D starAt = Vector3D.Zero;
-        if (sky.Star is SkyBody star)
-        {
-            Body starBody = Session.World.Bodies.First(b => b.Id == star.BodyId);
-            starAt = InScene(star) * star.DistanceKm;
-            _skyMaterial.SetShaderParameter("star_direction", ToGodot(InScene(star)));
-            _skyMaterial.SetShaderParameter("star_radius", (float)Radius(star));
-            _skyMaterial.SetShaderParameter("star_color",
-                BodyAppearance.StarColor(starBody.Appearance.StarType).ToGodot());
-        }
-
-        List<SkyBody> others = [.. sky.Bodies.Where(b => b.BodyId != sky.Star?.BodyId)
-            .Take(MaxSkyBodies)];
-        var directions = new Vector3[MaxSkyBodies];
-        var radii = new float[MaxSkyBodies];
-        var colors = new Vector3[MaxSkyBodies];
-        var light = new Vector3[MaxSkyBodies];
-        var shines = new float[MaxSkyBodies];
-        for (int i = 0; i < others.Count; i++)
-        {
-            SkyBody seen = others[i];
-            Body other = Session.World.Bodies.First(b => b.Id == seen.BodyId);
-            Vector3D direction = InScene(seen);
-            Color color = other.Kind == BodyKind.Star
-                ? BodyAppearance.StarColor(other.Appearance.StarType).ToGodot()
-                : other.Appearance.Color.ToGodot();
-            directions[i] = ToGodot(direction);
-            radii[i] = (float)Radius(seen);
-            colors[i] = new Vector3(color.R, color.G, color.B);
-            Vector3D toStar = starAt - direction * seen.DistanceKm;
-            light[i] = toStar.Length > 0 ? ToGodot(toStar * (1 / toStar.Length)) : Vector3.Up;
-            shines[i] = other.GivesLight ? 1 : 0;
-        }
-
-        _skyMaterial.SetShaderParameter("body_count", others.Count);
-        _skyMaterial.SetShaderParameter("body_directions", directions);
-        _skyMaterial.SetShaderParameter("body_radii", radii);
-        _skyMaterial.SetShaderParameter("body_colors", colors);
-        _skyMaterial.SetShaderParameter("body_light", light);
-        _skyMaterial.SetShaderParameter("body_shines", shines);
+        _weatherAge = 0;
+        _weather = Weather?.WeatherOf(id)?.At(time).SampleAt(_spot);
     }
 
-    // A body's radius in the sky, in radians: true, or with Magnify at least a set size.
-    private double Radius(SkyBody body)
+    // The haze's reach: shorter in rain, and shorter still in snow.
+    private double HazeKm()
     {
-        double radius = double.DegreesToRadians(body.AngularDiameterDegrees / 2);
-        return _magnify
-            ? Math.Max(radius, double.DegreesToRadians(MagnifiedRadiusDegrees))
-            : radius;
+        if (_weather is not WeatherSample weather || !BelowClouds())
+        {
+            return ClearHazeKm;
+        }
+
+        double thickness = weather.Precipitation switch
+        {
+            PrecipitationKind.Rain => 2,
+            PrecipitationKind.Snow => 6,
+            _ => 0,
+        };
+        return Math.Max(1.5, ClearHazeKm / (1 + thickness * weather.PrecipitationMmPerHour));
+    }
+
+    private bool BelowClouds() => _heightMeters < SurfaceSky.CloudHeightKm * 1000;
+
+    // The compass, the readout for the body under the mouse, the panel, and what's falling.
+    private void ShowReadouts(Body body, double time, SkyView sky,
+        (Vector3D East, Vector3D North, Vector3D Up) frame)
+    {
+        FirstPersonHud hud = _hud!;
+        hud.SetHeading(double.RadiansToDegrees(_heading));
+        hud.SetHover(_dragging ? null : HoverText(sky, frame), _mouse);
+        hud.SetInfo(InfoText(body, time, sky));
+
+        double light = sky.Star is SkyBody star
+            ? Math.Clamp((star.AltitudeDegrees + 6) / 12, 0.08, 1)
+            : 0.08;
+        if (_weather is WeatherSample weather && body.HasAtmosphere && BelowClouds())
+        {
+            double amount = Math.Clamp(weather.PrecipitationMmPerHour / 4, 0, 1);
+            double fall = weather.Precipitation == PrecipitationKind.Snow ? 1.5 : 8;
+            double across = weather.WindEastMs * Math.Cos(_heading)
+                - weather.WindNorthMs * Math.Sin(_heading);
+            hud.SetFalling(weather.Precipitation == PrecipitationKind.Rain ? amount : 0,
+                weather.Precipitation == PrecipitationKind.Snow ? amount : 0,
+                Math.Clamp(across / fall, -1.5, 1.5), light);
+        }
+        else
+        {
+            hud.SetFalling(0, 0, 0, light);
+        }
+    }
+
+    // The body under the mouse: its name, where it stands, how far, and how lit.
+    private string? HoverText(SkyView sky, (Vector3D East, Vector3D North, Vector3D Up) frame)
+    {
+        Vector3 ray = _camera!.ProjectRayNormal(_mouse);
+        var toward = new Vector3D(ray.X, ray.Y, ray.Z);
+        double up = toward.Dot(frame.Up);
+        float pixelDegrees = FieldOfViewDegrees / GetViewport().GetVisibleRect().Size.Y;
+        if (sky.BodyAt(toward.Dot(frame.East), toward.Dot(frame.North), up,
+                _magnify ? SurfaceSky.MagnifiedRadiusDegrees : 0, HoverPixels * pixelDegrees)
+            is not SkyBody body || body.AltitudeDegrees < -1)
+        {
+            return null;
+        }
+
+        string lit = body.Kind == BodyKind.Star ? "" : $" · {body.LitFraction * 100:0}% lit";
+        return $"{body.Name}\n{body.AltitudeDegrees:0}° up · {body.AzimuthDegrees:0}° " +
+            $"{CompassPoint(body.AzimuthDegrees)} · {Distance(body.DistanceKm)}{lit}";
+    }
+
+    // The date, the sun's time and height, the weather here, and the height when flying.
+    private string InfoText(Body body, double time, SkyView sky)
+    {
+        var lines = new List<string> { BodyClock.Describe(body, time) };
+        if (sky.Star is SkyBody star && sky.SolarTimeHours is double hours)
+        {
+            int minutes = (int)(hours * 60) % (24 * 60);
+            lines.Add($"Sun time {minutes / 60}:{minutes % 60:00} · " +
+                $"{star.Name} {Math.Abs(star.AltitudeDegrees):0}° " +
+                (star.AltitudeDegrees >= 0 ? "up" : "below the horizon"));
+        }
+
+        if (_weather is WeatherSample weather && body.HasAtmosphere)
+        {
+            lines.Add($"{LiveWeatherText.Describe(weather)} · {weather.TemperatureC:0} °C");
+        }
+
+        if (_flying)
+        {
+            lines.Add($"Height {_heightMeters:N0} m");
+        }
+
+        return string.Join('\n', lines);
     }
 
     private void ShowHelp()
     {
-        if (_hud is null)
-        {
-            _hud = new CanvasLayer { Layer = 5 };
-            _help = new Label
-            {
-                Position = new Vector2(12, 12),
-                Modulate = new Color(1, 1, 1, 0.85f),
-            };
-            _help.AddThemeColorOverride("font_outline_color", Colors.Black);
-            _help.AddThemeConstantOverride("outline_size", 4);
-            _hud.AddChild(_help);
-            AddChild(_hud);
-        }
-
-        _hud.Visible = true;
         Body? body = Session?.World.Bodies.Find(b => b.Id == _bodyId);
         (double metersPerSecond, string name) = _speeds[_speed];
-        _help!.Text = $"Standing on {body?.Name} · {(_flying ? "Flying" : "Walking")} · " +
+        _hud?.SetHelp($"Standing on {body?.Name} · {(_flying ? "Flying" : "Walking")} · " +
             $"{Speed(metersPerSecond)} ({name})" +
             $"{(_magnify ? " · Magnified" : "")}\n" +
             "Drag to look · W A S D move (Shift: faster) · Wheel: speed · F: " +
             $"{(_flying ? "walk" : "fly")}{(_flying ? " · Space / C: up / down" : "")} · " +
-            "M: magnify · Esc: back";
+            "M: magnify · Esc: back");
     }
 
     private static string Speed(double metersPerSecond) => metersPerSecond < 1000
         ? $"{metersPerSecond * 3.6:N0} km/h"
         : $"{metersPerSecond / 1000:N0} km/s";
+
+    private static string CompassPoint(double degrees) =>
+        _compass[(int)Math.Round(degrees / 22.5) % _compass.Length];
+
+    // Far distances in AU, middling ones in millions of km, near ones in km.
+    private static string Distance(double km) => km switch
+    {
+        >= 0.1 * CometTail.KmPerAu => $"{km / CometTail.KmPerAu:#,0.###} AU",
+        >= 1e6 => $"{km / 1e6:0.##} million km",
+        _ => $"{km:N0} km",
+    };
 
     private static double Held(Key key) => Input.IsKeyPressed(key) ? 1 : 0;
 
