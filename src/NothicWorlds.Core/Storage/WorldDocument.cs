@@ -20,6 +20,8 @@ internal sealed class WorldDocument
     public List<JournalEntryDocument>? Journal { get; init; }  // Added in format version 7
     public List<TimelineDocument>? Timelines { get; init; }  // Added in format version 7
     public List<EventDocument>? Events { get; init; }  // Added in format version 7
+    public List<RelationshipDocument>? Relationships { get; init; }  // Added in version 27
+    public List<DiagramDocument>? Diagrams { get; init; }  // Added in format version 27
     public List<NebulaDocument?>? Nebulas { get; init; }  // Added in format version 19
     public ViewDocument? View { get; init; }
 }
@@ -49,6 +51,7 @@ internal sealed class JournalEntryDocument
     public required Guid Id { get; init; }
     public required string Title { get; init; }
     public string? Text { get; init; }  // Omitted when empty
+    public string? Kind { get; init; }  // Added in format version 27; omitted for none
     public LocationDocument? Location { get; init; }
     public required DateTimeOffset CreatedUtc { get; init; }
     public required DateTimeOffset EditedUtc { get; init; }
@@ -99,6 +102,31 @@ internal sealed class EventDocument
     public double? End { get; init; }  // Omitted for a moment
     public LocationDocument? Location { get; init; }
     public List<Guid>? Entries { get; init; }  // Omitted when it links to none
+}
+
+internal sealed class RelationshipDocument
+{
+    public required Guid Id { get; init; }
+    public required Guid From { get; init; }
+    public required Guid To { get; init; }
+    public required string Kind { get; init; }
+    public string? Label { get; init; }  // Omitted when empty
+    public double? Start { get; init; }  // Omitted for always
+    public double? End { get; init; }  // Omitted for never
+}
+
+internal sealed class DiagramDocument
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public List<PlacementDocument?>? Entries { get; init; }  // Omitted when empty
+}
+
+internal sealed class PlacementDocument
+{
+    public required Guid Entry { get; init; }
+    public required double X { get; init; }
+    public required double Y { get; init; }
 }
 
 internal sealed class BodyDocument

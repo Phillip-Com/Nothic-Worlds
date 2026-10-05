@@ -29,6 +29,8 @@ internal static class WorldMapper
             Journal = NullIfEmpty(world.Journal.Select(ToDocument)),
             Timelines = NullIfEmpty(world.Timelines.Select(ToDocument)),
             Events = NullIfEmpty(world.Events.Select(ToDocument)),
+            Relationships = NullIfEmpty(world.Relationships.Select(ToDocument)),
+            Diagrams = NullIfEmpty(world.Diagrams.Select(ToDocument)),
             Nebulas = world.Nebulas.Count == 0
                 ? null
                 : [.. world.Nebulas.Select(nebula => new NebulaDocument
@@ -89,6 +91,8 @@ internal static class WorldMapper
         world.Journal.AddRange((document.Journal ?? []).Select(ToEntry));
         world.Timelines.AddRange((document.Timelines ?? []).Select(ToTimeline));
         world.Events.AddRange((document.Events ?? []).Select(ToEvent));
+        world.Relationships.AddRange((document.Relationships ?? []).Select(ToRelationship));
+        world.Diagrams.AddRange((document.Diagrams ?? []).Select(ToDiagram));
         RequireNoProblem(LoreRules.Problem(world));
         return world;
     }
@@ -194,6 +198,7 @@ internal static class WorldMapper
             Id = entry.Id,
             Title = entry.Title,
             Text = entry.Text.Length == 0 ? null : entry.Text,
+            Kind = entry.Kind is LoreKind kind ? WorldFormat.LoreKindName(kind) : null,
             Location = entry.Location is LoreLocation location ? ToDocument(location) : null,
             CreatedUtc = entry.CreatedUtc,
             EditedUtc = entry.EditedUtc,
@@ -209,6 +214,7 @@ internal static class WorldMapper
             Id = document!.Id,
             Title = document.Title ?? "",
             Text = document.Text ?? "",
+            Kind = document.Kind is null ? null : WorldFormat.ParseLoreKind(document.Kind),
             Location = document.Location is LocationDocument location
                 ? ToLocation(location)
                 : null,
@@ -276,6 +282,67 @@ internal static class WorldMapper
                 ? ToLocation(location)
                 : null,
             EntryIds = document.Entries is null ? [] : [.. document.Entries],
+        };
+    }
+
+    private static RelationshipDocument ToDocument(Relationship relationship)
+    {
+        return new RelationshipDocument
+        {
+            Id = relationship.Id,
+            From = relationship.FromEntryId,
+            To = relationship.ToEntryId,
+            Kind = WorldFormat.RelationshipKindName(relationship.Kind),
+            Label = relationship.Label.Length == 0 ? null : relationship.Label,
+            Start = relationship.StartDays,
+            End = relationship.EndDays,
+        };
+    }
+
+    // Checked fully afterwards by LoreRules.Problem (through Relationship.Problem).
+    private static Relationship ToRelationship(RelationshipDocument document)
+    {
+        Require(document is not null, "a relationship is empty");
+        return new Relationship
+        {
+            Id = document!.Id,
+            FromEntryId = document.From,
+            ToEntryId = document.To,
+            Kind = WorldFormat.ParseRelationshipKind(document.Kind),
+            Label = document.Label ?? "",
+            StartDays = document.Start,
+            EndDays = document.End,
+        };
+    }
+
+    private static DiagramDocument ToDocument(LoreDiagram diagram)
+    {
+        return new DiagramDocument
+        {
+            Id = diagram.Id,
+            Name = diagram.Name,
+            Entries = diagram.Placements.Count == 0
+                ? null
+                : [.. diagram.Placements.Select(p => new PlacementDocument
+                {
+                    Entry = p.EntryId,
+                    X = p.X,
+                    Y = p.Y,
+                })],
+        };
+    }
+
+    // Checked fully afterwards by LoreRules.Problem (through LoreDiagram.Problem).
+    private static LoreDiagram ToDiagram(DiagramDocument document)
+    {
+        Require(document is not null, "a diagram is empty");
+        Require((document!.Entries ?? []).All(p => p is not null), "a diagram's entry is empty");
+        return new LoreDiagram
+        {
+            Id = document.Id,
+            Name = document.Name ?? "",
+            Placements = [.. (document.Entries ?? [])
+                .Select(p => new DiagramPlacement(p!.Entry, p.X, p.Y))],
         };
     }
 

@@ -22,6 +22,12 @@ public sealed record JournalEntry
     /// <summary>The entry's text (plain text; lines are kept).</summary>
     public string Text { get; init; } = "";
 
+    /// <summary>
+    /// What the entry is about (a character, a faction), for its box in relationship
+    /// diagrams (VISION.md LORE-04); null for plain writing.
+    /// </summary>
+    public LoreKind? Kind { get; init; }
+
     /// <summary>Where it's about, or null for nowhere in particular.</summary>
     public LoreLocation? Location { get; init; }
 
@@ -37,6 +43,11 @@ public sealed record JournalEntry
         if (string.IsNullOrWhiteSpace(Title) || Title.Length > MaxTitleLength)
         {
             return $"a journal entry needs a title of up to {MaxTitleLength} characters";
+        }
+
+        if (Kind is LoreKind kind && !Enum.IsDefined(kind))
+        {
+            return "a journal entry has an unknown kind";
         }
 
         return Text is null || Text.Length > MaxTextLength

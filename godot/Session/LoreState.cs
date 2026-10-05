@@ -3,10 +3,11 @@ using NothicWorlds.Core.Model;
 namespace NothicWorlds.Session;
 
 /// <summary>
-/// A copy of a world's regions, weather pins, journal, timelines, and events, plus its terrain
-/// types, nebulas, and visual style, for undo and for telling whether the world still matches
-/// its saved file (VISION.md LORE-01, LORE-02, LORE-03, WTH-01, BOD-05, BOD-03, REN-05). They
-/// are immutable records, so copying the lists is enough: the copies share them.
+/// A copy of a world's regions, weather pins, journal, timelines, events, relationships, and
+/// diagrams, plus its terrain types, nebulas, and visual style, for undo and for telling
+/// whether the world still matches its saved file (VISION.md LORE-01 to LORE-04, WTH-01,
+/// BOD-05, BOD-03, REN-05). They are immutable records, so copying the lists is enough: the
+/// copies share them.
 /// </summary>
 internal sealed record LoreState(
     IReadOnlyList<TerrainType> TerrainTypes,
@@ -15,6 +16,8 @@ internal sealed record LoreState(
     IReadOnlyList<JournalEntry> Journal,
     IReadOnlyList<Timeline> Timelines,
     IReadOnlyList<TimelineEvent> Events,
+    IReadOnlyList<Relationship> Relationships,
+    IReadOnlyList<LoreDiagram> Diagrams,
     IReadOnlyList<Nebula> Nebulas,
     VisualStyle Style)
 {
@@ -23,7 +26,7 @@ internal sealed record LoreState(
     {
         return new LoreState([.. world.TerrainTypes], [.. world.Regions],
             [.. world.WeatherPins], [.. world.Journal], [.. world.Timelines], [.. world.Events],
-            [.. world.Nebulas], world.Style);
+            [.. world.Relationships], [.. world.Diagrams], [.. world.Nebulas], world.Style);
     }
 
     /// <summary>True if the world's lore is exactly this.</summary>
@@ -35,6 +38,8 @@ internal sealed record LoreState(
             && Journal.SequenceEqual(world.Journal)
             && Timelines.SequenceEqual(world.Timelines)
             && Events.SequenceEqual(world.Events)
+            && Relationships.SequenceEqual(world.Relationships)
+            && Diagrams.SequenceEqual(world.Diagrams)
             && Nebulas.SequenceEqual(world.Nebulas)
             && Style == world.Style;
     }
@@ -54,6 +59,10 @@ internal sealed record LoreState(
         world.Timelines.AddRange(Timelines);
         world.Events.Clear();
         world.Events.AddRange(Events);
+        world.Relationships.Clear();
+        world.Relationships.AddRange(Relationships);
+        world.Diagrams.Clear();
+        world.Diagrams.AddRange(Diagrams);
         world.Nebulas.Clear();
         world.Nebulas.AddRange(Nebulas);
         world.Style = Style;

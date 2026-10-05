@@ -64,6 +64,15 @@ public sealed class World
     /// </summary>
     public List<TimelineEvent> Events { get; } = [];
 
+    /// <summary>
+    /// The ties between journal entries (VISION.md LORE-04), shown in every diagram that holds
+    /// both ends.
+    /// </summary>
+    public List<Relationship> Relationships { get; } = [];
+
+    /// <summary>The world's relationship diagrams (VISION.md LORE-04), in list order.</summary>
+    public List<LoreDiagram> Diagrams { get; } = [];
+
     /// <summary>The nebulas on the sky around the system (VISION.md BOD-03).</summary>
     public List<Nebula> Nebulas { get; } = [];
 
@@ -93,14 +102,16 @@ public sealed class World
         };
         copy.Bodies.AddRange(Bodies.Select(body => body.Clone()));
 
-        // Terrain types, regions, weather pins, entries, timelines, events, and nebulas are
-        // immutable records, safe to share.
+        // Terrain types, regions, weather pins, entries, timelines, events, relationships,
+        // diagrams, and nebulas are immutable records, safe to share.
         copy.TerrainTypes.AddRange(TerrainTypes);
         copy.Regions.AddRange(Regions);
         copy.WeatherPins.AddRange(WeatherPins);
         copy.Journal.AddRange(Journal);
         copy.Timelines.AddRange(Timelines);
         copy.Events.AddRange(Events);
+        copy.Relationships.AddRange(Relationships);
+        copy.Diagrams.AddRange(Diagrams);
         copy.Nebulas.AddRange(Nebulas);
         return copy;
     }
