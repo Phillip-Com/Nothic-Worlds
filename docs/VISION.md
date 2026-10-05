@@ -119,7 +119,7 @@ A switch between metric and imperial for every measurement (`UI-04`). Owner's de
 - **The default follows the computer's region** (imperial in the United States, Liberia,
   and Myanmar) until it's changed.
 - **Two PRs:** conversion and formatting in Core (PR #82), then the setting and every readout
-  and field in the app.
+  and field in the app (PR #83).
 
 **Milestone 31: Lore Relationship Diagrams** · Complete (PR #81 merged 2026-10-05; owner's choice, 2026-10-05)
 Diagrams of how characters, factions, and nations are tied together (`LORE-04`). Owner's
@@ -937,7 +937,7 @@ piece.
   Map → save over the file → Ctrl+Z reloaded the map from the temporary copy, and saving again
   wrote it back into the file.
 
-**UI-04 — Metric and imperial units** · In Progress (M32: PR #82) · Base
+**UI-04 — Metric and imperial units** · Implemented (M32: PRs #82–#83) · Base
 **Intent:** A setting to switch everything between the imperial and metric systems for
 measuring distance, mass, volume, area, temperature, and so on (owner's idea, 2026-10-05).
 **Implementation (Core, M32, PR #82):**
@@ -952,6 +952,35 @@ measuring distance, mass, volume, area, temperature, and so on (owner's idea, 20
   (a locale's region: imperial for US, LR, MM; metric otherwise or when there's no region).
 - Tests (`UnitsTests`, 34): known values for every quantity, exact round trips in both
   systems, symbols, formatting, distances, and the default by region.
+
+**Implementation (the app, M32, PR #83):**
+- **The setting:** `AppSettings.Units` (in `user://settings.cfg`; until chosen,
+  `Units.DefaultFor(OS.GetLocale())`), read once and kept, with a `UnitsChanged` event.
+  **Units** is the first row of File ▸ Settings.
+- **`UI/UnitText.cs`:** `Format`, `Distance`, `Symbol`, and `Shown` with the setting filled in,
+  for readouts.
+- **`UI/UnitFields.cs`:** turns a number field into a measurement: `WithUnit(quantity, metric
+  limits, steps)`, `ShowMetric(value)`, and `MetricValue()`. A field remembers the metric
+  value it was given and hands it back exactly unless the user changed the number (so a
+  radius stored in km never drifts through a field in miles), and relabels itself when the
+  units change. Two lessons from testing, written into it: signals are held while it
+  relabels (new limits make Godot round the value again, which reached the world as an edit
+  and stored a radius in miles as km), and its limits sit on whole steps (Godot rounds to
+  steps counted from the lowest value, which turned a typed 4,000 miles into 3,999.62).
+- **Fields:** the System panel's radius, average temperature, and density; the Shapes
+  section's sizes; the terrain brush's size (by hand, its limits following the body); the
+  orbit distance (by hand beside its AU choice, with the same untouched-stays-exact rule).
+- **Readouts:** mass for small bodies, the radius and disc tooltips, the weather window
+  (temperatures, rain by month and year, its notes) and its chart's scales, live weather
+  (rain rates, wind), climate tooltips (how much colder, as a temperature change),
+  asteroids, the orbit guide's zones and limits and first person's sky readouts (both now
+  using `Units.FormatDistance`), the map's scale bar (a round number of km or miles), the
+  first-person panel (temperature, height, speed), the sculpt height, and the temperature
+  limit message. Panels showing measurements refresh when the units change.
+- Tested in the app (behind the owner's windows): the default followed this computer's US
+  region; switching to imperial showed 3,959 mi, 59 °F, and 344 lb/ft³; another edit left
+  the radius at exactly 6,371 km; typing 4,000 mi stored 6,437.376 km; 50 °F stored 10 °C;
+  and switching back to metric kept everything as stored.
 
 ### 4.3 Maps & Image Import (`MAP`)
 
