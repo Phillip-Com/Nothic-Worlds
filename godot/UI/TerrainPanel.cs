@@ -2,6 +2,7 @@ using Godot;
 using NothicWorlds.Controls;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Interop;
+using NothicWorlds.Rendering;
 using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
@@ -75,6 +76,12 @@ public partial class TerrainPanel : CanvasLayer
     /// <summary>The handles that place and shape shapes, in Shapes mode.</summary>
     [Export] public ShapeHandles? Shapes { get; set; }
 
+    /// <summary>
+    /// The live weather, whose clouds hide while the panel is open (owner's choice), so the
+    /// ground shows.
+    /// </summary>
+    [Export] public WeatherDisplay? Weather { get; set; }
+
     /// <summary>Whether the panel is open (it's still hidden while the toolbar is).</summary>
     public bool IsPanelOpen
     {
@@ -82,6 +89,7 @@ public partial class TerrainPanel : CanvasLayer
         set
         {
             _open = value;
+            Weather?.SetSurfaceEditing("Terrain", value);
             UpdateVisibility();
         }
     }

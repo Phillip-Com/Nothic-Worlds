@@ -135,8 +135,9 @@ Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 Placer = NodePath("../PinPlacer")
 
-[node name="MapPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Calibration", "Cutter", "Toolbar")]
+[node name="MapPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Calibration", "Cutter", "Toolbar", "Weather")]
 script = ExtResource("12_map")
+Weather = NodePath("../WeatherDisplay")
 Session = NodePath("../WorldSession")
 Calibration = NodePath("../CalibrationWorkspace")
 Cutter = NodePath("../CutEditor")
@@ -150,8 +151,9 @@ Camera = NodePath("../PlanetCamera")
 Toolbar = NodePath("../MapToolbar")
 SystemPanel = NodePath("../SystemPanel")
 
-[node name="TerrainPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "Brush", "Shapes")]
+[node name="TerrainPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "Brush", "Shapes", "Weather")]
 script = ExtResource("31_terrain_panel")
+Weather = NodePath("../WeatherDisplay")
 Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 Brush = NodePath("../TerrainBrush")

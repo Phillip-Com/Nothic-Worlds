@@ -28,6 +28,7 @@ public partial class WeatherDisplay : Node
     private readonly Dictionary<Guid, LiveWeather> _weather = [];
     private readonly Dictionary<Guid, WeatherSnapshots> _snapshots = [];
     private readonly HashSet<Guid> _stale = [];  // Showing weather from before the last change
+    private readonly HashSet<string> _editors = [];  // Panels editing the surface, now open
     private Task<Dictionary<Guid, LiveWeather>>? _rebuilding;
     private Task<(Image Weather, Image Wind)>? _baking;
     private (Guid Body, double TimeDays, bool Alone, double StartedAt) _bakingFor;
@@ -52,6 +53,25 @@ public partial class WeatherDisplay : Node
 
     /// <summary>Whether the wind shows (View ▸ Wind).</summary>
     public bool ShowWind { get; set; }
+
+    /// <summary>
+    /// Hides the clouds (with rain and snow) while a panel that edits the surface is open, so
+    /// the ground can be seen (owner's choice: the Terrain and Map panels), or shows them again
+    /// once none is. The wind still shows if it's on.
+    /// </summary>
+    /// <param name="panel">Which panel, by name.</param>
+    /// <param name="open">Whether it's open now.</param>
+    public void SetSurfaceEditing(string panel, bool open)
+    {
+        if (open)
+        {
+            _editors.Add(panel);
+        }
+        else
+        {
+            _editors.Remove(panel);
+        }
+    }
 
     /// <summary>
     /// How finely clouds are drawn (View ▸ Cloud Detail; remembered on this computer by
@@ -180,7 +200,8 @@ public partial class WeatherDisplay : Node
                 continue;
             }
 
-            if (!(ShowClouds || ShowWind) || !surface.IsVisibleInTree() || !IsBigEnough(surface))
+            bool clouds = ShowClouds && _editors.Count == 0;
+            if (!(clouds || ShowWind) || !surface.IsVisibleInTree() || !IsBigEnough(surface))
             {
                 surface.HideWeather();
                 continue;
@@ -192,7 +213,7 @@ public partial class WeatherDisplay : Node
                 _snapshots[id] = snapshots;
             }
 
-            surface.SetWeatherLook(ShowClouds, ShowWind, _detail);
+            surface.SetWeatherLook(clouds, ShowWind, _detail);
             if (snapshots.HasWeather)
             {
                 snapshots.ShowOn(surface, now);
