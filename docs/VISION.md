@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 30: First-Person Surface View** · In progress (owner's choice, 2026-10-05)
+**Milestone 30: First-Person Surface View** · Complete (PR #79 merged 2026-10-05; owner's choice, 2026-10-05)
 Stand on a world and look up (`REN-06`). Owner's decisions:
 - **Walk or fly:** move over the surface, following the ground, or fly freely.
 - **The sky at true size and place,** with a **magnify** switch that enlarges small bodies;
