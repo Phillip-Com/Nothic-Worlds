@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 29: Performance Tiers** · In progress (owner's choice, 2026-10-05)
+**Milestone 29: Performance Tiers** · Complete (PR #76 merged 2026-10-05; owner's choice, 2026-10-05)
 Keep the app light on modest computers and let stronger ones look their best (`REN-03`).
 Owner's decisions:
 - **A File ▸ Settings window** with a **Graphics Quality** preset (Low, Standard, High, or
