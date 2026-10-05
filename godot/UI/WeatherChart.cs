@@ -1,4 +1,5 @@
 using Godot;
+using NothicWorlds.Core.Measurement;
 
 namespace NothicWorlds.UI;
 
@@ -67,24 +68,28 @@ public partial class WeatherChart : Control
             Size.Y - TopMargin - BottomMargin - RainHeight - RainGap);
         var rainStrip = new Rect2(plot.Position.X, plot.End.Y + RainGap, plot.Size.X, RainHeight);
         double mostRain = Math.Max(_months.Max(m => m.RainMm), 1);
-        DrawString(font, new Vector2(2, rainStrip.Position.Y + 20), $"{mostRain:0}",
+        double mostShown = UnitText.Shown(Quantity.Precipitation, mostRain);
+        DrawString(font, new Vector2(2, rainStrip.Position.Y + 20),
+            mostShown.ToString(mostShown < 10 ? "0.#" : "0"),
             width: LeftMargin - 6, alignment: HorizontalAlignment.Right, fontSize: fontSize,
             modulate: _rain);
-        DrawString(font, new Vector2(2, rainStrip.End.Y), "mm", width: LeftMargin - 6,
+        DrawString(font, new Vector2(2, rainStrip.End.Y), UnitText.Symbol(Quantity.Precipitation),
+            width: LeftMargin - 6,
             alignment: HorizontalAlignment.Right, fontSize: fontSize, modulate: _rain);
         DrawRect(rainStrip, _axis with { A = 0.2f }, filled: false);
 
-        // Temperature scale: round steps around the year's range.
-        double low = _months.Min(m => m.LowC);
-        double high = _months.Max(m => m.HighC);
+        // Temperature scale: round steps around the year's range, in °C or °F.
+        static double Shown(double celsius) => UnitText.Shown(Quantity.Temperature, celsius);
+        double low = Shown(_months.Min(m => m.LowC));
+        double high = Shown(_months.Max(m => m.HighC));
         double step = NiceStep(high - low);
         double bottom = Math.Floor(low / step) * step;
         double top = Math.Max(Math.Ceiling(high / step) * step, bottom + step);
         float Y(double celsius) =>
-            plot.End.Y - (float)((celsius - bottom) / (top - bottom)) * plot.Size.Y;
+            plot.End.Y - (float)((Shown(celsius) - bottom) / (top - bottom)) * plot.Size.Y;
         for (double t = bottom; t <= top + 1e-9; t += step)
         {
-            float y = Y(t);
+            float y = plot.End.Y - (float)((t - bottom) / (top - bottom)) * plot.Size.Y;
             DrawLine(new Vector2(plot.Position.X, y), new Vector2(plot.End.X, y), _grid);
             DrawString(font, new Vector2(2, y + 4), $"{t:0}°", width: LeftMargin - 6,
                 alignment: HorizontalAlignment.Right, fontSize: fontSize, modulate: _axis);

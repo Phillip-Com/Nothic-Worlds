@@ -1,4 +1,5 @@
 using Godot;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Rendering;
 
 namespace NothicWorlds.Session;
@@ -22,6 +23,36 @@ public static class AppSettings
     private const string RenderScaleKey = "render_scale";
     private const string FrameRateKey = "frame_rate_limit";
     private const string HighQualityMapsKey = "high_quality_maps";
+    private const string UnitsKey = "units";
+
+    // Read once, then kept: it's asked for every time a measurement is shown.
+    private static UnitSystem? _units;
+
+    /// <summary>
+    /// Raised when <see cref="Units"/> changes, so measurements shown can follow.
+    /// </summary>
+    public static event Action? UnitsChanged;
+
+    /// <summary>
+    /// The units measurements are shown and typed in (File ▸ Settings; VISION.md UI-04). Until
+    /// chosen, it follows the computer's region (owner's choice).
+    /// </summary>
+    public static UnitSystem Units
+    {
+        get => _units ??= Read(Load(), UnitsKey,
+            Core.Measurement.Units.DefaultFor(OS.GetLocale()));
+        set
+        {
+            if (value == Units)
+            {
+                return;
+            }
+
+            _units = value;
+            Save(UnitsKey, value.ToString());
+            UnitsChanged?.Invoke();
+        }
+    }
 
     /// <summary>
     /// The graphics options (File ▸ Settings; VISION.md REN-03). Any never saved (or unreadable)

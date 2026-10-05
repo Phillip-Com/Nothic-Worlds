@@ -1,6 +1,7 @@
 using Godot;
 using NothicWorlds.Controls;
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 using NothicWorlds.Session;
@@ -128,15 +129,16 @@ public partial class AsteroidEventsSection : VBoxContainer
     private static string Details(AsteroidEvent asteroid)
     {
         string size = asteroid.SizeMeters < 1000
-            ? $"{asteroid.SizeMeters:N0} m"
-            : $"{asteroid.SizeMeters / 1000:0.#} km";
+            ? UnitText.Format(Quantity.Length, asteroid.SizeMeters)
+            : UnitText.Format(Quantity.Distance, asteroid.SizeMeters / 1000, 1);
         return asteroid.Spot is GeoCoordinate spot
             ? $"A {size} asteroid hits at {PlaceText.Describe(spot)}"
-            : $"A {size} asteroid, {Rounded(asteroid.DistanceKm):N0} km away";
+            : $"A {size} asteroid, {Rounded(UnitText.Shown(Quantity.Distance,
+                asteroid.DistanceKm)):N0} {UnitText.Symbol(Quantity.Distance)} away";
     }
 
     // Three significant figures: the distances are rolled by chance, so more would be false
-    // precision (e.g. 1,830,000 km, not 1,827,643).
+    // precision (e.g. 1,830,000 km, not 1,827,643). In km or miles.
     private static double Rounded(double km)
     {
         double unit = Math.Pow(10, Math.Max(0, Math.Floor(Math.Log10(km)) - 2));

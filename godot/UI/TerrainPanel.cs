@@ -1,5 +1,6 @@
 using Godot;
 using NothicWorlds.Controls;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Interop;
 using NothicWorlds.Rendering;
@@ -153,6 +154,11 @@ public partial class TerrainPanel : CanvasLayer
 
         Session.Changed += Refresh;
         Session.SelectionChanged += Refresh;
+        AppSettings.UnitsChanged += () =>
+        {
+            ShowSize();
+            UpdateBrush();
+        };
         Refresh();
         UpdateVisibility();
     }
@@ -199,7 +205,6 @@ public partial class TerrainPanel : CanvasLayer
         sizeRow.AddChild(_sizeSlider);
         _sizeField = new SpinBox
         {
-            Suffix = "km",
             Step = 1,
             CustomMinimumSize = new Vector2(100, 0),
             TooltipText = "The brush's radius on the selected body",
@@ -475,14 +480,16 @@ public partial class TerrainPanel : CanvasLayer
         _syncing = false;
     }
 
-    // The brush's radius in km on the selected body, with limits to suit its size.
+    // The brush's radius in km or miles (by the setting) on the selected body, with limits to
+    // suit its size.
     private void ShowSize()
     {
-        double kmPerDegree = KmPerDegree();
+        double perDegree = UnitText.Shown(Quantity.Distance, KmPerDegree());
         _syncing = true;
-        _sizeField.MinValue = Math.Max(Math.Round(MinRadiusDegrees * kmPerDegree), 1);
-        _sizeField.MaxValue = Math.Round(MaxRadiusDegrees * kmPerDegree);
-        _sizeField.ShowValue(Math.Round(_sizeSlider.Value * kmPerDegree));
+        _sizeField.Suffix = UnitText.Symbol(Quantity.Distance);
+        _sizeField.MinValue = Math.Max(Math.Round(MinRadiusDegrees * perDegree), 1);
+        _sizeField.MaxValue = Math.Round(MaxRadiusDegrees * perDegree);
+        _sizeField.ShowValue(Math.Round(_sizeSlider.Value * perDegree));
         _syncing = false;
     }
 
@@ -497,7 +504,8 @@ public partial class TerrainPanel : CanvasLayer
         {
             _syncing = true;
             _sizeSlider.Value = Math.Clamp(
-                _sizeField.Value / KmPerDegree(), MinRadiusDegrees, MaxRadiusDegrees);
+                _sizeField.Value / UnitText.Shown(Quantity.Distance, KmPerDegree()),
+                MinRadiusDegrees, MaxRadiusDegrees);
             _syncing = false;
         }
 
@@ -521,7 +529,7 @@ public partial class TerrainPanel : CanvasLayer
         bool byHeight = tool is SculptTool.Raise or SculptTool.Lower;
         _heightRow.Visible = byHeight;
         _amountRow.Visible = !byHeight;
-        _heightValue.Text = $"{_heightSlider.Value:N0} m";
+        _heightValue.Text = UnitText.Format(Quantity.Length, _heightSlider.Value);
         _amountValue.Text = $"{_amountSlider.Value:N0}%";
 
         bool sculpting = _sculptButton.ButtonPressed;

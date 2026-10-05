@@ -1,6 +1,7 @@
 using Godot;
 using NothicWorlds.Controls;
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Rendering;
 using NothicWorlds.Session;
@@ -143,8 +144,10 @@ public partial class LocalViewAids : CanvasLayer
             return;
         }
 
-        double km = RoundDistance(kmPerPixel * LongestBarPixels);
-        float length = (float)(km / kmPerPixel);
+        // A round number of km or miles (by the setting).
+        double perPixel = UnitText.Shown(Quantity.Distance, kmPerPixel);
+        double shown = RoundDistance(perPixel * LongestBarPixels);
+        float length = (float)(shown / perPixel);
         Vector2 end = at + new Vector2(length, 0);
         foreach ((Color color, float width) in new[] { (_shadow, 5f), (_ink, 2f) })
         {
@@ -153,7 +156,8 @@ public partial class LocalViewAids : CanvasLayer
             _overlay.DrawLine(end + new Vector2(0, -6), end + new Vector2(0, 6), color, width);
         }
 
-        Text(font, at + new Vector2(0, -10), $"{km:#,0.###} km");
+        Text(font, at + new Vector2(0, -10),
+            $"{shown:#,0.###} {UnitText.Symbol(Quantity.Distance)}");
     }
 
     // The latitude, longitude, and regions at the mouse.

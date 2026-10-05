@@ -1,3 +1,4 @@
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 
@@ -21,17 +22,21 @@ public static class ClimateText
         _ => "Open land",
     };
 
+    // A drop in temperature of so many °C, in the chosen units ("6 °C" or "11 °F").
+    private static string Colder(double celsius) =>
+        UnitText.Format(Quantity.TemperatureChange, celsius);
+
     /// <summary>What a climate kind does to the weather, for its tooltip.</summary>
     public static string Effect(ClimateKind kind) => kind switch
     {
         ClimateKind.Water => "Seas and lakes: milder, later seasons, a smaller day/night " +
-            "swing, and more rain nearby (within about 500 km)",
+            $"swing, and more rain nearby (within about {UnitText.Format(Quantity.Distance, 500)})",
         ClimateKind.Forest => "A slightly smaller day/night swing, and a little wetter",
         ClimateKind.Desert => "A much bigger day/night swing, a little warmer, and very dry",
         ClimateKind.Wetland => "A smaller day/night swing, and wetter",
-        ClimateKind.Mountains => "About 6 °C colder, with a bigger day/night swing and more " +
-            "rain",
-        ClimateKind.Ice => "About 8 °C colder (ice reflects most sunlight), and drier",
+        ClimateKind.Mountains => $"About {Colder(6)} colder, with a bigger day/night swing " +
+            "and more rain",
+        ClimateKind.Ice => $"About {Colder(8)} colder (ice reflects most sunlight), and drier",
         _ => "No special effect on the weather",
     };
 
@@ -42,8 +47,8 @@ public static class ClimateText
         ClimateKind.Forest => "a slightly smaller day/night swing",
         ClimateKind.Desert => "a much bigger day/night swing, a little warmer",
         ClimateKind.Wetland => "a smaller day/night swing",
-        ClimateKind.Mountains => "about 6 °C colder, a bigger day/night swing",
-        ClimateKind.Ice => "about 8 °C colder",
+        ClimateKind.Mountains => $"about {Colder(6)} colder, a bigger day/night swing",
+        ClimateKind.Ice => $"about {Colder(8)} colder",
         _ => "",
     };
 
@@ -60,7 +65,8 @@ public static class ClimateText
         }
 
         string here = terrain.Here is ClimateKind kind ? $"{Name(kind)} here" : "unpainted here";
-        string water = $"{terrain.WaterShare:0%} water within {terrain.RadiusKm:0} km";
+        string water = $"{terrain.WaterShare:0%} water within " +
+            UnitText.Format(Quantity.Distance, terrain.RadiusKm);
         var effects = new List<string>();
         if (terrain.Maritime >= 0.15)
         {

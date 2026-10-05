@@ -1,5 +1,7 @@
 using Godot;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Rendering;
+using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
 
@@ -20,6 +22,7 @@ public partial class SettingsWindow : AcceptDialog
     private Dropdown _resolution = null!;
     private Dropdown _frameRate = null!;
     private CheckBox _highQualityMaps = null!;
+    private Dropdown _units = null!;
     private bool _showing;
 
     /// <summary>The graphics options. Set it before adding the window to the tree.</summary>
@@ -30,6 +33,8 @@ public partial class SettingsWindow : AcceptDialog
         Title = "Settings";
         OkButtonText = "Close";
         var layout = new VBoxContainer { CustomMinimumSize = new Vector2(ContentWidth, 0) };
+        layout.AddChild(BuildUnits());
+        layout.AddChild(new HSeparator());
         layout.AddChild(new Label { Text = "Graphics", ThemeTypeVariation = "HeaderSmall" });
         var grid = new GridContainer { Columns = 2 };
         _quality = Row(grid, "Quality",
@@ -97,10 +102,32 @@ public partial class SettingsWindow : AcceptDialog
         AboutToPopup += Refresh;
     }
 
+    // Metric or imperial for every measurement (VISION.md UI-04; owner's choice: here, for
+    // this computer, worlds staying metric).
+    private Control BuildUnits()
+    {
+        var grid = new GridContainer { Columns = 2 };
+        _units = Row(grid, "Units",
+            "Shows and takes every measurement in these units: distances, heights, speeds, " +
+            "temperatures, rain, density. AU and Earth or Sun masses stay as they are. Worlds " +
+            "are saved the same either way",
+            [("Metric (km, °C)", (int)UnitSystem.Metric),
+                ("Imperial (miles, °F)", (int)UnitSystem.Imperial)]);
+        _units.ItemSelected += _ =>
+        {
+            if (!_showing)
+            {
+                AppSettings.Units = (UnitSystem)_units.GetSelectedId();
+            }
+        };
+        return grid;
+    }
+
     /// <summary>Shows the settings in effect.</summary>
     public void Refresh()
     {
         _showing = true;
+        Pick(_units, (int)AppSettings.Units);
         GraphicsOptions options = Graphics.Options;
         Pick(_quality, (int)options.Quality);
         Pick(_relief, (int)options.ReliefDetail);

@@ -1,5 +1,6 @@
 using Godot;
 using NothicWorlds.Controls;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 using NothicWorlds.Rendering;
@@ -106,6 +107,7 @@ public partial class WeatherWindow : AcceptDialog
             Refresh();
         };
         Session.TimeChanged += Refresh;
+        AppSettings.UnitsChanged += Refresh;
         Session.WorldClosed += _ => Hide();
         if (LiveWeather is not null)
         {
@@ -142,9 +144,10 @@ public partial class WeatherWindow : AcceptDialog
     }
 
     // A whole number of degrees, never "-0".
+    // A temperature as a whole number of degrees in °C or °F (never "-0").
     private static string Degrees(double celsius)
     {
-        double rounded = Math.Round(celsius);
+        double rounded = Math.Round(UnitText.Shown(Quantity.Temperature, celsius));
         return (rounded == 0 ? 0 : rounded).ToString("0");
     }
 
@@ -214,16 +217,20 @@ public partial class WeatherWindow : AcceptDialog
             thisMonth < 0 ? null : RainText(chartMonths, thisMonth));
         _now.Text = NowText(body, pin, now);
         double yearRain = chartMonths.Sum(m => m.RainMm);
-        _yearLabel.Text = $"{yearName} · {yearRain:N0} mm of rain a year";
+        _yearLabel.Text = $"{yearName} · {UnitText.Format(Quantity.Precipitation, yearRain)} " +
+            "of rain a year";
         _chart.Show(chartMonths, (float)((now - from) / (to - from)));
         _terrain.Text = ClimateText.Describe(climate.Terrain);
         _note.Text = body.Shape == BodyShape.FlatDisc
             ? $"Estimated from the sunlight on this flat world, which is the same everywhere: " +
-                $"around {body.Name}'s average of {body.AverageTemperatureC:0.#} °C (set in the " +
-                "System panel), with two summers a year, adjusted for the painted terrain. Rain " +
-                "falls evenly, more where it's moist and less where it's cold." + LiveNote(body)
+                $"around {body.Name}'s average of " +
+                $"{UnitText.Format(Quantity.Temperature, body.AverageTemperatureC, 1)} " +
+                "(set in the System panel), with two summers a year, adjusted for the painted " +
+                "terrain. Rain falls evenly, more where it's moist and less where it's cold." +
+                LiveNote(body)
             : $"Estimated from the sunlight here, around {body.Name}'s average of " +
-                $"{body.AverageTemperatureC:0.#} °C (set in the System panel), adjusted for the " +
+                $"{UnitText.Format(Quantity.Temperature, body.AverageTemperatureC, 1)} (set in " +
+                "the System panel), adjusted for the " +
                 "painted terrain. Rain comes from a tropical rain belt that follows the sun, " +
                 "storms in the middle latitudes, and the moisture nearby." + LiveNote(body);
     }
@@ -255,7 +262,8 @@ public partial class WeatherWindow : AcceptDialog
         double average = months.Average(m => m.RainMm);
         string season = rain > 1.6 * average ? " (wet season)"
             : rain < 0.4 * average ? " (dry season)" : "";
-        return $"{rain:N0} mm of rain this month{season}";
+        return $"{UnitText.Format(Quantity.Precipitation, rain,
+            UnitText.System == UnitSystem.Imperial ? 1 : 0)} of rain this month{season}";
     }
 
     private void ShowToday(
@@ -279,7 +287,8 @@ public partial class WeatherWindow : AcceptDialog
             ? $"noon sun {today.NoonSunDegrees:0}° up"
             : "the sun doesn't rise";
         _today.Text = $"{BodyClock.Describe(body, now)}\n" +
-            $"{Degrees(today.MeanC)} °C (low {Degrees(today.LowC)}, " +
+            $"{Degrees(today.MeanC)} {UnitText.Symbol(Quantity.Temperature)} " +
+            $"(low {Degrees(today.LowC)}, " +
             $"high {Degrees(today.HighC)}) · " +
             $"{(int)daylight.TotalHours} h {daylight.Minutes:00} m of daylight · {sun}{season}" +
             (rain is null ? "" : $"\n{rain}");
