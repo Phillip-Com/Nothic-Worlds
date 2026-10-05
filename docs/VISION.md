@@ -108,7 +108,20 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 29: Performance Tiers** · In progress (owner's choice, 2026-10-05)
+**Milestone 30: First-Person Surface View** · In progress (owner's choice, 2026-10-05)
+Stand on a world and look up (`REN-06`). Owner's decisions:
+- **Walk or fly:** move over the surface, following the ground, or fly freely.
+- **The sky at true size and place,** with a **magnify** switch that enlarges small bodies;
+  moon phases and eclipses as they really fall.
+- **Included:** day and night sky colors (black skies on airless worlds), the live weather
+  overhead, the ground and horizon, and a compass with readouts (names and heights on hover).
+- **Base tier** (measured on the baseline laptop; `REN-06` was "Advanced, probably").
+- **Three PRs:** the sky in Core (PR #77), the first-person view with walking, flying, and the
+  sky, then the ground, weather overhead, and readouts.
+- Known limit: the ground from eye level is only as sharp as the map (an 8k map is about 5 km
+  a pixel on an Earth-sized planet).
+
+**Milestone 29: Performance Tiers** · Complete (PR #76 merged 2026-10-05; owner's choice, 2026-10-05)
 Keep the app light on modest computers and let stronger ones look their best (`REN-03`).
 Owner's decisions:
 - **A File ▸ Settings window** with a **Graphics Quality** preset (Low, Standard, High, or
@@ -662,9 +675,27 @@ as realistic or simple.
   an added block. Benchmark (Painterly against `main`, back to back): 193/193 vs 192/200 fps,
   same memory.
 
-**REN-06 — First-person surface view** · Future · Advanced (probably)
+**REN-06 — First-person surface view** · In Progress (M30: PR #77) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
-**Implementation:** —
+**Implementation (the sky in Core, M30, PR #77):**
+- **`BodyOrientation.ToSystem(body, time, direction)`:** turns a direction on the body (its map's
+  frame) into the system's at a moment: spun by the day, then leaned by the tilt (Rodrigues'
+  rotation). The same turn `SystemView` gives the globe, now in Core so the sky and the drawing
+  agree.
+- **`Simulation/SkyView.cs`:** `SkyView.From(bodies, observer, spot, heightKm, time)` (null for
+  stars and flat worlds, whose tumbling sky isn't worked out yet): every other body as a
+  **`SkyBody`**: altitude above the horizon, compass azimuth (clockwise from north), true
+  angular diameter, distance, lit fraction ((1 + cos phase angle) / 2; stars and bodies without
+  a star fully lit), and its direction in the spot's east/north/up frame; nearest first; and
+  the body's own star, whose height will set the sky's colors. Light bending at the horizon
+  isn't modeled.
+- **Tests** (`SkyViewTests`, 15), each against code that already worked it out another way: the
+  body's north turns to the seasons' north pole (no tilt, Earth's, tipped over); the sun's
+  highest in a day is the climate's noon height (equator, 45° N, 30° S, both seasons; within
+  0.6°); the time it's up is the climate's daylight (within 15 minutes); it rises in the east
+  and sets in the west; it's about half a degree across; a moon goes from new to full and is
+  full opposite the sun; only globes get a sky; and the same moment gives the same sky.
+
 
 ### 4.2 Interface Layout (`UI`)
 
