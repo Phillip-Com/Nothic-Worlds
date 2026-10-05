@@ -57,6 +57,7 @@ public partial class ShapedGlobe : Node3D
     private CsgCombiner3D? _combiner;
     private MeshInstance3D? _preview;
     private MeshInstance3D? _drawn;
+    private TriangleMesh? _triangles;  // The drawn carving, for finding where clicks land
     private bool _waitingForCarving;
     private (IReadOnlyList<ShapeEdit> Shapes, HeightGrid Heights, double RadiusKm, float Relief)?
         _built;
@@ -115,6 +116,22 @@ public partial class ShapedGlobe : Node3D
         _waitingForCarving = false;
         _drawn ??= NewDrawnMesh();
         _drawn.Mesh = carved;
+        _triangles = carved.GenerateTriangleMesh();
+    }
+
+    /// <summary>
+    /// Where a ray (in the globe's own space) first meets the carved surface, holes and all, or
+    /// null if it misses (or nothing has been carved yet).
+    /// </summary>
+    public Vector3? RayHit(Vector3 origin, Vector3 direction)
+    {
+        if (_triangles is null)
+        {
+            return null;
+        }
+
+        Godot.Collections.Dictionary hit = _triangles.IntersectRay(origin, direction);
+        return hit.Count > 0 ? (Vector3)hit["position"] : null;
     }
 
     private MeshInstance3D NewDrawnMesh()

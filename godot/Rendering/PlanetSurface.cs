@@ -509,6 +509,29 @@ public partial class PlanetSurface : MeshInstance3D
         UpdateBounds();
     }
 
+    /// <summary>True while the globe is drawn carved by shapes (VISION.md BOD-04).</summary>
+    public bool IsCarved => _carved is not null;
+
+    /// <summary>
+    /// Where a ray (in the globe's own space) first meets the carved globe, into its holes and
+    /// hollows, or null if it misses or the globe isn't carved.
+    /// </summary>
+    public Vector3? CarvedHit(Vector3 origin, Vector3 direction) =>
+        _carved?.RayHit(origin, direction);
+
+    /// <summary>
+    /// How far a drawn point (in the globe's own space) is above the body's radius, in true km.
+    /// The ground under it is drawn with its relief exaggerated and shapes aren't, so the
+    /// exaggeration there is taken back out.
+    /// </summary>
+    public double TrueHeightKmOf(Vector3 point, double radiusKm)
+    {
+        var direction = new Vector3D(point.X, point.Y, point.Z);
+        double groundMeters = _shownHeights.SampleAt(direction);
+        double lift = groundMeters * (_reliefScale - 1 / (radiusKm * 1000));
+        return (point.Length() - 1 - lift) * radiusKm;
+    }
+
     /// <summary>
     /// Shows a shape being dragged as a see-through preview (VISION.md BOD-04), or hides it.
     /// </summary>
