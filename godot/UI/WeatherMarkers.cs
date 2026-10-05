@@ -53,6 +53,9 @@ public partial class WeatherMarkers : CanvasLayer
     /// <summary>Places a new pin by a click on the globe.</summary>
     [Export] public PinPlacer? Placer { get; set; }
 
+    /// <summary>The live weather, for a pin's weather right now (VISION.md WTH-02).</summary>
+    [Export] public WeatherDisplay? LiveWeather { get; set; }
+
     /// <summary>Whether weather pins are shown (the toolbar's Pins toggle).</summary>
     public bool ShowPins
     {
@@ -78,7 +81,12 @@ public partial class WeatherMarkers : CanvasLayer
             return;
         }
 
-        _window = new WeatherWindow { Session = Session, Camera = Camera };
+        _window = new WeatherWindow
+        {
+            Session = Session,
+            Camera = Camera,
+            LiveWeather = LiveWeather,
+        };
         AddChild(_window);
         BuildNameDialog();
 

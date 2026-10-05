@@ -2,6 +2,7 @@ using Godot;
 using NothicWorlds.Controls;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
+using NothicWorlds.Rendering;
 using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
@@ -9,8 +10,9 @@ namespace NothicWorlds.UI;
 /// <summary>
 /// A weather pin's weather (VISION.md WTH-01; owner's choices: a year chart with today marked,
 /// plus today's numbers): its name (editable), place, today's temperature, daylight, noon sun,
-/// and season, and the year chart for the current year of the body's calendar (or of its own
-/// year, without one). It doesn't block the rest of the app, so the clock can run while it's
+/// and season, the live weather right now (WTH-02: the sky, rain or snow, and the wind), and
+/// the year chart for the current year of the body's calendar (or of its own year, without
+/// one). It doesn't block the rest of the app, so the clock can run while it's
 /// open; today follows the clock.
 /// </summary>
 public partial class WeatherWindow : AcceptDialog
@@ -22,6 +24,7 @@ public partial class WeatherWindow : AcceptDialog
     private LineEdit _name = null!;
     private Label _place = null!;
     private Label _today = null!;
+    private Label _now = null!;
     private Label _yearLabel = null!;
     private WeatherChart _chart = null!;
     private Label _terrain = null!;
@@ -41,6 +44,9 @@ public partial class WeatherWindow : AcceptDialog
 
     /// <summary>The camera, for Zoom to (VISION.md REN-04).</summary>
     public PlanetCamera? Camera { get; init; }
+
+    /// <summary>The live weather (VISION.md WTH-02), for the weather right now.</summary>
+    public WeatherDisplay? LiveWeather { get; init; }
 
     public override void _Ready()
     {
@@ -74,6 +80,8 @@ public partial class WeatherWindow : AcceptDialog
         layout.AddChild(_place);
         _today = WrappingLabel();
         layout.AddChild(_today);
+        _now = WrappingLabel();
+        layout.AddChild(_now);
         _yearLabel = new Label();
         layout.AddChild(_yearLabel);
         _chart = new WeatherChart();
@@ -99,6 +107,10 @@ public partial class WeatherWindow : AcceptDialog
         };
         Session.TimeChanged += Refresh;
         Session.WorldClosed += _ => Hide();
+        if (LiveWeather is not null)
+        {
+            LiveWeather.WeatherRebuilt += Refresh;
+        }
     }
 
     /// <summary>Shows a weather pin's weather.</summary>
@@ -183,6 +195,7 @@ public partial class WeatherWindow : AcceptDialog
         if (_climate is not ClimateYear climate)
         {
             _today.Text = $"{body.Name} has no star, so there's no weather to work out.";
+            _now.Text = "";
             _yearLabel.Text = "";
             _chart.Show([], null);
             _terrain.Text = "";
@@ -199,6 +212,7 @@ public partial class WeatherWindow : AcceptDialog
         int thisMonth = months.FindIndex(m => now >= m.From && now < m.To);
         ShowToday(body, pin, climate, now,
             thisMonth < 0 ? null : RainText(chartMonths, thisMonth));
+        _now.Text = NowText(body, pin, now);
         double yearRain = chartMonths.Sum(m => m.RainMm);
         _yearLabel.Text = $"{yearName} · {yearRain:N0} mm of rain a year";
         _chart.Show(chartMonths, (float)((now - from) / (to - from)));
@@ -207,13 +221,31 @@ public partial class WeatherWindow : AcceptDialog
             ? $"Estimated from the sunlight on this flat world, which is the same everywhere: " +
                 $"around {body.Name}'s average of {body.AverageTemperatureC:0.#} °C (set in the " +
                 "System panel), with two summers a year, adjusted for the painted terrain. Rain " +
-                "falls evenly, more where it's moist and less where it's cold. Winds aren't " +
-                "modeled."
+                "falls evenly, more where it's moist and less where it's cold." + LiveNote(body)
             : $"Estimated from the sunlight here, around {body.Name}'s average of " +
                 $"{body.AverageTemperatureC:0.#} °C (set in the System panel), adjusted for the " +
                 "painted terrain. Rain comes from a tropical rain belt that follows the sun, " +
-                "storms in the middle latitudes, and the moisture nearby. Winds aren't modeled.";
+                "storms in the middle latitudes, and the moisture nearby." + LiveNote(body);
     }
+
+    // The live weather here right now, in a line (or why there's none).
+    private string NowText(Body body, WeatherPin pin, double now)
+    {
+        if (!body.HasAtmosphere)
+        {
+            return $"{body.Name} has no air, so no clouds, rain, or wind (Has air, in the " +
+                "System panel, gives it some).";
+        }
+
+        return LiveWeather?.WeatherOf(body.Id) is LiveWeather weather
+            ? $"Right now: {LiveWeatherText.Describe(weather.At(now).SampleAt(pin.Spot))}"
+            : "Right now: working out the weather…";
+    }
+
+    private static string LiveNote(Body body) => body.HasAtmosphere
+        ? " Right now's weather moves with the clock: clouds carried by the winds, storms, " +
+            "rain, and snow, on the same climate."
+        : "";
 
     // This month's rain, and whether it's a wet or dry season (well above or below the
     // year's average month).

@@ -250,8 +250,9 @@ Toolbar = NodePath("../MapToolbar")
 Journal = NodePath("../JournalPanel")
 Timeline = NodePath("../TimelineStrip")
 
-[node name="WeatherMarkers" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar", "Placer")]
+[node name="WeatherMarkers" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar", "Placer", "LiveWeather")]
 script = ExtResource("28_weather")
+LiveWeather = NodePath("../WeatherDisplay")
 Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 Camera = NodePath("../PlanetCamera")
