@@ -58,7 +58,7 @@ public sealed class SkyView
     /// <summary>
     /// The sky from <paramref name="spot"/> on <paramref name="observer"/> (a globe),
     /// <paramref name="heightKm"/> above its radius, at <paramref name="timeDays"/>; or null
-    /// if the observer has no surface or is a flat world (whose sky isn't worked out yet).
+    /// if the observer has no surface or is a flat world (see <see cref="FromFlat"/>).
     /// </summary>
     /// <exception cref="ArgumentException">The bodies' orbits are invalid.</exception>
     public static SkyView? From(IReadOnlyList<Body> bodies, Body observer, GeoCoordinate spot,
@@ -69,13 +69,44 @@ public sealed class SkyView
             return null;
         }
 
-        Dictionary<Guid, Vector3D> positions = SystemPositions.At(bodies, timeDays);
         Vector3D localUp = SphericalPolygon.ToUnit(spot);
-        Vector3D up = BodyOrientation.ToSystem(observer, timeDays, localUp);
         (Vector3D localEast, Vector3D localNorth) = Tangents(localUp);
-        Vector3D east = BodyOrientation.ToSystem(observer, timeDays, localEast);
-        Vector3D north = BodyOrientation.ToSystem(observer, timeDays, localNorth);
-        Vector3D eye = positions[observer.Id] + up * (observer.RadiusKm + heightKm);
+        return Seen(bodies, observer, localUp * (1 + heightKm / observer.RadiusKm),
+            (localEast, localNorth, localUp), timeDays, solarTime: true);
+    }
+
+    /// <summary>
+    /// The sky from <paramref name="spot"/> on a flat world <paramref name="observer"/>,
+    /// <paramref name="heightKm"/> off its surface, at <paramref name="timeDays"/> (owner's
+    /// choice: the same sky across the disc, as its light and seasons already are): on the top
+    /// face, the sun's height is its angle above the disc, so day and night come everywhere at
+    /// once; on the underside, the sky is the other way up. No solar time (the sun doesn't
+    /// cross a meridian over a disc). Null unless the observer is a flat world.
+    /// </summary>
+    /// <exception cref="ArgumentException">The bodies' orbits are invalid.</exception>
+    public static SkyView? FromFlat(IReadOnlyList<Body> bodies, Body observer, FlatSpot spot,
+        double heightKm, double timeDays)
+    {
+        if (!observer.HasSurface || observer.Shape != BodyShape.FlatDisc)
+        {
+            return null;
+        }
+
+        return Seen(bodies, observer, FlatWalk.Point(spot, heightKm / observer.RadiusKm),
+            FlatWalk.Frame(spot), timeDays, solarTime: false);
+    }
+
+    // The sky from an eye at a point in the space the body is drawn in (its radii; a flat
+    // world's disc space), with the given east, north, and up there (in that space too).
+    private static SkyView Seen(IReadOnlyList<Body> bodies, Body observer, Vector3D eyeLocal,
+        (Vector3D East, Vector3D North, Vector3D Up) local, double timeDays, bool solarTime)
+    {
+        Dictionary<Guid, Vector3D> positions = SystemPositions.At(bodies, timeDays);
+        Vector3D up = BodyOrientation.ShapeToSystem(observer, timeDays, local.Up);
+        Vector3D east = BodyOrientation.ShapeToSystem(observer, timeDays, local.East);
+        Vector3D north = BodyOrientation.ShapeToSystem(observer, timeDays, local.North);
+        Vector3D eye = positions[observer.Id]
+            + BodyOrientation.ShapeToSystem(observer, timeDays, eyeLocal) * observer.RadiusKm;
         Body? ownStar = Seasons.StarFor(bodies, observer);
 
         var seen = new List<SkyBody>();
@@ -96,9 +127,9 @@ public sealed class SkyView
             }
         }
 
-        double? solarTime = star is null ? null
+        double? time = !solarTime || star is null ? null
             : SolarTime(BodyOrientation.NorthPole(observer), up, east, star);
-        return new SkyView([.. seen.OrderBy(b => b.DistanceKm)], star, solarTime);
+        return new SkyView([.. seen.OrderBy(b => b.DistanceKm)], star, time);
     }
 
     // The star's hour angle at the spot (how far west of the meridian it has turned, around

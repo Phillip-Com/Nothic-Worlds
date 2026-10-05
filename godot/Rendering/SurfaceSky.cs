@@ -190,6 +190,51 @@ public sealed class SurfaceSky
     public bool ShowClouds(PlanetSurface globe, Body body, Basis toBody, Vector3D eye,
         double groundRadius, double sunAltitudeDegrees, double unitsPerKm)
     {
+        double eyeRadius = eye.Length;
+        Vector3D up = eye * (1 / eyeRadius);
+        if (!ShowCloudCover(globe, body, toBody, up, sunAltitudeDegrees, unitsPerKm))
+        {
+            return false;
+        }
+
+        double layer = groundRadius + CloudHeightKm / body.RadiusKm;
+        _material.SetShaderParameter("flat_layer", false);
+        _material.SetShaderParameter("eye_direction", ToGodot(up));
+        _material.SetShaderParameter("eye_radius", (float)eyeRadius);
+        // (layer − eye)(layer + eye): kept apart from the radii, too close for a float.
+        _material.SetShaderParameter("cloud_gap",
+            (float)((layer - eyeRadius) * (layer + eyeRadius)));
+        return true;
+    }
+
+    /// <summary>
+    /// Draws the clouds over a flat world's top face, as <see cref="ShowClouds"/> does over a
+    /// globe: the layer is a plane over the disc, and the eye is at <paramref name="eye"/> in
+    /// the body's own space, standing on <paramref name="spot"/>. None off the top face (the
+    /// rim and underside are bare rock, with no weather).
+    /// </summary>
+    public bool ShowFlatClouds(PlanetSurface globe, Body body, Basis toBody, FlatSpot spot,
+        Vector3D eye, double sunAltitudeDegrees, double unitsPerKm)
+    {
+        if (FlatWalk.MapDirection(spot) is not Vector3D map
+            || !ShowCloudCover(globe, body, toBody, map, sunAltitudeDegrees, unitsPerKm))
+        {
+            _material.SetShaderParameter("has_clouds", false);
+            return false;
+        }
+
+        double layer = FlatDisc.HalfThickness + CloudHeightKm / body.RadiusKm;
+        _material.SetShaderParameter("flat_layer", true);
+        _material.SetShaderParameter("eye_point", ToGodot(eye));
+        _material.SetShaderParameter("layer_above", (float)(layer - eye.Y));
+        return true;
+    }
+
+    // What the sky and the deck share: the weather, the detail's frame around the map point
+    // under the eye (a globe direction), the deck's light and scale, and the body's turn.
+    private bool ShowCloudCover(PlanetSurface globe, Body body, Basis toBody, Vector3D mapUp,
+        double sunAltitudeDegrees, double unitsPerKm)
+    {
         bool clouds = body.HasAtmosphere && globe.CopyCloudsTo(_material)
             && globe.CopyCloudsTo(DeckMaterial);
         _material.SetShaderParameter("has_clouds", clouds);
@@ -198,15 +243,10 @@ public sealed class SurfaceSky
             return false;
         }
 
-        double eyeRadius = eye.Length;
-        double layer = groundRadius + CloudHeightKm / body.RadiusKm;
-        _material.SetShaderParameter("to_body", toBody);
-        Vector3D up = eye * (1 / eyeRadius);
-        var east = new Vector3D(up.Z, 0, -up.X);  // As FirstPersonGround's (any pair at a pole)
+        var east = new Vector3D(mapUp.Z, 0, -mapUp.X);  // As FirstPersonGround's (any at a pole)
         east = east.Length < 1e-9 ? new Vector3D(1, 0, 0) : east * (1 / east.Length);
-        _material.SetShaderParameter("eye_direction", ToGodot(up));
-        var north = new Vector3D(up.Y * east.Z - up.Z * east.Y, up.Z * east.X - up.X * east.Z,
-            up.X * east.Y - up.Y * east.X);
+        var north = new Vector3D(mapUp.Y * east.Z - mapUp.Z * east.Y,
+            mapUp.Z * east.X - mapUp.X * east.Z, mapUp.X * east.Y - mapUp.Y * east.X);
         foreach (ShaderMaterial material in (ShaderMaterial[])[_material, DeckMaterial])
         {
             material.SetShaderParameter("ground_east", ToGodot(east));
@@ -217,10 +257,7 @@ public sealed class SurfaceSky
 
         DeckMaterial.SetShaderParameter("cloud_light", CloudLight(sunAltitudeDegrees));
         DeckMaterial.SetShaderParameter("units_per_km", (float)unitsPerKm);
-        _material.SetShaderParameter("eye_radius", (float)eyeRadius);
-        // (layer − eye)(layer + eye): kept apart from the radii, too close for a float.
-        _material.SetShaderParameter("cloud_gap",
-            (float)((layer - eyeRadius) * (layer + eyeRadius)));
+        _material.SetShaderParameter("to_body", toBody);
         _material.SetShaderParameter("km_per_radius", (float)body.RadiusKm);
         return true;
     }
