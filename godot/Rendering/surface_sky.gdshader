@@ -30,28 +30,18 @@ uniform vec3 body_colors[MAX_BODIES];
 uniform vec3 body_light[MAX_BODIES];
 uniform float body_shines[MAX_BODIES];
 
-// The live weather's clouds (see planet_weather.gdshaderinc for the snapshots' layout).
+// The live weather's clouds overhead (the cover itself is in cloud_layer.gdshaderinc).
+#include "res://Rendering/cloud_layer.gdshaderinc"
 uniform bool has_clouds = false;
-uniform sampler2D weather_old : filter_linear, repeat_enable;
-uniform sampler2D weather_new : filter_linear, repeat_enable;
-uniform float weather_blend = 0.0;
-uniform float weather_clock = 0.0;  // Standard days, so the fine detail slowly changes
-uniform float cloud_detail = 1.0;   // A quality setting: 0 leaves the snapshots' soft clouds
 
 // The layer of cloud, in the body's own frame and radii: the turn from the scene's frame to
-// the body's, the eye's direction and distance from the body's middle, the cloud layer's
+// the body's, the eye's direction and distance from the body's middle, and the cloud layer's
 // radius squared less the eye's (set apart, as the difference is too fine for a float to keep
-// from the two), and the noise's scale for detail some km across.
+// from the two).
 uniform mat3 to_body = mat3(1.0);
 uniform vec3 eye_direction = vec3(0.0, 1.0, 0.0);
 uniform float eye_radius = 1.0;
 uniform float cloud_gap = 0.0016;
-uniform float cloud_noise_scale = 2000.0;
-// Fine detail: a tiling noise image laid flat over the layer around the spot (east and north
-// along the ground, in the body's frame), much cheaper than working noise out per pixel.
-uniform sampler2D cloud_noise : filter_linear_mipmap, repeat_enable;
-uniform vec3 ground_east = vec3(1.0, 0.0, 0.0);
-uniform vec3 ground_north = vec3(0.0, 0.0, 1.0);
 uniform float km_per_radius = 6371.0;
 
 vec3 to_linear(vec3 color) {
@@ -120,8 +110,8 @@ vec4 disc(vec3 direction, vec3 middle, float radius, vec3 color, vec3 light, flo
 }
 
 // The cloud seen along a direction (alpha 0 for none): lit by day, warm toward a low sun,
-// grey where rain falls, dark by night. Seen from below the layer only: from above, they'd
-// lie over the ground, which is drawn over the sky and would hide them (a known limit).
+// grey where rain falls, dark by night. Seen from below the layer only; from above, the cloud
+// deck (cloud_deck.gdshader) draws them over the ground.
 vec4 clouds(vec3 direction, float day, float sun_height) {
 	if (!has_clouds || cloud_gap <= 0.0) {
 		return vec4(0.0);
@@ -132,26 +122,9 @@ vec4 clouds(vec3 direction, float day, float sun_height) {
 	float b = eye_radius * dot(eye_direction, d);
 	float t = -b + sqrt(b * b + cloud_gap);
 	vec3 at = normalize(eye_direction * eye_radius + d * t);
-	float latitude = asin(clamp(at.y, -1.0, 1.0));
-	float longitude = atan(at.x, at.z);
-	vec2 uv = vec2(longitude / TAU + 0.5, 0.5 - latitude / PI);
-	vec4 weather = mix(texture(weather_old, uv), texture(weather_new, uv), weather_blend);
-
-	// Fine detail some km across, fading out with distance, where it would only shimmer.
-	float distance_km = t * km_per_radius;
-	float fine = 0.0;
-	if (cloud_detail > 0.0) {
-		vec2 along_ground = vec2(dot(at, ground_east), dot(at, ground_north)) * cloud_noise_scale
-			+ vec2(weather_clock * 30.0, 0.0);
-		fine = (texture(cloud_noise, along_ground / 8.0).r * 0.6
-			+ texture(cloud_noise, along_ground / 8.0 * 2.7 + 0.37).r * 0.4 - 0.5)
-			* 0.9 * cloud_detail * (1.0 - smoothstep(20.0, 120.0, distance_km));
-	}
-	float cover = smoothstep(0.25, 0.7, weather.r + fine)
-		* mix(0.7, 1.0, smoothstep(0.5, 0.9, weather.r));  // Thick cloud hides the stars
-
-	vec3 color = mix(vec3(1.0), vec3(0.5, 0.53, 0.6), clamp(weather.g * 2.5, 0.0, 0.75));
-	color *= mix(1.0, 0.65, smoothstep(0.6, 1.0, weather.r));  // Thick cloud's dark underside
+	vec4 cloud = cloud_at(at, t * km_per_radius);
+	float cover = cloud.x;
+	vec3 color = cloud.yzw;
 	float toward_sun = max(dot(direction, star_direction), 0.0);
 	float low_sun = 1.0 - smoothstep(0.0, 0.25, abs(sun_height));
 	color = mix(color, vec3(1.0, 0.55, 0.3), low_sun * (0.3 + 0.5 * toward_sun));

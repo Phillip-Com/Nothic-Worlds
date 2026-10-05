@@ -30,6 +30,9 @@ public sealed class SurfaceSky
     private static readonly Shader _shader =
         GD.Load<Shader>("res://Rendering/surface_sky.gdshader");
 
+    private static readonly Shader _deckShader =
+        GD.Load<Shader>("res://Rendering/cloud_deck.gdshader");
+
     private readonly ShaderMaterial _material = new() { Shader = _shader };
     private readonly Sky _sky;
     private WorldEnvironment? _scene;
@@ -40,8 +43,9 @@ public sealed class SurfaceSky
     public SurfaceSky()
     {
         _sky = new Sky { SkyMaterial = _material, RadianceSize = Sky.RadianceSizeEnum.Size32 };
-        // The clouds' fine detail, made once (on a thread of Godot's own).
-        _material.SetShaderParameter("cloud_noise", new NoiseTexture2D
+        // The clouds' fine detail, made once (on a thread of Godot's own), for both the sky
+        // and the deck.
+        var noise = new NoiseTexture2D
         {
             Width = 256,
             Height = 256,
@@ -53,8 +57,16 @@ public sealed class SurfaceSky
                 Frequency = 1f / 32,
                 FractalOctaves = 3,
             },
-        });
+        };
+        _material.SetShaderParameter("cloud_noise", noise);
+        DeckMaterial.SetShaderParameter("cloud_noise", noise);
     }
+
+    /// <summary>
+    /// The material for the cloud deck: the clouds below an eye flying above them, drawn on
+    /// rings at the cloud layer (see <see cref="ShowClouds"/>).
+    /// </summary>
+    public ShaderMaterial DeckMaterial { get; } = new() { Shader = _deckShader };
 
     /// <summary>
     /// The radius a body is drawn at in the sky, in degrees: true, or with
@@ -167,19 +179,23 @@ public sealed class SurfaceSky
     }
 
     /// <summary>
-    /// Draws the clouds overhead from the globe's live weather (<paramref name="globe"/>'s
-    /// snapshots; none if it has none). The eye is at <paramref name="eye"/> in the body's
-    /// own frame and radii, over ground <paramref name="groundRadius"/> radii out;
-    /// <paramref name="toBody"/> turns the scene's frame into the body's.
+    /// Draws the clouds from the globe's live weather (<paramref name="globe"/>'s snapshots):
+    /// overhead in the sky, and on the <see cref="DeckMaterial"/> for when the eye is above
+    /// them. The eye is at <paramref name="eye"/> in the body's own frame and radii, over
+    /// ground <paramref name="groundRadius"/> radii out; <paramref name="toBody"/> turns the
+    /// scene's frame into the body's. The deck is lit for the sun's height and
+    /// <paramref name="unitsPerKm"/> is the scene's scale. Returns false if there are none
+    /// (no air, or no weather shown).
     /// </summary>
-    public void ShowClouds(PlanetSurface globe, Body body, Basis toBody, Vector3D eye,
-        double groundRadius)
+    public bool ShowClouds(PlanetSurface globe, Body body, Basis toBody, Vector3D eye,
+        double groundRadius, double sunAltitudeDegrees, double unitsPerKm)
     {
-        bool clouds = body.HasAtmosphere && globe.CopyCloudsTo(_material);
+        bool clouds = body.HasAtmosphere && globe.CopyCloudsTo(_material)
+            && globe.CopyCloudsTo(DeckMaterial);
         _material.SetShaderParameter("has_clouds", clouds);
         if (!clouds)
         {
-            return;
+            return false;
         }
 
         double eyeRadius = eye.Length;
@@ -189,16 +205,35 @@ public sealed class SurfaceSky
         var east = new Vector3D(up.Z, 0, -up.X);  // As FirstPersonGround's (any pair at a pole)
         east = east.Length < 1e-9 ? new Vector3D(1, 0, 0) : east * (1 / east.Length);
         _material.SetShaderParameter("eye_direction", ToGodot(up));
-        _material.SetShaderParameter("ground_east", ToGodot(east));
-        _material.SetShaderParameter("ground_north", ToGodot(new Vector3D(
-            up.Y * east.Z - up.Z * east.Y, up.Z * east.X - up.X * east.Z,
-            up.X * east.Y - up.Y * east.X)));
+        var north = new Vector3D(up.Y * east.Z - up.Z * east.Y, up.Z * east.X - up.X * east.Z,
+            up.X * east.Y - up.Y * east.X);
+        foreach (ShaderMaterial material in (ShaderMaterial[])[_material, DeckMaterial])
+        {
+            material.SetShaderParameter("ground_east", ToGodot(east));
+            material.SetShaderParameter("ground_north", ToGodot(north));
+            material.SetShaderParameter("cloud_noise_scale",
+                (float)(body.RadiusKm / CloudDetailKm));
+        }
+
+        DeckMaterial.SetShaderParameter("cloud_light", CloudLight(sunAltitudeDegrees));
+        DeckMaterial.SetShaderParameter("units_per_km", (float)unitsPerKm);
         _material.SetShaderParameter("eye_radius", (float)eyeRadius);
         // (layer − eye)(layer + eye): kept apart from the radii, too close for a float.
         _material.SetShaderParameter("cloud_gap",
             (float)((layer - eyeRadius) * (layer + eyeRadius)));
-        _material.SetShaderParameter("cloud_noise_scale", (float)(body.RadiusKm / CloudDetailKm));
         _material.SetShaderParameter("km_per_radius", (float)body.RadiusKm);
+        return true;
+    }
+
+    // The light on cloud tops (as the sky lights the clouds overhead): bright by day, warmer
+    // as the sun nears the horizon, dark by night.
+    private static Vector3 CloudLight(double sunAltitudeDegrees)
+    {
+        double height = Math.Sin(double.DegreesToRadians(sunAltitudeDegrees));
+        double dawn = SmoothStep(-0.1, 0.1, height);
+        float light = (float)(0.006 + 0.95 * dawn * dawn);
+        float low = (float)(0.5 * (1 - SmoothStep(0, 0.25, Math.Abs(height))));
+        return new Vector3(1, 1, 1).Lerp(new Vector3(1, 0.55f, 0.3f), low) * light;
     }
 
     /// <summary>
