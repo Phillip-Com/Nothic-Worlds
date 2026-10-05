@@ -314,6 +314,12 @@ public partial class WeatherDisplay : Node
 
     private bool IsBigEnough(PlanetSurface globe)
     {
+        // Standing on it, the globe fills the view (and its camera is set aside).
+        if (System!.StandingOn is Guid standing && System.SurfaceFor(standing) == globe)
+        {
+            return true;
+        }
+
         if (Camera!.IsPositionBehind(globe.GlobalPosition))
         {
             return false;

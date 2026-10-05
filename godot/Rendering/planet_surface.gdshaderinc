@@ -146,6 +146,10 @@ uniform vec3 sun_direction = vec3(0.0, 1.0, 0.0);
 
 varying vec3 local_direction;
 
+// 1 on the ground around a first-person eye, which leaves the clouds and the grid to the sky
+// (surface_sky.gdshader draws the clouds overhead; seen from below they aren't on the ground).
+varying float eye_level_ground;
+
 // On a flat world's top face, distance from the center is the angle from the north pole (the
 // disc's radius is PI), so a point maps back to the globe direction it stands for. Must match
 // FlatDisc in Core.
@@ -695,6 +699,7 @@ void vertex() {
 	// around the eye, not the globe's middle, so its positions keep their precision; it brings
 	// each point's direction from the globe's middle along (CUSTOM0, w = 1) and is lifted
 	// already. Other meshes have no CUSTOM0 (it reads as 0).
+	eye_level_ground = CUSTOM0.w > 0.5 ? 1.0 : 0.0;
 	if (CUSTOM0.w > 0.5) {
 		local_direction = CUSTOM0.xyz;
 	} else {
@@ -742,12 +747,12 @@ void fragment() {
 	}
 
 	vec3 weather_glow = vec3(0.0);
-	if (has_weather) {
+	if (has_weather && eye_level_ground < 0.5) {
 		color = draw_weather(color, direction, radians(latitude), radians(longitude),
 			pixel_angle, weather_glow);
 	}
 
-	if (show_grid) {
+	if (show_grid && eye_level_ground < 0.5) {
 		float grid = max(
 			grid_line(latitude, latitude_step, grid_spacing_degrees, grid_line_pixels),
 			grid_line(longitude, longitude_step, grid_spacing_degrees, grid_line_pixels));
