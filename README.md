@@ -126,7 +126,10 @@ at sunrise and sunset, and dark with stars at night (always black on a world wit
 sun and moons are where they really are and their true size, and moons show their phases;
 **M** magnifies small ones. Drag to look around, walk with **W A S D** (Shift for faster, the
 mouse wheel to change pace from walking to very fast), press **F** to fly (**Space** and **C**
-to rise and sink), and **Esc** to go back. Flat worlds can't be stood on yet.
+to rise and sink), and **Esc** to go back. On a flat world the sky is the same across the
+whole disc, so day and night come everywhere at once as it tumbles; north points to the
+disc's center, and walking south far enough takes you over the rim, down the edge, and onto
+the bare underside, where the sky is the other way up.
 
 The live weather is overhead too: the clouds you see from orbit drift across the sky, grey
 where rain falls, and rain or snow falls around you, slanted by the wind. Fly up through them

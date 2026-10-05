@@ -120,7 +120,7 @@ Owner's decisions:
   the page's dark background, titled with its name.
 - **Tidy the docs:** close `REN-01`'s old status, fix the format example's heading.
 - **Three PRs:** the docs and diagram extras (PR #84), clouds from above (PR #85), then flat
-  worlds.
+  worlds (PR #86).
 
 **Milestone 32: Metric and Imperial Units** · Complete (PR #83 merged 2026-10-05; owner's idea and choice, 2026-10-05)
 A switch between metric and imperial for every measurement (`UI-04`). Owner's decisions:
@@ -724,7 +724,7 @@ as realistic or simple.
   an added block. Benchmark (Painterly against `main`, back to back): 193/193 vs 192/200 fps,
   same memory.
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Implementation (the sky in Core, M30, PR #77):**
 - **`BodyOrientation.ToSystem(body, time, direction)`:** turns a direction on the body (its map's
@@ -830,6 +830,35 @@ as realistic or simple.
 - **Performance** (this machine, fullscreen, uncapped, looking down from 8 km): 41–62 fps with
   the deck against 52 without (noisy: most of the cost is the view itself); 93 fps at eye level;
   the regular benchmark is unchanged.
+
+**Implementation (standing on flat worlds, M33, PR #86):**
+- **Core `Geometry/FlatWalk.cs`** (with `FlatSpot` and `FlatFace`): a spot on a flat world's
+  top face, rim, or underside; `Point` (with a height off the face), `Frame` (east, north,
+  and up: north toward the top's center, up the rim, out toward the rim underneath, so a
+  heading carries over the edges), `MapDirection` (the map point under the spot; none off the
+  top), and `Walk`, in short steps, each in the frame where it starts, crossing from face to
+  face (owner's choice: walking over the rim goes on down the edge and onto the underside).
+  Tests (`FlatWalkTests`, 14): south from the center over the rim, down it, and to the
+  underside's center; walks undone by walking back (over the edge too); square frames; north
+  to the center; map points; heights off each face.
+- **Core `BodyOrientation.ShapeToSystem`:** the space a body is drawn in, to the system's: a
+  globe's own frame, or a flat world's disc space, which tumbles like a coin (its spin axis
+  across the disc) as the 3D view draws it. `SkyView` now works from any point and frame on
+  a body through it, and **`SkyView.FromFlat`** gives a flat world's sky: the same across the
+  disc (owner's choice), so day and night come to the whole face at once as it tumbles, and
+  the underside sees it the other way up; no sun time. Tests (4 more in `SkyViewTests`).
+- **The app:** View ▸ Stand Here on a flat world stands on the top face at the screen's middle
+  (`GlobePicker` already found it). `Rendering/FlatPatch.cs` is the flat ground around the eye
+  (rings on the top or bottom face, a strip of the rim; each triangle turned to face out),
+  the top drawn with the globe's material (each point's disc place in `CUSTOM0`, which the
+  surface shader already maps for flat worlds) and the rim and underside with the bare rock
+  (`PlanetSurface.RockMaterial`); it sits 1 millionth of a radius off the disc's own face so
+  the two don't flicker against each other. A second patch at the cloud layer is the flat
+  cloud deck; over the top face `surface_sky.gdshader`'s flat layer meets each line of sight
+  with a plane over the disc (`SurfaceSky.ShowFlatClouds`). Only the top face has weather.
+- **Fixed on the way:** while standing, `SystemView` draws the body stood on at full detail
+  (its level of detail had been measured from the set-aside globe camera), and places the
+  eye through `ShapeToSystem`.
 
 
 ### 4.2 Interface Layout (`UI`)
