@@ -108,7 +108,20 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 32: Metric and Imperial Units** · In progress (owner's idea and choice, 2026-10-05)
+**Milestone 33: Polish and Loose Ends** · In progress (owner's choice, 2026-10-05)
+Owner's decisions:
+- **Standing on flat worlds** (`REN-06`): the **same sky across the disc** (the sun's height is
+  its angle above the disc, so day and night come everywhere at once, as flat worlds are
+  already lit and weathered; north points to the disc's center), and **walking over the rim
+  onto the underside**.
+- **Clouds from above:** flying above the cloud layer in first person shows the clouds below.
+- **Diagram extras** (`LORE-04`): drag entries from the list onto a diagram, and **save a
+  diagram as a picture**: the whole diagram, fitted with a margin, at twice normal detail, on
+  the page's dark background, titled with its name.
+- **Tidy the docs:** close `REN-01`'s old status, fix the format example's heading.
+- **Three PRs:** the docs and diagram extras (PR #84), clouds from above, then flat worlds.
+
+**Milestone 32: Metric and Imperial Units** · Complete (PR #83 merged 2026-10-05; owner's idea and choice, 2026-10-05)
 A switch between metric and imperial for every measurement (`UI-04`). Owner's decisions:
 - **A setting in File ▸ Settings, for this computer**, not saved in worlds (which always store
   metric, so they read right on anyone's machine).
@@ -475,7 +488,7 @@ Each entry uses this format:
 
 ### 4.1 Rendering & Navigation (`REN`)
 
-**REN-01 — 3D world rendering** · In Progress (star systems drawn, PR #17) · Base
+**REN-01 — 3D world rendering** · Implemented (M1: PR #3; star systems: PR #17; built on by later milestones) · Base
 **Intent:** Render worlds and bodies in 3D. This grew from the original "3D render of a 2D world" concept.
 **Implementation (M1, PR #3):**
 - The planet is a `SphereMesh` (radius 1, 128×64 segments) in `godot/Scenes/main.tscn`, with one
@@ -2659,6 +2672,18 @@ choice, 2026-10-05).
   it, at least 200 units apart, rows 140 apart. A loop of parents still gets a layout. The
   rest go in a grid below, walked along their ties so tied entries end up near each other.
   Dates don't matter to it (a parent stays a parent). Tests (`DiagramLayoutTests`, 9).
+
+**Implementation (extras, M33, PR #84):**
+- **Drag from the list:** the page's entry list forwards drags (`SetDragForwarding`): the
+  chosen entries (or the one under the mouse) travel with their titles shown, and
+  `DiagramCanvas._DropData` places them in a row where they land, as one undo step
+  (`DiagramPage.AddEntries`, shared with the Add to Diagram button).
+- **Save as Image…:** a native save dialog (Pictures folder, the diagram's name as the file
+  name), then `SaveImageAsync` draws the diagram into an off-screen `SubViewport` with a
+  second `DiagramCanvas` (`ForExport`: no link dots or selection, the name as a title, the
+  same "every tie" choice) sized by `DiagramCanvas.PictureOf` at twice normal detail with a
+  40-pixel margin (smaller if the picture would pass 8,192 pixels), waits for it to draw,
+  and saves a PNG. A canvas now stops listening to the session when it leaves the tree.
 
 ### 4.10 Saving (`SAV`)
 

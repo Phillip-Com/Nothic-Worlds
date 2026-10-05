@@ -14,7 +14,8 @@ namespace NothicWorlds.UI;
 /// unless every tie is shown.
 /// </summary>
 /// <remarks>
-/// Drag a box to move it; drag from the dot on its right edge onto another box to link them;
+/// Drop journal entries from the page's list to put them where they land. Drag a box to move
+/// it; drag from the dot on its right edge onto another box to link them;
 /// double-click a box to open its entry; click a line to edit the tie; Delete takes the
 /// selected box off the diagram. Drag the background (or with the middle or right button) to
 /// pan; the wheel zooms around the mouse.
@@ -57,6 +58,18 @@ public partial class DiagramCanvas : Control
     /// <summary>A box was double-clicked: its entry.</summary>
     public event Action<Guid>? EntryOpened;
 
+    /// <summary>Journal entries were dropped on the diagram: which, and the diagram spot.</summary>
+    public event Action<Guid[], Vector2>? EntriesDropped;
+
+    /// <summary>
+    /// True to draw for a saved picture: no dots to link by, no selection, and the diagram's
+    /// name as a title.
+    /// </summary>
+    public bool ForExport { get; init; }
+
+    /// <summary>The title drawn at the top, for a saved picture (none on screen).</summary>
+    public string? Title { get; init; }
+
     /// <summary>The selected box, or null.</summary>
     public Guid? SelectedEntry => _selectedEntry;
 
@@ -67,6 +80,53 @@ public partial class DiagramCanvas : Control
         MouseFilter = MouseFilterEnum.Stop;
         Session.Changed += QueueRedraw;
         Session.TimeChanged += QueueRedraw;
+    }
+
+    // A canvas made for a saved picture goes away again: it mustn't be left listening.
+    public override void _ExitTree()
+    {
+        Session.Changed -= QueueRedraw;
+        Session.TimeChanged -= QueueRedraw;
+    }
+
+    /// <summary>
+    /// The size a picture of a diagram needs at <paramref name="zoom"/> (diagram units to
+    /// pixels), with a margin and room for a title, and the view that fits it all.
+    /// </summary>
+    public static (Vector2 Size, Vector2 Pan) PictureOf(LoreDiagram diagram, float zoom)
+    {
+        const float margin = 40, titleBand = 60;
+        double left = diagram.Placements.Min(p => p.X), right = diagram.Placements.Max(p => p.X);
+        double top = diagram.Placements.Min(p => p.Y), bottom = diagram.Placements.Max(p => p.Y);
+        var size = new Vector2(
+            ((float)(right - left) + BoxWidth) * zoom + 2 * margin,
+            ((float)(bottom - top) + BoxHeight) * zoom + 2 * margin + titleBand);
+        // The diagram's middle, a title band's height below the picture's.
+        Vector2 middle = new Vector2((float)(left + right) / 2, (float)(top + bottom) / 2) * zoom;
+        return (size, new Vector2(-middle.X, -middle.Y + titleBand / 2));
+    }
+
+    /// <summary>Shows a diagram for a saved picture, at a set zoom and view.</summary>
+    public void ShowAt(Guid diagramId, float zoom, Vector2 pan)
+    {
+        DiagramId = diagramId;
+        _zoom = zoom;
+        _pan = pan;
+        QueueRedraw();
+    }
+
+    public override bool _CanDropData(Vector2 atPosition, Variant data) =>
+        DiagramId is not null && data.VariantType == Variant.Type.Array;
+
+    public override void _DropData(Vector2 atPosition, Variant data)
+    {
+        Guid[] entries = [.. data.AsGodotArray()
+            .Select(id => Guid.TryParse(id.AsString(), out Guid entry) ? entry : Guid.Empty)
+            .Where(entry => entry != Guid.Empty)];
+        if (entries.Length > 0)
+        {
+            EntriesDropped?.Invoke(entries, ToDiagram(atPosition));
+        }
     }
 
     /// <summary>Shows a diagram (or none), fitted to the view.</summary>
@@ -137,6 +197,13 @@ public partial class DiagramCanvas : Control
         if (_linkingFrom is Guid from && boxes.TryGetValue(from, out Vector2 start))
         {
             DrawLine(Handle(start), _mouse, _selected, 2, antialiased: true);
+        }
+
+        if (Title is not null)
+        {
+            Font font = GetThemeDefaultFont();
+            DrawString(font, new Vector2(40, 48), Title, HorizontalAlignment.Left, -1,
+                (int)(14 * _zoom), Colors.White);
         }
     }
 
@@ -392,7 +459,11 @@ public partial class DiagramCanvas : Control
                 Colors.White, TextServer.JustificationFlag.None);
         }
 
-        DrawCircle(Handle(middle), HandleRadius * Mathf.Sqrt(_zoom), _selected with { A = 0.9f });
+        if (!ForExport)
+        {
+            DrawCircle(Handle(middle), HandleRadius * Mathf.Sqrt(_zoom),
+                _selected with { A = 0.9f });
+        }
     }
 
     private void DrawCentered(string text)

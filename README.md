@@ -142,8 +142,9 @@ place, or other). Drag from a box's dot onto another box to tie them: parent of,
 sibling of, ally of, rival of, at war with, member of, rules, serves, or in your own words,
 with dates if it began or ended. A tie shows in every diagram that holds both entries, as it
 stands at the world clock's time: ended ones fade, ones not yet begun are hidden (**Show every
-tie** shows them all). **Arrange** lays out a family tree, parents above children, with
-everything else below. Double-click a box to open its entry; the Journal panel also lists an
+tie** shows them all). Entries can be dragged from the list onto the diagram. **Arrange** lays
+out a family tree, parents above children, with everything else below; **Save as Image…**
+saves the whole diagram as a picture. Double-click a box to open its entry; the Journal panel also lists an
 entry's relationships, where they can be added and edited. Esc goes back to the globe.
 
 **Physics** (the switch in the time bar) moves the bodies by real gravity from that moment, each

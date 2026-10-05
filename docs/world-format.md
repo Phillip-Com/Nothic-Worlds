@@ -25,11 +25,14 @@ A `.nworld` file is a standard **zip archive** containing:
 - Limits when reading: `world.json` up to 16 MB, each asset up to 256 MB, each terrain image
   up to 16 MB, each height image up to 32 MB.
 
-## `world.json` (version 13)
+## `world.json` (an example)
+
+An example of the file's main parts. It doesn't show every optional field: the tables below
+list them all.
 
 ```json
 {
-  "formatVersion": 13,
+  "formatVersion": 27,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
