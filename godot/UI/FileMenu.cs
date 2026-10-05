@@ -1,6 +1,7 @@
 using Godot;
 using NothicWorlds.Controls;
 using NothicWorlds.Core.Storage;
+using NothicWorlds.Rendering;
 using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
@@ -30,6 +31,9 @@ public partial class FileMenu : Node
     /// </summary>
     [Export] public MapToolbar? Toolbar { get; set; }
 
+    /// <summary>The graphics options, set in File ▸ Settings (VISION.md REN-03).</summary>
+    [Export] public GraphicsSettings? Graphics { get; set; }
+
     /// <summary>Where world files go unless the user picks somewhere else.</summary>
     public static string DefaultFolder => Path.Combine(
         System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments),
@@ -41,6 +45,7 @@ public partial class FileMenu : Node
         Open,
         Save,
         SaveAs,
+        Settings,
     }
 
     private enum UnsavedChoice
@@ -72,7 +77,29 @@ public partial class FileMenu : Node
         menu.AddSeparator();
         menu.AddItem("Save", (int)MenuItem.Save, Ctrl(Key.S));
         menu.AddItem("Save As…", (int)MenuItem.SaveAs, Ctrl(Key.S, shift: true));
-        menu.IdPressed += id => Run((MenuItem)(int)id);
+        if (Graphics is not null)
+        {
+            // Settings belong to this computer, not the world, so they open whatever's busy.
+            var settings = new SettingsWindow { Graphics = Graphics };
+            AddChild(settings);
+            menu.AddSeparator();
+            menu.AddItem("Settings…", (int)MenuItem.Settings);
+            menu.IdPressed += id =>
+            {
+                if (id == (int)MenuItem.Settings)
+                {
+                    settings.PopupCentered();
+                }
+            };
+        }
+
+        menu.IdPressed += id =>
+        {
+            if (id != (int)MenuItem.Settings)
+            {
+                Run((MenuItem)(int)id);
+            }
+        };
         Toolbar.MenuArea.AddChild(_button);
 
         _openDialog = CreateFileDialog("Open World", FileDialog.FileModeEnum.OpenFile);

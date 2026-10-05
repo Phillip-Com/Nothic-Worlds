@@ -185,10 +185,10 @@ public partial class SystemView : Node3D
     public float ReliefExaggeration { get; set; } = 10;
 
     /// <summary>
-    /// How finely sculpted globes' shapes are drawn (View ▸ Relief Detail; owner's choice: a
-    /// quality setting, remembered on this computer by <see cref="AppSettings"/>).
+    /// How finely sculpted globes' shapes are drawn (owner's choice: a quality setting, in File ▸
+    /// Settings; see <see cref="GraphicsSettings"/>).
     /// </summary>
-    public ReliefDetail ReliefDetail { get; set; } = AppSettings.ReliefDetail;
+    public ReliefDetail ReliefDetail { get; set; } = ReliefDetail.Standard;
 
     /// <summary>
     /// Whether sculpted relief is shaded map-style, lit from the northwest so it always shows,

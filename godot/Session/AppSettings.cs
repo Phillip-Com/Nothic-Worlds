@@ -18,34 +18,35 @@ public static class AppSettings
     private const string ReliefDetailKey = "relief_detail";
     private const string MapShadingKey = "map_style_shading";
     private const string CloudDetailKey = "cloud_detail";
+    private const string AntiAliasingKey = "anti_aliasing";
+    private const string RenderScaleKey = "render_scale";
+    private const string FrameRateKey = "frame_rate_limit";
 
-    /// <summary>How finely sculpted globes are drawn (View ▸ Relief Detail).</summary>
-    public static ReliefDetail ReliefDetail
+    /// <summary>
+    /// The graphics options (File ▸ Settings; VISION.md REN-03). Any never saved (or unreadable)
+    /// is taken from <paramref name="defaults"/>, the preset for this computer's graphics.
+    /// </summary>
+    public static GraphicsOptions LoadGraphics(GraphicsOptions defaults)
     {
-        get
-        {
-            ConfigFile file = Load();
-            string name = (string)file.GetValue(DisplaySection, ReliefDetailKey,
-                nameof(ReliefDetail.Standard));
-            return Enum.TryParse(name, out ReliefDetail detail) && Enum.IsDefined(detail)
-                ? detail
-                : ReliefDetail.Standard;
-        }
-        set => Save(ReliefDetailKey, value.ToString());
+        ConfigFile file = Load();
+        return new GraphicsOptions(
+            Read(file, ReliefDetailKey, defaults.ReliefDetail),
+            Read(file, CloudDetailKey, defaults.CloudDetail),
+            Read(file, AntiAliasingKey, defaults.AntiAliasing),
+            Read(file, RenderScaleKey, defaults.RenderScale),
+            Read(file, FrameRateKey, defaults.FrameRateLimit));
     }
 
-    /// <summary>How finely live weather's clouds are drawn (View ▸ Cloud Detail).</summary>
-    public static CloudDetail CloudDetail
+    /// <summary>Remembers the graphics options.</summary>
+    public static void SaveGraphics(GraphicsOptions options)
     {
-        get
-        {
-            string name = (string)Load().GetValue(DisplaySection, CloudDetailKey,
-                nameof(CloudDetail.High));
-            return Enum.TryParse(name, out CloudDetail detail) && Enum.IsDefined(detail)
-                ? detail
-                : CloudDetail.High;
-        }
-        set => Save(CloudDetailKey, value.ToString());
+        ConfigFile file = Load();
+        file.SetValue(DisplaySection, ReliefDetailKey, options.ReliefDetail.ToString());
+        file.SetValue(DisplaySection, CloudDetailKey, options.CloudDetail.ToString());
+        file.SetValue(DisplaySection, AntiAliasingKey, options.AntiAliasing.ToString());
+        file.SetValue(DisplaySection, RenderScaleKey, options.RenderScale.ToString());
+        file.SetValue(DisplaySection, FrameRateKey, options.FrameRateLimit.ToString());
+        Write(file);
     }
 
     /// <summary>Whether relief is shaded map-style (View ▸ Relief Shading).</summary>
@@ -62,10 +63,23 @@ public static class AppSettings
         return file;
     }
 
+    // An option stored by name, or the fallback if it's missing or not a known name.
+    private static T Read<T>(ConfigFile file, string key, T fallback)
+        where T : struct, Enum
+    {
+        string name = (string)file.GetValue(DisplaySection, key, fallback.ToString());
+        return Enum.TryParse(name, out T value) && Enum.IsDefined(value) ? value : fallback;
+    }
+
     private static void Save(string key, Variant value)
     {
         ConfigFile file = Load();
         file.SetValue(DisplaySection, key, value);
+        Write(file);
+    }
+
+    private static void Write(ConfigFile file)
+    {
         Error error = file.Save(FilePath);
         if (error != Error.Ok)
         {

@@ -36,6 +36,7 @@
 [ext_resource type="Script" uid="uid://bycuo01vgll24" path="res://Rendering/NebulaBackdrop.cs" id="34_nebula_backdrop"]
 [ext_resource type="Script" uid="uid://n530wo5yywp5" path="res://Controls/ShapeHandles.cs" id="35_shape_handles"]
 [ext_resource type="Script" uid="uid://c0sv1vlx28k5o" path="res://Rendering/WeatherDisplay.cs" id="36_weather_display"]
+[ext_resource type="Script" uid="uid://dfy6wx1608yu" path="res://Rendering/GraphicsSettings.cs" id="37_graphics_settings"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -96,8 +97,9 @@ Timeline = NodePath("../TimelineStrip")
 RegionsPanel = NodePath("../RegionsPanel")
 SystemPanel = NodePath("../SystemPanel")
 
-[node name="FileMenu" type="Node" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
+[node name="FileMenu" type="Node" parent="." node_paths=PackedStringArray("Session", "Toolbar", "Graphics")]
 script = ExtResource("9_filemenu")
+Graphics = NodePath("../GraphicsSettings")
 Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 
@@ -299,3 +301,8 @@ script = ExtResource("36_weather_display")
 Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 Camera = NodePath("../PlanetCamera")
+
+[node name="GraphicsSettings" type="Node" parent="." node_paths=PackedStringArray("System", "LiveWeather")]
+script = ExtResource("37_graphics_settings")
+System = NodePath("../SystemView")
+LiveWeather = NodePath("../WeatherDisplay")

@@ -108,9 +108,7 @@ public partial class ViewMenu : Node
             "While the System panel is open: green rings where orbits around the selected " +
             "body (and around what it circles) would stay steady, red where they wouldn't.");
         menu.AddSubmenuNodeItem("Relief", BuildReliefMenu());
-        menu.AddSubmenuNodeItem("Relief Detail", BuildReliefDetailMenu());
         menu.AddSubmenuNodeItem("Relief Shading", BuildReliefShadingMenu());
-        menu.AddSubmenuNodeItem("Cloud Detail", BuildCloudDetailMenu());
         menu.AboutToPopup += () => ShowChecks(menu);
         menu.IdPressed += id => Toggle((MenuItem)(int)id);
         Toolbar.MenuArea.AddChild(_button);
@@ -211,32 +209,6 @@ public partial class ViewMenu : Node
         return relief;
     }
 
-    // How finely sculpted globes are drawn (a quality setting, remembered on this computer).
-    private PopupMenu BuildReliefDetailMenu()
-    {
-        var detail = new PopupMenu();
-        detail.AddRadioCheckItem("Low (lightest)", (int)ReliefDetail.Low);
-        detail.AddRadioCheckItem("Standard", (int)ReliefDetail.Standard);
-        detail.AddRadioCheckItem("High (sharpest outlines)", (int)ReliefDetail.High);
-        detail.AboutToPopup += () =>
-        {
-            for (int index = 0; index < detail.ItemCount; index++)
-            {
-                detail.SetItemChecked(index,
-                    detail.GetItemId(index) == (int)(System?.ReliefDetail ?? 0));
-            }
-        };
-        detail.IdPressed += id =>
-        {
-            if (System is not null)
-            {
-                System.ReliefDetail = (ReliefDetail)(int)id;
-                AppSettings.ReliefDetail = System.ReliefDetail;
-            }
-        };
-        return detail;
-    }
-
     // How the world is drawn (owner's choice: saved with the world, so it's an undoable edit).
     private PopupMenu BuildStyleMenu()
     {
@@ -263,33 +235,6 @@ public partial class ViewMenu : Node
         };
         styles.IdPressed += id => Session?.SetStyle((VisualStyle)(int)id);
         return styles;
-    }
-
-    // How finely clouds are drawn (owner's choice: a quality setting, remembered here).
-    private PopupMenu BuildCloudDetailMenu()
-    {
-        var detail = new PopupMenu();
-        detail.AddRadioCheckItem("Low", (int)CloudDetail.Low);
-        detail.SetItemTooltip(0, "Softer, coarser clouds: the lightest to draw");
-        detail.AddRadioCheckItem("High", (int)CloudDetail.High);
-        detail.SetItemTooltip(1, "Finer clouds with ragged edges");
-        detail.AboutToPopup += () =>
-        {
-            foreach (CloudDetail level in Enum.GetValues<CloudDetail>())
-            {
-                detail.SetItemChecked(detail.GetItemIndex((int)level),
-                    LiveWeather?.Detail == level);
-            }
-        };
-        detail.IdPressed += id =>
-        {
-            if (LiveWeather is not null)
-            {
-                LiveWeather.Detail = (CloudDetail)(int)id;
-                AppSettings.CloudDetail = LiveWeather.Detail;
-            }
-        };
-        return detail;
     }
 
     // How relief is shaded: by the sunlight, or map-style from a fixed direction.
