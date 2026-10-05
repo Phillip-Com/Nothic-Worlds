@@ -454,6 +454,7 @@ public partial class SystemView : Node3D
         {
             surface.ReliefScale = (float)(ReliefExaggeration / (body.RadiusKm * 1000));
             surface.ReliefDetail = ReliefDetail;
+            surface.ScreenRadius = ScreenRadiusOf(visual.Root.GlobalPosition, (float)place.Radius);
             surface.SetShapes(body.Surface.Shapes, body.RadiusKm);
             surface.MapShading = MapStyleShading;
             surface.Style = Style;
@@ -616,6 +617,19 @@ public partial class SystemView : Node3D
         }
 
         visual.Rings.Light(sun!.Value);  // A surface means the sun was worked out above
+    }
+
+    // How big a globe of this radius (scene units) at this place is drawn on screen: its radius
+    // in pixels, or 0 behind the camera.
+    private float ScreenRadiusOf(Vector3 center, float radius)
+    {
+        if (Camera is null || Camera.IsPositionBehind(center))
+        {
+            return 0;
+        }
+
+        Vector2 middle = Camera.UnprojectPosition(center);
+        return middle.DistanceTo(Camera.UnprojectPosition(center + Camera.GlobalBasis.X * radius));
     }
 
     private static Vector3 ToGodotDirection(Vector3D vector) =>

@@ -80,6 +80,31 @@ public partial class PlanetSurface : MeshInstance3D
 
     // The globe mesh, kept while the body is flat, and the flat world's rock.
     private Mesh? _sphereMesh;
+
+    // Level of detail (VISION.md REN-03; owner's choice: always on): a globe this small on
+    // screen (its radius in pixels) is drawn with a lighter mesh. Each level is left a little
+    // past where it's entered, so a globe at the boundary doesn't flicker between them.
+    private const float LightBelowPixels = 200;
+    private const float PlainBelowPixels = 60;
+    private const float LevelMarginPixels = 1.15f;
+
+    // A coarse sphere for globes too small to show the fine one's roundness.
+    private static readonly SphereMesh _coarseSphere = new()
+    {
+        Radius = 1.0f,
+        Height = 2.0f,
+        RadialSegments = 32,
+        Rings = 16,
+    };
+
+    private DetailLevel _detailLevel = DetailLevel.Full;
+
+    private enum DetailLevel
+    {
+        Full,     // The chosen relief detail and the fine sphere
+        Light,    // The lightest relief mesh
+        Plain,    // The coarse sphere, sculpted or not (the shader still lifts the relief)
+    }
     private MeshInstance3D? _rock;
     private BodyShape _shape = BodyShape.Sphere;
 
@@ -471,6 +496,23 @@ public partial class PlanetSurface : MeshInstance3D
         }
     }
 
+    /// <summary>
+    /// How big the globe is drawn on screen, as its radius in pixels (0 if it's behind the
+    /// camera): small globes get lighter meshes (level of detail, VISION.md REN-03).
+    /// </summary>
+    public float ScreenRadius
+    {
+        set
+        {
+            DetailLevel level = LevelFor(value);
+            if (level != _detailLevel)
+            {
+                _detailLevel = level;
+                ChooseMesh();
+            }
+        }
+    }
+
     /// <summary>How finely the sculpted shape is drawn (a quality setting).</summary>
     public ReliefDetail ReliefDetail
     {
@@ -740,16 +782,33 @@ public partial class PlanetSurface : MeshInstance3D
         return image;
     }
 
+    // The level of detail for a globe this big on screen; leaving a level takes a little more
+    // than entering it did.
+    private DetailLevel LevelFor(float pixels)
+    {
+        float plainUntil = PlainBelowPixels
+            * (_detailLevel == DetailLevel.Plain ? LevelMarginPixels : 1);
+        float lightUntil = LightBelowPixels
+            * (_detailLevel >= DetailLevel.Light ? LevelMarginPixels : 1);
+        return pixels < plainUntil ? DetailLevel.Plain
+            : pixels < lightUntil ? DetailLevel.Light
+            : DetailLevel.Full;
+    }
+
     // A flat world's disc, a carved globe (drawn by its own child node), a sculpted globe's
-    // cube-sphere, or the plain sphere.
+    // cube-sphere, or the plain sphere, lighter when the globe is small on screen.
     private void ChooseMesh()
     {
         _sphereMesh ??= Mesh;
         bool carved = Shape == BodyShape.Sphere && _shapes.Count > 0;
+        Mesh? sphere = _detailLevel == DetailLevel.Plain ? _coarseSphere : _sphereMesh;
+        ReliefDetail relief = _detailLevel == DetailLevel.Light
+            ? (ReliefDetail)Math.Min((int)_reliefDetail, (int)ReliefDetail.Low)
+            : _reliefDetail;
         Mesh = Shape == BodyShape.FlatDisc ? FlatDiscMeshes.Top
             : carved ? null
-            : _shownHeights.IsEmpty ? _sphereMesh
-            : CubeSphereMesh.For(_reliefDetail);
+            : _shownHeights.IsEmpty || _detailLevel == DetailLevel.Plain ? sphere
+            : CubeSphereMesh.For(relief);
         SurfaceMaterial.SetShaderParameter("lifted_on_cpu", carved);
         if (carved)
         {
