@@ -228,7 +228,8 @@ new faces are bare rock.
 
 **Add ▸ Weather Pin** adds a weather pin: click the spot on the planet, then name it. Weather pins
 show as small suns; click one to see that spot's weather: today's temperature, daylight, noon sun,
-and season, and a chart of the whole year (temperatures and daylight by month, with today
+and season, the weather right now (on a body with air: the sky, rain or snow, and the wind, such
+as "Stormy · rain, 1.1 mm an hour · wind from the west at 43 km/h"), and a chart of the whole year (temperatures and daylight by month, with today
 marked) that follows the clock. Temperatures are estimates from the sunlight, around the
 planet's **Avg. temperature**, set in the System panel (Earth: about 15 °C), adjusted for the
 painted terrain: water within about 500 km makes the seasons and the day/night swing milder,

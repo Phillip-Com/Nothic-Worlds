@@ -48,6 +48,11 @@ public partial class WeatherDisplay : Node
     /// <summary>The camera, for how big the globes are on screen.</summary>
     [Export] public Camera3D? Camera { get; set; }
 
+    /// <summary>
+    /// Raised when the bodies' weather has been worked out again (after the world changed).
+    /// </summary>
+    public event Action? WeatherRebuilt;
+
     /// <summary>Whether clouds, rain, and snow show (View ▸ Clouds).</summary>
     public bool ShowClouds { get; set; } = true;
 
@@ -86,6 +91,12 @@ public partial class WeatherDisplay : Node
             _stale.UnionWith(_snapshots.Keys);  // Snapshots at the new detail, from now on
         }
     }
+
+    /// <summary>
+    /// A body's live weather as last worked out, or null if it has none (no air or no star) or
+    /// it isn't ready yet. Safe to ask for moments from.
+    /// </summary>
+    public LiveWeather? WeatherOf(Guid bodyId) => _weather.GetValueOrDefault(bodyId);
 
     public override void _Ready()
     {
@@ -186,6 +197,7 @@ public partial class WeatherDisplay : Node
 
         // Snapshots of the old weather blend into the new; ask for new ones now.
         _stale.UnionWith(_snapshots.Keys);
+        WeatherRebuilt?.Invoke();
     }
 
     // Draws the weather on every globe with it that's big enough to see, hides it on the rest,

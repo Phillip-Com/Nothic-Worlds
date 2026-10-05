@@ -118,7 +118,7 @@ Watch the weather move across a world (`WTH-02`). Owner's decisions:
   too); only bodies with air have live weather. Format version 26.
 - **Base tier, with a cloud-detail quality setting** (`WTH-02` was Advanced; owner's choice).
 - **Three PRs:** the weather in Core (PR #71), drawing it on the globe (PR #72), then today's
-  weather in weather pins.
+  weather in weather pins (PR #73).
 
 **Milestone 26: Visual Styles** · Complete (PR #70 merged 2026-10-04; owner's choice, 2026-10-04)
 Let each world choose how it's drawn (`REN-05`). Owner's decisions:
@@ -2102,7 +2102,7 @@ season, etc. This is the lightweight version that works on any system.
   winters, wet June to September, 1,215 mm a year), a forest pin by the sea at 48° N (643 mm),
   and the same pin as desert (84 mm); the window fits and scrolls at the small size.
 
-**WTH-02 — Live weather simulation** · In Progress (M27: PRs #71–#72) · Base (owner's choice, 2026-10-04; was Advanced)
+**WTH-02 — Live weather simulation** · Implemented (M27: PRs #71–#73) · Base (owner's choice, 2026-10-04; was Advanced)
 **Intent:** As detailed as possible. Ideally the user can watch clouds and weather move across
 the world.
 **Implementation (the weather in Core, M27, PR #71):**
@@ -2179,6 +2179,20 @@ the world.
   cyclone and a tropical storm close up, the Atmosphere box (and undo) taking the weather away
   and back, and the View menu's items. Benchmark: 180/179 fps against `main`'s 192/191 with
   the weather showing; the same as `main` with View ▸ Clouds off.
+**Implementation (today's weather in weather pins, M27, PR #73):**
+- **Right now** in a weather pin's window (`UI/WeatherWindow.cs`), under today's figures: the
+  live weather at the pin, from `WeatherDisplay.WeatherOf(body)` (the same weather the globe
+  shows), worked out for the clock's moment whenever the window refreshes, and again when the
+  weather is rebuilt (`WeatherDisplay.WeatherRebuilt`). Without air it says so, and how to give
+  the body some.
+- **`UI/LiveWeatherText.cs`:** the sky (Clear, Partly cloudy, Mostly cloudy, Overcast; Stormy
+  in a cyclone, In a tropical storm), what's falling (dry, a trace, light, plain, or heavy rain
+  or snow, with mm an hour), and the wind (calm, or from one of eight compass points, in
+  km/h), such as "Stormy · rain, 1.1 mm an hour · wind from the west at 43 km/h". The window's
+  note no longer says winds aren't modeled.
+- **Verified in the running app** with real clicks on pins, maximized and at 1152 × 648: a pin
+  in clear trade winds, one in a cyclone, the line following the clock, and "no air" with the
+  Atmosphere box unticked (and undo).
 
 ### 4.9 Lore & Journal (`LORE`)
 
