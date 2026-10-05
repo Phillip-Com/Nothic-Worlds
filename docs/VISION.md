@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 27: Live Weather** · In progress (owner's choice, 2026-10-04)
+**Milestone 27: Live Weather** · Complete (PR #73 merged 2026-10-05; owner's choice, 2026-10-04)
 Watch the weather move across a world (`WTH-02`). Owner's decisions:
 - **Worked out from the time,** not stepped forward: any date's weather is ready at once and
   always the same (CLAUDE.md §5), built on the weather pins' climate (`WTH-01`, `WTH-03`).
