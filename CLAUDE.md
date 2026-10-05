@@ -181,6 +181,7 @@ src/NothicWorlds.Core/         Plain C# library, NO Godot references
   Geometry/                    Shared math: coordinates on spheres, conversions
   Editing/                     Undo/redo history
   Maps/                        Map image rules (layout, size limits)
+  Measurement/                 Units: metric and imperial conversion and formatting
   Model/                       World data: bodies, maps, journals, calendars
   Simulation/                  Orbits, time, events, weather logic
   Storage/                     Save/load, format versioning, migrations
