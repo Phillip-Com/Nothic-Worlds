@@ -100,8 +100,9 @@ maps, so it shows at any time of day; both are remembered on this computer.
 panel; planets have it to start with, moons don't): clouds drift with the winds, storms spiral
 through the middle latitudes, tropical storms with clear eyes form over warm seas late in
 summer, and rain (fine lines) and snow (dots) fall from the thickest clouds. Run the clock to
-watch it move; any date's weather is ready at once and always the same. **View ▸ Clouds**
-hides it, **View ▸ Wind** shows the winds as streaks, and **View ▸ Cloud Detail** (Low or
+watch it move; any date's weather is ready at once and always the same. Clouds step aside
+while the Terrain or Map panel is open, so you can see the ground. **View ▸ Clouds** hides
+them, **View ▸ Wind** shows the winds as streaks, and **View ▸ Cloud Detail** (Low or
 High, remembered on this computer) trades finer clouds for speed.
 
 **View ▸ Style** sets how the world is drawn: **Painterly** (the default: soft bands of light

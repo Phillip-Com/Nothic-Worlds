@@ -7,6 +7,7 @@ A record of key project decisions made by the owner. Newest first.
 
 | Date | Decision | Status | PR / Commit | Notes |
 |------|----------|--------|-------------|-------|
+| 2026-10-05 | **Clouds hide while the Terrain or Map panel is open** (the wind stays if on); live weather's ~6% cost is fine for the Base tier | In PR | [#72](https://github.com/Phillip-Com/Nothic-Worlds/pull/72) | Owner's choices on PR #72's open questions. VISION.md `WTH-02` |
 | 2026-10-05 | Live weather is **drawn in the planet's own surface shader**, not a see-through shell above it: about 6% of the frame rate instead of 18% on the baseline laptop, lit like the ground in every style | In PR | [#72](https://github.com/Phillip-Com/Nothic-Worlds/pull/72) | Claude's design within the plan, after measuring both. VISION.md `WTH-02` |
 | 2026-10-05 | **View ▸ Clouds** (on) and **View ▸ Wind** (off) are show/hide switches; **View ▸ Cloud Detail** (Low or **High**, the default) is a quality setting remembered on this computer | In PR | [#72](https://github.com/Phillip-Com/Nothic-Worlds/pull/72) | Owner's choice of a quality setting; the rest Claude's design. VISION.md `WTH-02` |
 | 2026-10-04 | Milestone 27: **live weather worked out from the time** (always the same, any date at once), showing **clouds, rain and snow, wind, and today's weather in pins**; **Base tier with a quality setting** (`WTH-02` was Advanced); **three PRs** | Merged | [#71](https://github.com/Phillip-Com/Nothic-Worlds/pull/71) · `69d3845` | VISION.md §3, `WTH-02` |

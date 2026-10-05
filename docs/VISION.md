@@ -2169,6 +2169,9 @@ the world.
   stays within about 0.01 day of the clock.
 - **Settings:** View ▸ Clouds (on) and View ▸ Wind (off); View ▸ Cloud Detail, Low or High
   (the default), remembered on this computer (`AppSettings.CloudDetail`, `CloudDetail`).
+  Clouds hide while the Terrain or Map panel is open, so the ground being edited shows
+  (owner's choice; `WeatherDisplay.SetSurfaceEditing`); the wind stays if it's on. The cost
+  with the weather showing, about 6%, is fine for Base (owner's choice).
 - **Atmosphere** in the System panel ("Has air", planets and moons):
   `WorldSession.SetAtmosphere`, one undo step.
 - **Verified in the running app** with real clicks, maximized and at 1152 × 648: clouds in each
