@@ -119,7 +119,8 @@ Owner's decisions:
   diagram as a picture**: the whole diagram, fitted with a margin, at twice normal detail, on
   the page's dark background, titled with its name.
 - **Tidy the docs:** close `REN-01`'s old status, fix the format example's heading.
-- **Three PRs:** the docs and diagram extras (PR #84), clouds from above, then flat worlds.
+- **Three PRs:** the docs and diagram extras (PR #84), clouds from above (PR #85), then flat
+  worlds.
 
 **Milestone 32: Metric and Imperial Units** · Complete (PR #83 merged 2026-10-05; owner's idea and choice, 2026-10-05)
 A switch between metric and imperial for every measurement (`UI-04`). Owner's decisions:
@@ -787,7 +788,7 @@ as realistic or simple.
   comes from a tiling noise image (Godot's `NoiseTexture2D`, made once) laid along the ground,
   fading out beyond 20–120 km; it's skipped when the Cloud detail setting is low. Thick cloud
   hides the stars; clouds darken by night, warm toward a low sun, and grey where it rains.
-  From above the layer they aren't drawn (a known limit: they'd lie over the ground).
+  From above the layer the sky leaves them to the cloud deck (since PR #85).
   `WeatherDisplay` keeps the weather of the body stood on, whose globe its camera no longer
   sees; the ground around the eye leaves the clouds and grid out (`eye_level_ground` in
   `planet_surface.gdshaderinc`), as from below they aren't on the ground.
@@ -812,6 +813,23 @@ as realistic or simple.
   72 fps with clouds against 88 without (about 61 with the noise worked out per pixel;
   Godot's half-resolution sky pass would be cheaper still, but doesn't work in the Mobile
   renderer); the regular benchmark is unchanged.
+
+**Implementation (clouds from above, M33, PR #85):**
+- **The cloud deck:** while the eye is above the cloud layer (5 km up), a second
+  `FirstPersonGround` is built at the layer's radius over the ground here (its `Build` now takes
+  any radius for each direction) and drawn with `cloud_deck.gdshader`: unshaded, see-through
+  where the cloud is thin, so the ground shows between the clouds, lit for the sun's height
+  (`SurfaceSky.DeckMaterial`, filled by `ShowClouds`, which now returns whether there are any).
+  It's rebuilt and placed with the ground.
+- **Shared clouds:** the cover moved from the sky shader into `cloud_layer.gdshaderinc`
+  (`cloud_at`: the weather snapshots plus the fine noise image, fading with distance), which the
+  sky and the deck both include, with the same noise texture and ground frame, so climbing
+  through the layer doesn't change the clouds. (Painting the globe's clouds on the ground was
+  tried first: the snapshots are hundreds of km a pixel, so from a few km up they were one flat
+  grey.)
+- **Performance** (this machine, fullscreen, uncapped, looking down from 8 km): 41–62 fps with
+  the deck against 52 without (noisy: most of the cost is the view itself); 93 fps at eye level;
+  the regular benchmark is unchanged.
 
 
 ### 4.2 Interface Layout (`UI`)
