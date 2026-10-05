@@ -60,19 +60,36 @@ float cloud_edge(float cover, float fine) {
 #endif
 }
 
+// A grid of square cells over the globe, `size` radians across: rows of latitude, each split
+// into as many cells as fit around it at its own width. Returns the cell (row, column) and
+// where the point is in it, in cells from its middle, east and north. Unlike longitude ×
+// cos(latitude), this doesn't shear away from longitude 0, nor jump at the date line (bar the
+// one cell that straddles it).
+vec4 globe_cell(float latitude, float longitude, float size) {
+	float row = floor(latitude / size);
+	float row_width = max(cos((row + 0.5) * size), 0.05);
+	float column = floor(longitude * row_width / size);
+	float middle_longitude = (column + 0.5) * size / row_width;
+	float east = longitude - middle_longitude;
+	east -= TAU * round(east / TAU);
+	return vec4(row, column,
+		east * row_width / size, (latitude - (row + 0.5) * size) / size);
+}
+
 // The wind as short streaks on a grid about 28 pixels apart (the spacing only changes in steps
 // of two as the camera zooms): each points along the wind at its cell's middle, longer where it
-// blows harder, brightest at its downwind end, with a pulse running along it. `ground` is
-// radians east (shrunk toward the poles) and north.
-float wind_streak(vec2 ground) {
-	float pixel = length(fwidth(ground));
+// blows harder, brightest at its downwind end, with a pulse running along it. `pixel` is the
+// radians of the globe across one pixel.
+float wind_streak(float latitude, float longitude, float pixel) {
 	float cell_size = exp2(ceil(log2(28.0 * pixel)));
-	vec2 cell = floor(ground / cell_size);
-	float seed = weather_hash(dot(cell, vec2(1.0, 57.0)));
-	vec2 middle = (cell + 0.5 + (vec2(seed, weather_hash(seed * 31.0)) - 0.5) * 0.3) * cell_size;
+	vec4 cell = globe_cell(latitude, longitude, cell_size);
+	float seed = weather_hash(cell.x * 57.0 + cell.y);
+	vec2 jitter = (vec2(seed, weather_hash(seed * 31.0)) - 0.5) * 0.3;
+	vec2 offset = cell.zw - jitter;  // From the streak's middle, in cells
 
-	float middle_latitude = clamp(middle.y, -HALF_PI, HALF_PI);
-	float middle_longitude = middle.x / max(cos(middle_latitude), 0.05);
+	float row_width = max(cos((cell.x + 0.5) * cell_size), 0.05);
+	float middle_latitude = clamp((cell.x + 0.5 + jitter.y) * cell_size, -HALF_PI, HALF_PI);
+	float middle_longitude = (cell.y + 0.5 + jitter.x) * cell_size / row_width;
 	vec2 uv = vec2(middle_longitude / TAU + 0.5, 0.5 - middle_latitude / PI);
 	vec2 wind = (mix(texture(wind_old, uv).rg, texture(wind_new, uv).rg, weather_blend) - 0.5)
 		* 2.0 * WIND_RANGE_MS;
@@ -82,7 +99,6 @@ float wind_streak(vec2 ground) {
 	}
 
 	vec2 along_wind = wind / speed;
-	vec2 offset = (ground - middle) / cell_size;  // In cells
 	float along = dot(offset, along_wind);
 	float across = dot(offset, vec2(-along_wind.y, along_wind.x));
 	float half_length = 0.12 + 0.3 * clamp(speed / 20.0, 0.0, 1.0);
@@ -94,33 +110,32 @@ float wind_streak(vec2 ground) {
 	return on_line * (0.25 + 0.5 * toward_head + 0.25 * pulse * pulse);
 }
 
-// Rain's lines and snow's dots over the color (see draw_weather). `ground_width` is how much
-// `ground` changes from pixel to pixel, worked out before any branching (where the GPU's
-// measure of it can't be trusted).
-vec3 draw_falling(vec3 color, vec2 ground, vec2 ground_width, float rain, float snow,
-		float day) {
-	float pixel = length(ground_width);
+// Rain's slanting lines and snow's dots over the color (see draw_weather). `pixel` is the
+// radians of the globe across one pixel.
+vec3 draw_falling(vec3 color, float latitude, float longitude, float pixel, float rain,
+		float snow, float day) {
 	float spacing = exp2(floor(log2(1.0 / max(7.0 * pixel, 1e-6))));
+	vec2 ground = vec2(longitude * cos(latitude), latitude);
 	float rain_marks = pixel_lines((ground.x + ground.y * 2.5) * spacing,
-		(ground_width.x + 2.5 * ground_width.y) * spacing) * smoothstep(0.05, 0.3, rain);
-	vec2 cell = ground * spacing * 0.7;
-	vec2 offset = fract(cell) - 0.5;
-	float cell_pixel = length(ground_width) * spacing * 0.7;
-	float dot_size = 1.6 * cell_pixel;
+		2.7 * pixel * spacing) * smoothstep(0.05, 0.3, rain);
+	float dot_cells = 1.0 / (spacing * 0.7);  // Radians across a snow dot's cell
+	vec2 offset = globe_cell(latitude, longitude, dot_cells).zw;
+	float dot_size = 1.6 * pixel / dot_cells;
 	float snow_marks = (1.0 - smoothstep(dot_size * 0.6, dot_size, length(offset)))
-		* smoothstep(0.05, 0.3, snow) * smoothstep(4.0, 8.0, 1.0 / cell_pixel);
+		* smoothstep(0.05, 0.3, snow) * smoothstep(4.0, 8.0, dot_cells / pixel);
 	color = mix(color, vec3(0.45, 0.62, 0.95), rain_marks * 0.8 * day);
 	return mix(color, vec3(1.0), snow_marks * day);
 }
 
 // The surface color with the weather over it, at a direction and its latitude and longitude
-// (radians). `glow` gets the wind's own light, so it shows by night too.
-vec3 draw_weather(vec3 color, vec3 direction, float latitude, float longitude, out vec3 glow) {
+// (radians). `pixel` is the radians of the globe across one pixel, worked out by the surface
+// from the direction (so it doesn't jump at the date line as longitude does). `glow` gets the
+// wind's own light, so it shows by night too.
+vec3 draw_weather(vec3 color, vec3 direction, float latitude, float longitude, float pixel,
+		out vec3 glow) {
 	glow = vec3(0.0);
 	vec2 uv = vec2(longitude / TAU + 0.5, 0.5 - latitude / PI);
 	vec4 weather = mix(texture(weather_old, uv), texture(weather_new, uv), weather_blend);
-	vec2 ground = vec2(longitude * cos(latitude), latitude);
-	vec2 ground_width = fwidth(ground);
 
 	if (show_clouds) {
 		float fine = 0.0;
@@ -151,12 +166,12 @@ vec3 draw_weather(vec3 color, vec3 direction, float latitude, float longitude, o
 		// it falls hard enough to see (spacings that change in steps of two as the camera
 		// zooms). Most of the globe is dry, and skips this.
 		if (max(rain, snow) > 0.05) {
-			color = draw_falling(color, ground, ground_width, rain, snow, day);
+			color = draw_falling(color, latitude, longitude, pixel, rain, snow, day);
 		}
 	}
 
 	if (show_wind) {
-		float streak = wind_streak(ground);
+		float streak = wind_streak(latitude, longitude, pixel);
 		color = mix(color, vec3(0.8, 0.97, 1.0), streak);
 		glow = vec3(0.25, 0.32, 0.35) * streak;
 	}
