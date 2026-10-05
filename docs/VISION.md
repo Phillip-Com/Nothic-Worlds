@@ -122,7 +122,7 @@ Owner's decisions:
   on a dedicated card (owner's choice after measuring the baseline laptop: it runs even 4×
   anti-aliasing at ~140 fps, so Low would cost looks for nothing).
 - **Two PRs:** the Settings window and presets (PR #75), then level of detail and the
-  Advanced tier.
+  Advanced tier (PR #76).
 
 **Milestone 28: Small Fixes** · Complete (PR #74 merged 2026-10-05; owner's choice, 2026-10-05)
 One tidy-up PR for issues found along the way (PR #74): the dotted line the grid drew along the
@@ -512,7 +512,7 @@ retuned zoom limits, or rotating the camera toward the slid planet instead of sl
   (`src/NothicWorlds.Core/Geometry/`). Reuse these for pins, region outlines, and anything else
   placed by latitude/longitude.
 
-**REN-03 — Performance tiers** · In Progress (M29: PR #75) · —
+**REN-03 — Performance tiers** · Implemented (M29: PRs #75–#76) · —
 **Intent:** Keep requirements low with level-of-detail, quality settings, and rendering only what's
 visible. Heavier features go in an opt-in **Advanced** section.
 **Implementation (M1, PR #3):** measurement tools only. The tiers themselves aren't built yet.
@@ -545,6 +545,27 @@ per-user data folder (`user://settings.cfg`); a missing or damaged file gives th
   and Standard each setting every option (and the viewport, frame cap, relief, and cloud
   detail following), one option changed by itself showing Custom, and the choices saved (the
   test's settings file removed afterwards).
+**Level of detail and the Advanced tier (M29, PR #76):**
+- **Level of detail** (`PlanetSurface.ScreenRadius`, always on): `SystemView` tells each globe
+  its radius on screen every frame. Under 200 pixels a sculpted globe uses the Low relief mesh
+  (whatever Relief Detail says); under 60, every globe uses a coarse 32 × 16 sphere instead of
+  the 128 × 64 one (a sculpted one's relief is still lifted and shaded by the shader). Leaving
+  a level takes 15% more than entering it, so a globe at the edge doesn't flicker. Carved and
+  flat worlds keep their own meshes. Measured with a sculpted planet and eight sculpted moons
+  on the baseline laptop: from far out 203 fps with 34,000 triangles, against 107 fps with 1.6
+  million without it; 223 against 161 nearer in. The standard benchmark is unchanged
+  (161/161 vs 161/161 fps).
+- **High-quality maps** (the Advanced tier; File ▸ Settings ▸ Advanced, with its memory cost
+  spelled out; in no preset): `Maps/MapQuality.Uncompressed` skips the S3TC compression of
+  imported maps and map pieces (`MapImageLoader`, `PieceTextureBaker`); far bodies' small
+  previews stay compressed. Switching it reloads the selected map and re-bakes the pieces
+  (`WorldSession.ReloadMapsAsync`); it's set before anything loads at start (`GraphicsSettings`
+  in `_EnterTree`) and remembered (`AppSettings.HighQualityMaps`). Measured with a 4096 ×
+  2048 map: DXT1 and 107 MB of video memory, uncompressed (RGB8) 206 MB; the old copy is freed
+  when .NET next collects garbage.
+- **Verified in the running app:** the meshes stepping down and back up as the camera moves out
+  and in (radius 359 → 161 → 72 → 21 px and back), and a generated map switching between
+  compressed and uncompressed; the Settings window's Advanced section at 1152 × 648.
 - `godot/Diagnostics/PerformanceOverlay.cs`: F3 shows FPS, video memory, app memory, and draw calls.
 - `godot/Diagnostics/Benchmark.cs`: run with `-- --benchmark`. It orbits and zooms for 10 s
   with VSync off, then prints the results. Use it to catch performance regressions.
@@ -2485,6 +2506,3 @@ answered, move the answer into the relevant entry above and remove the question 
 
 New raw ideas go here first, then get sorted into a feature area once reviewed.
 
-- **High-quality textures option (Advanced tier):** a setting to keep maps uncompressed for
-  perfect quality on systems with more graphics memory (~497 MB for an 8k map vs ~137 MB
-  compressed). Raised during `MAP-01`.
