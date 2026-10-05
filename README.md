@@ -129,7 +129,8 @@ mouse wheel to change pace from walking to very fast), press **F** to fly (**Spa
 to rise and sink), and **Esc** to go back. Flat worlds can't be stood on yet.
 
 The live weather is overhead too: the clouds you see from orbit drift across the sky, grey
-where rain falls, and rain or snow falls around you, slanted by the wind. On a world with air,
+where rain falls, and rain or snow falls around you, slanted by the wind. Fly up through them
+and you look down on the same clouds, with the ground showing between. On a world with air,
 distant ground fades into a haze, more so in rain or snow. A compass runs along the top; point
 at the sun or a moon to see its name, how high it stands, its direction and distance, and how
 much of it is lit. The bottom corner shows the date, the time by the sun, and the weather where

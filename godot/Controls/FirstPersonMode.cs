@@ -53,6 +53,7 @@ public partial class FirstPersonMode : Node
     private readonly SurfaceSky _sky = new();
     private Camera3D? _camera;
     private FirstPersonGround? _ground;
+    private FirstPersonGround? _deck;  // The clouds below, when flying above them
     private FirstPersonHud? _hud;
     private Guid? _bodyId;
     private Vector3D _spot;  // Unit direction on the body, its own frame
@@ -166,6 +167,8 @@ public partial class FirstPersonMode : Node
 
         _ground?.QueueFree();
         _ground = null;
+        _deck?.QueueFree();
+        _deck = null;
         _camera?.QueueFree();
         _camera = null;
         if (GlobeCamera is not null)
@@ -215,6 +218,13 @@ public partial class FirstPersonMode : Node
 
         _ground = new FirstPersonGround();
         AddChild(_ground);
+        _deck = new FirstPersonGround
+        {
+            Name = "CloudDeck",
+            MaterialOverride = _sky.DeckMaterial,
+            Visible = false,
+        };
+        AddChild(_deck);
         if (Environment is not null)
         {
             _sky.Show(Environment);
@@ -325,7 +335,9 @@ public partial class FirstPersonMode : Node
         }
 
         _sky.ShowBodies(Session.World.Bodies, body, sky, frame, _magnify, Nebulas?.SkyTexture);
-        _sky.ShowClouds(globe, body, BodyBasis(body, time).Transposed(), eye, groundRadius);
+        bool clouds = _sky.ShowClouds(globe, body, BodyBasis(body, time).Transposed(), eye,
+            groundRadius, sky.Star?.AltitudeDegrees ?? -90, place.Radius / body.RadiusKm);
+        _deck!.Visible = clouds && !BelowClouds() && !globe.IsCarved;
         _sky.ShowHaze(body.HasAtmosphere, place.Radius / body.RadiusKm, HazeKm(),
             sky.Star?.AltitudeDegrees ?? -90, _weather?.CloudCover ?? 0);
         ShowReadouts(body, time, sky, frame);
@@ -406,9 +418,10 @@ public partial class FirstPersonMode : Node
         return level * Math.Cos(_pitch) + frame.Up * Math.Sin(_pitch);
     }
 
-    // The rings of ground around the eye: built again when the eye has moved a good part of
-    // its height away from their middle, risen or sunk by half, or the ground changed (they
-    // reach past the horizon, which moves out as the eye rises); placed relative to the eye.
+    // The rings of ground around the eye, and the cloud deck's: built again when the eye has
+    // moved a good part of its height away from their middle, risen or sunk by half, or the
+    // ground changed (they reach past the horizon, which moves out as the eye rises); placed
+    // relative to the eye.
     private void PlaceGround(PlanetSurface globe, Body body, double time, Vector3D eye,
         double displayRadius)
     {
@@ -431,12 +444,28 @@ public partial class FirstPersonMode : Node
             ground.MaterialOverride = globe.MaterialOverride;
             _groundVersion = globe.ReliefVersion;
             _groundHeightMeters = _heightMeters;
+
+            // The cloud deck: the same rings at the cloud layer, over the ground here.
+            double layer = ground.CenterRadius + SurfaceSky.CloudHeightKm / body.RadiusKm;
+            _deck!.Build(_ => layer, _spot, 2e-7, Math.Clamp(horizon * 4, 0.003, 0.6));
         }
 
-        Basis turn = BodyBasis(body, time);
-        Vector3D offset = ground.Center * ground.CenterRadius - eye;
-        ground.GlobalTransform = new Transform3D(
-            turn.Scaled(Vector3.One * (float)displayRadius),
+        PlaceRings(ground, body, time, eye, displayRadius);
+        PlaceRings(_deck!, body, time, eye, displayRadius);
+    }
+
+    // Puts rings built around a spot in the scene, relative to the eye.
+    private static void PlaceRings(FirstPersonGround rings, Body body, double time, Vector3D eye,
+        double displayRadius)
+    {
+        if (rings.Mesh is null)
+        {
+            return;
+        }
+
+        Vector3D offset = rings.Center * rings.CenterRadius - eye;
+        rings.GlobalTransform = new Transform3D(
+            BodyBasis(body, time).Scaled(Vector3.One * (float)displayRadius),
             ToGodot(ToSystem(body, time, offset) * displayRadius));
     }
 

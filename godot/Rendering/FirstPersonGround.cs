@@ -4,7 +4,9 @@ using NothicWorlds.Core.Geometry;
 namespace NothicWorlds.Rendering;
 
 /// <summary>
-/// The ground around a first-person eye (VISION.md REN-06): rings of mesh around a point on
+/// The ground around a first-person eye (VISION.md REN-06), or the cloud deck above it (the
+/// same rings at the cloud layer's height, with their own material): rings of mesh around a
+/// point on
 /// the globe, fine underfoot and coarser out toward the horizon, drawn with the globe's own
 /// material so the map, terrain, relief, and style match. Its positions are kept relative to
 /// that point rather than the globe's middle, so they hold their precision a meter from the
@@ -35,9 +37,18 @@ public partial class FirstPersonGround : MeshInstance3D
     /// arc away, the drawn ground's height read from <paramref name="globe"/>.
     /// </summary>
     public void Build(PlanetSurface globe, Vector3D center, double innerAngle, double outerAngle)
+        => Build(direction => globe.SurfaceRadiusAt(direction), center, innerAngle, outerAngle);
+
+    /// <summary>
+    /// Builds the rings as <see cref="Build(PlanetSurface, Vector3D, double, double)"/>, at
+    /// the radius <paramref name="radiusAt"/> gives for each direction (the cloud deck: the
+    /// cloud layer's).
+    /// </summary>
+    public void Build(Func<Vector3D, double> radiusAt, Vector3D center, double innerAngle,
+        double outerAngle)
     {
         Center = center;
-        CenterRadius = globe.SurfaceRadiusAt(center);
+        CenterRadius = radiusAt(center);
         Vector3D middle = center * CenterRadius;
         (Vector3D east, Vector3D north) = Tangents(center);
 
@@ -73,7 +84,7 @@ public partial class FirstPersonGround : MeshInstance3D
         // Each point, lifted to the drawn ground and kept relative to the middle point.
         void Add(int index, Vector3D direction)
         {
-            Vector3D point = direction * globe.SurfaceRadiusAt(direction) - middle;
+            Vector3D point = direction * radiusAt(direction) - middle;
             positions[index] = new Vector3((float)point.X, (float)point.Y, (float)point.Z);
             normals[index] = new Vector3((float)direction.X, (float)direction.Y,
                 (float)direction.Z);
