@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 25** (see **Version history** at the end)
+**Current format version: 26** (see **Version history** at the end)
 
 ## Container
 
@@ -203,6 +203,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `bodies[].axialTilt` | yes | Degrees the spin axis leans, 0 to 180 |
 | `bodies[].axialTiltDirection` | yes | Degrees: which way the north pole leans (see the axis rule below) |
 | `bodies[].appearance` | yes | How the body looks (`BOD-06`). Stars: `starType`, one of `"red-dwarf"`, `"orange"`, `"yellow"`, `"white"`, `"blue"` (it sets the star's color and its light's). Planets and moons: `color` (`#RRGGBB`) and `pattern`, one of `"plain"`, `"rocky"`, `"banded"`, `"icy"`, `"cloudy"`, shown where there's no map. |
+| `bodies[].atmosphere` | no | Planets and moons only: `true` if the body has air, and so live weather (`WTH-02`). Always written for them; omitted (files before version 26) means `true` for a planet and `false` for a moon. Refused on other kinds of body. |
 | `bodies[].averageTemperature` | yes | °C, −270 to 2,000: the body's average surface temperature over a year (`WTH-01`; Earth about 15). Weather pins spread it by latitude and season. |
 | `bodies[].density` | no | g/cm³, 0.000001 to 10,000,000: how dense the body is (`SIM-04`; Earth 5.5), which with its radius gives its mass, as if it were a globe. Omitted for the typical density of its kind and size (see `BodyMass` in the code). |
 | `bodies[].calendar` | no | The body's own calendar (`CAL-01`). Omitted to count plain days. |
@@ -455,6 +456,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 26 | Live weather (M27): planets and moons gain `atmosphere` | Nothing to change: a missing `atmosphere` means planets have air and moons don't |
 | 25 | Visual styles (M26): worlds gain a `style` | Nothing to change: version 24 worlds are painterly, which a missing `style` means |
 | 24 | Shapes (M25): surfaces gain optional `shapes` added or cut | Nothing to change: version 23 bodies have none |
 | 23 | Body sculpting (M24): surfaces gain optional `heights` (a 16-bit height image) | Nothing to change: version 22 bodies are unsculpted |

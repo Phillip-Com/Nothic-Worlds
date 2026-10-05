@@ -48,6 +48,31 @@ public class NewBodiesTests
     }
 
     [Fact]
+    public void NewPlanetsHaveAir_AndNewMoonsDont()
+    {
+        World world = World.CreateNew();
+        Body planet = world.Bodies[0];
+        Body sun = world.Bodies.Single(b => b.Kind == BodyKind.Star);
+
+        Assert.True(planet.HasAtmosphere);
+        Assert.True(NewBodies.Planet(world.Bodies, sun).HasAtmosphere);
+        Assert.False(NewBodies.Moon(world.Bodies, planet).HasAtmosphere);
+    }
+
+    [Fact]
+    public void Atmosphere_IsCopied_AndCompared()
+    {
+        Body planet = World.CreateNew().Bodies[0];
+
+        Body copy = planet.Clone();
+
+        Assert.True(copy.HasSameContent(planet));
+        copy.HasAtmosphere = false;
+        Assert.False(copy.HasSameContent(planet));
+        Assert.False(copy.Clone().HasAtmosphere);
+    }
+
+    [Fact]
     public void SecondMoon_OrbitsFartherOut_AndTakesLonger()
     {
         World world = World.CreateNew();

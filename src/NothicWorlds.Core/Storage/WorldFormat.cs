@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 25;
+    public const int CurrentVersion = 26;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -207,6 +207,10 @@ internal static partial class WorldFormat
 
         // 24 → 25: worlds gained a "style" (M26). Older worlds are painterly, the default
         // (owner's choice: painterly for all), which a missing style already reads as.
+        document => document,
+
+        // 25 → 26: planets and moons gained "atmosphere" (M27, live weather). Older planets
+        // have air and moons don't (owner's choice), which a missing value already reads as.
         document => document,
     ];
 

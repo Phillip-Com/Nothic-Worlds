@@ -51,7 +51,7 @@ public sealed class ClimateYear
     private const double SeasonDegreesPerSunlight = 20.0;
 
     // How long land and sea take to warm and cool, in standard days: seasons lag about this.
-    private const double HeatLagDays = 30.0;
+    internal const double HeatLagDays = 30.0;
 
     // The day/night swing for a 24-hour day, in °C; longer days swing more (up to the cap).
     private const double DayNightSwingC = 10.0;
@@ -67,11 +67,11 @@ public sealed class ClimateYear
     // star's lagged latitude, this many degrees wide), the storm belt's peak (centred at this
     // latitude, shifted by this share of the season's star latitude), and the drizzle anywhere.
     private const double TropicalRainMm = 9.0;
-    private const double TropicalBeltShare = 0.6;
+    internal const double TropicalBeltShare = 0.6;
     private const double TropicalBeltWidth = 11.0;
     private const double StormRainMm = 2.6;
-    private const double StormBeltLatitude = 48.0;
-    private const double StormBeltShift = 0.35;
+    internal const double StormBeltLatitude = 48.0;
+    internal const double StormBeltShift = 0.35;
     private const double StormBeltWidth = 13.0;
     private const double DrizzleMm = 0.25;
 
@@ -301,7 +301,7 @@ public sealed class ClimateYear
     }
 
     // How much of the rain falls at a day's mean temperature: cold air holds little water.
-    private static double Warmth(double meanC) => Math.Clamp(
+    internal static double Warmth(double meanC) => Math.Clamp(
         (meanC - RainLeastAtC) / (RainFullAtC - RainLeastAtC), ColdestRainShare, 1.0);
 
     private static double Bell(double offset, double width) =>
@@ -320,7 +320,7 @@ public sealed class ClimateYear
 
     // How much colder (or warmer) the kind of ground is than the latitude alone gives, in °C:
     // ice reflects most sunlight, mountains stand high in thinner air, deserts have clear skies.
-    private static double Offset(ClimateKind? ground) => ground switch
+    internal static double Offset(ClimateKind? ground) => ground switch
     {
         ClimateKind.Ice => -8.0,
         ClimateKind.Mountains => -6.0,
@@ -331,7 +331,7 @@ public sealed class ClimateYear
     // Sunlight as the ground feels it: each day moves part of the way toward the day's light
     // (an exponential average with the heat lag), run round the year twice so the start
     // doesn't matter.
-    private static double[] Lagged(double[] sunlight, double step, double lagDays)
+    internal static double[] Lagged(double[] sunlight, double step, double lagDays)
     {
         double keep = Math.Exp(-step / lagDays);
         double felt = sunlight.Average();

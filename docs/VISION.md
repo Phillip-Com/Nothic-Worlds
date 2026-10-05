@@ -108,7 +108,19 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 26: Visual Styles** · In progress (owner's choice, 2026-10-04)
+**Milestone 27: Live Weather** · In progress (owner's choice, 2026-10-04)
+Watch the weather move across a world (`WTH-02`). Owner's decisions:
+- **Worked out from the time,** not stepped forward: any date's weather is ready at once and
+  always the same (CLAUDE.md §5), built on the weather pins' climate (`WTH-01`, `WTH-03`).
+- **Shown:** clouds on the globe, rain and snow, the winds, and weather pins reporting today's
+  weather.
+- **An Atmosphere switch per body:** planets have air by default, moons don't (existing worlds
+  too); only bodies with air have live weather. Format version 26.
+- **Base tier, with a cloud-detail quality setting** (`WTH-02` was Advanced; owner's choice).
+- **Three PRs:** the weather in Core (PR #71), drawing it on the globe, then today's weather
+  in weather pins.
+
+**Milestone 26: Visual Styles** · Complete (PR #70 merged 2026-10-04; owner's choice, 2026-10-04)
 Let each world choose how it's drawn (`REN-05`). Owner's decisions:
 - **Three styles:** **Painterly** (soft bands of light, brushy surfaces, gentle outlines),
   **Realistic** (today's lighting, unchanged), and **Simple** (flat colors, a crisp day and night,
@@ -2090,10 +2102,44 @@ season, etc. This is the lightweight version that works on any system.
   winters, wet June to September, 1,215 mm a year), a forest pin by the sea at 48° N (643 mm),
   and the same pin as desert (84 mm); the window fits and scrolls at the small size.
 
-**WTH-02 — Live weather simulation** · Idea · Advanced
+**WTH-02 — Live weather simulation** · In Progress (M27: PR #71) · Base (owner's choice, 2026-10-04; was Advanced)
 **Intent:** As detailed as possible. Ideally the user can watch clouds and weather move across
 the world.
-**Implementation:** —
+**Implementation (the weather in Core, M27, PR #71):**
+- **`Body.HasAtmosphere`** (owner's choice: a switch; planets on, moons off by default, also
+  for older files): only bodies with air have live weather. Format **version 26**,
+  `bodies[].atmosphere`.
+- **`Simulation/LiveWeather.cs`:** `LiveWeather.For(bodies, body, terrainTypes)` (null without
+  air or a star) builds, once per body: a `ClimateYear` every 5° of latitude (each moment's mean
+  temperature and expected rain, as the weather pins have it), the star's latitude felt a month
+  late through the year (where the tropical rain belt and the storm belts are), and coarse
+  copies of the painted terrain (moisture every 5°, the kind of ground every 1°), so it never
+  reads the terrain afterwards and moments can be worked out on other threads. About 50 ms.
+- **`WeatherMoment`** (`LiveWeather.At(time)`): `SampleAt(spot)` gives a `WeatherSample`: cloud
+  cover, rain or snow (mm an hour; snow at or below 0.5 °C), wind east and north, the day's
+  mean temperature (with the ground's offset), and the storm the spot is in. About 6 µs a
+  sample, so a whole globe at 64 squares a face is about 40 ms across the cores.
+  - **Winds:** three belts each side of the equator (trade winds, westerlies, polar
+    easterlies), shifted with the season; storms add their own, counterclockwise in the north.
+  - **Clouds:** noise from `WeatherNoise` (hashed, the same on every machine) carried by the
+    wind; two layers take turns starting afresh every 2 days so the winds never shear it into
+    streaks. Wetter climates are cloudier; features about 900 km across.
+  - **Storms** (`StormTracks`, `StormShape`): made up from the body's ID and fixed slots of
+    time, so any moment finds its storms without stepping through the days before it.
+    **Cyclones** form near the storm belts, ride the westerlies east and toward the poles for
+    3.5–7 days, and are wide spirals with a trailing front; **tropical storms** form over warm
+    water (or unpainted ground) when the tropics are 20 °C or warmer, likeliest late in summer,
+    drift west then curve away from the equator, weaken over land, and have a clear eye.
+  - **Rain** falls from the thickest half of the usual cloud and from storms; a year of it
+    comes to about the climate's (measured: equator ~1,940 mm against 2,017; 45° ~860 against
+    773; the dry belt at 30° a little drier, ~220 against 340).
+- **Flat worlds:** no belts, a gentle wind, cyclones anywhere, no tropical storms.
+- **Tests** (`LiveWeatherTests`, 25): which bodies have weather, the same weather every time,
+  smooth change, sensible values at the poles, a year's rain against the climate's at five
+  latitudes, the dry belt, a desert world, snow on a frozen world, the wind belts, cyclones'
+  places and tracks, storms turning the right way in each hemisphere, tropical storms only on
+  warm worlds, a cyclone's cloudy middle and a tropical storm's clear eye, and flat worlds; plus
+  the version 26 golden file, older files' atmospheres, and new moons being airless.
 
 ### 4.9 Lore & Journal (`LORE`)
 
