@@ -1,3 +1,4 @@
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Simulation;
 
 namespace NothicWorlds.UI;
@@ -41,11 +42,12 @@ public static class LiveWeatherText
         double rate = sample.PrecipitationMmPerHour;
         if (rate < 0.05)
         {
-            return $"a trace of {what}";  // Too little to measure in tenths of a mm
+            return $"a trace of {what}";  // Too little to measure (under 0.05 mm)
         }
 
         string how = rate < 0.5 ? $"light {what}" : rate < 4 ? what : $"heavy {what}";
-        return $"{how}, {rate:0.0} mm an hour";
+        int decimals = UnitText.System == UnitSystem.Imperial ? 2 : 1;
+        return $"{how}, {UnitText.Format(Quantity.Precipitation, rate, decimals)} an hour";
     }
 
     private static string Wind(WeatherSample sample)
@@ -57,6 +59,6 @@ public static class LiveWeatherText
         }
 
         int point = (int)Math.Round(sample.WindFromDegrees / 45) % _compass.Length;
-        return $"wind from the {_compass[point]} at {kmPerHour:0} km/h";
+        return $"wind from the {_compass[point]} at {UnitText.Format(Quantity.Speed, kmPerHour)}";
     }
 }

@@ -139,13 +139,8 @@ public partial class OrbitGuideSection : VBoxContainer
         }
     }
 
-    // Far distances in AU, middling ones in millions of km, near ones in km.
-    private static string Distance(double km) => km switch
-    {
-        >= 0.1 * KmPerAu => $"{(km / KmPerAu).ToString("#,0.###", CultureInfo.CurrentCulture)} AU",
-        >= 1e6 => $"{(km / 1e6).ToString("0.##", CultureInfo.CurrentCulture)} million km",
-        _ => $"{km.ToString("N0", CultureInfo.CurrentCulture)} km",
-    };
+    // Far distances in AU, middling ones in millions of km or miles, near ones in km or miles.
+    private static string Distance(double km) => UnitText.Distance(km);
 
     private static string PeriodText(double days) => days >= 2
         ? $"{days.ToString("#,0.##", CultureInfo.CurrentCulture)} days"

@@ -1,4 +1,5 @@
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 
 namespace NothicWorlds.Session;
@@ -90,8 +91,10 @@ public partial class WorldSession
         if (!double.IsFinite(temperatureC)
             || temperatureC is < Body.MinAverageTemperatureC or > Body.MaxAverageTemperatureC)
         {
-            return $"an average temperature must be {Body.MinAverageTemperatureC} °C to " +
-                $"{Body.MaxAverageTemperatureC} °C";
+            UnitSystem units = AppSettings.Units;
+            return "an average temperature must be " +
+                $"{Units.Format(Quantity.Temperature, Body.MinAverageTemperatureC, units)} to " +
+                Units.Format(Quantity.Temperature, Body.MaxAverageTemperatureC, units);
         }
 
         RecordUndo($"Edit {body.Name}", mergeKey: ("temperature", bodyId));

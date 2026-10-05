@@ -1,6 +1,7 @@
 using System.Globalization;
 using Godot;
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 using NothicWorlds.Interop;
@@ -65,6 +66,7 @@ public partial class SystemPanel : CanvasLayer
     private OptionButton _parent = null!;
     private SpinBox _distance = null!;
     private OptionButton _distanceUnit = null!;
+    private double _shownDistanceKm;  // The orbit distance the field was last given
     private SpinBox _period = null!;
     private SpinBox _startAngle = null!;
     private CheckButton _extrasToggle = null!;
@@ -186,6 +188,7 @@ public partial class SystemPanel : CanvasLayer
 
         Session.Changed += SyncWithWorld;
         Session.SelectionChanged += SyncWithWorld;
+        AppSettings.UnitsChanged += SyncWithWorld;
         SyncWithWorld();
         UpdateVisibility();
     }
@@ -243,11 +246,11 @@ public partial class SystemPanel : CanvasLayer
         _shape.AddItem("Flat world", (int)BodyShape.FlatDisc);
         _shape.ItemSelected += index => CommitShape((BodyShape)_shape.GetItemId((int)index));
         grid.AddChild(_shape);
-        _radius = AddField(grid, "Radius", 1, Body.MaxRadiusKm, 1, "km", CommitPhysical);
+        _radius = AddField(grid, "Radius", 1, Body.MaxRadiusKm, 1, "", CommitPhysical)
+            .WithUnit(Quantity.Distance, 1, Body.MaxRadiusKm, 1);
         _dayLength = AddField(grid, "Day length", 0.01, Body.MaxDayLengthHours, 0.1, "h",
             CommitPhysical);
         _axialTilt = AddField(grid, "Axial tilt", 0, 180, 0.1, "°", CommitPhysical);
-        _radius.TooltipText = "The body's radius (Earth: 6,371 km)";
         _dayLength.TooltipText = DayLengthTip;
         _axisDirection = AddField(grid, "Axis direction", 0, 360, 1, "°", CommitPhysical)
             .WithWrapAround();
@@ -255,9 +258,9 @@ public partial class SystemPanel : CanvasLayer
         _axisDirection.TooltipText = "Which way the north pole leans, measured like the " +
             "orbit angles. It sets when in the year the solstices fall";
         _temperature = AddField(grid, "Avg. temperature", Body.MinAverageTemperatureC,
-            Body.MaxAverageTemperatureC, 0.5, "°C", CommitTemperature);
-        _temperature.TooltipText = "The body's average surface temperature over a year " +
-            "(Earth: about 15 °C). Weather pins spread it by latitude and season";
+            Body.MaxAverageTemperatureC, 0.5, "", CommitTemperature)
+            .WithUnit(Quantity.Temperature, Body.MinAverageTemperatureC,
+                Body.MaxAverageTemperatureC, 0.5, 1);
         _atmosphereLabel = new Label { Text = "Atmosphere" };
         grid.AddChild(_atmosphereLabel);
         _atmosphere = new CheckBox
@@ -334,7 +337,7 @@ public partial class SystemPanel : CanvasLayer
         _distanceUnit = new Dropdown { FocusMode = Control.FocusModeEnum.None };
         _distanceUnit.AddItem("km", (int)DistanceUnit.Kilometers);
         _distanceUnit.AddItem("AU", (int)DistanceUnit.AstronomicalUnits);
-        _distanceUnit.TooltipText = "AU: the Earth–Sun distance (about 149.6 million km)";
+        _distanceUnit.TooltipText = "AU: the Earth–Sun distance";
         _distanceUnit.ItemSelected += _ => ShowSelected();
         distanceRow.AddChild(_distance);
         distanceRow.AddChild(_distanceUnit);
@@ -499,13 +502,16 @@ public partial class SystemPanel : CanvasLayer
             _kind.Select(_kind.GetItemIndex((int)body.Kind));
         }
 
-        _radius.ShowValue(body.RadiusKm);
+        _radius.ShowMetric(body.RadiusKm);
         _dayLength.ShowValue(body.DayLengthHours);
         (Body? dayBy, Body? periodBy) = CalendarFitting.FittedBy(Session!.World.Bodies, body);
         Lock(_dayLength, dayBy, DayLengthTip, "keeps each year exactly one calendar year");
         _axialTilt.ShowValue(body.AxialTiltDegrees);
         _axisDirection.ShowValue(body.AxialTiltDirectionDegrees);
-        _temperature.ShowValue(body.AverageTemperatureC);
+        _temperature.ShowMetric(body.AverageTemperatureC);
+        _temperature.TooltipText = "The body's average surface temperature over a year " +
+            $"(Earth: about {UnitText.Format(Quantity.Temperature, 15)}). Weather pins spread " +
+            "it by latitude and season";
         _atmosphere.SetPressedNoSignal(body.HasAtmosphere);
         ShowDensity(body);
         ShowAppearance(body);
@@ -578,9 +584,13 @@ public partial class SystemPanel : CanvasLayer
             }
         }
 
+        _distanceUnit.SetItemText(
+            _distanceUnit.GetItemIndex((int)DistanceUnit.Kilometers),
+            UnitText.Symbol(Quantity.Distance));
         bool inAu = SelectedUnit() == DistanceUnit.AstronomicalUnits;
         _distance.Step = inAu ? 0.001 : 1;
-        _distance.ShowValue(inAu ? orbit.DistanceKm / KmPerAu : orbit.DistanceKm);
+        _shownDistanceKm = orbit.DistanceKm;
+        _distance.ShowValue(DistanceShown(orbit.DistanceKm));
         _period.ShowValue(orbit.PeriodDays);
         _startAngle.ShowValue(orbit.StartAngleDegrees);
         _eccentricity.ShowValue(orbit.Eccentricity);
@@ -678,6 +688,11 @@ public partial class SystemPanel : CanvasLayer
 
     private DistanceUnit SelectedUnit() => (DistanceUnit)_distanceUnit.GetSelectedId();
 
+    // An orbit's distance as the field shows it: in AU, or in km or miles.
+    private double DistanceShown(double km) => SelectedUnit() == DistanceUnit.AstronomicalUnits
+        ? km / KmPerAu
+        : UnitText.Shown(Quantity.Distance, km);
+
     private void CommitName()
     {
         if (!_syncing && Session is not null)
@@ -697,14 +712,17 @@ public partial class SystemPanel : CanvasLayer
         double discKm = body.RadiusKm * FlatDisc.Radius;
         _shape.TooltipText = body.Shape == BodyShape.FlatDisc
             ? $"A flat world: the whole map on top, the north pole at the center and the far " +
-                $"south around the rim. The disc is {discKm:N0} km from center to rim (Radius " +
+                $"south around the rim. The disc is {UnitText.Format(Quantity.Distance, discKm)} " +
+                "from center to rim (Radius " +
                 "is the matching globe's)."
             : "A globe, or a flat world with the whole map on a disc";
         _radius.TooltipText = body.Kind == BodyKind.WorldTree
-            ? $"Half the tree's height: it stands {2 * body.RadiusKm:N0} km tall"
+            ? $"Half the tree's height: it stands " +
+                $"{UnitText.Format(Quantity.Distance, 2 * body.RadiusKm)} tall"
             : body.Shape == BodyShape.FlatDisc
-            ? $"The matching globe's radius; the disc reaches {discKm:N0} km from its center"
-            : "The body's radius (Earth: 6,371 km)";
+            ? $"The matching globe's radius; the disc reaches " +
+                $"{UnitText.Format(Quantity.Distance, discKm)} from its center"
+            : $"The body's radius (Earth: {UnitText.Format(Quantity.Distance, 6371)})";
         _dayLength.TooltipText = body.Kind == BodyKind.WorldTree
             ? "How long the tree takes to turn once: the year of the realms on its branches"
             : DayLengthTip;
@@ -734,7 +752,7 @@ public partial class SystemPanel : CanvasLayer
         }
 
         string? problem = Session.SetBodyPhysical(Session.SelectedBodyId,
-            _radius.Value, _dayLength.Value, _axialTilt.Value, _axisDirection.Value);
+            _radius.MetricValue(), _dayLength.Value, _axialTilt.Value, _axisDirection.Value);
         ReportProblem(problem);
     }
 
@@ -824,9 +842,8 @@ public partial class SystemPanel : CanvasLayer
     {
         grid.AddChild(new Label { Text = "Density" });
         var row = new HBoxContainer();
-        _density = CreateField(0.01, Body.MaxDensityGramsPerCm3, 0.01, "g/cm³", CommitDensity);
-        _density.TooltipText = "How dense the body is (Earth: 5.5 g/cm³, Jupiter: 1.3, ice: " +
-            "0.9). With its size it gives the body's mass, which the stable orbit guide uses";
+        _density = CreateField(0.01, Body.MaxDensityGramsPerCm3, 0.01, "", CommitDensity)
+            .WithUnit(Quantity.Density, 0.01, Body.MaxDensityGramsPerCm3, 0.01, 0.5);
         row.AddChild(_density);
         _typicalDensity = CreateButton("Typical", ResetDensity,
             "Go back to the usual density for its kind and size, which follows it as it's resized");
@@ -839,13 +856,18 @@ public partial class SystemPanel : CanvasLayer
 
     private void ShowDensity(Body body)
     {
-        _density.ShowValue(BodyMass.Density(body));
+        _density.ShowMetric(BodyMass.Density(body));
+        _density.TooltipText = "How dense the body is (Earth: " +
+            $"{UnitText.Format(Quantity.Density, 5.51, 1)}, Jupiter: " +
+            $"{UnitText.Format(Quantity.Density, 1.33, 1)}, ice: " +
+            $"{UnitText.Format(Quantity.Density, 0.92, 1)}). With its size it gives the body's " +
+            "mass, which the stable orbit guide uses";
         _typicalDensity.Disabled = body.DensityGramsPerCm3 is null;
         _mass.Text = MassText(BodyMass.Kg(body), body.Kind)
             + (body.DensityGramsPerCm3 is null ? " (typical)" : "");
     }
 
-    // Stars in Sun masses, other big bodies in Earth masses, and small ones in kg.
+    // Stars in Sun masses, other big bodies in Earth masses, and small ones in kg or pounds.
     private static string MassText(double kg, BodyKind kind)
     {
         if (kind == BodyKind.Star)
@@ -856,7 +878,8 @@ public partial class SystemPanel : CanvasLayer
         double earths = kg / BodyMass.EarthKg;
         return earths >= 0.001
             ? Masses(earths, "Earth")
-            : $"{kg.ToString("0.##e+0", CultureInfo.CurrentCulture)} kg";
+            : UnitText.Shown(Quantity.Mass, kg).ToString("0.##e+0", CultureInfo.CurrentCulture)
+                + " " + UnitText.Symbol(Quantity.Mass);
     }
 
     private static string Masses(double count, string of)
@@ -869,7 +892,7 @@ public partial class SystemPanel : CanvasLayer
     {
         if (!_syncing && Session is not null)
         {
-            ReportProblem(Session.SetDensity(Session.SelectedBodyId, _density.Value));
+            ReportProblem(Session.SetDensity(Session.SelectedBodyId, _density.MetricValue()));
         }
     }
 
@@ -885,7 +908,8 @@ public partial class SystemPanel : CanvasLayer
         if (!_syncing && Session is not null)
         {
             ReportProblem(
-                Session.SetAverageTemperature(Session.SelectedBodyId, _temperature.Value));
+                Session.SetAverageTemperature(Session.SelectedBodyId,
+                    _temperature.MetricValue()));
         }
     }
 
@@ -899,9 +923,13 @@ public partial class SystemPanel : CanvasLayer
             return;
         }
 
-        double distanceKm = SelectedUnit() == DistanceUnit.AstronomicalUnits
+        // Left as shown, the distance stays exactly as stored (the field rounds what it shows).
+        double distanceKm = Math.Abs(_distance.Value - DistanceShown(_shownDistanceKm))
+            <= _distance.Step / 2
+            ? _shownDistanceKm
+            : SelectedUnit() == DistanceUnit.AstronomicalUnits
             ? _distance.Value * KmPerAu
-            : _distance.Value;
+            : Units.ToMetric(Quantity.Distance, _distance.Value, UnitText.System);
         Orbit orbit = current with
         {
             ParentId = parent,

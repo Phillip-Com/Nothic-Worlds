@@ -103,7 +103,11 @@ watch it move; any date's weather is ready at once and always the same. Clouds s
 while the Terrain or Map panel is open, so you can see the ground. **View ▸ Clouds** hides
 them, and **View ▸ Wind** shows the winds as streaks.
 
-**File ▸ Settings…** holds settings for this computer. **Graphics Quality** (Low, Standard, or
+**File ▸ Settings…** holds settings for this computer. **Units** shows and takes every
+measurement in metric (km, °C) or imperial (miles, °F): sizes, distances, heights, speeds,
+temperatures, rain, and density. It starts on imperial on a computer set to the United States
+and metric elsewhere. AU and Earth or Sun masses stay the same either way, and worlds are saved
+the same, so they read right on anyone's computer. **Graphics Quality** (Low, Standard, or
 High) sets every graphics option at once: how finely relief and clouds are drawn, how edges
 are smoothed, the 3D view's resolution, and the frame-rate limit (fewer frames save battery).
 Each can also be set on its own. It starts on Standard on built-in graphics and High on a

@@ -1,5 +1,6 @@
 using Godot;
 using NothicWorlds.Controls;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Session;
 
@@ -91,12 +92,12 @@ public partial class ShapesSection : VBoxContainer
         _operation = OperationDropdown(Commit);
         row.AddChild(_operation);
         grid.AddChild(row);
-        _depth = Field(grid, "Depth", "km", -1e6, 1e6, out _,
+        _depth = SizeField(grid, "Depth", -1e6, 1e6, out _,
             "How far its middle is above the body's radius (negative: below; minus the radius " +
             "is the body's center)");
-        _width = Field(grid, "Width", "km", 1, 1e6, out _, "Across (a sphere's diameter)");
-        _height = Field(grid, "Height", "km", 1, 1e6, out _heightLabel, "Up from the surface");
-        _length = Field(grid, "Length", "km", 1, 1e6, out _lengthLabel, "Along its turn");
+        _width = SizeField(grid, "Width", 1, 1e6, out _, "Across (a sphere's diameter)");
+        _height = SizeField(grid, "Height", 1, 1e6, out _heightLabel, "Up from the surface");
+        _length = SizeField(grid, "Length", 1, 1e6, out _lengthLabel, "Along its turn");
         _turn = Field(grid, "Turn", "°", 0, 360, out _, "Clockwise from north");
         _turn.WithWrapAround();
         box.AddChild(grid);
@@ -149,10 +150,10 @@ public partial class ShapesSection : VBoxContainer
         _showing = true;
         _kind.Select(_kind.GetItemIndex((int)selected.Kind));
         _operation.Select(_operation.GetItemIndex((int)selected.Operation));
-        _depth.ShowValue(selected.DepthKm);
-        _width.ShowValue(selected.WidthKm);
-        _height.ShowValue(selected.HeightKm);
-        _length.ShowValue(selected.LengthKm);
+        _depth.ShowMetric(selected.DepthKm);
+        _width.ShowMetric(selected.WidthKm);
+        _height.ShowMetric(selected.HeightKm);
+        _length.ShowMetric(selected.LengthKm);
         _turn.ShowValue(selected.TurnDegrees);
         bool hasHeight = selected.Kind != ShapeKind.Sphere;
         bool hasLength = selected.Kind == ShapeKind.Box;
@@ -173,10 +174,10 @@ public partial class ShapesSection : VBoxContainer
         {
             Kind = (ShapeKind)_kind.GetSelectedId(),
             Operation = (ShapeOperation)_operation.GetSelectedId(),
-            DepthKm = _depth.Value,
-            WidthKm = _width.Value,
-            HeightKm = _height.Value,
-            LengthKm = _length.Value,
+            DepthKm = _depth.MetricValue(),
+            WidthKm = _width.MetricValue(),
+            HeightKm = _height.MetricValue(),
+            LengthKm = _length.MetricValue(),
             TurnDegrees = _turn.Value % 360,
         });
         if (problem is not null)
@@ -206,6 +207,11 @@ public partial class ShapesSection : VBoxContainer
         dropdown.ItemSelected += _ => changed();
         return dropdown;
     }
+
+    // A size in km or miles (by the setting), from min to max km.
+    private SpinBox SizeField(GridContainer grid, string name, double min, double max,
+        out Label label, string tip) =>
+        Field(grid, name, "", min, max, out label, tip).WithUnit(Quantity.Distance, min, max, 1);
 
     private SpinBox Field(GridContainer grid, string name, string unit, double min, double max,
         out Label label, string tip)

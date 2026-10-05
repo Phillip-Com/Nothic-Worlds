@@ -1,5 +1,6 @@
 using Godot;
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 using NothicWorlds.Rendering;
@@ -532,12 +533,13 @@ public partial class FirstPersonMode : Node
 
         if (_weather is WeatherSample weather && body.HasAtmosphere)
         {
-            lines.Add($"{LiveWeatherText.Describe(weather)} · {weather.TemperatureC:0} °C");
+            lines.Add($"{LiveWeatherText.Describe(weather)} · " +
+                UnitText.Format(Quantity.Temperature, weather.TemperatureC));
         }
 
         if (_flying)
         {
-            lines.Add($"Height {_heightMeters:N0} m");
+            lines.Add($"Height {UnitText.Format(Quantity.Length, _heightMeters)}");
         }
 
         return string.Join('\n', lines);
@@ -556,19 +558,15 @@ public partial class FirstPersonMode : Node
     }
 
     private static string Speed(double metersPerSecond) => metersPerSecond < 1000
-        ? $"{metersPerSecond * 3.6:N0} km/h"
-        : $"{metersPerSecond / 1000:N0} km/s";
+        ? UnitText.Format(Quantity.Speed, metersPerSecond * 3.6)
+        : $"{UnitText.Shown(Quantity.Distance, metersPerSecond / 1000):N0} " +
+            $"{UnitText.Symbol(Quantity.Distance)}/s";
 
     private static string CompassPoint(double degrees) =>
         _compass[(int)Math.Round(degrees / 22.5) % _compass.Length];
 
-    // Far distances in AU, middling ones in millions of km, near ones in km.
-    private static string Distance(double km) => km switch
-    {
-        >= 0.1 * CometTail.KmPerAu => $"{km / CometTail.KmPerAu:#,0.###} AU",
-        >= 1e6 => $"{km / 1e6:0.##} million km",
-        _ => $"{km:N0} km",
-    };
+    // Far distances in AU, middling ones in millions of km or miles, near ones in km or miles.
+    private static string Distance(double km) => UnitText.Distance(km);
 
     private static double Held(Key key) => Input.IsKeyPressed(key) ? 1 : 0;
 
