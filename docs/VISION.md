@@ -108,7 +108,20 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 31: Lore Relationship Diagrams** · In progress (owner's choice, 2026-10-05)
+**Milestone 32: Metric and Imperial Units** · In progress (owner's idea and choice, 2026-10-05)
+A switch between metric and imperial for every measurement (`UI-04`). Owner's decisions:
+- **A setting in File ▸ Settings, for this computer**, not saved in worlds (which always store
+  metric, so they read right on anyone's machine).
+- **Both what's shown and what's typed** switch: fields show and take the chosen units.
+- **Everyday units switch** (km and miles, meters and feet, km/h and mph, °C and °F, mm and
+  inches, km² and square miles, liters and gallons, kg and pounds, g/cm³ and lb/ft³);
+  **astronomical ones stay** in both (AU, Earth and Sun masses, light-years).
+- **The default follows the computer's region** (imperial in the United States, Liberia,
+  and Myanmar) until it's changed.
+- **Two PRs:** conversion and formatting in Core (PR #82), then the setting and every readout
+  and field in the app.
+
+**Milestone 31: Lore Relationship Diagrams** · Complete (PR #81 merged 2026-10-05; owner's choice, 2026-10-05)
 Diagrams of how characters, factions, and nations are tied together (`LORE-04`). Owner's
 decisions:
 - **The boxes are journal entries,** which gain an optional kind (character, faction, nation,
@@ -923,6 +936,22 @@ piece.
   Delete → Ctrl+Z (texture back instantly); five fill color changes undone in one step; Clear
   Map → save over the file → Ctrl+Z reloaded the map from the temporary copy, and saving again
   wrote it back into the file.
+
+**UI-04 — Metric and imperial units** · In Progress (M32: PR #82) · Base
+**Intent:** A setting to switch everything between the imperial and metric systems for
+measuring distance, mass, volume, area, temperature, and so on (owner's idea, 2026-10-05).
+**Implementation (Core, M32, PR #82):**
+- `Measurement/UnitSystem.cs` (Metric, Imperial) and `Measurement/Quantity.cs`: the kinds of
+  measurement that switch (distance, length, speed, temperature, temperature change,
+  precipitation, area, volume, mass, density), each stored in its metric unit.
+- `Measurement/Units.cs`: `ToShown` and `ToMetric` (exact both ways: US customary factors,
+  °F with its offset; a temperature change without it), `Symbol`, `Format` (in the computer's
+  number style), `FormatDistance` (AU from a tenth of one in both systems, then millions of km
+  or miles, then whole ones: the rule `OrbitGuideSection` and `FirstPersonMode` each wrote
+  out, for them to share), `KmPerAu` (now also behind `CometTail.KmPerAu`), and `DefaultFor`
+  (a locale's region: imperial for US, LR, MM; metric otherwise or when there's no region).
+- Tests (`UnitsTests`, 34): known values for every quantity, exact round trips in both
+  systems, symbols, formatting, distances, and the default by region.
 
 ### 4.3 Maps & Image Import (`MAP`)
 
