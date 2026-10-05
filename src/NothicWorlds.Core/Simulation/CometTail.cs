@@ -9,7 +9,7 @@ namespace NothicWorlds.Core.Simulation;
 public static class CometTail
 {
     /// <summary>The Earth–Sun distance (one astronomical unit), in km.</summary>
-    public const double KmPerAu = 149_597_870.7;
+    public const double KmPerAu = Measurement.Units.KmPerAu;
 
     // About the length of Halley's comet's tail as it passed the Earth's distance.
     private const double LengthAtOneAuKm = 2e7;
