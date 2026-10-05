@@ -108,6 +108,21 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 31: Lore Relationship Diagrams** · In progress (owner's choice, 2026-10-05)
+Diagrams of how characters, factions, and nations are tied together (`LORE-04`). Owner's
+decisions:
+- **The boxes are journal entries,** which gain an optional kind (character, faction, nation,
+  place, other) for their look; clicking a box opens the entry.
+- **Relationship kinds:** parent of, married to, sibling of, ally of, rival of, at war with,
+  member of, rules, serves, plus **other** in the user's own words. Family ties can be laid
+  out as a family tree.
+- **Named diagrams, shared ties:** any number of diagrams ("House Arren", "The Northern
+  Alliance"), entries placed on each by hand with an Arrange button; a tie is stored once and
+  shows in every diagram that holds both ends.
+- **Optional start and end dates** on ties, so a diagram shows them as they stand at the world
+  clock's time (past ones faded).
+- **Two PRs:** the model and file format in Core (PR #80), then the diagram page.
+
 **Milestone 30: First-Person Surface View** · Complete (PR #79 merged 2026-10-05; owner's choice, 2026-10-05)
 Stand on a world and look up (`REN-06`). Owner's decisions:
 - **Walk or fly:** move over the surface, following the ground, or fly freely.
@@ -2521,12 +2536,35 @@ they're key helpers for the calendar features (`CAL-01`–`CAL-03`, `SIM-02`).
   shown timeline, making a "History" timeline if there's none), `UpdateEvent` (checks the
   timeline, links, and place still exist), `DeleteEvent`.
 
-**LORE-04 — Lore relationship diagrams** · Deferred · —
+**LORE-04 — Lore relationship diagrams** · In Progress (M31: PR #80) · Base
 **Intent:** Diagrams of connections between characters, factions, and nations (e.g. family trees,
 alliances, rivalries). They probably need their own tab or page because of the space they take.
 This is separate from the star system tree (`UI-02`).
-**Notes:** Tabled. Revisit when the lore features are further along.
-**Implementation:** —
+**Notes:** Tabled until the lore features were further along; taken up in Milestone 31 (owner's
+choice, 2026-10-05).
+**Implementation (Core, M31, PR #80):**
+- `Model/LoreKind.cs`: what an entry is about (character, faction, nation, place, other),
+  as `JournalEntry.Kind` (null for plain writing). The journal's edits copy entries with
+  changes, so they keep it.
+- `Model/Relationship.cs` and `RelationshipKind.cs`: a tie from one entry to another (the
+  parent, member, ruler, or servant is "from"), with a kind, a label (required for Other,
+  up to 100 characters), and optional `StartDays` and `EndDays` on the world clock.
+  `IsMutual` (married, siblings, allies, rivals, at war) and `StandsAt(time)` (inclusive at
+  both ends) are for the diagrams. In `World.Relationships`, up to 20,000.
+- `Model/LoreDiagram.cs` and `DiagramPlacement.cs`: a named diagram (up to 100 characters)
+  and where each entry's box sits on it (diagram units of about a pixel, within ±1,000,000;
+  each entry once; up to 1,000). In `World.Diagrams`, up to 200. Equal when every placement
+  matches.
+- `LoreRules`: checks both (own problems, unique IDs, every end and box an existing entry);
+  `RelationshipsOf(world, entry)`; and `ForgetEntry(world, entry)`, which removes an entry's
+  event links, ties, and boxes, now used by `WorldSession.DeleteJournalEntry` (so a deleted
+  entry can't leave a tie that would stop the world saving). `LoreState` copies both lists,
+  so undo and the saved-file check cover them.
+- World file **format version 27**: optional `kind` on journal entries, optional
+  `relationships` and `diagrams` (docs/world-format.md); older files have none.
+- **Tests:** `RelationshipTests` (28: the rules, dates, mutual kinds, forgetting an entry,
+  equality, cloning) and 26 more in `WorldPackageTests` (the version 27 golden file written
+  and read, version 26 files, ten kinds of damage refused, every kind written by name).
 
 ### 4.10 Saving (`SAV`)
 

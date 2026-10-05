@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 26** (see **Version history** at the end)
+**Current format version: 27** (see **Version history** at the end)
 
 ## Container
 
@@ -146,6 +146,7 @@ A `.nworld` file is a standard **zip archive** containing:
       "id": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
       "title": "The Founding",
       "text": "First line.\nSecond line.",
+      "kind": "faction",
       "location": {
         "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         "region": "4e4e4e4e-4e4e-4e4e-4e4e-4e4e4e4e4e4e",
@@ -170,6 +171,27 @@ A `.nworld` file is a standard **zip archive** containing:
       "start": 400,
       "end": 4783.25,
       "entries": [ "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1" ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2",
+      "from": "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2",
+      "to": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+      "kind": "other",
+      "label": "pays tribute to",
+      "start": 401,
+      "end": 4783.25
+    }
+  ],
+  "diagrams": [
+    {
+      "id": "d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1",
+      "name": "The Empire and Luna",
+      "entries": [
+        { "entry": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1", "x": 0, "y": 0 },
+        { "entry": "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2", "x": 240.5, "y": -80 }
+      ]
     }
   ],
   "view": {
@@ -271,6 +293,7 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…journal[].id` | yes | GUID, unique among entries |
 | `…journal[].title` | yes | Not empty, up to 200 characters |
 | `…journal[].text` | no | Plain text with `\n` line breaks, up to 200,000 characters. Omitted when empty. |
+| `…journal[].kind` | no | What it's about, for its box in relationship diagrams (`LORE-04`): `character`, `faction`, `nation`, `place`, or `other`. Omitted for plain writing (and in files before version 27). |
 | `…journal[].location` | no | Where it's about (see **Locations** below). Omitted for nowhere in particular. |
 | `…journal[].createdUtc`, `editedUtc` | yes | Real-world times it was written and last changed (for sorting) |
 | `timelines` | no | Named timelines (`LORE-03`), in lane order. Omitted when there are none. Up to 100. |
@@ -286,6 +309,15 @@ A `.nworld` file is a standard **zip archive** containing:
 | `…events[].end` | no | When it ends, not before `start`. Omitted for a moment. |
 | `…events[].location` | no | Where it happens (see **Locations**) |
 | `…events[].entries` | no | The `id`s of journal entries it links to, each once (every one must exist). Links are many to many and stored only here; an entry's events are the ones listing it. Omitted when none. |
+| `relationships` | no | Ties between journal entries (`LORE-04`), shown in every diagram that holds both ends. Omitted when there are none. Up to 20,000. |
+| `…relationships[].id` | yes | GUID, unique among relationships |
+| `…relationships[].from`, `to` | yes | The `id`s of two different journal entries (both must exist). For one-way kinds, `from` is the parent, the member, the ruler, or the servant. |
+| `…relationships[].kind` | yes | `parent-of`, `married-to`, `sibling-of`, `ally-of`, `rival-of`, `at-war-with`, `member-of`, `rules`, `serves`, or `other`. `married-to`, `sibling-of`, `ally-of`, `rival-of`, and `at-war-with` are mutual. |
+| `…relationships[].label` | no | The user's words for it, up to 100 characters. Required for `other`; omitted when empty. |
+| `…relationships[].start`, `end` | no | When it began and ended, in standard days like `timeDays` (`end` not before `start`). Omitted for always and never. |
+| `diagrams` | no | Named relationship diagrams (`LORE-04`), in list order. Omitted when there are none. Up to 200. |
+| `…diagrams[].id`, `name` | yes | GUID, unique among diagrams; name not empty, up to 100 characters |
+| `…diagrams[].entries` | no | The journal entries it shows, in drawing order, each once (every one must exist), up to 1,000: `entry` (its `id`) and `x`, `y` (where its box's middle sits, in diagram units of about a pixel, rightward and down, each within ±1,000,000). Omitted when empty. |
 | `nebulas` | no | Nebulas on the sky around the system (`BOD-03`), at most 20; omitted for none. Each: `id` (GUID, unique), `name` (1–100 characters), `latitude` (−90 to 90°, above or below the system's reference plane) and `longitude` (any, measured like orbit angles), `size` (its radius on the sky, 2–120°), `brightness` (0.05–1), `color` and `secondColor` (`#RRGGBB`). |
 | `view` | no | Camera when saved. Omitted means the default view. |
 | `view.latitude`, `longitude` | yes | Degrees; camera direction from the focus point. Below an altitude of 0.25 (the local view, `REN-04`) they're the focused body's own coordinates, since the camera rides with its spin; otherwise they're fixed in space. |
@@ -456,6 +488,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 27 | Lore diagrams (M31): journal entries gain an optional `kind`; optional `relationships` and `diagrams` | Nothing to change: version 26 worlds have none |
 | 26 | Live weather (M27): planets and moons gain `atmosphere` | Nothing to change: a missing `atmosphere` means planets have air and moons don't |
 | 25 | Visual styles (M26): worlds gain a `style` | Nothing to change: version 24 worlds are painterly, which a missing `style` means |
 | 24 | Shapes (M25): surfaces gain optional `shapes` added or cut | Nothing to change: version 23 bodies have none |
