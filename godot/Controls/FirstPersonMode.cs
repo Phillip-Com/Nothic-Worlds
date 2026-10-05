@@ -54,6 +54,17 @@ public partial class FirstPersonMode : Node
     private Camera3D? _camera;
     private FirstPersonGround? _ground;
     private FirstPersonGround? _deck;  // The clouds below, when flying above them
+    private FlatPatch? _flatGround;    // On a flat world, the ground around the eye
+    private FlatPatch? _flatDeck;      // ... and the clouds below
+    private FlatSpot? _flat;           // Where the eye stands on a flat world (else on a globe)
+    private double _flatBuiltHeightMeters;
+
+    // On a flat world the ground patch sits this far off the disc's own face (in globe radii,
+    // about 6 m on an Earth-sized world), so the two don't flicker against each other where
+    // they'd lie in the same plane; the eye stands on the patch. Too small to see at the
+    // patch's edge, many km away.
+    private const double FlatGroundLift = 1e-6;
+    private FlatFace _flatBuiltFace;
     private FirstPersonHud? _hud;
     private Guid? _bodyId;
     private Vector3D _spot;  // Unit direction on the body, its own frame
@@ -135,17 +146,23 @@ public partial class FirstPersonMode : Node
         }
 
         Body body = Session.SelectedBody;
-        if (!body.HasSurface || body.Shape == BodyShape.FlatDisc
-            || System.SurfaceFor(body.Id) is not PlanetSurface globe)
+        if (!body.HasSurface || System.SurfaceFor(body.Id) is not PlanetSurface globe)
         {
-            Toolbar?.ShowError(body.Shape == BodyShape.FlatDisc
-                ? "Standing on a flat world isn't possible yet."
-                : "Only planets and moons can be stood on.");
+            Toolbar?.ShowError("Only planets and moons can be stood on.");
             return;
         }
 
         Vector2 middle = GlobeCamera.GetViewport().GetVisibleRect().Size / 2;
         Vector3? point = GlobePicker.PointAt(GlobeCamera, globe, middle);
+        if (body.Shape == BodyShape.FlatDisc)
+        {
+            // On a flat world: the spot on its top face (or its middle, if that's missed).
+            Vector3 onTop = point ?? Vector3.Zero;
+            Enter(body.Id, new Vector3D(0, 1, 0),
+                FlatWalk.OnTop(new Vector3D(onTop.X, onTop.Y, onTop.Z)));
+            return;
+        }
+
         Vector3 toward = point
             ?? (globe.GlobalTransform.AffineInverse() * GlobeCamera.GlobalPosition);
         Enter(body.Id, Unit(new Vector3D(toward.X, toward.Y, toward.Z)));
@@ -169,6 +186,10 @@ public partial class FirstPersonMode : Node
         _ground = null;
         _deck?.QueueFree();
         _deck = null;
+        _flatGround?.QueueFree();
+        _flatGround = null;
+        _flatDeck?.QueueFree();
+        _flatDeck = null;
         _camera?.QueueFree();
         _camera = null;
         if (GlobeCamera is not null)
@@ -193,11 +214,12 @@ public partial class FirstPersonMode : Node
         _hud!.Visible = false;
     }
 
-    private void Enter(Guid bodyId, Vector3D spot)
+    private void Enter(Guid bodyId, Vector3D spot, FlatSpot? flat = null)
     {
         Leave();
         _bodyId = bodyId;
         _spot = spot;
+        _flat = flat;
         _heading = 0;
         _pitch = 0;
         _flying = false;
@@ -225,6 +247,19 @@ public partial class FirstPersonMode : Node
             Visible = false,
         };
         AddChild(_deck);
+        if (flat is not null)
+        {
+            _flatGround = new FlatPatch { Name = "FlatGround" };
+            AddChild(_flatGround);
+            _flatDeck = new FlatPatch
+            {
+                Name = "FlatCloudDeck",
+                MaterialOverride = _sky.DeckMaterial,
+                Visible = false,
+            };
+            AddChild(_flatDeck);
+        }
+
         if (Environment is not null)
         {
             _sky.Show(Environment);
@@ -315,29 +350,49 @@ public partial class FirstPersonMode : Node
         }
 
         Move(body, delta);
-        double groundRadius = GroundRadius(globe, body);
         double radiusMeters = body.RadiusKm * 1000;
-        Vector3D eye = _spot * (groundRadius + _heightMeters / radiusMeters);
+        double groundRadius = _flat is null ? GroundRadius(globe, body) : 1;
+        Vector3D eye = _flat is FlatSpot standing
+            ? FlatWalk.Point(standing, FlatGroundLift + _heightMeters / radiusMeters)
+            : _spot * (groundRadius + _heightMeters / radiusMeters);
         System.StandingOn = id;
         System.StandingEye = eye;
 
         double time = Session.World.TimeDays;
         (Vector3D East, Vector3D North, Vector3D Up) frame = Frame(body, time);
         PlaceCamera(frame, _heightMeters / radiusMeters * place.Radius);
-        PlaceGround(globe, body, time, eye, place.Radius);
-        UpdateWeather(id, time, delta);
+        if (_flat is FlatSpot flat)
+        {
+            PlaceFlatGround(globe, body, time, eye, place.Radius, flat);
+        }
+        else
+        {
+            PlaceGround(globe, body, time, eye, place.Radius);
+        }
 
-        double heightKm = (groundRadius - 1) * body.RadiusKm + _heightMeters / 1000;
-        if (SkyView.From(Session.World.Bodies, body, SphericalPolygon.FromUnit(_spot), heightKm,
-            time) is not SkyView sky)
+        UpdateWeather(id, time, delta);
+        SkyView? seen = _flat is FlatSpot spot
+            ? SkyView.FromFlat(Session.World.Bodies, body, spot, _heightMeters / 1000, time)
+            : SkyView.From(Session.World.Bodies, body, SphericalPolygon.FromUnit(_spot),
+                (groundRadius - 1) * body.RadiusKm + _heightMeters / 1000, time);
+        if (seen is not SkyView sky)
         {
             return;
         }
 
         _sky.ShowBodies(Session.World.Bodies, body, sky, frame, _magnify, Nebulas?.SkyTexture);
-        bool clouds = _sky.ShowClouds(globe, body, BodyBasis(body, time).Transposed(), eye,
-            groundRadius, sky.Star?.AltitudeDegrees ?? -90, place.Radius / body.RadiusKm);
-        _deck!.Visible = clouds && !BelowClouds() && !globe.IsCarved;
+        Basis toBody = BodyBasis(body, time).Transposed();
+        double sunAltitude = sky.Star?.AltitudeDegrees ?? -90;
+        double unitsPerKm = place.Radius / body.RadiusKm;
+        bool clouds = _flat is FlatSpot on
+            ? _sky.ShowFlatClouds(globe, body, toBody, on, eye, sunAltitude, unitsPerKm)
+            : _sky.ShowClouds(globe, body, toBody, eye, groundRadius, sunAltitude, unitsPerKm);
+        bool deck = clouds && !BelowClouds() && !globe.IsCarved;
+        _deck!.Visible = deck && _flat is null;
+        if (_flatDeck is not null)
+        {
+            _flatDeck.Visible = deck && _flat is { Face: FlatFace.Top };
+        }
         _sky.ShowHaze(body.HasAtmosphere, place.Radius / body.RadiusKm, HazeKm(),
             sky.Star?.AltitudeDegrees ?? -90, _weather?.CloudCover ?? 0);
         ShowReadouts(body, time, sky, frame);
@@ -372,6 +427,14 @@ public partial class FirstPersonMode : Node
 
         double bearing = _heading + Math.Atan2(sideways, forward);
         double length = Math.Sqrt(forward * forward + sideways * sideways);
+        if (_flat is FlatSpot flat)
+        {
+            // Over the face, the rim, and the underside alike (FlatWalk keeps north toward
+            // the top's center, so the heading carries over the edge).
+            _flat = FlatWalk.Walk(flat, bearing, speed * length / (body.RadiusKm * 1000));
+            return;
+        }
+
         double angle = speed * length / (body.RadiusKm * 1000 + _heightMeters);
         (Vector3D east, Vector3D north) = Tangents(_spot);
         Vector3D along = north * Math.Cos(bearing) + east * Math.Sin(bearing);
@@ -454,6 +517,58 @@ public partial class FirstPersonMode : Node
         PlaceRings(_deck!, body, time, eye, displayRadius);
     }
 
+    // On a flat world, the patch of ground around the eye (the map on top, bare rock on the
+    // rim and underside) and the cloud deck over the top: built again when the eye has moved a
+    // good part of its height away from their middle, onto another face, or risen or sunk by
+    // half; placed relative to the eye.
+    private void PlaceFlatGround(PlanetSurface globe, Body body, double time, Vector3D eye,
+        double displayRadius, FlatSpot flat)
+    {
+        _ground!.Visible = false;
+        FlatPatch ground = _flatGround!;
+        double height = _heightMeters / (body.RadiusKm * 1000);
+        Vector3D underfoot = FlatWalk.Point(flat, FlatGroundLift);
+        double risen = _heightMeters / _flatBuiltHeightMeters;
+        if (ground.Mesh is null || flat.Face != _flatBuiltFace
+            || (ground.Middle - underfoot).Length > Math.Max(height * 0.25, 1e-7)
+            || risen > 1.5 || risen < 1 / 1.5)
+        {
+            // No horizon on a flat face: the patch reaches well past what the eye sees sharply,
+            // and the disc's own mesh beyond it.
+            double outer = Math.Clamp(height * 400, 0.003, 2 * FlatDisc.Radius);
+            ground.Build(flat, outer, FlatGroundLift);
+            ground.MaterialOverride = flat.Face == FlatFace.Top
+                ? globe.MaterialOverride
+                : PlanetSurface.RockMaterial;
+            if (flat.Face == FlatFace.Top)
+            {
+                // The deck carries each point's map direction, as the globe's deck does.
+                _flatDeck!.Build(flat, outer, SurfaceSky.CloudHeightKm / body.RadiusKm,
+                    point => FlatDisc.DirectionFor(point));
+            }
+
+            _flatBuiltHeightMeters = _heightMeters;
+            _flatBuiltFace = flat.Face;
+        }
+
+        PlacePatch(ground, body, time, eye, displayRadius);
+        PlacePatch(_flatDeck!, body, time, eye, displayRadius);
+    }
+
+    // Puts a flat world's patch in the scene, relative to the eye.
+    private static void PlacePatch(FlatPatch patch, Body body, double time, Vector3D eye,
+        double displayRadius)
+    {
+        if (patch.Mesh is null)
+        {
+            return;
+        }
+
+        patch.GlobalTransform = new Transform3D(
+            BodyBasis(body, time).Scaled(Vector3.One * (float)displayRadius),
+            ToGodot(ToSystem(body, time, patch.Middle - eye) * displayRadius));
+    }
+
     // Puts rings built around a spot in the scene, relative to the eye.
     private static void PlaceRings(FirstPersonGround rings, Body body, double time, Vector3D eye,
         double displayRadius)
@@ -479,7 +594,11 @@ public partial class FirstPersonMode : Node
         }
 
         _weatherAge = 0;
-        _weather = Weather?.WeatherOf(id)?.At(time).SampleAt(_spot);
+        // On a flat world, only the top face has weather (the rim and underside are rock).
+        Vector3D? at = _flat is FlatSpot flat ? FlatWalk.MapDirection(flat) : _spot;
+        _weather = at is Vector3D direction
+            ? Weather?.WeatherOf(id)?.At(time).SampleAt(direction)
+            : null;
     }
 
     // The haze's reach: shorter in rain, and shorter still in snow.
@@ -552,11 +671,13 @@ public partial class FirstPersonMode : Node
     private string InfoText(Body body, double time, SkyView sky)
     {
         var lines = new List<string> { BodyClock.Describe(body, time) };
-        if (sky.Star is SkyBody star && sky.SolarTimeHours is double hours)
+        if (sky.Star is SkyBody star)
         {
-            int minutes = (int)(hours * 60) % (24 * 60);
-            lines.Add($"Sun time {minutes / 60}:{minutes % 60:00} · " +
-                $"{star.Name} {Math.Abs(star.AltitudeDegrees):0}° " +
+            // No sun time on a flat world: the sun doesn't cross a meridian over a disc.
+            string sunTime = sky.SolarTimeHours is double hours
+                ? $"Sun time {(int)(hours * 60) % 1440 / 60}:{(int)(hours * 60) % 60:00} · "
+                : "";
+            lines.Add($"{sunTime}{star.Name} {Math.Abs(star.AltitudeDegrees):0}° " +
                 (star.AltitudeDegrees >= 0 ? "up" : "below the horizon"));
         }
 
@@ -602,13 +723,20 @@ public partial class FirstPersonMode : Node
     // East, north, and up at the spot, in the system's (and scene's) frame.
     private (Vector3D East, Vector3D North, Vector3D Up) Frame(Body body, double time)
     {
+        if (_flat is FlatSpot flat)
+        {
+            (Vector3D flatEast, Vector3D flatNorth, Vector3D flatUp) = FlatWalk.Frame(flat);
+            return (ToSystem(body, time, flatEast), ToSystem(body, time, flatNorth),
+                ToSystem(body, time, flatUp));
+        }
+
         (Vector3D east, Vector3D north) = Tangents(_spot);
         return (ToSystem(body, time, east), ToSystem(body, time, north),
             ToSystem(body, time, _spot));
     }
 
     private static Vector3D ToSystem(Body body, double time, Vector3D local) =>
-        BodyOrientation.ToSystem(body, time, local);
+        BodyOrientation.ShapeToSystem(body, time, local);
 
     // The body's turn (its own frame to the scene's) as a basis.
     private static Basis BodyBasis(Body body, double time) => new(

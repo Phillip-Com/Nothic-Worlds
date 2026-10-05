@@ -114,6 +114,9 @@ public partial class PlanetSurface : MeshInstance3D
         Roughness = 1.0f,
     };
 
+    /// <summary>The bare rock of a flat world's rim and underside.</summary>
+    public static Material RockMaterial => _rockMaterial;
+
     /// <summary>
     /// The globe's shape (VISION.md BOD-02): a sphere, or a flat world's disc with bare rock
     /// underneath. Maps and terrain stay as they are; only where they're drawn changes.

@@ -135,8 +135,8 @@ public partial class SystemView : Node3D
     public Guid? StandingOn { get; set; }
 
     /// <summary>
-    /// Where the eye is, in the standing body's own frame (its radii from its middle, as on its
-    /// map: +Y north).
+    /// Where the eye is, in the space the standing body is drawn in (its radii from its middle:
+    /// a globe's own frame, +Y north as on its map; a flat world's disc space).
     /// </summary>
     public Vector3D StandingEye { get; set; }
 
@@ -421,7 +421,8 @@ public partial class SystemView : Node3D
             && _layout.TryGetValue(standing, out DisplayBody stand))
         {
             Origin = stand.Position
-                + BodyOrientation.ToSystem(ground, world.TimeDays, StandingEye) * stand.Radius;
+                + BodyOrientation.ShapeToSystem(ground, world.TimeDays, StandingEye)
+                * stand.Radius;
         }
 
         bool anyStar = false;
@@ -479,7 +480,11 @@ public partial class SystemView : Node3D
         {
             surface.ReliefScale = (float)(ReliefExaggeration / (body.RadiusKm * 1000));
             surface.ReliefDetail = ReliefDetail;
-            surface.ScreenRadius = ScreenRadiusOf(visual.Root.GlobalPosition, (float)place.Radius);
+            // Standing on it, the body fills the view (and the globe's camera is set aside):
+            // always full detail.
+            surface.ScreenRadius = body.Id == StandingOn
+                ? float.MaxValue
+                : ScreenRadiusOf(visual.Root.GlobalPosition, (float)place.Radius);
             surface.SetShapes(body.Surface.Shapes, body.RadiusKm);
             surface.MapShading = MapStyleShading;
             surface.Style = Style;

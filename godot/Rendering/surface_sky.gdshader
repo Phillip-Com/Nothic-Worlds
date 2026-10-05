@@ -44,6 +44,12 @@ uniform float eye_radius = 1.0;
 uniform float cloud_gap = 0.0016;
 uniform float km_per_radius = 6371.0;
 
+// On a flat world's top face the layer is a plane over the disc instead: the eye's place on
+// the disc (in the body's own space and radii) and how far the layer is above it.
+uniform bool flat_layer = false;
+uniform vec3 eye_point = vec3(0.0, 0.04, 0.0);
+uniform float layer_above = 0.0008;
+
 vec3 to_linear(vec3 color) {
 	vec3 low = color / 12.92;
 	vec3 high = pow((color + 0.055) / 1.055, vec3(2.4));
@@ -109,19 +115,45 @@ vec4 disc(vec3 direction, vec3 middle, float radius, vec3 color, vec3 light, flo
 	return vec4(color * lit, edge);
 }
 
+// The globe direction a point over a flat world's top face stands for (as FlatDisc does).
+vec3 disc_direction(vec3 point) {
+	float across = length(point.xz);
+	if (across < 1e-6) {
+		return vec3(0.0, 1.0, 0.0);
+	}
+	float from_pole = min(across, PI);
+	vec2 sideways = point.xz / across * sin(from_pole);
+	return vec3(sideways.x, cos(from_pole), sideways.y);
+}
+
 // The cloud seen along a direction (alpha 0 for none): lit by day, warm toward a low sun,
 // grey where rain falls, dark by night. Seen from below the layer only; from above, the cloud
 // deck (cloud_deck.gdshader) draws them over the ground.
 vec4 clouds(vec3 direction, float day, float sun_height) {
-	if (!has_clouds || cloud_gap <= 0.0) {
+	if (!has_clouds || (flat_layer ? layer_above <= 0.0 : cloud_gap <= 0.0)) {
 		return vec4(0.0);
 	}
 
-	// Where the line of sight meets the layer: |eye + t·d| = layer's radius.
 	vec3 d = to_body * direction;
-	float b = eye_radius * dot(eye_direction, d);
-	float t = -b + sqrt(b * b + cloud_gap);
-	vec3 at = normalize(eye_direction * eye_radius + d * t);
+	float t;
+	vec3 at;
+	if (flat_layer) {
+		// Where the line of sight meets the plane over the disc, and the map point there.
+		if (d.y <= 1e-4) {
+			return vec4(0.0);
+		}
+		t = layer_above / d.y;
+		vec3 hit = eye_point + d * t;
+		if (length(hit.xz) > PI) {
+			return vec4(0.0);  // Past the rim: no clouds over the edge of the world
+		}
+		at = disc_direction(hit);
+	} else {
+		// Where the line of sight meets the layer: |eye + t·d| = layer's radius.
+		float b = eye_radius * dot(eye_direction, d);
+		t = -b + sqrt(b * b + cloud_gap);
+		at = normalize(eye_direction * eye_radius + d * t);
+	}
 	vec4 cloud = cloud_at(at, t * km_per_radius);
 	float cover = cloud.x;
 	vec3 color = cloud.yzw;
