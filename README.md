@@ -116,6 +116,14 @@ with brushed edges, a warm glow at dusk, and gentle outlines), **Realistic** (tr
 or **Simple** (flat daylight, a crisp line between day and night, and clean outlines). The
 style is saved with the world, and changing it can be undone.
 
+**View ▸ Stand Here** puts you on the ground of the planet or moon you're looking at, at the
+spot in the middle of the screen, to see its sky as someone there would: blue by day, glowing
+at sunrise and sunset, and dark with stars at night (always black on a world without air). The
+sun and moons are where they really are and their true size, and moons show their phases;
+**M** magnifies small ones. Drag to look around, walk with **W A S D** (Shift for faster, the
+mouse wheel to change pace from walking to very fast), press **F** to fly (**Space** and **C**
+to rise and sink), and **Esc** to go back. Flat worlds can't be stood on yet.
+
 **Physics** (the switch in the time bar) moves the bodies by real gravity from that moment, each
 starting at its orbit's natural speed, so you can watch whether your system holds together.
 Only the view follows it: seasons, calendars, eclipses, and weather stay on your designed
