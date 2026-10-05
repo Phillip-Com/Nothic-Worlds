@@ -38,6 +38,7 @@
 [ext_resource type="Script" uid="uid://c0sv1vlx28k5o" path="res://Rendering/WeatherDisplay.cs" id="36_weather_display"]
 [ext_resource type="Script" uid="uid://dfy6wx1608yu" path="res://Rendering/GraphicsSettings.cs" id="37_graphics_settings"]
 [ext_resource type="Script" uid="uid://cbe50wlgeuodc" path="res://Controls/FirstPersonMode.cs" id="38_first_person"]
+[ext_resource type="Script" uid="uid://v0mroiw8us84" path="res://UI/DiagramPage.cs" id="39_diagram_page"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -89,8 +90,17 @@ script = ExtResource("4_overlay")
 script = ExtResource("5_indicator")
 Camera = NodePath("../PlanetCamera")
 
-[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("MapPanel", "Terrain", "SystemPanel", "Journal", "Timeline", "RegionsPanel")]
+[node name="DiagramPage" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "Journal", "GlobeCamera", "HideWhileOpen")]
+script = ExtResource("39_diagram_page")
+Session = NodePath("../WorldSession")
+Toolbar = NodePath("../MapToolbar")
+Journal = NodePath("../JournalPanel")
+GlobeCamera = NodePath("../PlanetCamera")
+HideWhileOpen = [NodePath("../CameraModeIndicator"), NodePath("../BodyMarkers"), NodePath("../EclipseMarkers"), NodePath("../RegionMarkers"), NodePath("../PinMarkers"), NodePath("../WeatherMarkers")]
+
+[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("MapPanel", "Terrain", "SystemPanel", "Journal", "Timeline", "RegionsPanel", "Diagrams")]
 script = ExtResource("7_toolbar")
+Diagrams = NodePath("../DiagramPage")
 MapPanel = NodePath("../MapPanel")
 Terrain = NodePath("../TerrainPanel")
 Journal = NodePath("../JournalPanel")

@@ -29,6 +29,10 @@ public partial class JournalPanel : CanvasLayer
     private Control _editor = null!;
     private LineEdit _title = null!;
     private OptionButton _place = null!;
+    private OptionButton _kind = null!;
+    private VBoxContainer _ties = null!;
+    private Button _addTie = null!;
+    private RelationshipDialog _tieEditor = null!;
     private RegionChoice _region = null!;
     private Label _pin = null!;
     private Button _pinButton = null!;
@@ -201,6 +205,24 @@ public partial class JournalPanel : CanvasLayer
         _place.ItemSelected += _ => Commit();
         placeRow.AddChild(_place);
         editor.AddChild(placeRow);
+
+        var kindRow = new HBoxContainer();
+        kindRow.AddChild(new Label { Text = "Kind" });
+        _kind = new Dropdown
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "What the entry is about, for its box in relationship diagrams",
+        };
+        _kind.AddItem("Plain writing");
+        foreach (LoreKind kind in LoreWords.EntryKinds)
+        {
+            _kind.AddItem(LoreWords.Kind(kind));
+        }
+
+        _kind.ItemSelected += _ => Commit();
+        kindRow.AddChild(_kind);
+        editor.AddChild(kindRow);
         _region = new RegionChoice();
         _region.Changed += Commit;
         editor.AddChild(_region);
@@ -237,6 +259,7 @@ public partial class JournalPanel : CanvasLayer
 
         _links = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         editor.AddChild(_links);
+        editor.AddChild(BuildTies());
         _dates = new Label
         {
             Modulate = new Color(1, 1, 1, 0.6f),
@@ -250,6 +273,64 @@ public partial class JournalPanel : CanvasLayer
         };
         editor.AddChild(_problem);
         return editor;
+    }
+
+    // The entry's relationships (VISION.md LORE-04; owner's choice: editable here as well as on
+    // diagrams), each a button that opens it in the editor, and one to add another.
+    private Control BuildTies()
+    {
+        var section = new VBoxContainer();
+        _ties = new VBoxContainer();
+        section.AddChild(_ties);
+        _addTie = new Button
+        {
+            Text = "Add Relationship…",
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Tie this entry to another: family, allies, rivals, rulers, members",
+        };
+        _addTie.Pressed += () =>
+        {
+            if (Selected is JournalEntry entry && Session!.World.Journal
+                .FirstOrDefault(e => e.Id != entry.Id) is JournalEntry other)
+            {
+                _tieEditor.New(entry.Id, other.Id);
+            }
+        };
+        section.AddChild(_addTie);
+        _tieEditor = new RelationshipDialog { Session = Session! };
+        AddChild(_tieEditor);
+        return section;
+    }
+
+    private void ShowTies(JournalEntry entry)
+    {
+        foreach (Node child in _ties.GetChildren())
+        {
+            _ties.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        List<Relationship> ties = [.. LoreRules.RelationshipsOf(Session!.World, entry.Id)];
+        _ties.AddChild(new Label
+        {
+            Text = ties.Count == 0 ? "No relationships yet." : "Relationships:",
+        });
+        foreach (Relationship tie in ties)
+        {
+            var button = new Button
+            {
+                Text = LoreWords.Sentence(tie, Session.World.Journal),
+                Flat = true,
+                Alignment = HorizontalAlignment.Left,
+                TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
+                FocusMode = Control.FocusModeEnum.None,
+                TooltipText = "Edit or delete this relationship",
+            };
+            button.Pressed += () => _tieEditor.Edit(tie);
+            _ties.AddChild(button);
+        }
+
+        _addTie.Disabled = Session.World.Journal.Count < 2;
     }
 
     private void UpdateVisibility()
@@ -312,6 +393,7 @@ public partial class JournalPanel : CanvasLayer
             Title = _title.Text.Trim(),
             Text = _text.Text,
             Location = ChosenPlace(entry.Location),
+            Kind = _kind.Selected <= 0 ? null : LoreWords.EntryKinds[_kind.Selected - 1],
         });
         _problem.Text = problem is null ? "" : $"Not saved yet: {problem}.";
     }
@@ -486,7 +568,11 @@ public partial class JournalPanel : CanvasLayer
             ? "Stars and comets have no surface to pin"
             : "Click the spot on the place's globe (Esc cancels)";
         _unpinButton.Visible = entry.Location?.Pin is not null;
+        _kind.Select(entry.Kind is LoreKind kind
+            ? Array.IndexOf(LoreWords.EntryKinds, kind) + 1
+            : 0);
         _links.Text = LinksText(entry);
+        ShowTies(entry);
         _dates.Text = $"Written {entry.CreatedUtc.ToLocalTime():g}  ·  " +
             $"edited {entry.EditedUtc.ToLocalTime():g}";
         _syncing = false;
