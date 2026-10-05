@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 31: Lore Relationship Diagrams** · In progress (owner's choice, 2026-10-05)
+**Milestone 31: Lore Relationship Diagrams** · Complete (PR #81 merged 2026-10-05; owner's choice, 2026-10-05)
 Diagrams of how characters, factions, and nations are tied together (`LORE-04`). Owner's
 decisions:
 - **The boxes are journal entries,** which gain an optional kind (character, faction, nation,
