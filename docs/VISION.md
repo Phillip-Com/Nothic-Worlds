@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 32: Metric and Imperial Units** · In progress (owner's idea and choice, 2026-10-05)
+**Milestone 32: Metric and Imperial Units** · Complete (PR #83 merged 2026-10-05; owner's idea and choice, 2026-10-05)
 A switch between metric and imperial for every measurement (`UI-04`). Owner's decisions:
 - **A setting in File ▸ Settings, for this computer**, not saved in worlds (which always store
   metric, so they read right on anyone's machine).
