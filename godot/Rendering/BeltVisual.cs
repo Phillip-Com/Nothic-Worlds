@@ -74,6 +74,13 @@ public sealed class BeltVisual
     }
 
     /// <summary>Removes the rocks.</summary>
+    /// <summary>Whether the belt is drawn.</summary>
+    public bool Visible
+    {
+        get => _node.Visible;
+        set => _node.Visible = value;
+    }
+
     public void Free() => _node.QueueFree();
 
     // Each rock: its orbit (distance, starting angle, tilt, and tilt direction) and its look

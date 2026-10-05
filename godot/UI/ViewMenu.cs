@@ -1,4 +1,5 @@
 using Godot;
+using NothicWorlds.Controls;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 using NothicWorlds.Rendering;
@@ -44,6 +45,9 @@ public partial class ViewMenu : Node
     /// <summary>The live weather drawn over the globes: clouds, wind, and their detail.</summary>
     [Export] public WeatherDisplay? LiveWeather { get; set; }
 
+    /// <summary>Standing on a world in first person (VISION.md REN-06).</summary>
+    [Export] public FirstPersonMode? Standing { get; set; }
+
     private enum MenuItem
     {
         Pins,
@@ -61,6 +65,7 @@ public partial class ViewMenu : Node
     }
 
     private const int StyleMenuId = 100;
+    private const int StandMenuId = 102;
 
     // The relief exaggerations offered (owner's choice: about 1× to 50×).
     private static readonly int[] _reliefChoices = [1, 5, 10, 20, 50];
@@ -82,6 +87,10 @@ public partial class ViewMenu : Node
         PopupMenu menu = _button.GetPopup();
         // Explicit ids: one left out is the item's position, which would clash with MenuItem's.
         menu.AddSubmenuNodeItem("Style", BuildStyleMenu(), StyleMenuId);
+        menu.AddItem("Stand Here", StandMenuId);
+        menu.SetItemTooltip(menu.GetItemIndex(StandMenuId),
+            "Stand on the selected planet or moon at the middle of the view, and look around " +
+            "in first person: walk, fly, and watch the sky (Esc to come back)");
         menu.AddSeparator(id: StyleMenuId + 1);
         menu.AddCheckItem("Pins", (int)MenuItem.Pins);
         menu.AddCheckItem("Weather Pins", (int)MenuItem.WeatherPins);
@@ -110,7 +119,17 @@ public partial class ViewMenu : Node
         menu.AddSubmenuNodeItem("Relief", BuildReliefMenu());
         menu.AddSubmenuNodeItem("Relief Shading", BuildReliefShadingMenu());
         menu.AboutToPopup += () => ShowChecks(menu);
-        menu.IdPressed += id => Toggle((MenuItem)(int)id);
+        menu.IdPressed += id =>
+        {
+            if (id == StandMenuId)
+            {
+                Standing?.StandOnSelected();
+            }
+            else
+            {
+                Toggle((MenuItem)(int)id);
+            }
+        };
         Toolbar.MenuArea.AddChild(_button);
     }
 

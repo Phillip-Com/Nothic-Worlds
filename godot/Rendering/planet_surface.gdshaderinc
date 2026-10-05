@@ -691,10 +691,18 @@ float map_shade(vec3 normal, vec3 direction) {
 #endif
 
 void vertex() {
-	local_direction = VERTEX;
-	if (has_heights && !flat_disc && !lifted_on_cpu) {
-		vec3 direction = normalize(VERTEX);
-		VERTEX = direction * (1.0 + height_at(direction, 0.0) * relief_scale);
+	// The ground around a first-person eye (VISION.md REN-06, FirstPersonGround) is built
+	// around the eye, not the globe's middle, so its positions keep their precision; it brings
+	// each point's direction from the globe's middle along (CUSTOM0, w = 1) and is lifted
+	// already. Other meshes have no CUSTOM0 (it reads as 0).
+	if (CUSTOM0.w > 0.5) {
+		local_direction = CUSTOM0.xyz;
+	} else {
+		local_direction = VERTEX;
+		if (has_heights && !flat_disc && !lifted_on_cpu) {
+			vec3 direction = normalize(VERTEX);
+			VERTEX = direction * (1.0 + height_at(direction, 0.0) * relief_scale);
+		}
 	}
 }
 
