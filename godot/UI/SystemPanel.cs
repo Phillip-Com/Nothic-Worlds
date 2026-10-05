@@ -45,6 +45,8 @@ public partial class SystemPanel : CanvasLayer
     private SpinBox _axialTilt = null!;
     private SpinBox _axisDirection = null!;
     private SpinBox _temperature = null!;
+    private CheckBox _atmosphere = null!;
+    private Label _atmosphereLabel = null!;
     private SpinBox _density = null!;
     private Button _typicalDensity = null!;
     private Label _mass = null!;
@@ -256,6 +258,23 @@ public partial class SystemPanel : CanvasLayer
             Body.MaxAverageTemperatureC, 0.5, "°C", CommitTemperature);
         _temperature.TooltipText = "The body's average surface temperature over a year " +
             "(Earth: about 15 °C). Weather pins spread it by latitude and season";
+        _atmosphereLabel = new Label { Text = "Atmosphere" };
+        grid.AddChild(_atmosphereLabel);
+        _atmosphere = new CheckBox
+        {
+            Text = "Has air",
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Air brings live weather: clouds, rain and snow, and wind " +
+                "(View ▸ Clouds, View ▸ Wind)",
+        };
+        _atmosphere.Toggled += on =>
+        {
+            if (!_syncing && Session is not null)
+            {
+                Session.SetAtmosphere(Session.SelectedBodyId, on);
+            }
+        };
+        grid.AddChild(_atmosphere);
         AddDensityFields(grid);
         AddAppearanceFields(grid);
         layout.AddChild(grid);
@@ -487,6 +506,7 @@ public partial class SystemPanel : CanvasLayer
         _axialTilt.ShowValue(body.AxialTiltDegrees);
         _axisDirection.ShowValue(body.AxialTiltDirectionDegrees);
         _temperature.ShowValue(body.AverageTemperatureC);
+        _atmosphere.SetPressedNoSignal(body.HasAtmosphere);
         ShowDensity(body);
         ShowAppearance(body);
 
@@ -494,6 +514,7 @@ public partial class SystemPanel : CanvasLayer
         _temperature.Visible = body.HasSurface;
         _temperature.GetParent().GetChild<Control>(_temperature.GetIndex() - 1).Visible =
             body.HasSurface;
+        _atmosphere.Visible = _atmosphereLabel.Visible = body.HasSurface;
 
         _orbitFields.Visible = body.Orbit is not null;
         _noOrbit.Visible = body.Orbit is null;

@@ -4,6 +4,7 @@ using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Maps;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Maps;
+using NothicWorlds.Rendering;
 using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
@@ -78,6 +79,12 @@ public partial class MapPanel : CanvasLayer
     /// </summary>
     public bool IsEditingPoints { get; private set; }
 
+    /// <summary>
+    /// The live weather, whose clouds hide while the panel is open (owner's choice), so the
+    /// ground shows.
+    /// </summary>
+    [Export] public WeatherDisplay? Weather { get; set; }
+
     /// <summary>Whether the panel is open (it's still hidden while the toolbar is).</summary>
     public bool IsPanelOpen
     {
@@ -85,6 +92,7 @@ public partial class MapPanel : CanvasLayer
         set
         {
             _open = value;
+            Weather?.SetSurfaceEditing("Map", value);
             UpdateVisibility();
         }
     }

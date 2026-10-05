@@ -141,9 +141,44 @@ public partial class PlanetSurface : MeshInstance3D
         }
     }
 
-    /// <summary>The way to the star, in the planet's own space, for the rings' shadow.</summary>
-    public void SetRingSun(Vector3 direction) =>
-        SurfaceMaterial.SetShaderParameter("ring_sun", direction);
+    /// <summary>
+    /// The way to the star, in the planet's own space: for the rings' shadow, and for live
+    /// weather, which fades by night.
+    /// </summary>
+    public void SetSunDirection(Vector3 direction) =>
+        SurfaceMaterial.SetShaderParameter("sun_direction", direction);
+
+    /// <summary>
+    /// Draws live weather over the surface (VISION.md WTH-02): two snapshots and how far the
+    /// clock is from the older to the newer (0 to 1), at a clock time (standard days). See
+    /// <see cref="WeatherSnapshots"/>.
+    /// </summary>
+    public void ShowWeather(Texture2D weatherOld, Texture2D weatherNew, Texture2D windOld,
+        Texture2D windNew, float blend, double clockDays)
+    {
+        ShaderMaterial material = SurfaceMaterial;
+        material.SetShaderParameter("has_weather", true);
+        material.SetShaderParameter("weather_old", weatherOld);
+        material.SetShaderParameter("weather_new", weatherNew);
+        material.SetShaderParameter("wind_old", windOld);
+        material.SetShaderParameter("wind_new", windNew);
+        material.SetShaderParameter("weather_blend", blend);
+        material.SetShaderParameter("weather_clock", (float)(clockDays % 1000));
+    }
+
+    /// <summary>
+    /// Which parts of the weather show (clouds with rain and snow, the wind), and how finely.
+    /// </summary>
+    public void SetWeatherLook(bool clouds, bool wind, CloudDetail detail)
+    {
+        ShaderMaterial material = SurfaceMaterial;
+        material.SetShaderParameter("show_clouds", clouds);
+        material.SetShaderParameter("show_wind", wind);
+        material.SetShaderParameter("cloud_detail", detail == CloudDetail.High ? 1f : 0f);
+    }
+
+    /// <summary>Stops drawing live weather.</summary>
+    public void HideWeather() => SurfaceMaterial.SetShaderParameter("has_weather", false);
 
     /// <summary>True if a map image is currently applied.</summary>
     public bool HasMap { get; private set; }

@@ -99,4 +99,21 @@ public partial class WorldSession
         MarkChanged(systemChanged: false);
         return null;
     }
+
+    /// <summary>
+    /// Gives a planet or moon air, and so live weather, or takes it away (VISION.md WTH-02), as
+    /// one undo step.
+    /// </summary>
+    public void SetAtmosphere(Guid bodyId, bool hasAtmosphere)
+    {
+        if (FindBody(bodyId) is not Body body || !body.HasSurface
+            || body.HasAtmosphere == hasAtmosphere)
+        {
+            return;
+        }
+
+        RecordUndo(hasAtmosphere ? $"Give {body.Name} Air" : $"Take {body.Name}'s Air");
+        body.HasAtmosphere = hasAtmosphere;
+        MarkChanged(systemChanged: false);
+    }
 }
