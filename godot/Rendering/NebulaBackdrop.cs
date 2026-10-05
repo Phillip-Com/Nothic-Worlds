@@ -33,6 +33,12 @@ public partial class NebulaBackdrop : Node
     /// <summary>The scene's environment, whose background shows the nebulas.</summary>
     [Export] public WorldEnvironment? Environment { get; set; }
 
+    /// <summary>
+    /// The painted sky with the nebulas (laid out as nebula_sky.gdshader reads it), or null when
+    /// there are none; for the sky seen from a world's surface (VISION.md REN-06).
+    /// </summary>
+    public Texture2D? SkyTexture { get; private set; }
+
     public override void _Ready()
     {
         if (Session is null || Environment?.Environment is not Godot.Environment environment)
@@ -104,6 +110,7 @@ public partial class NebulaBackdrop : Node
     {
         if (pixels.Length == 0)
         {
+            SkyTexture = null;
             environment.BackgroundMode = Godot.Environment.BGMode.Color;
             return;
         }
@@ -111,7 +118,8 @@ public partial class NebulaBackdrop : Node
         var bytes = new byte[pixels.Length * sizeof(float)];
         Buffer.BlockCopy(pixels, 0, bytes, 0, bytes.Length);
         Image image = Image.CreateFromData(SkyWidth, SkyHeight, false, Image.Format.Rgbf, bytes);
-        _material.SetShaderParameter("nebula_sky", ImageTexture.CreateFromImage(image));
+        SkyTexture = ImageTexture.CreateFromImage(image);
+        _material.SetShaderParameter("nebula_sky", SkyTexture);
         environment.BackgroundMode = Godot.Environment.BGMode.Sky;
     }
 }

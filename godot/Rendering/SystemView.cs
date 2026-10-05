@@ -126,6 +126,20 @@ public partial class SystemView : Node3D
     /// </summary>
     public Vector3D Origin { get; private set; }
 
+    /// <summary>
+    /// The body a first-person eye stands on (VISION.md REN-06), or null. While set, the scene
+    /// is centered on the eye, so the ground right around it keeps its precision, and the other
+    /// bodies, orbit lines, and belts are hidden: the sky draws the bodies at their true size
+    /// instead.
+    /// </summary>
+    public Guid? StandingOn { get; set; }
+
+    /// <summary>
+    /// Where the eye is, in the standing body's own frame (its radii from its middle, as on its
+    /// map: +Y north).
+    /// </summary>
+    public Vector3D StandingEye { get; set; }
+
     /// <summary>Each body's display position and size, as last placed.</summary>
     public IReadOnlyDictionary<Guid, DisplayBody> Layout => _layout;
 
@@ -403,6 +417,13 @@ public partial class SystemView : Node3D
             radius = focusRadius;
         }
 
+        if (StandingOn is Guid standing && world.Bodies.Find(b => b.Id == standing) is Body ground
+            && _layout.TryGetValue(standing, out DisplayBody stand))
+        {
+            Origin = stand.Position
+                + BodyOrientation.ToSystem(ground, world.TimeDays, StandingEye) * stand.Radius;
+        }
+
         bool anyStar = false;
         foreach (Body body in world.Bodies)
         {
@@ -420,6 +441,10 @@ public partial class SystemView : Node3D
 
         PlaceBelts(world);
         FollowFocusedSurface(world);
+        if (StandingOn is not null)
+        {
+            HideAllBut(StandingOn.Value);
+        }
 
         if (FallbackLight is not null)
         {
@@ -501,6 +526,33 @@ public partial class SystemView : Node3D
         }
     }
 
+    // While standing on a body: only it is drawn (its lights stay on, to light the ground).
+    private void HideAllBut(Guid standing)
+    {
+        foreach ((Guid id, BodyVisual visual) in _visuals)
+        {
+            if (id != standing)
+            {
+                visual.Root.Visible = false;
+            }
+
+            if (visual.OrbitLine is not null)
+            {
+                visual.OrbitLine.Visible = false;
+            }
+
+            if (visual.Tail is not null)
+            {
+                visual.Tail.Mesh.Visible = false;
+            }
+        }
+
+        foreach (BeltVisual belt in _belts.Values)
+        {
+            belt.Visible = false;
+        }
+    }
+
     private static void Hide(BodyVisual visual)
     {
         visual.Root.Visible = false;
@@ -570,6 +622,7 @@ public partial class SystemView : Node3D
                     _belts[belt.Id] = visual;
                 }
 
+                visual.Visible = true;  // Hidden only while standing on a world
                 visual.Place(ToScene(place.Position), place.Radius, star, world.TimeDays, _scale);
             }
         }

@@ -117,7 +117,7 @@ Stand on a world and look up (`REN-06`). Owner's decisions:
   overhead, the ground and horizon, and a compass with readouts (names and heights on hover).
 - **Base tier** (measured on the baseline laptop; `REN-06` was "Advanced, probably").
 - **Three PRs:** the sky in Core (PR #77), the first-person view with walking, flying, and the
-  sky, then the ground, weather overhead, and readouts.
+  sky (PR #78), then the ground, weather overhead, and readouts.
 - Known limit: the ground from eye level is only as sharp as the map (an 8k map is about 5 km
   a pixel on an Earth-sized planet).
 
@@ -675,7 +675,7 @@ as realistic or simple.
   an added block. Benchmark (Painterly against `main`, back to back): 193/193 vs 192/200 fps,
   same memory.
 
-**REN-06 — First-person surface view** · In Progress (M30: PR #77) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · In Progress (M30: PRs #77, #78) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Implementation (the sky in Core, M30, PR #77):**
 - **`BodyOrientation.ToSystem(body, time, direction)`:** turns a direction on the body (its map's
@@ -695,6 +695,33 @@ as realistic or simple.
   0.6°); the time it's up is the climate's daylight (within 15 minutes); it rises in the east
   and sets in the west; it's about half a degree across; a moon goes from new to full and is
   full opposite the sun; only globes get a sky; and the same moment gives the same sky.
+
+**Implementation (standing on a world, M30, PR #78):**
+- **`Controls/FirstPersonMode.cs`:** **View ▸ Stand Here** stands on the spot at the screen's
+  middle (`GlobePicker.PointAt`; flat worlds and stars refused). It makes its own camera
+  current, pauses the globe camera (its W/A/S/D panning would otherwise run underneath), hides
+  the editing panels and markers listed in `HideWhileStanding`, and puts everything back on
+  **Esc**. Moves along great circles at a pace the wheel steps through (walking pace to
+  300 km/s); walking keeps the eye 1.7 m above the drawn ground (a carved hole's floor
+  included), flying holds its height. Look by dragging; **F** flies, **M** magnifies.
+- **Precision:** an Earth-sized globe in floats only resolves to about half a meter, so while
+  standing `SystemView` puts the scene's origin at the eye (`StandingOn`, `StandingEye`) and
+  hides every other body, orbit line, tail, and belt (the lights stay, to light the ground).
+  The camera sits at the origin with its near plane scaled to the eye's height.
+- **`Rendering/FirstPersonGround.cs`:** rings of mesh around the spot (96 × 72, fine underfoot
+  and spreading out geometrically to beyond the horizon), kept relative to the spot so they
+  stay sharp, drawn with the globe's own material; each point's direction from the globe's
+  middle rides in `CUSTOM0`, which `planet_surface.gdshaderinc` reads in place of the vertex
+  for this mesh. Rebuilt only after moving a quarter of the eye's height or when the relief
+  changes.
+- **`Rendering/surface_sky.gdshader`** (a sky shader, filled each frame from Core's `SkyView`):
+  a day gradient with a sunset glow by the sun's height (full a little after sunrise, a
+  quarter as it touches the horizon, gone 3° below), then space (the nebula backdrop through
+  `NebulaBackdrop.SkyTexture`, or the background, plus stars fixed to the system) once the sun
+  is 2° down; up to 12 bodies as discs at true size, lit on the side toward their star so
+  moons show phases (magnified to at least 0.8° across); the sun's disc and its glare.
+- **Performance** (this machine, fullscreen, uncapped): 94–106 fps standing, against
+  121–186 fps on the globe; the regular benchmark is unchanged.
 
 
 ### 4.2 Interface Layout (`UI`)
