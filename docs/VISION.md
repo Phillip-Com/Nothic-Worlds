@@ -108,6 +108,11 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 28: Small Fixes** · In progress (owner's choice, 2026-10-05)
+One tidy-up PR for issues found along the way (PR #74): the dotted line the grid drew along the
+date line, which also bent the wind's streaks there, and clicks that ignored holes carved by
+shapes (see `BOD-04`).
+
 **Milestone 27: Live Weather** · Complete (PR #73 merged 2026-10-05; owner's choice, 2026-10-04)
 Watch the weather move across a world (`WTH-02`). Owner's decisions:
 - **Worked out from the time,** not stepped forward: any date's weather is ready at once and
@@ -1480,6 +1485,23 @@ built from both. Heights come first (M24), shapes next.
   (the preview while dragging, carved on release), typing a negative depth, Delete, and undo.
   Benchmark: not run; nothing is drawn differently outside Shapes mode, and the handles redraw
   only while it's on.
+**Fixed (M28, PR #74):**
+- **Clicks reach into holes:** on a carved globe, `GlobePicker.PointAt` finds where the click
+  meets the carving itself (`ShapedGlobe.RayHit`, Godot's `TriangleMesh` of the drawn mesh),
+  so pins, the brush, and the shape tools pick the spot actually under the mouse. A shape
+  clicked into a hole or hollow goes at that depth (`PlanetSurface.TrueHeightKmOf` takes the
+  relief's exaggeration back out; `WorldSession.AddShape`'s `groundKm`): an added box sits on a
+  pit's floor. Clicks within 0.1% of the radius of the sculpted ground count as the ground,
+  since the coarse carving's flat facets sit a little inside it.
+- **The date line:** longitude jumps from 180 to −180 there, which the GPU took for a huge step
+  per pixel: the grid drew a dotted line along it, and live weather's wind streaks and snow
+  dots (laid out by longitude × cos latitude, which also sheared them far from longitude 0)
+  came out wide and slanted. The grid now measures longitude's step both ways round and takes
+  the smaller (`longitude_width`); the weather lays its streaks and dots out in square cells
+  along each row of latitude (`globe_cell`), sized by the globe's own angle per pixel.
+- **Verified in the running app:** the night side across the date line (no dotted line, even
+  streaks), and a box placed by a real click onto the floor of a 600 km-deep pit (its bottom
+  at −600 km). Benchmark: unchanged against `main` (177/177 vs 177/179 fps).
 
 **BOD-05 — Terrain/biome painting** · Implemented (M11: PR #33, #34, #35) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.
