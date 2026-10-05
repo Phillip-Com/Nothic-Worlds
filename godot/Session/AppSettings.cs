@@ -21,6 +21,7 @@ public static class AppSettings
     private const string AntiAliasingKey = "anti_aliasing";
     private const string RenderScaleKey = "render_scale";
     private const string FrameRateKey = "frame_rate_limit";
+    private const string HighQualityMapsKey = "high_quality_maps";
 
     /// <summary>
     /// The graphics options (File ▸ Settings; VISION.md REN-03). Any never saved (or unreadable)
@@ -47,6 +48,15 @@ public static class AppSettings
         file.SetValue(DisplaySection, RenderScaleKey, options.RenderScale.ToString());
         file.SetValue(DisplaySection, FrameRateKey, options.FrameRateLimit.ToString());
         Write(file);
+    }
+
+    /// <summary>
+    /// Whether imported maps are kept uncompressed (File ▸ Settings, Advanced; VISION.md REN-03).
+    /// </summary>
+    public static bool HighQualityMaps
+    {
+        get => Load().GetValue(DisplaySection, HighQualityMapsKey, false).AsBool();
+        set => Save(HighQualityMapsKey, value);
     }
 
     /// <summary>Whether relief is shaded map-style (View ▸ Relief Shading).</summary>

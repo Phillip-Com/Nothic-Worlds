@@ -302,7 +302,8 @@ Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 Camera = NodePath("../PlanetCamera")
 
-[node name="GraphicsSettings" type="Node" parent="." node_paths=PackedStringArray("System", "LiveWeather")]
+[node name="GraphicsSettings" type="Node" parent="." node_paths=PackedStringArray("System", "LiveWeather", "Session")]
 script = ExtResource("37_graphics_settings")
+Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 LiveWeather = NodePath("../WeatherDisplay")

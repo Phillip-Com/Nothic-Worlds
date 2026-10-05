@@ -186,12 +186,17 @@ public static class MapImageLoader
 
         // S3TC compression (owner decision): an 8k map uses ~137 MB of graphics memory instead
         // of ~497 MB on the baseline laptop, at the cost of ~2 s extra load time and slight
-        // blockiness on fine detail. If it fails, keep the uncompressed image instead of failing
-        // the import.
-        Error compressResult = image.Compress(Image.CompressMode.S3Tc, Image.CompressSource.Srgb);
-        if (compressResult != Error.Ok)
+        // blockiness on fine detail; unless high-quality maps are on (see MapQuality). If it
+        // fails, keep the uncompressed image instead of failing the import.
+        if (!MapQuality.Uncompressed)
         {
-            GD.PushWarning($"Map compression failed ({compressResult}); using it uncompressed.");
+            Error compressResult =
+                image.Compress(Image.CompressMode.S3Tc, Image.CompressSource.Srgb);
+            if (compressResult != Error.Ok)
+            {
+                GD.PushWarning(
+                    $"Map compression failed ({compressResult}); using it uncompressed.");
+            }
         }
 
         return (image, check);

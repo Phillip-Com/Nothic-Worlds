@@ -1597,6 +1597,45 @@ public partial class WorldSession : Node
         return (textures, failed);
     }
 
+    /// <summary>
+    /// Loads the selected body's map and every map piece again, so a change to how maps are
+    /// prepared (high-quality maps, VISION.md REN-03) shows. Does nothing while a save or open
+    /// is running; maps loaded later follow the change anyway.
+    /// </summary>
+    /// <returns>Why the map couldn't be shown, or null.</returns>
+    public async Task<string?> ReloadMapsAsync()
+    {
+        if (IsBusy)
+        {
+            return null;
+        }
+
+        SetBusy(true);
+        try
+        {
+            (Dictionary<Guid, Texture2D> textures, _) = await BakePiecesAsync(
+                [.. World.Bodies.SelectMany(body => body.Surface.Pieces)], _assets);
+
+            // Replaced one by one: textures only the undo history still uses stay.
+            foreach ((Guid id, Texture2D texture) in textures)
+            {
+                _pieceTextures[id] = texture;
+            }
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+
+        foreach (Body body in World.Bodies)
+        {
+            ShowPieces(body);
+        }
+
+        _fullMap = null;
+        return await ShowMapsAsync();
+    }
+
     // Makes every globe show the right map: the selected body's at full size (loading it if
     // needed), the others as previews (loaded in the background).
     private async Task<string?> ShowMapsAsync()

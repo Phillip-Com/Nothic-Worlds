@@ -19,6 +19,7 @@ public partial class SettingsWindow : AcceptDialog
     private Dropdown _antiAliasing = null!;
     private Dropdown _resolution = null!;
     private Dropdown _frameRate = null!;
+    private CheckBox _highQualityMaps = null!;
     private bool _showing;
 
     /// <summary>The graphics options. Set it before adding the window to the tree.</summary>
@@ -67,14 +68,31 @@ public partial class SettingsWindow : AcceptDialog
         }
 
         layout.AddChild(grid);
-        layout.AddChild(new Label
+        layout.AddChild(Note(
+            $"This computer's graphics: {RenderingServer.GetVideoAdapterName().Trim()} " +
+            $"(starts on {GraphicsSettings.DefaultQuality})."));
+
+        // The Advanced tier (owner's choice): heavier options, off unless chosen, and in no
+        // preset.
+        layout.AddChild(new HSeparator());
+        layout.AddChild(new Label { Text = "Advanced", ThemeTypeVariation = "HeaderSmall" });
+        _highQualityMaps = new CheckBox
         {
-            Text = $"This computer's graphics: {RenderingServer.GetVideoAdapterName().Trim()} " +
-                $"(starts on {GraphicsSettings.DefaultQuality}).",
-            AutowrapMode = TextServer.AutowrapMode.WordSmart,
-            CustomMinimumSize = new Vector2(ContentWidth, 0),
-            Modulate = new Color(1, 1, 1, 0.6f),
-        });
+            Text = "High-quality maps",
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Keeps imported maps uncompressed, for perfectly crisp detail",
+        };
+        _highQualityMaps.Toggled += on =>
+        {
+            if (!_showing)
+            {
+                Graphics.HighQualityMaps = on;
+            }
+        };
+        layout.AddChild(_highQualityMaps);
+        layout.AddChild(Note(
+            "Uses about 3½ times the video memory for maps (an 8k map: about 500 MB instead " +
+            "of 140 MB). For computers with plenty of graphics memory."));
         AddChild(layout);
         AboutToPopup += Refresh;
     }
@@ -90,6 +108,7 @@ public partial class SettingsWindow : AcceptDialog
         Pick(_antiAliasing, (int)options.AntiAliasing);
         Pick(_resolution, (int)options.RenderScale);
         Pick(_frameRate, (int)options.FrameRateLimit);
+        _highQualityMaps.SetPressedNoSignal(Graphics.HighQualityMaps);
         _showing = false;
     }
 
@@ -144,6 +163,14 @@ public partial class SettingsWindow : AcceptDialog
         grid.AddChild(dropdown);
         return dropdown;
     }
+
+    private static Label Note(string text) => new()
+    {
+        Text = text,
+        AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        CustomMinimumSize = new Vector2(ContentWidth, 0),
+        Modulate = new Color(1, 1, 1, 0.6f),
+    };
 
     private static void Pick(Dropdown dropdown, int id) =>
         dropdown.Select(dropdown.GetItemIndex(id));

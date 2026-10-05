@@ -47,11 +47,16 @@ public static class PieceTextureBaker
         ApplyMask(piece, outline);
         piece.GenerateMipmaps();
 
-        // With transparency this becomes DXT5: about a quarter of the memory of raw pixels.
-        Error compressed = piece.Compress(Image.CompressMode.S3Tc, Image.CompressSource.Srgb);
-        if (compressed != Error.Ok)
+        // With transparency this becomes DXT5: about a quarter of the memory of raw pixels
+        // (unless high-quality maps are on, see MapQuality).
+        if (!MapQuality.Uncompressed)
         {
-            GD.PushWarning($"Piece compression failed ({compressed}); using it uncompressed.");
+            Error compressed =
+                piece.Compress(Image.CompressMode.S3Tc, Image.CompressSource.Srgb);
+            if (compressed != Error.Ok)
+            {
+                GD.PushWarning($"Piece compression failed ({compressed}); using it uncompressed.");
+            }
         }
 
         return piece;
