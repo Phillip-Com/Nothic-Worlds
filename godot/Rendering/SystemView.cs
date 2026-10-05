@@ -580,10 +580,23 @@ public partial class SystemView : Node3D
         }
     }
 
-    // Shows, updates, or removes a body's rings (VISION.md BOD-03), and lights them and their
-    // shadow from its star.
+    // Tells a globe which way its star is (for its rings' shadow and its weather by night), and
+    // shows, updates, or removes its rings (VISION.md BOD-03), lit from the star.
     private void PlaceRings(BodyVisual visual, Body body)
     {
+        Vector3? sun = null;
+        if (visual.Surface is PlanetSurface globe)
+        {
+            Vector3 toStar = Session is not null
+                && Seasons.StarFor(Session.World.Bodies, body) is Body star
+                && _layout.TryGetValue(star.Id, out DisplayBody starPlace)
+                && _layout.TryGetValue(body.Id, out DisplayBody here)
+                ? ToGodotDirection(starPlace.Position - here.Position)
+                : Vector3.Up;
+            sun = (visual.Root.GlobalTransform.Basis.Inverse() * toStar).Normalized();
+            globe.SetSunDirection(sun.Value);
+        }
+
         if (body.Rings is not PlanetRings rings || visual.Surface is not PlanetSurface surface)
         {
             if (visual.Rings is not null)
@@ -602,15 +615,7 @@ public partial class SystemView : Node3D
             surface.SetRings(rings, visual.Rings.Normal, visual.Rings.Seed);
         }
 
-        Vector3 toStar = Session is not null
-            && Seasons.StarFor(Session.World.Bodies, body) is Body star
-            && _layout.TryGetValue(star.Id, out DisplayBody starPlace)
-            && _layout.TryGetValue(body.Id, out DisplayBody here)
-            ? ToGodotDirection(starPlace.Position - here.Position)
-            : Vector3.Up;
-        Vector3 local = (visual.Root.GlobalTransform.Basis.Inverse() * toStar).Normalized();
-        visual.Rings.Light(local);
-        surface.SetRingSun(local);
+        visual.Rings.Light(sun!.Value);  // A surface means the sun was worked out above
     }
 
     private static Vector3 ToGodotDirection(Vector3D vector) =>

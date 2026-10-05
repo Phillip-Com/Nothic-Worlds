@@ -133,14 +133,16 @@ uniform float grid_line_pixels = 1.2;
 uniform bool flat_disc = false;
 
 // The planet's rings (VISION.md BOD-03), for the shadow they cast: their radii (in planet
-// radii), their pattern, the plane they lie in (its normal), and the way to the star, both in
-// the planet's own space.
+// radii), their pattern, and the plane they lie in (its normal, in the planet's own space).
 uniform bool has_rings = false;
 uniform float ring_inner = 1.25;
 uniform float ring_outer = 2.3;
 uniform float ring_seed = 0.0;
 uniform vec3 ring_normal = vec3(0.0, 1.0, 0.0);
-uniform vec3 ring_sun = vec3(0.0, 1.0, 0.0);
+
+// The way to the star, in the planet's own space: for the rings' shadow, and for live weather,
+// which fades by night.
+uniform vec3 sun_direction = vec3(0.0, 1.0, 0.0);
 
 varying vec3 local_direction;
 
@@ -674,6 +676,8 @@ float map_shade(vec3 normal, vec3 direction) {
 	return clamp(1.0 + 0.6 * (facing - 1.0), 0.4, 1.5);
 }
 
+#include "res://Rendering/planet_weather.gdshaderinc"
+
 #ifdef STYLED
 #include "res://Rendering/planet_style.gdshaderinc"
 #endif
@@ -709,14 +713,20 @@ void fragment() {
 	// The rings' shadow: where the line from here toward the star crosses them. (A flat
 	// world's face is left unshadowed, as for eclipses.)
 	if (has_rings && !flat_disc) {
-		float facing = dot(ring_sun, ring_normal);
+		float facing = dot(sun_direction, ring_normal);
 		float ahead = abs(facing) > 1e-4 ? -dot(direction, ring_normal) / facing : -1.0;
 		if (ahead > 0.0) {
-			vec3 hit = direction + ring_sun * ahead;
+			vec3 hit = direction + sun_direction * ahead;
 			float radius = length(hit - ring_normal * dot(hit, ring_normal));
 			color *= 1.0 - 0.75 * ring_density(
 				(radius - ring_inner) / (ring_outer - ring_inner), ring_seed);
 		}
+	}
+
+	vec3 weather_glow = vec3(0.0);
+	if (has_weather) {
+		color = draw_weather(color, direction, radians(latitude), radians(longitude),
+			weather_glow);
 	}
 
 	if (show_grid) {
@@ -734,6 +744,7 @@ void fragment() {
 	}
 
 	ALBEDO = color;
+	EMISSION = weather_glow;
 	ROUGHNESS = 0.9;
 	if (lifted_on_cpu && !has_heights) {
 		// The carved globe's faces are flat: shade it as the round globe it is.

@@ -8,8 +8,9 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The View menu (VISION.md UI-01; owner's choice: the show/hide switches as checkable items in one
-/// menu): the world's Style (REN-05), then Pins, Weather Pins, Regions, Terrain, Season Markers,
-/// Meteor Shower Markers, Eclipse Markers, Grid (also the G key), and True Scale. The checkmarks
+/// menu): the world's Style (REN-05), then Pins, Weather Pins, Regions, Terrain, Clouds and Wind
+/// (WTH-02), Season Markers, Meteor Shower Markers, Eclipse Markers, Grid (also the G key), and
+/// True Scale. The checkmarks
 /// are refreshed each time it opens, so they always match what's shown.
 /// </summary>
 public partial class ViewMenu : Node
@@ -40,6 +41,9 @@ public partial class ViewMenu : Node
     /// <summary>The open world, whose style is chosen here.</summary>
     [Export] public WorldSession? Session { get; set; }
 
+    /// <summary>The live weather drawn over the globes: clouds, wind, and their detail.</summary>
+    [Export] public WeatherDisplay? LiveWeather { get; set; }
+
     private enum MenuItem
     {
         Pins,
@@ -52,6 +56,8 @@ public partial class ViewMenu : Node
         Grid,
         TrueScale,
         OrbitGuide,
+        Clouds,
+        Wind,
     }
 
     private const int StyleMenuId = 100;
@@ -81,6 +87,12 @@ public partial class ViewMenu : Node
         menu.AddCheckItem("Weather Pins", (int)MenuItem.WeatherPins);
         menu.AddCheckItem("Regions", (int)MenuItem.Regions);
         menu.AddCheckItem("Terrain", (int)MenuItem.Terrain);
+        menu.AddCheckItem("Clouds", (int)MenuItem.Clouds);
+        menu.AddCheckItem("Wind", (int)MenuItem.Wind);
+        menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.Clouds),
+            "Live weather on planets and moons with air: clouds, rain, and snow");
+        menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.Wind),
+            "Streaks flowing with the wind over planets and moons with air");
         menu.AddSeparator();
         menu.AddCheckItem("Season Markers", (int)MenuItem.SeasonMarkers);
         menu.AddCheckItem("Meteor Shower Markers", (int)MenuItem.ShowerMarkers);
@@ -98,6 +110,7 @@ public partial class ViewMenu : Node
         menu.AddSubmenuNodeItem("Relief", BuildReliefMenu());
         menu.AddSubmenuNodeItem("Relief Detail", BuildReliefDetailMenu());
         menu.AddSubmenuNodeItem("Relief Shading", BuildReliefShadingMenu());
+        menu.AddSubmenuNodeItem("Cloud Detail", BuildCloudDetailMenu());
         menu.AboutToPopup += () => ShowChecks(menu);
         menu.IdPressed += id => Toggle((MenuItem)(int)id);
         Toolbar.MenuArea.AddChild(_button);
@@ -122,6 +135,8 @@ public partial class ViewMenu : Node
         MenuItem.Terrain => System?.ShowTerrain ?? false,
         MenuItem.Grid => System?.ShowGrid ?? false,
         MenuItem.OrbitGuide => System?.ShowOrbitGuide ?? false,
+        MenuItem.Clouds => LiveWeather?.ShowClouds ?? false,
+        MenuItem.Wind => LiveWeather?.ShowWind ?? false,
         _ => System?.DisplayScale == SystemScale.True,
     };
 
@@ -159,6 +174,12 @@ public partial class ViewMenu : Node
                 break;
             case MenuItem.OrbitGuide when System is not null:
                 System.ShowOrbitGuide = on;
+                break;
+            case MenuItem.Clouds when LiveWeather is not null:
+                LiveWeather.ShowClouds = on;
+                break;
+            case MenuItem.Wind when LiveWeather is not null:
+                LiveWeather.ShowWind = on;
                 break;
         }
     }
@@ -242,6 +263,33 @@ public partial class ViewMenu : Node
         };
         styles.IdPressed += id => Session?.SetStyle((VisualStyle)(int)id);
         return styles;
+    }
+
+    // How finely clouds are drawn (owner's choice: a quality setting, remembered here).
+    private PopupMenu BuildCloudDetailMenu()
+    {
+        var detail = new PopupMenu();
+        detail.AddRadioCheckItem("Low", (int)CloudDetail.Low);
+        detail.SetItemTooltip(0, "Softer, coarser clouds: the lightest to draw");
+        detail.AddRadioCheckItem("High", (int)CloudDetail.High);
+        detail.SetItemTooltip(1, "Finer clouds with ragged edges");
+        detail.AboutToPopup += () =>
+        {
+            foreach (CloudDetail level in Enum.GetValues<CloudDetail>())
+            {
+                detail.SetItemChecked(detail.GetItemIndex((int)level),
+                    LiveWeather?.Detail == level);
+            }
+        };
+        detail.IdPressed += id =>
+        {
+            if (LiveWeather is not null)
+            {
+                LiveWeather.Detail = (CloudDetail)(int)id;
+                AppSettings.CloudDetail = LiveWeather.Detail;
+            }
+        };
+        return detail;
     }
 
     // How relief is shaded: by the sunlight, or map-style from a fixed direction.

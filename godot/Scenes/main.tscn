@@ -35,6 +35,7 @@
 [ext_resource type="Script" path="res://UI/LocalViewAids.cs" id="33_local_aids"]
 [ext_resource type="Script" uid="uid://bycuo01vgll24" path="res://Rendering/NebulaBackdrop.cs" id="34_nebula_backdrop"]
 [ext_resource type="Script" uid="uid://n530wo5yywp5" path="res://Controls/ShapeHandles.cs" id="35_shape_handles"]
+[ext_resource type="Script" uid="uid://c0sv1vlx28k5o" path="res://Rendering/WeatherDisplay.cs" id="36_weather_display"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -172,8 +173,9 @@ script = ExtResource("15_edit")
 Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 
-[node name="ViewMenu" type="Node" parent="." node_paths=PackedStringArray("Toolbar", "Pins", "Weather", "Regions", "Bodies", "Eclipses", "System", "Session")]
+[node name="ViewMenu" type="Node" parent="." node_paths=PackedStringArray("Toolbar", "Pins", "Weather", "Regions", "Bodies", "Eclipses", "System", "Session", "LiveWeather")]
 script = ExtResource("29_view_menu")
+LiveWeather = NodePath("../WeatherDisplay")
 Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 Pins = NodePath("../PinMarkers")
@@ -288,3 +290,9 @@ Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 Camera = NodePath("../PlanetCamera")
 Toolbar = NodePath("../MapToolbar")
+
+[node name="WeatherDisplay" type="Node" parent="." node_paths=PackedStringArray("Session", "System", "Camera")]
+script = ExtResource("36_weather_display")
+Session = NodePath("../WorldSession")
+System = NodePath("../SystemView")
+Camera = NodePath("../PlanetCamera")

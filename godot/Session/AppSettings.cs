@@ -17,6 +17,7 @@ public static class AppSettings
     private const string DisplaySection = "display";
     private const string ReliefDetailKey = "relief_detail";
     private const string MapShadingKey = "map_style_shading";
+    private const string CloudDetailKey = "cloud_detail";
 
     /// <summary>How finely sculpted globes are drawn (View ▸ Relief Detail).</summary>
     public static ReliefDetail ReliefDetail
@@ -31,6 +32,20 @@ public static class AppSettings
                 : ReliefDetail.Standard;
         }
         set => Save(ReliefDetailKey, value.ToString());
+    }
+
+    /// <summary>How finely live weather's clouds are drawn (View ▸ Cloud Detail).</summary>
+    public static CloudDetail CloudDetail
+    {
+        get
+        {
+            string name = (string)Load().GetValue(DisplaySection, CloudDetailKey,
+                nameof(CloudDetail.High));
+            return Enum.TryParse(name, out CloudDetail detail) && Enum.IsDefined(detail)
+                ? detail
+                : CloudDetail.High;
+        }
+        set => Save(CloudDetailKey, value.ToString());
     }
 
     /// <summary>Whether relief is shaded map-style (View ▸ Relief Shading).</summary>
