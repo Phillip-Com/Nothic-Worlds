@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 28: Small Fixes** · In progress (owner's choice, 2026-10-05)
+**Milestone 28: Small Fixes** · Complete (PR #74 merged 2026-10-05; owner's choice, 2026-10-05)
 One tidy-up PR for issues found along the way (PR #74): the dotted line the grid drew along the
 date line, which also bent the wind's streaks there, and clicks that ignored holes carved by
 shapes (see `BOD-04`).
