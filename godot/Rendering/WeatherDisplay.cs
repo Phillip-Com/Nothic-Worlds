@@ -37,7 +37,7 @@ public partial class WeatherDisplay : Node
     private double _lastClock = double.NaN;
     private double _clockRate;  // Standard days per second, smoothed
     private int _nextBody;
-    private CloudDetail _detail = AppSettings.CloudDetail;
+    private CloudDetail _detail = CloudDetail.High;
 
     /// <summary>The open world.</summary>
     [Export] public WorldSession? Session { get; set; }
@@ -79,8 +79,8 @@ public partial class WeatherDisplay : Node
     }
 
     /// <summary>
-    /// How finely clouds are drawn (View ▸ Cloud Detail; remembered on this computer by
-    /// <see cref="AppSettings"/>).
+    /// How finely clouds are drawn (a quality setting, in File ▸ Settings; see
+    /// <see cref="GraphicsSettings"/>).
     /// </summary>
     public CloudDetail Detail
     {

@@ -35,10 +35,14 @@ public partial class Benchmark : Node
             return;
         }
 
-        // Uncapped frame rate shows how much headroom there is above 60 fps.
+        // Uncapped frame rate shows how much headroom there is above 60 fps (whatever the
+        // frame-rate limit in File ▸ Settings; the other graphics options stay as set).
         DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+        Engine.MaxFps = 0;
+        Viewport viewport = GetViewport();
         GD.Print($"Benchmark: {RenderingServer.GetVideoAdapterName()}, " +
-            $"{GetViewport().GetVisibleRect().Size} px, " +
+            $"{viewport.GetVisibleRect().Size} px, smoothing {viewport.Msaa3D}/" +
+            $"{viewport.ScreenSpaceAA}, 3D at {viewport.Scaling3DScale:P0}, " +
             $"{WarmUpSeconds}s warm-up + {MeasureSeconds}s measured...");
     }
 
