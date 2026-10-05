@@ -92,9 +92,8 @@ Guide**.
 Sculpted planets and moons show their relief: mountains rise and basins sink, shaded by the
 light on their slopes. Real relief is tiny next to a planet, so **View ▸ Relief** exaggerates it
 (10× by default; True Scale shows it as it is). Pins, regions, and the camera keep to the raised
-ground. **View ▸ Relief Detail** trades sharper mountain outlines for speed (Low, Standard,
-High), and **View ▸ Relief Shading ▸ Map-style** lights relief from the northwest as on printed
-maps, so it shows at any time of day; both are remembered on this computer.
+ground. **View ▸ Relief Shading ▸ Map-style** lights relief from the northwest as on printed
+maps, so it shows at any time of day (remembered on this computer).
 
 **Live weather** moves over planets and moons with air (**Atmosphere: Has air** in the System
 panel; planets have it to start with, moons don't): clouds drift with the winds, storms spiral
@@ -102,8 +101,13 @@ through the middle latitudes, tropical storms with clear eyes form over warm sea
 summer, and rain (fine lines) and snow (dots) fall from the thickest clouds. Run the clock to
 watch it move; any date's weather is ready at once and always the same. Clouds step aside
 while the Terrain or Map panel is open, so you can see the ground. **View ▸ Clouds** hides
-them, **View ▸ Wind** shows the winds as streaks, and **View ▸ Cloud Detail** (Low or
-High, remembered on this computer) trades finer clouds for speed.
+them, and **View ▸ Wind** shows the winds as streaks.
+
+**File ▸ Settings…** holds settings for this computer. **Graphics Quality** (Low, Standard, or
+High) sets every graphics option at once: how finely relief and clouds are drawn, how edges
+are smoothed, the 3D view's resolution, and the frame-rate limit (fewer frames save battery).
+Each can also be set on its own. It starts on Standard on built-in graphics and High on a
+dedicated graphics card.
 
 **View ▸ Style** sets how the world is drawn: **Painterly** (the default: soft bands of light
 with brushed edges, a warm glow at dusk, and gentle outlines), **Realistic** (true lighting),

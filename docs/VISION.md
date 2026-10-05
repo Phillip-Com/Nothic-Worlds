@@ -108,6 +108,22 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
+**Milestone 29: Performance Tiers** · In progress (owner's choice, 2026-10-05)
+Keep the app light on modest computers and let stronger ones look their best (`REN-03`).
+Owner's decisions:
+- **A File ▸ Settings window** with a **Graphics Quality** preset (Low, Standard, High, or
+  Custom) that sets everything at once, each option below it; Relief Detail and Cloud Detail
+  move there from the View menu (View keeps show and hide).
+- **The options:** anti-aliasing, the 3D view's resolution, a frame-rate limit, relief and
+  cloud detail; plus **automatic level of detail** (always on).
+- **The Advanced tier** holds **high-quality map textures** (uncompressed), behind a switch
+  with a memory warning.
+- **The starting preset comes from the graphics chip:** Standard on integrated graphics, High
+  on a dedicated card (owner's choice after measuring the baseline laptop: it runs even 4×
+  anti-aliasing at ~140 fps, so Low would cost looks for nothing).
+- **Two PRs:** the Settings window and presets (PR #75), then level of detail and the
+  Advanced tier.
+
 **Milestone 28: Small Fixes** · Complete (PR #74 merged 2026-10-05; owner's choice, 2026-10-05)
 One tidy-up PR for issues found along the way (PR #74): the dotted line the grid drew along the
 date line, which also bent the wind's streaks there, and clicks that ignored holes carved by
@@ -496,14 +512,39 @@ retuned zoom limits, or rotating the camera toward the slid planet instead of sl
   (`src/NothicWorlds.Core/Geometry/`). Reuse these for pins, region outlines, and anything else
   placed by latitude/longitude.
 
-**REN-03 — Performance tiers** · In Progress (measurement tools done) · —
+**REN-03 — Performance tiers** · In Progress (M29: PR #75) · —
 **Intent:** Keep requirements low with level-of-detail, quality settings, and rendering only what's
 visible. Heavier features go in an opt-in **Advanced** section.
 **Implementation (M1, PR #3):** measurement tools only. The tiers themselves aren't built yet.
-**Quality settings (M24, PR #62):** the first one, **View ▸ Relief Detail** (Low, Standard,
-High: how finely sculpted globes' shapes are drawn, `BOD-04`). Settings that belong to the
-computer, not the world, live in `godot/Session/AppSettings.cs`, kept in Godot's per-user data
-folder (`user://settings.cfg`); a missing or damaged file gives the defaults.
+**Quality settings (M24, PR #62):** the first one, Relief Detail (Low, Standard, High: how
+finely sculpted globes' shapes are drawn, `BOD-04`; now in File ▸ Settings). Settings that
+belong to the computer, not the world, live in `godot/Session/AppSettings.cs`, kept in Godot's
+per-user data folder (`user://settings.cfg`); a missing or damaged file gives the defaults.
+**The Settings window and presets (M29, PR #75):**
+- **`UI/SettingsWindow.cs`** (File ▸ Settings…, opens even while a save runs): Graphics Quality
+  (Low, Standard, High; Custom shows when the options match none) and each option: Relief
+  detail, Cloud detail, Smooth edges (Off, Quick FXAA, Finest 4× MSAA), 3D resolution (100%,
+  75%, 50%), Frame rate (Match the screen, 60, 30 a second); with tooltips, and the computer's
+  graphics named. Changes apply at once.
+- **`Rendering/GraphicsOptions.cs`:** the options as one record, the presets (Low: Low relief
+  and clouds, no smoothing, 75%, 30 fps; Standard: Standard relief, High clouds, FXAA, 100%,
+  60 fps; High: High relief and clouds, 4× MSAA, 100%, the screen's rate), which preset a set
+  matches, and the starting one (`DefaultFor`: High on a discrete GPU, else Standard).
+- **`Rendering/GraphicsSettings.cs`** (a node in the scene) puts them into effect: the
+  viewport's MSAA, FXAA, and 3D scale, `Engine.MaxFps`, `SystemView.ReliefDetail`, and
+  `WeatherDisplay.Detail`. `AppSettings.LoadGraphics` takes any option never saved from the
+  starting preset (so earlier Relief and Cloud Detail choices carry over) and nothing is
+  written until the user changes something.
+- **Benchmark** (`-- --benchmark`): lifts the frame-rate limit and prints the smoothing and 3D
+  resolution it ran at, so results compare across settings.
+- **Measured** (baseline laptop, Vega 10, fullscreen): no smoothing ~147–171 fps (runs vary),
+  FXAA ~159–161, 4× MSAA ~139 (+76 MB video memory, a ~100 ms hitch on the first frame), 75%
+  resolution ~158, 50% ~206. Against `main`, the default Standard preset (FXAA) costs ~7%: 159/159
+  vs 171/171 fps.
+- **Verified in the running app** at 1152 × 648: File ▸ Settings… opened from the menu; Low, High,
+  and Standard each setting every option (and the viewport, frame cap, relief, and cloud
+  detail following), one option changed by itself showing Custom, and the choices saved (the
+  test's settings file removed afterwards).
 - `godot/Diagnostics/PerformanceOverlay.cs`: F3 shows FPS, video memory, app memory, and draw calls.
 - `godot/Diagnostics/Benchmark.cs`: run with `-- --benchmark`. It orbits and zooms for 10 s
   with VSync off, then prints the results. Use it to catch performance regressions.
@@ -2189,8 +2230,8 @@ the world.
   of the running clock (by how long the last one took and how fast the clock runs) so the
   blend never waits; a jump of the clock starts afresh. At 1 day a second the newest snapshot
   stays within about 0.01 day of the clock.
-- **Settings:** View ▸ Clouds (on) and View ▸ Wind (off); View ▸ Cloud Detail, Low or High
-  (the default), remembered on this computer (`AppSettings.CloudDetail`, `CloudDetail`).
+- **Settings:** View ▸ Clouds (on) and View ▸ Wind (off); Cloud Detail, Low or High (the
+  default), remembered on this computer (`CloudDetail`; in File ▸ Settings since M29).
   Clouds hide while the Terrain or Map panel is open, so the ground being edited shows
   (owner's choice; `WeatherDisplay.SetSurfaceEditing`); the wind stays if it's on. The cost
   with the weather showing, about 6%, is fine for Base (owner's choice).
