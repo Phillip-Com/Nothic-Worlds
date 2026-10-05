@@ -187,6 +187,65 @@ public sealed class SkyViewTests
     }
 
     [Fact]
+    public void AFlatWorldsSky_IsTheSameAcrossItsTop()
+    {
+        (World world, Body planet) = EarthLike();
+        planet.Shape = BodyShape.FlatDisc;
+
+        SkyBody middle = FlatSky(world, planet, new FlatSpot(FlatFace.Top, 0, 0), 30).Star!;
+        SkyBody nearRim = FlatSky(world, planet, new FlatSpot(FlatFace.Top, 2.5, -1.2), 30).Star!;
+
+        Assert.Equal(middle.AltitudeDegrees, nearRim.AltitudeDegrees, 2);
+    }
+
+    [Fact]
+    public void AFlatWorldsUnderside_SeesTheSkyTheOtherWayUp()
+    {
+        (World world, Body planet) = EarthLike();
+        planet.Shape = BodyShape.FlatDisc;
+
+        double top = FlatSky(world, planet, new FlatSpot(FlatFace.Top, 1, 1), 30)
+            .Star!.AltitudeDegrees;
+        double under = FlatSky(world, planet, new FlatSpot(FlatFace.Bottom, 1, 1), 30)
+            .Star!.AltitudeDegrees;
+
+        Assert.Equal(-top, under, 2);
+    }
+
+    [Fact]
+    public void OnAFlatWorld_DayAndNightComeToTheWholeDiscAtOnce()
+    {
+        (World world, Body planet) = EarthLike();
+        planet.Shape = BodyShape.FlatDisc;
+        var middle = new FlatSpot(FlatFace.Top, 0, 0);
+        var nearRim = new FlatSpot(FlatFace.Top, -2.8, 0.9);
+
+        // Through a day the coin-like disc tumbles, so its sun rises and sets...
+        List<double> heights = [.. Enumerable.Range(0, 48)
+            .Select(i => FlatSky(world, planet, middle, 30 + i / 48.0).Star!.AltitudeDegrees)];
+        Assert.True(heights.Max() > 10 && heights.Min() < -10,
+            $"{heights.Min():F1}° to {heights.Max():F1}°");
+
+        // ...at the same moment everywhere on its face.
+        foreach (double day in new[] { 30.1, 30.4, 30.7 })
+        {
+            Assert.Equal(FlatSky(world, planet, middle, day).Star!.AltitudeDegrees,
+                FlatSky(world, planet, nearRim, day).Star!.AltitudeDegrees, 2);
+        }
+
+        Assert.Null(FlatSky(world, planet, middle, 30).SolarTimeHours);
+    }
+
+    [Fact]
+    public void FlatSkies_AreOnlyForFlatWorlds()
+    {
+        (World world, Body planet) = EarthLike();
+
+        Assert.Null(SkyView.FromFlat(world.Bodies, planet, new FlatSpot(FlatFace.Top, 0, 0), 0,
+            0));
+    }
+
+    [Fact]
     public void TheSameMoment_AlwaysGivesTheSameSky()
     {
         (World world, Body planet) = EarthLike();
@@ -197,6 +256,9 @@ public sealed class SkyViewTests
 
         Assert.Equal(first.Bodies, second.Bodies);
     }
+
+    private static SkyView FlatSky(World world, Body planet, FlatSpot spot, double day) =>
+        SkyView.FromFlat(world.Bodies, planet, spot, 0, day)!;
 
     // The sky every StepMinutes through one standard day from `day`.
     private static List<SkyView> DayOfSky(World world, Body planet, GeoCoordinate spot,

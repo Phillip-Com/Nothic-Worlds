@@ -20,6 +20,22 @@ public static class BodyOrientation
     }
 
     /// <summary>
+    /// Turns a point or direction in the space the body is drawn in into the system's frame at
+    /// a time: for a globe, its own frame (as <see cref="ToSystem"/>); for a flat world, the
+    /// disc's space (<see cref="Geometry.FlatDisc"/>), which tumbles like a spinning coin
+    /// (owner's choice, VISION.md BOD-02): its spin axis lies across the disc, toward its +X,
+    /// and its top face (+Y) starts toward the globe frame's +Z. The same turn the 3D view
+    /// gives the disc.
+    /// </summary>
+    public static Vector3D ShapeToSystem(Body body, double timeDays, Vector3D shapeLocal)
+    {
+        Vector3D local = body.Shape == BodyShape.FlatDisc
+            ? new Vector3D(shapeLocal.Z, shapeLocal.X, shapeLocal.Y)
+            : shapeLocal;
+        return ToSystem(body, timeDays, local);
+    }
+
+    /// <summary>
     /// Turns a direction on the body (its own frame: +Y north, longitude 0 toward +Z, as on
     /// its map) into the system's frame at a time: spun by the day, then leaned by the axial
     /// tilt. The same turn the 3D view gives the globe, so what's drawn and what's worked out
