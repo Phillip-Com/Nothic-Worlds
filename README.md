@@ -107,7 +107,9 @@ them, and **View ▸ Wind** shows the winds as streaks.
 High) sets every graphics option at once: how finely relief and clouds are drawn, how edges
 are smoothed, the 3D view's resolution, and the frame-rate limit (fewer frames save battery).
 Each can also be set on its own. It starts on Standard on built-in graphics and High on a
-dedicated graphics card.
+dedicated graphics card. Globes small on screen are always drawn more simply, so a system full
+of sculpted moons stays smooth. **Advanced ▸ High-quality maps** keeps imported maps
+uncompressed, for perfect detail at about 3½ times the video memory.
 
 **View ▸ Style** sets how the world is drawn: **Painterly** (the default: soft bands of light
 with brushed edges, a warm glow at dusk, and gentle outlines), **Realistic** (true lighting),
