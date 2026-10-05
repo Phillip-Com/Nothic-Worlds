@@ -8,14 +8,19 @@ namespace NothicWorlds.UI;
 /// <summary>
 /// The relationship diagrams page (VISION.md LORE-04; owner's choice: a full-window page from
 /// the toolbar's Diagrams button). On the left: the world's diagrams (new, rename, delete), the
-/// journal entries to add to the one shown, the selected box's kind and buttons, Arrange, and
-/// whether to show every tie or only those standing at the clock's time. The rest is the
+/// journal entries to add to the one shown (with a button, or by dragging them onto it), the
+/// selected box's kind and buttons, Arrange, Save as Image, and whether to show every tie or
+/// only those standing at the clock's time. The rest is the
 /// <see cref="DiagramCanvas"/>. While it's open the 3D view stops drawing and its camera
 /// pauses; the toolbar and the clock stay on top, so the clock can still be run.
 /// </summary>
 public partial class DiagramPage : CanvasLayer
 {
     private const float SideWidth = 250, TopMargin = 64;
+
+    // The longest side a saved picture can have, in pixels: a size every graphics chip can
+    // draw.
+    private const float MaxPicturePixels = 8_192;
 
     private Control _root = null!;
     private ItemList _diagrams = null!;
@@ -28,6 +33,8 @@ public partial class DiagramPage : CanvasLayer
     private Label _selectedTitle = null!;
     private OptionButton _kind = null!;
     private Button _arrange = null!;
+    private Button _saveImage = null!;
+    private FileDialog _imageDialog = null!;
     private CheckBox _allTimes = null!;
     private DiagramCanvas _canvas = null!;
     private RelationshipDialog _dialog = null!;
@@ -113,6 +120,7 @@ public partial class DiagramPage : CanvasLayer
         _canvas.LinkRequested += (from, to) => _dialog.New(from, to);
         _canvas.RelationshipClicked += relationship => _dialog.Edit(relationship);
         _canvas.EntryOpened += OpenInJournal;
+        _canvas.EntriesDropped += AddEntries;
         _canvas.GuiInput += _ => ShowSelection();
         _root.AddChild(_canvas);
 
@@ -262,12 +270,15 @@ public partial class DiagramPage : CanvasLayer
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
         };
         _entries.ItemActivated += _ => AddSelectedEntries();
+        _entries.SetDragForwarding(Callable.From<Vector2, Variant>(DragEntries),
+            Callable.From<Vector2, Variant, bool>((_, _) => false),
+            Callable.From<Vector2, Variant>((_, _) => { }));
         list.AddChild(_entries);
         _add = new Button
         {
             Text = "Add to Diagram",
             TooltipText = "Put the chosen entries on the diagram, in the middle of the view " +
-                "(double-clicking one adds it too)",
+                "(or drag them onto it, or double-click one)",
         };
         _add.Pressed += AddSelectedEntries;
         list.AddChild(_add);
@@ -336,6 +347,23 @@ public partial class DiagramPage : CanvasLayer
             }
         };
         list.AddChild(_arrange);
+        _saveImage = new Button
+        {
+            Text = "Save as Image…",
+            TooltipText = "Save the whole diagram as a PNG picture, to share or print",
+        };
+        _saveImage.Pressed += AskWhereToSaveImage;
+        list.AddChild(_saveImage);
+        _imageDialog = new FileDialog
+        {
+            Title = "Save Diagram as Image",
+            FileMode = FileDialog.FileModeEnum.SaveFile,
+            Access = FileDialog.AccessEnum.Filesystem,
+            UseNativeDialog = true,
+            Filters = ["*.png ; PNG images"],
+        };
+        _imageDialog.FileSelected += path => _ = SaveImageAsync(path);
+        AddChild(_imageDialog);
         _allTimes = new CheckBox
         {
             Text = "Show every tie",
@@ -388,6 +416,7 @@ public partial class DiagramPage : CanvasLayer
         _delete.Disabled = current is null;
         _name.Editable = current is not null;
         _arrange.Disabled = current is null || current.Placements.Count == 0;
+        _saveImage.Disabled = _arrange.Disabled;
         _refreshing = false;
         ShowEntries();
         ShowSelection();
@@ -420,17 +449,45 @@ public partial class DiagramPage : CanvasLayer
     }
 
     // Puts the chosen entries in a row in the middle of the view.
-    private void AddSelectedEntries()
+    private void AddSelectedEntries() => AddEntries(ChosenEntries(), _canvas.MiddleSpot());
+
+    // The entries chosen in the list. Read before adding any: each addition refreshes the
+    // list, which renumbers it.
+    private Guid[] ChosenEntries() => [.. _entries.GetSelectedItems()
+        .Select(index => Guid.Parse(_entries.GetItemMetadata(index).AsString()))];
+
+    // Dragging from the list carries the chosen entries (or the one under the mouse, if it
+    // isn't chosen), with their titles shown under the mouse.
+    private Variant DragEntries(Vector2 at)
     {
-        if (CurrentDiagram() is not LoreDiagram diagram)
+        int under = _entries.GetItemAtPosition(at, exact: true);
+        if (under < 0)
+        {
+            return default;
+        }
+
+        if (!_entries.IsSelected(under))
+        {
+            _entries.Select(under);
+        }
+
+        Guid[] chosen = ChosenEntries();
+        var titles = new Label
+        {
+            Text = chosen.Length == 1 ? _entries.GetItemText(under) : $"{chosen.Length} entries",
+        };
+        _entries.SetDragPreview(titles);
+        return new Godot.Collections.Array([.. chosen.Select(id => Variant.From(id.ToString()))]);
+    }
+
+    // Puts entries in a row around a diagram spot, as one undo step.
+    private void AddEntries(Guid[] chosen, Vector2 middle)
+    {
+        if (CurrentDiagram() is not LoreDiagram diagram || chosen.Length == 0)
         {
             return;
         }
 
-        // Read before adding: each addition refreshes the list, which renumbers it.
-        Guid[] chosen = [.. _entries.GetSelectedItems()
-            .Select(index => Guid.Parse(_entries.GetItemMetadata(index).AsString()))];
-        Vector2 middle = _canvas.MiddleSpot();
         Session!.BeginGesture("Add to Diagram");
         for (int i = 0; i < chosen.Length; i++)
         {
@@ -473,6 +530,76 @@ public partial class DiagramPage : CanvasLayer
 
         LoreKind? kind = index == 0 ? null : LoreWords.EntryKinds[index - 1];
         Session.UpdateJournalEntry(entry with { Kind = kind });
+    }
+
+    private void AskWhereToSaveImage()
+    {
+        if (CurrentDiagram() is not LoreDiagram diagram)
+        {
+            return;
+        }
+
+        _imageDialog.CurrentDir = OS.GetSystemDir(OS.SystemDir.Pictures);
+        _imageDialog.CurrentFile = $"{SafeFileName(diagram.Name)}.png";
+        _imageDialog.PopupCentered();
+    }
+
+    // Draws the whole diagram into a picture off screen (owner's choice: every box, fitted with
+    // a margin, at twice normal detail, on the page's background, titled) and saves it.
+    private async Task SaveImageAsync(string path)
+    {
+        if (CurrentDiagram() is not { Placements.Count: > 0 } diagram)
+        {
+            return;
+        }
+
+        // Twice normal detail, or less if that would make a picture too big to save.
+        float zoom = 2;
+        (Vector2 size, Vector2 pan) = DiagramCanvas.PictureOf(diagram, zoom);
+        float fit = Math.Min(1, MaxPicturePixels / Math.Max(size.X, size.Y));
+        if (fit < 1)
+        {
+            zoom *= fit;
+            (size, pan) = DiagramCanvas.PictureOf(diagram, zoom);
+        }
+
+        var picture = new SubViewport
+        {
+            Size = new Vector2I((int)Math.Ceiling(size.X), (int)Math.Ceiling(size.Y)),
+            Disable3D = true,
+            RenderTargetUpdateMode = SubViewport.UpdateMode.Once,
+        };
+        var canvas = new DiagramCanvas
+        {
+            Session = Session!,
+            ForExport = true,
+            Title = diagram.Name,
+            ShowAllTimes = _canvas.ShowAllTimes,
+            Size = size,
+        };
+        picture.AddChild(canvas);
+        AddChild(picture);
+        canvas.ShowAt(diagram.Id, zoom, pan);
+        await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+        await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+        Error result = picture.GetTexture().GetImage().SavePng(path);
+        picture.QueueFree();
+        if (result == Error.Ok)
+        {
+            Toolbar?.ShowInfo($"Saved {System.IO.Path.GetFileName(path)}.");
+        }
+        else
+        {
+            Toolbar?.ShowError($"Couldn't save the picture ({result}).");
+        }
+    }
+
+    // A diagram's name as a file name: characters files can't have become dashes.
+    private static string SafeFileName(string name)
+    {
+        char[] bad = System.IO.Path.GetInvalidFileNameChars();
+        string safe = new([.. name.Select(c => bad.Contains(c) ? '-' : c)]);
+        return safe.Trim().Length == 0 ? "Diagram" : safe.Trim();
     }
 
     // Goes back to the globe with the entry open in the Journal panel.
