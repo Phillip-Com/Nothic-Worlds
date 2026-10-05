@@ -117,8 +117,8 @@ Watch the weather move across a world (`WTH-02`). Owner's decisions:
 - **An Atmosphere switch per body:** planets have air by default, moons don't (existing worlds
   too); only bodies with air have live weather. Format version 26.
 - **Base tier, with a cloud-detail quality setting** (`WTH-02` was Advanced; owner's choice).
-- **Three PRs:** the weather in Core (PR #71), drawing it on the globe, then today's weather
-  in weather pins.
+- **Three PRs:** the weather in Core (PR #71), drawing it on the globe (PR #72), then today's
+  weather in weather pins.
 
 **Milestone 26: Visual Styles** · Complete (PR #70 merged 2026-10-04; owner's choice, 2026-10-04)
 Let each world choose how it's drawn (`REN-05`). Owner's decisions:
@@ -2102,7 +2102,7 @@ season, etc. This is the lightweight version that works on any system.
   winters, wet June to September, 1,215 mm a year), a forest pin by the sea at 48° N (643 mm),
   and the same pin as desert (84 mm); the window fits and scrolls at the small size.
 
-**WTH-02 — Live weather simulation** · In Progress (M27: PR #71) · Base (owner's choice, 2026-10-04; was Advanced)
+**WTH-02 — Live weather simulation** · In Progress (M27: PRs #71–#72) · Base (owner's choice, 2026-10-04; was Advanced)
 **Intent:** As detailed as possible. Ideally the user can watch clouds and weather move across
 the world.
 **Implementation (the weather in Core, M27, PR #71):**
@@ -2140,6 +2140,42 @@ the world.
   places and tracks, storms turning the right way in each hemisphere, tropical storms only on
   warm worlds, a cyclone's cloudy middle and a tropical storm's clear eye, and flat worlds; plus
   the version 26 golden file, older files' atmospheres, and new moons being airless.
+**Implementation (drawing the weather, M27, PR #72):**
+- **Drawn in the planet's own surface** (`Rendering/planet_weather.gdshaderinc`, included by
+  `planet_surface.gdshaderinc` before the grid): clouds, rain and snow, and the wind over the
+  ground, lit like it in every style (`REN-05`), on carved and flat worlds too. A first try drew
+  a see-through shell over each globe; it cost about 18% of the frame rate on the baseline
+  laptop (192 → 158 fps), because every pixel of the globe was drawn twice. In the surface:
+  about 6% (192 → 180), and nothing at all with the weather hidden.
+  - **Snapshots:** `WeatherImages` turns a `WeatherMoment` into two images (cloud, rain, snow;
+    wind east and north), 256 × 128 spots (High) or 128 × 64 (Low), worked out across the
+    processor's cores. Each globe keeps an older and a newer one (`WeatherSnapshots`) and
+    blends between them as the clock moves.
+  - **Clouds:** soft and wandering at the edges in Painterly, soft in Realistic, crisp in
+    Simple; thin cloud is see-through; at High detail fine noise roughens the edges. Rain
+    clouds are darker. By night clouds mostly fade (`SystemView` now tells every globe which way
+    its star is, not only ringed ones), since the scene's ambient light would make them glow.
+  - **Rain** shows as fine slanting lines and **snow** as dots, about 7 and 10 pixels apart
+    whatever the zoom; the dry part of the globe skips them.
+  - **Wind** (View ▸ Wind): short streaks on a grid about 28 pixels apart, each pointing with
+    the wind at its middle, longer where it's stronger, brightest at the downwind end with a
+    pulse running along it; they glow faintly, so they show by night too. (Streaks along the
+    flow itself broke up wherever the wind turned.)
+- **`Rendering/WeatherDisplay.cs`:** works each body's `LiveWeather` out again on another
+  thread a moment after the world changes (from a copy of the bodies), and keeps the globes
+  fed: one snapshot at a time, only for globes at least 20 pixels across, made a little ahead
+  of the running clock (by how long the last one took and how fast the clock runs) so the
+  blend never waits; a jump of the clock starts afresh. At 1 day a second the newest snapshot
+  stays within about 0.01 day of the clock.
+- **Settings:** View ▸ Clouds (on) and View ▸ Wind (off); View ▸ Cloud Detail, Low or High
+  (the default), remembered on this computer (`AppSettings.CloudDetail`, `CloudDetail`).
+- **Atmosphere** in the System panel ("Has air", planets and moons):
+  `WorldSession.SetAtmosphere`, one undo step.
+- **Verified in the running app** with real clicks, maximized and at 1152 × 648: clouds in each
+  style by day and night, moving smoothly with the clock running, the wind, Low detail, a
+  cyclone and a tropical storm close up, the Atmosphere box (and undo) taking the weather away
+  and back, and the View menu's items. Benchmark: 180/179 fps against `main`'s 192/191 with
+  the weather showing; the same as `main` with View ▸ Clouds off.
 
 ### 4.9 Lore & Journal (`LORE`)
 
