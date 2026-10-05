@@ -225,7 +225,8 @@ public partial class WorldSession
     }
 
     /// <summary>
-    /// Deletes a journal entry, and its links from timeline events, as one undo step.
+    /// Deletes a journal entry, with its links from timeline events, its relationships, and
+    /// its boxes on diagrams, as one undo step.
     /// </summary>
     public void DeleteJournalEntry(Guid entryId)
     {
@@ -237,17 +238,8 @@ public partial class WorldSession
 
         RecordUndo($"Delete {World.Journal[index].Title}");
         World.Journal.RemoveAt(index);
-        for (int i = 0; i < World.Events.Count; i++)
-        {
-            TimelineEvent timelineEvent = World.Events[i];
-            if (timelineEvent.EntryIds.Contains(entryId))
-            {
-                World.Events[i] = timelineEvent with
-                {
-                    EntryIds = [.. timelineEvent.EntryIds.Where(id => id != entryId)],
-                };
-            }
-        }
+        // Its links from events, its relationships, and its boxes on diagrams go with it.
+        LoreRules.ForgetEntry(World, entryId);
 
         MarkChanged(systemChanged: false);
     }

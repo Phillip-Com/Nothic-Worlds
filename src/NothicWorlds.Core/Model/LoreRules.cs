@@ -3,9 +3,9 @@ using NothicWorlds.Core.Geometry;
 namespace NothicWorlds.Core.Model;
 
 /// <summary>
-/// Rules that tie a world's regions, journal, timelines, and events together (VISION.md
-/// LORE-01, LORE-02, LORE-03): every link and reference points at something that exists, and
-/// nothing is listed twice.
+/// Rules that tie a world's regions, journal, timelines, events, relationships, and diagrams
+/// together (VISION.md LORE-01 to LORE-04): every link and reference points at something that
+/// exists, and nothing is listed twice.
 /// </summary>
 public static class LoreRules
 {
@@ -21,6 +21,12 @@ public static class LoreRules
     /// <summary>The most regions a world can hold.</summary>
     public const int MaxRegions = 5_000;
 
+    /// <summary>The most relationships a world can hold.</summary>
+    public const int MaxRelationships = 20_000;
+
+    /// <summary>The most diagrams a world can hold.</summary>
+    public const int MaxDiagrams = 200;
+
     /// <summary>What's wrong with the world's lore, or null if nothing.</summary>
     public static string? Problem(World world)
     {
@@ -31,10 +37,18 @@ public static class LoreRules
                 $"{MaxTimelines} timelines, {MaxEvents:N0} events, and {MaxRegions:N0} regions";
         }
 
+        if (world.Relationships.Count > MaxRelationships || world.Diagrams.Count > MaxDiagrams)
+        {
+            return $"a world can hold up to {MaxRelationships:N0} relationships and " +
+                $"{MaxDiagrams} diagrams";
+        }
+
         string? own = world.Regions.Select(r => r.Problem())
             .Concat(world.Journal.Select(e => e.Problem()))
             .Concat(world.Timelines.Select(t => t.Problem()))
             .Concat(world.Events.Select(e => e.Problem()))
+            .Concat(world.Relationships.Select(r => r.Problem()))
+            .Concat(world.Diagrams.Select(d => d.Problem()))
             .FirstOrDefault(problem => problem is not null);
         if (own is not null)
         {
@@ -44,9 +58,12 @@ public static class LoreRules
         if (HasDuplicates(world.Regions.Select(r => r.Id))
             || HasDuplicates(world.Journal.Select(e => e.Id))
             || HasDuplicates(world.Timelines.Select(t => t.Id))
-            || HasDuplicates(world.Events.Select(e => e.Id)))
+            || HasDuplicates(world.Events.Select(e => e.Id))
+            || HasDuplicates(world.Relationships.Select(r => r.Id))
+            || HasDuplicates(world.Diagrams.Select(d => d.Id)))
         {
-            return "two regions, journal entries, timelines, or events share an ID";
+            return "two regions, journal entries, timelines, events, relationships, or " +
+                "diagrams share an ID";
         }
 
         var entries = world.Journal.Select(e => e.Id).ToHashSet();
@@ -71,6 +88,17 @@ public static class LoreRules
             {
                 return $"the event '{timelineEvent.Title}' links to a missing journal entry";
             }
+        }
+
+        if (world.Relationships.Any(r => !entries.Contains(r.FromEntryId)
+                || !entries.Contains(r.ToEntryId)))
+        {
+            return "a relationship links to a missing journal entry";
+        }
+
+        if (world.Diagrams.Any(d => d.Placements.Any(p => !entries.Contains(p.EntryId))))
+        {
+            return "a diagram shows a missing journal entry";
         }
 
         IEnumerable<LoreLocation?> locations = world.Journal.Select(e => e.Location)
@@ -104,6 +132,46 @@ public static class LoreRules
     public static IEnumerable<TimelineEvent> EventsLinkedTo(World world, Guid entryId)
     {
         return world.Events.Where(e => e.EntryIds.Contains(entryId));
+    }
+
+    /// <summary>
+    /// The relationships an entry takes part in, either way, in the world's order.
+    /// </summary>
+    public static IEnumerable<Relationship> RelationshipsOf(World world, Guid entryId)
+    {
+        return world.Relationships.Where(r => r.FromEntryId == entryId || r.ToEntryId == entryId);
+    }
+
+    /// <summary>
+    /// Removes everything that points at a journal entry, ahead of deleting it: its links from
+    /// events, its relationships, and its boxes on diagrams. The entry itself stays.
+    /// </summary>
+    public static void ForgetEntry(World world, Guid entryId)
+    {
+        for (int i = 0; i < world.Events.Count; i++)
+        {
+            TimelineEvent timelineEvent = world.Events[i];
+            if (timelineEvent.EntryIds.Contains(entryId))
+            {
+                world.Events[i] = timelineEvent with
+                {
+                    EntryIds = [.. timelineEvent.EntryIds.Where(id => id != entryId)],
+                };
+            }
+        }
+
+        world.Relationships.RemoveAll(r => r.FromEntryId == entryId || r.ToEntryId == entryId);
+        for (int i = 0; i < world.Diagrams.Count; i++)
+        {
+            LoreDiagram diagram = world.Diagrams[i];
+            if (diagram.Placements.Any(p => p.EntryId == entryId))
+            {
+                world.Diagrams[i] = diagram with
+                {
+                    Placements = [.. diagram.Placements.Where(p => p.EntryId != entryId)],
+                };
+            }
+        }
     }
 
     private static bool HasDuplicates(IEnumerable<Guid> ids)

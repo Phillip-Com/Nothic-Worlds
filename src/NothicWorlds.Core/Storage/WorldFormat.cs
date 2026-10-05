@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 26;
+    public const int CurrentVersion = 27;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -91,6 +91,29 @@ internal static partial class WorldFormat
         [VisualStyle.Painterly] = "painterly",
         [VisualStyle.Realistic] = "realistic",
         [VisualStyle.Simple] = "simple",
+    };
+
+    private static readonly Dictionary<LoreKind, string> _loreKindNames = new()
+    {
+        [LoreKind.Character] = "character",
+        [LoreKind.Faction] = "faction",
+        [LoreKind.Nation] = "nation",
+        [LoreKind.Place] = "place",
+        [LoreKind.Other] = "other",
+    };
+
+    private static readonly Dictionary<RelationshipKind, string> _relationshipKindNames = new()
+    {
+        [RelationshipKind.ParentOf] = "parent-of",
+        [RelationshipKind.MarriedTo] = "married-to",
+        [RelationshipKind.SiblingOf] = "sibling-of",
+        [RelationshipKind.AllyOf] = "ally-of",
+        [RelationshipKind.RivalOf] = "rival-of",
+        [RelationshipKind.AtWarWith] = "at-war-with",
+        [RelationshipKind.MemberOf] = "member-of",
+        [RelationshipKind.Rules] = "rules",
+        [RelationshipKind.Serves] = "serves",
+        [RelationshipKind.Other] = "other",
     };
 
     private static readonly Dictionary<SurfacePattern, string> _patternNames = new()
@@ -211,6 +234,10 @@ internal static partial class WorldFormat
 
         // 25 → 26: planets and moons gained "atmosphere" (M27, live weather). Older planets
         // have air and moons don't (owner's choice), which a missing value already reads as.
+        document => document,
+
+        // 26 → 27: journal entries gained an optional "kind", and worlds optional
+        // "relationships" and "diagrams" (M31, lore diagrams). Older worlds have none.
         document => document,
     ];
 
@@ -351,6 +378,17 @@ internal static partial class WorldFormat
     public static string StyleName(VisualStyle style) => _styleNames[style];
 
     public static VisualStyle ParseStyle(string? name) => Parse(_styleNames, name, "style");
+
+    public static string LoreKindName(LoreKind kind) => _loreKindNames[kind];
+
+    public static LoreKind ParseLoreKind(string? name) =>
+        Parse(_loreKindNames, name, "journal entry kind");
+
+    public static string RelationshipKindName(RelationshipKind kind) =>
+        _relationshipKindNames[kind];
+
+    public static RelationshipKind ParseRelationshipKind(string? name) =>
+        Parse(_relationshipKindNames, name, "relationship kind");
 
     public static string PatternName(SurfacePattern pattern) => _patternNames[pattern];
 
