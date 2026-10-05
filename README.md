@@ -124,6 +124,13 @@ sun and moons are where they really are and their true size, and moons show thei
 mouse wheel to change pace from walking to very fast), press **F** to fly (**Space** and **C**
 to rise and sink), and **Esc** to go back. Flat worlds can't be stood on yet.
 
+The live weather is overhead too: the clouds you see from orbit drift across the sky, grey
+where rain falls, and rain or snow falls around you, slanted by the wind. On a world with air,
+distant ground fades into a haze, more so in rain or snow. A compass runs along the top; point
+at the sun or a moon to see its name, how high it stands, its direction and distance, and how
+much of it is lit. The bottom corner shows the date, the time by the sun, and the weather where
+you stand.
+
 **Physics** (the switch in the time bar) moves the bodies by real gravity from that moment, each
 starting at its orbit's natural speed, so you can watch whether your system holds together.
 Only the view follows it: seasons, calendars, eclipses, and weather stay on your designed
