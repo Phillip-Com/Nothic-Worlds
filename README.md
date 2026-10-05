@@ -131,6 +131,17 @@ at the sun or a moon to see its name, how high it stands, its direction and dist
 much of it is lit. The bottom corner shows the date, the time by the sun, and the weather where
 you stand.
 
+**Diagrams** (in the toolbar) shows how your characters, factions, and nations are tied
+together. Make as many diagrams as you like ("House Arren", "The Northern Alliance") and add
+journal entries to them; each shows as a box colored by its kind (character, faction, nation,
+place, or other). Drag from a box's dot onto another box to tie them: parent of, married to,
+sibling of, ally of, rival of, at war with, member of, rules, serves, or in your own words,
+with dates if it began or ended. A tie shows in every diagram that holds both entries, as it
+stands at the world clock's time: ended ones fade, ones not yet begun are hidden (**Show every
+tie** shows them all). **Arrange** lays out a family tree, parents above children, with
+everything else below. Double-click a box to open its entry; the Journal panel also lists an
+entry's relationships, where they can be added and edited. Esc goes back to the globe.
+
 **Physics** (the switch in the time bar) moves the bodies by real gravity from that moment, each
 starting at its orbit's natural speed, so you can watch whether your system holds together.
 Only the view follows it: seasons, calendars, eclipses, and weather stay on your designed

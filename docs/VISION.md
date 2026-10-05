@@ -121,7 +121,10 @@ decisions:
   shows in every diagram that holds both ends.
 - **Optional start and end dates** on ties, so a diagram shows them as they stand at the world
   clock's time (past ones faded).
-- **Two PRs:** the model and file format in Core (PR #80), then the diagram page.
+- **Two PRs:** the model and file format in Core (PR #80), then the diagram page (PR #81).
+- **The page's choices:** a **full-window page** from a Diagrams button in the toolbar (the 3D
+  view pauses); ties made by **dragging from one box to another**, and also **listed and
+  edited in the Journal panel**; **Arrange** lays out a **family tree, then the rest**.
 
 **Milestone 30: First-Person Surface View** · Complete (PR #79 merged 2026-10-05; owner's choice, 2026-10-05)
 Stand on a world and look up (`REN-06`). Owner's decisions:
@@ -2536,7 +2539,7 @@ they're key helpers for the calendar features (`CAL-01`–`CAL-03`, `SIM-02`).
   shown timeline, making a "History" timeline if there's none), `UpdateEvent` (checks the
   timeline, links, and place still exist), `DeleteEvent`.
 
-**LORE-04 — Lore relationship diagrams** · In Progress (M31: PR #80) · Base
+**LORE-04 — Lore relationship diagrams** · Implemented (M31: PRs #80–#81) · Base
 **Intent:** Diagrams of connections between characters, factions, and nations (e.g. family trees,
 alliances, rivalries). They probably need their own tab or page because of the space they take.
 This is separate from the star system tree (`UI-02`).
@@ -2565,6 +2568,39 @@ choice, 2026-10-05).
 - **Tests:** `RelationshipTests` (28: the rules, dates, mutual kinds, forgetting an entry,
   equality, cloning) and 26 more in `WorldPackageTests` (the version 27 golden file written
   and read, version 26 files, ten kinds of damage refused, every kind written by name).
+
+**Implementation (the diagram page, M31, PR #81):**
+- **`UI/DiagramPage.cs`** (a full-window layer just under the toolbar, which stays on top with
+  the clock): the diagram list (New, Delete, a name field renamed as typed), a searchable list
+  of the journal entries not yet on the diagram (Add to Diagram puts the chosen ones in a row
+  in the middle of the view; double-clicking adds one), the selected box's kind, **Open in
+  Journal**, and **Take off Diagram**, then **Arrange**, **Show every tie**, and a line of help.
+  While open, the 3D view stops drawing (`Viewport.Disable3D`), the globe camera pauses, and
+  the globe's overlays (`HideWhileOpen`) hide, each put back as it was. **Diagrams** is one of
+  the toolbar's right-hand buttons (`MapToolbar.Diagrams`, `HideDiagrams`), so opening the
+  Journal closes the page: that's how double-clicking a box opens its entry. Esc goes back.
+- **`UI/DiagramCanvas.cs`** draws it: boxes colored and marked by kind (`UI/LoreWords.cs` holds
+  the words and colors), an elbow from parents down to a child, a double line for a marriage,
+  dashes for rivals and siblings, a heavy red line for a war, arrows for one-way ties, and the
+  user's own words on the line. Several ties between one pair sit side by side. Ties are
+  shown as of the clock: ended ones at 30%, those not begun hidden. Drag a box to move it (one
+  undo step per drag, through the session's gestures); drag from its dot onto another box to
+  tie them; click a line to edit it (hovering shows it as a sentence, with its dates); the
+  wheel zooms around the mouse; the background pans. Shown diagrams fit the view.
+- **`UI/RelationshipDialog.cs`**: from, kind, to, own words (needed for Other), and optional
+  begin and end dates in the selected body's calendar (`DateFields`, like events'); Save is
+  one undo step; Delete for an existing tie. Used by the page and by the **Journal panel**,
+  which gains a **Kind** choice and a list of the entry's relationships (each opens the
+  editor) with **Add Relationship…**.
+- **`Session/WorldSession.Diagrams.cs`**: add, edit, and delete relationships (checked
+  against the world: both entries must exist); add, rename, and delete diagrams; place,
+  move, and take entries off a diagram; and Arrange, each undoable.
+- **`Model/DiagramLayout.cs`** (Core): the Arrange layout. Family members (parent of, married
+  to, sibling of) go in rows by generation, parents above children, spouses level and side
+  by side, siblings level; each row is placed as near as it can be under the parents above
+  it, at least 200 units apart, rows 140 apart. A loop of parents still gets a layout. The
+  rest go in a grid below, walked along their ties so tied entries end up near each other.
+  Dates don't matter to it (a parent stays a parent). Tests (`DiagramLayoutTests`, 9).
 
 ### 4.10 Saving (`SAV`)
 

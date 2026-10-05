@@ -4,7 +4,8 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The top bar (VISION.md UI-01): a slot for the File, Edit, View, and Add menus, then the panel
-/// buttons (System, Map, Terrain, Journal, Regions, Timeline), plus a message line underneath that
+/// buttons (System, Map, Terrain, Journal, Regions, Diagrams, Timeline), plus a message line
+/// underneath that
 /// other parts of the app use. Success messages fade after a few seconds. Warnings and errors stay
 /// until the next message.
 /// </summary>
@@ -22,6 +23,7 @@ public partial class MapToolbar : CanvasLayer
     private Button _journalButton = null!;
     private Button _timelineButton = null!;
     private Button _regionsButton = null!;
+    private Button _diagramsButton = null!;
     private Label _message = null!;
 
     // Increases with every message, so an old auto-hide timer doesn't hide a newer message.
@@ -47,6 +49,13 @@ public partial class MapToolbar : CanvasLayer
 
     /// <summary>The Regions panel, shown and hidden by the Regions button.</summary>
     [Export] public RegionsPanel? RegionsPanel { get; set; }
+
+    /// <summary>
+    /// The relationship diagrams page (VISION.md LORE-04), shown and hidden by the Diagrams
+    /// button. It takes the whole window, so it's one of the right-hand buttons: opening the
+    /// Journal (to read an entry from a box) closes it, and opening it closes the panels.
+    /// </summary>
+    [Export] public DiagramPage? Diagrams { get; set; }
 
     /// <summary>Space at the start of the toolbar row, where the menus go.</summary>
     public HBoxContainer MenuArea { get; } = new();
@@ -92,7 +101,10 @@ public partial class MapToolbar : CanvasLayer
             "Journal", "The world's journal: write entries about places and history");
         _regionsButton = CreateButton(
             "Regions", "Outline and name regions on the planet: countries, forests, seas");
-        Button[] rightPanels = [mapButton, terrainButton, _journalButton, _regionsButton];
+        _diagramsButton = CreateButton(
+            "Diagrams", "Relationship diagrams: how characters, factions, and nations are tied");
+        Button[] rightPanels =
+            [mapButton, terrainButton, _journalButton, _regionsButton, _diagramsButton];
         foreach (Button button in rightPanels)
         {
             button.ToggleMode = true;
@@ -137,6 +149,18 @@ public partial class MapToolbar : CanvasLayer
                 RegionsPanel.IsPanelOpen = open;
             }
         };
+        _diagramsButton.Toggled += open =>
+        {
+            if (open)
+            {
+                _systemButton.ButtonPressed = false;  // It would cover the diagram list
+            }
+
+            if (Diagrams is not null)
+            {
+                Diagrams.IsPageOpen = open;
+            }
+        };
 
         _timelineButton = CreateButton(
             "Timeline", "The timeline strip: your world's history, as lanes of events");
@@ -173,6 +197,12 @@ public partial class MapToolbar : CanvasLayer
     public void ShowTimeline()
     {
         _timelineButton.ButtonPressed = true;
+    }
+
+    /// <summary>Closes the diagrams page, back to the globe.</summary>
+    public void HideDiagrams()
+    {
+        _diagramsButton.ButtonPressed = false;
     }
 
     /// <summary>Opens the Regions panel (closing the others on the right).</summary>
