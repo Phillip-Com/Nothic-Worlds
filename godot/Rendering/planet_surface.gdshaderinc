@@ -160,10 +160,18 @@ vec3 flat_disc_direction(vec3 point) {
 }
 
 // 1.0 on a line through multiples of `spacing`, fading to 0.0 over `pixels` screen pixels.
-float grid_line(float value, float spacing, float pixels) {
+// `width` is how much `value` changes from pixel to pixel.
+float grid_line(float value, float width, float spacing, float pixels) {
 	float scaled = value / spacing;
 	float distance_to_line = abs(fract(scaled - 0.5) - 0.5);
-	return 1.0 - clamp(distance_to_line / (fwidth(scaled) * pixels), 0.0, 1.0);
+	return 1.0 - clamp(distance_to_line / (width / spacing * pixels), 0.0, 1.0);
+}
+
+// How much longitude (degrees) changes from pixel to pixel. Longitude jumps from 180 to −180
+// at the date line, where the GPU's own measure would be huge (it drew a dotted line there), so
+// it's also measured from 0 to 360, which jumps elsewhere, and the smaller taken.
+float longitude_width(float longitude) {
+	return min(fwidth(longitude), fwidth(mod(longitude + 360.0, 360.0)));
 }
 
 // ----- Projections: latitude/longitude (radians) to image position (0-1, top-left origin) -----
@@ -702,6 +710,8 @@ void fragment() {
 	vec3 color = has_map ? sample_map(radians(latitude), radians(longitude))
 		: terrain_shown ? unpainted_color : surface_look(direction);
 	float pixel_angle = length(fwidth(direction));
+	float latitude_step = fwidth(latitude);
+	float longitude_step = longitude_width(longitude);
 	color = draw_pieces(color, direction, pixel_angle);
 	if (terrain_shown) {
 		// Colors come multiplied by alpha: "over" blending, weakened over a map.
@@ -726,18 +736,18 @@ void fragment() {
 	vec3 weather_glow = vec3(0.0);
 	if (has_weather) {
 		color = draw_weather(color, direction, radians(latitude), radians(longitude),
-			weather_glow);
+			pixel_angle, weather_glow);
 	}
 
 	if (show_grid) {
 		float grid = max(
-			grid_line(latitude, grid_spacing_degrees, grid_line_pixels),
-			grid_line(longitude, grid_spacing_degrees, grid_line_pixels));
+			grid_line(latitude, latitude_step, grid_spacing_degrees, grid_line_pixels),
+			grid_line(longitude, longitude_step, grid_spacing_degrees, grid_line_pixels));
 
 		// The equator and longitude 0 stand out so the user can tell which way is which.
 		float highlight = max(
-			grid_line(latitude, 360.0, grid_line_pixels * 1.5),
-			grid_line(longitude, 360.0, grid_line_pixels * 1.5));
+			grid_line(latitude, latitude_step, 360.0, grid_line_pixels * 1.5),
+			grid_line(longitude, longitude_step, 360.0, grid_line_pixels * 1.5));
 
 		color = mix(color, grid_color, grid * 0.6);
 		color = mix(color, highlight_color, highlight);

@@ -21,18 +21,35 @@ public static class GlobePicker
     /// visible edge nearest the ray, so a drag keeps working past the edge.
     /// </summary>
     public static GeoCoordinate? CoordinateAt(
+        PlanetCamera camera, Node3D planet, Vector2 screen, bool nearestWhenMissed = false) =>
+        PointAt(camera, planet, screen, nearestWhenMissed) is Vector3 hit
+            ? SphericalCoordinates.FromDirection(
+                GlobeShape.DirectionAt(ShapeOf(planet), hit).ToNumerics())
+            : null;
+
+    /// <summary>
+    /// The drawn surface point under a screen position, in the planet's own space (radii), or
+    /// null if it misses; see <see cref="CoordinateAt"/>. On a globe carved by shapes
+    /// (VISION.md BOD-04) it's the carving's surface, inside holes and hollows too.
+    /// </summary>
+    public static Vector3? PointAt(
         PlanetCamera camera, Node3D planet, Vector2 screen, bool nearestWhenMissed = false)
     {
         Transform3D toPlanet = planet.GlobalTransform.AffineInverse();
         Vector3 origin = toPlanet * camera.ProjectRayOrigin(screen);
         Vector3 direction = (toPlanet.Basis * camera.ProjectRayNormal(screen)).Normalized();
-        BodyShape shape = ShapeOf(planet);
-        Vector3? point = shape == BodyShape.FlatDisc
-            ? FacePointHit(origin, direction, nearestWhenMissed)
-            : SculptedPointHit(planet, origin, direction, nearestWhenMissed);
-        return point is Vector3 hit
-            ? SphericalCoordinates.FromDirection(GlobeShape.DirectionAt(shape, hit).ToNumerics())
-            : null;
+        if (ShapeOf(planet) == BodyShape.FlatDisc)
+        {
+            return FacePointHit(origin, direction, nearestWhenMissed);
+        }
+
+        if (planet is PlanetSurface { IsCarved: true } carved
+            && carved.CarvedHit(origin, direction) is Vector3 inside)
+        {
+            return inside;
+        }
+
+        return SculptedPointHit(planet, origin, direction, nearestWhenMissed);
     }
 
     /// <summary>

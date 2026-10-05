@@ -33,6 +33,7 @@ public partial class ShapeHandles : CanvasLayer
     private const float ClickSlopPixels = 5.0f;
     private const double TurnHandleBeyond = 1.4;  // The turn handle, past the shape's end
     private const double TurnSnapDegrees = 15.0;
+    private const double CarvingToleranceOfRadius = 0.001;  // Clicks this near count as ground
 
     private static readonly Color _lineColor = new(1.0f, 0.85f, 0.2f);
     private static readonly Color _outlineColor = new(0.0f, 0.0f, 0.0f, 0.8f);
@@ -195,12 +196,26 @@ public partial class ShapeHandles : CanvasLayer
 
         bool click = _pressedAt is Vector2 pressed && pressed.DistanceTo(mouse) <= ClickSlopPixels;
         _pressedAt = null;
-        if (!click || SpotAt(mouse) is not GeoCoordinate spot)
+        if (!click || Globe is not PlanetSurface globe
+            || GlobePicker.PointAt(Camera!, globe, mouse) is not Vector3 point)
         {
             return false;
         }
 
-        (ShapeEdit? added, string? problem) = Session!.AddShape(spot, PlaceKind, PlaceOperation);
+        // On a carved globe the click may land in a hole or hollow: the shape goes there. (The
+        // carving's flat facets sit a little off the round ground, so near it, the ground.)
+        GeoCoordinate spot = SphericalCoordinates.FromDirection(
+            new System.Numerics.Vector3(point.X, point.Y, point.Z));
+        double radiusKm = Session!.SelectedBody.RadiusKm;
+        double? groundKm = globe.IsCarved ? globe.TrueHeightKmOf(point, radiusKm) : null;
+        if (groundKm is double clicked
+            && Math.Abs(clicked - GroundKm(spot)) < CarvingToleranceOfRadius * radiusKm)
+        {
+            groundKm = null;
+        }
+
+        (ShapeEdit? added, string? problem) =
+            Session!.AddShape(spot, PlaceKind, PlaceOperation, groundKm);
         if (added is not null)
         {
             SelectedShapeId = added.Id;

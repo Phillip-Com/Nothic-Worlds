@@ -12,9 +12,16 @@ public partial class WorldSession
     /// body: an added one sits on the ground, a cut one is half sunk into it (a pit, or a
     /// crater for a sphere). One undo step.
     /// </summary>
+    /// <param name="spot">Where on the body.</param>
+    /// <param name="kind">Which kind of shape.</param>
+    /// <param name="operation">Whether it adds or cuts.</param>
+    /// <param name="groundKm">
+    /// The height of the ground it goes on, in km above the radius, when that isn't the sculpted
+    /// ground at the spot (such as the floor of a hole another shape cut); null for that ground.
+    /// </param>
     /// <returns>The new shape, or null if it couldn't be placed (and why).</returns>
     public (ShapeEdit? Shape, string? Problem) AddShape(
-        GeoCoordinate spot, ShapeKind kind, ShapeOperation operation)
+        GeoCoordinate spot, ShapeKind kind, ShapeOperation operation, double? groundKm = null)
     {
         if (!SelectedBodyCanBeSculpted)
         {
@@ -29,10 +36,10 @@ public partial class WorldSession
 
         double width = Math.Max(1, Math.Round(body.RadiusKm * 0.05));
         double height = kind == ShapeKind.Sphere ? width : Math.Max(1, Math.Round(width * 0.3));
-        double groundKm = HeightAt(spot) / 1000;
+        double ground = groundKm ?? HeightAt(spot) / 1000;
         double depth = operation == ShapeOperation.Add && kind != ShapeKind.Sphere
-            ? groundKm + height / 2
-            : groundKm;
+            ? ground + height / 2
+            : ground;
         var shape = new ShapeEdit(Guid.NewGuid(), kind, operation, spot, depth, width, height,
             width, 0);
         RecordUndo($"Add {kind}");
