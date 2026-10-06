@@ -8,7 +8,8 @@ namespace NothicWorlds.Scenes;
 
 /// <summary>
 /// Root of the main scene. It sets up app-wide input actions, asks about unsaved changes before
-/// the window closes, and handles command-line options (given after <c>--</c>):
+/// the window closes, shows the start screen (VISION.md UI-06) unless told what to open, and
+/// handles command-line options (given after <c>--</c>):
 /// <list type="bullet">
 /// <item><c>--open=&lt;path&gt;</c>: open a world file at startup.</item>
 /// <item>
@@ -36,6 +37,10 @@ public partial class Main : Node3D
         GetTree().AutoAcceptQuit = false;
 
         string[] arguments = OS.GetCmdlineUserArgs();
+        if (arguments.Length == 0)
+        {
+            GetNode<StartScreen>("StartScreen").Open();
+        }
 
         if (ArgumentValue(arguments, OpenArgumentPrefix) is string worldPath)
         {

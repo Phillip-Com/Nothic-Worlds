@@ -273,6 +273,7 @@ would hide Godot's `Input` class.)
 | Check line length (Git Bash; prints nothing if OK) | `awk 'length > 100 {print FILENAME":"FNR}' $(git ls-files '*.cs' '*.gdshader')` |
 | Run the app headless (smoke test) | `godot --headless --path godot --quit-after 30` |
 | Performance benchmark (opens fullscreen ~12 s) | `godot --path godot --fullscreen -- --benchmark` |
+| Build the Windows app (make `build/windows/` first) | `godot --headless --path godot --export-release "Windows Desktop" ../build/windows/NothicWorlds.exe` |
 
 Before opening a PR, the first five must succeed: the build has no errors, the tests pass, the
 formatting check makes no changes, the line-length check prints nothing, and the headless run
@@ -285,6 +286,13 @@ commit under the same conditions before blaming the change. On this machine
 Godot is installed via winget. If the `godot` command isn't on PATH, use the full path to
 `Godot_v4.7.2-stable_mono_win64_console.exe` under
 `%LOCALAPPDATA%\Microsoft\WinGet\Packages\GodotEngine.GodotEngine.Mono_*`.
+
+Building the Windows app needs Godot's export templates for the same version (4.7.2, .NET),
+in `%APPDATA%\Godot\export_templates\4.7.2.stable.mono\`. Get them from the Godot editor
+(Editor ▸ Manage Export Templates) or from the official release on Godot's GitHub, checking
+the download against the release's `SHA512-SUMS.txt`. The app is built into `build/`, which
+git ignores. Double-click `build/windows/NothicWorlds.exe` to run it; the `.pck` file and the
+`data_NothicWorlds_windows_x86_64` folder next to it must stay with it.
 
 ---
 

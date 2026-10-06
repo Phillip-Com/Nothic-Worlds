@@ -1,13 +1,14 @@
 using Godot;
 using NothicWorlds.Core.Measurement;
+using NothicWorlds.Core.Storage;
 using NothicWorlds.Rendering;
 
 namespace NothicWorlds.Session;
 
 /// <summary>
 /// Settings that belong to this computer rather than to any world (VISION.md REN-03), such as
-/// how much detail to draw: kept in <c>user://settings.cfg</c> in Godot's per-user data folder,
-/// and never saved in world files.
+/// how much detail to draw and the worlds opened lately: kept in <c>user://settings.cfg</c> in
+/// Godot's per-user data folder, and never saved in world files.
 /// </summary>
 /// <remarks>
 /// A missing or damaged file just gives the defaults; settings never stop the app starting.
@@ -24,6 +25,8 @@ public static class AppSettings
     private const string FrameRateKey = "frame_rate_limit";
     private const string HighQualityMapsKey = "high_quality_maps";
     private const string UnitsKey = "units";
+    private const string FilesSection = "files";
+    private const string RecentWorldsKey = "recent_worlds";
 
     // Read once, then kept: it's asked for every time a measurement is shown.
     private static UnitSystem? _units;
@@ -95,6 +98,32 @@ public static class AppSettings
     {
         get => Load().GetValue(DisplaySection, MapShadingKey, false).AsBool();
         set => Save(MapShadingKey, value);
+    }
+
+    /// <summary>
+    /// The world files opened or saved lately on this computer, newest first (for the start
+    /// screen; VISION.md UI-06).
+    /// </summary>
+    public static IReadOnlyList<string> RecentWorldPaths =>
+        Load().GetValue(FilesSection, RecentWorldsKey, Array.Empty<string>()).AsStringArray();
+
+    /// <summary>Puts a world file at the top of the recent worlds.</summary>
+    public static void RememberWorld(string path)
+    {
+        SaveRecentWorlds(RecentWorlds.Add(RecentWorldPaths, path));
+    }
+
+    /// <summary>Takes a world file off the recent worlds (e.g. it's been moved).</summary>
+    public static void ForgetWorld(string path)
+    {
+        SaveRecentWorlds(RecentWorlds.Remove(RecentWorldPaths, path));
+    }
+
+    private static void SaveRecentWorlds(IReadOnlyList<string> paths)
+    {
+        ConfigFile file = Load();
+        file.SetValue(FilesSection, RecentWorldsKey, paths.ToArray());
+        Write(file);
     }
 
     private static ConfigFile Load()

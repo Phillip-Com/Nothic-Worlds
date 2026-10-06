@@ -39,6 +39,7 @@
 [ext_resource type="Script" uid="uid://dfy6wx1608yu" path="res://Rendering/GraphicsSettings.cs" id="37_graphics_settings"]
 [ext_resource type="Script" uid="uid://cbe50wlgeuodc" path="res://Controls/FirstPersonMode.cs" id="38_first_person"]
 [ext_resource type="Script" uid="uid://v0mroiw8us84" path="res://UI/DiagramPage.cs" id="39_diagram_page"]
+[ext_resource type="Script" uid="uid://cekut15kuxtr5" path="res://UI/StartScreen.cs" id="40_start_screen"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -330,3 +331,8 @@ Nebulas = NodePath("../NebulaBackdrop")
 Weather = NodePath("../WeatherDisplay")
 Toolbar = NodePath("../MapToolbar")
 HideWhileStanding = [NodePath("../MapToolbar"), NodePath("../CameraModeIndicator"), NodePath("../TimelineStrip"), NodePath("../RegionsPanel"), NodePath("../JournalPanel"), NodePath("../MapPanel"), NodePath("../LocalViewAids"), NodePath("../TerrainPanel"), NodePath("../CutEditor"), NodePath("../PieceHandles"), NodePath("../BodyMarkers"), NodePath("../EclipseMarkers"), NodePath("../RegionMarkers"), NodePath("../PinMarkers"), NodePath("../WeatherMarkers"), NodePath("../SystemPanel"), NodePath("../RegionEditor"), NodePath("../TerrainBrush"), NodePath("../ShapeHandles")]
+
+[node name="StartScreen" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Files")]
+script = ExtResource("40_start_screen")
+Session = NodePath("../WorldSession")
+Files = NodePath("../FileMenu")
