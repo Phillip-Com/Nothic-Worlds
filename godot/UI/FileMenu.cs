@@ -19,6 +19,7 @@ public partial class FileMenu : Node
     private MenuButton _button = null!;
     private FileDialog _openDialog = null!;
     private FileDialog _saveDialog = null!;
+    private SettingsWindow? _settings;
     private ConfirmationDialog _unsavedDialog = null!;
     private TaskCompletionSource<string?>? _pendingPath;
     private TaskCompletionSource<UnsavedChoice>? _pendingChoice;
@@ -80,15 +81,15 @@ public partial class FileMenu : Node
         if (Graphics is not null)
         {
             // Settings belong to this computer, not the world, so they open whatever's busy.
-            var settings = new SettingsWindow { Graphics = Graphics };
-            AddChild(settings);
+            _settings = new SettingsWindow { Graphics = Graphics };
+            AddChild(_settings);
             menu.AddSeparator();
             menu.AddItem("Settings…", (int)MenuItem.Settings);
             menu.IdPressed += id =>
             {
                 if (id == (int)MenuItem.Settings)
                 {
-                    settings.PopupCentered();
+                    ShowSettings();
                 }
             };
         }
@@ -151,6 +152,18 @@ public partial class FileMenu : Node
         };
     }
 
+    /// <summary>Asks which world file to open, as File ▸ Open… does, and opens it.</summary>
+    public void ShowOpenDialog()
+    {
+        Run(MenuItem.Open);
+    }
+
+    /// <summary>Shows the Settings window, as File ▸ Settings… does.</summary>
+    public void ShowSettings()
+    {
+        _settings?.PopupCentered();
+    }
+
     /// <summary>Opens a world file, showing the outcome in the message line.</summary>
     public async Task OpenPathAsync(string path)
     {
@@ -164,6 +177,7 @@ public partial class FileMenu : Node
         try
         {
             string? warning = await Session.OpenAsync(path);
+            AppSettings.RememberWorld(path);
             if (warning is null)
             {
                 Toolbar.ShowInfo($"Opened “{Session.World.Name}”.");
@@ -251,6 +265,7 @@ public partial class FileMenu : Node
         try
         {
             await Session!.SaveAsync(path);
+            AppSettings.RememberWorld(path);
             Toolbar?.ShowInfo($"Saved “{Session.World.Name}”.");
             return true;
         }
