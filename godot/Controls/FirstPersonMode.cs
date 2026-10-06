@@ -29,6 +29,9 @@ public partial class FirstPersonMode : Node
     private const double EyeHeightMeters = 1.7;
     private const float LookDegreesPerPixel = 0.2f;
 
+    // The least time between rebuilds of the ground while it's only drifted a little.
+    private const double MinGroundRebuildSeconds = 0.1;
+
     // The ground detail's coarsest noise size, and how many of those the noise repeats over:
     // GROUND_DETAIL_METERS and PATTERN_NOISE_SIZE in planet_surface.gdshaderinc.
     private const double GroundDetailMeters = 4;
@@ -83,6 +86,8 @@ public partial class FirstPersonMode : Node
     private int _speed;
     private int _groundVersion = -1;
     private double _groundHeightMeters;  // The eye's height when the ground was built
+    private double _sinceGroundBuilt;     // Seconds since the ground was last built
+    private bool _deckStale = true;       // The cloud deck doesn't match the ground yet
     private WeatherSample? _weather;
     private double _weatherAge = double.PositiveInfinity;
 
@@ -105,6 +110,9 @@ public partial class FirstPersonMode : Node
 
     /// <summary>The nebulas painted on the sky, for the night sky.</summary>
     [Export] public NebulaBackdrop? Nebulas { get; set; }
+
+    /// <summary>Picks the spot to stand on with a click on the globe.</summary>
+    [Export] public PinPlacer? Placer { get; set; }
 
     /// <summary>The live weather, for what's overhead and falling.</summary>
     [Export] public WeatherDisplay? Weather { get; set; }
@@ -140,6 +148,35 @@ public partial class FirstPersonMode : Node
     }
 
     /// <summary>
+    /// Asks for a click on the selected planet or moon (owner's choice), then stands there.
+    /// Esc cancels.
+    /// </summary>
+    public void ChooseWhereToStand()
+    {
+        if (Session is null)
+        {
+            return;
+        }
+
+        Body body = Session.SelectedBody;
+        if (!body.HasSurface)
+        {
+            Toolbar?.ShowError("Only planets and moons can be stood on.");
+            return;
+        }
+
+        if (Placer is null)
+        {
+            StandOnSelected();
+            return;
+        }
+
+        Guid id = body.Id;
+        Placer.Start(id, spot => StandAt(id, spot),
+            prompt: $"Click where on {body.Name} to stand (Esc cancels).");
+    }
+
+    /// <summary>
     /// Stands on the selected body at the spot in the middle of the screen (or, if that misses
     /// the globe, the spot facing the camera).
     /// </summary>
@@ -171,6 +208,25 @@ public partial class FirstPersonMode : Node
         Vector3 toward = point
             ?? (globe.GlobalTransform.AffineInverse() * GlobeCamera.GlobalPosition);
         Enter(body.Id, Unit(new Vector3D(toward.X, toward.Y, toward.Z)));
+    }
+
+    // Stands on a body at a spot clicked on its globe (on a flat world, the spot on its top
+    // face that shows that place on the map).
+    private void StandAt(Guid bodyId, GeoCoordinate spot)
+    {
+        if (Session?.World.Bodies.Find(b => b.Id == bodyId) is not Body body)
+        {
+            return;
+        }
+
+        Vector3D direction = SphericalPolygon.ToUnit(spot);
+        if (body.Shape == BodyShape.FlatDisc)
+        {
+            Enter(bodyId, new Vector3D(0, 1, 0), FlatWalk.OnTop(FlatDisc.TopPointFor(direction)));
+            return;
+        }
+
+        Enter(bodyId, direction);
     }
 
     /// <summary>Goes back to the globe, if standing.</summary>
@@ -355,6 +411,7 @@ public partial class FirstPersonMode : Node
         }
 
         Move(body, delta);
+        _sinceGroundBuilt += delta;
         double radiusMeters = body.RadiusKm * 1000;
         double groundRadius = _flat is null ? GroundRadius(globe, body) : 1;
         Vector3D eye = _flat is FlatSpot standing
@@ -490,7 +547,9 @@ public partial class FirstPersonMode : Node
     // The rings of ground around the eye, and the cloud deck's: built again when the eye has
     // moved a good part of its height away from their middle, risen or sunk by half, or the
     // ground changed (they reach past the horizon, which moves out as the eye rises); placed
-    // relative to the eye.
+    // relative to the eye. Moving fast, that would be every frame, which took the frame rate
+    // down to a dozen a second: then they're built at most every MinGroundRebuildSeconds,
+    // unless the eye has gone a good way out across them.
     private void PlaceGround(PlanetSurface globe, Body body, double time, Vector3D eye,
         double displayRadius)
     {
@@ -502,23 +561,32 @@ public partial class FirstPersonMode : Node
         }
 
         double height = _heightMeters / (body.RadiusKm * 1000);
+        double horizon = Math.Acos(1 / (1 + height));
+        double outer = Math.Clamp(horizon * 4, 0.003, 0.6);
         double moved = Math.Acos(Math.Clamp(ground.Center.Dot(_spot), -1, 1));
         double risen = _heightMeters / _groundHeightMeters;
+        bool drifted = moved > Math.Max(height * 0.25, 1e-7)
+            && (_sinceGroundBuilt >= MinGroundRebuildSeconds || moved > outer * 0.3);
         if (ground.Mesh is null || globe.ReliefVersion != _groundVersion
-            || moved > Math.Max(height * 0.25, 1e-7) || risen > 1.5 || risen < 1 / 1.5)
+            || drifted || risen > 1.5 || risen < 1 / 1.5)
         {
-            double horizon = Math.Acos(1 / (1 + height));
-            ground.Build(globe, _spot, Math.Max(height * 0.5, 2e-7),
-                Math.Clamp(horizon * 4, 0.003, 0.6));
+            _sinceGroundBuilt = 0;
+            ground.Build(globe, _spot, Math.Max(height * 0.5, 2e-7), outer);
             ground.MaterialOverride = globe.MaterialOverride;
             SetGroundDetail(ground.MaterialOverride, ground.Center * ground.CenterRadius,
                 body.RadiusKm);
             _groundVersion = globe.ReliefVersion;
             _groundHeightMeters = _heightMeters;
+            _deckStale = true;
+        }
 
-            // The cloud deck: the same rings at the cloud layer, over the ground here.
+        // The cloud deck: the same rings at the cloud layer, over the ground here. It's only
+        // seen from above the clouds, so it's built only then.
+        if (_deckStale && !BelowClouds())
+        {
+            _deckStale = false;
             double layer = ground.CenterRadius + SurfaceSky.CloudHeightKm / body.RadiusKm;
-            _deck!.Build(_ => layer, _spot, 2e-7, Math.Clamp(horizon * 4, 0.003, 0.6));
+            _deck!.Build(_ => layer, ground.Center, 2e-7, outer);
         }
 
         PlaceRings(ground, body, time, eye, displayRadius);
