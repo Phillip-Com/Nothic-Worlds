@@ -1100,10 +1100,33 @@ to work).
   the height for Raise and Lower, or "Nothing changed" when the ground was already like that
   (`TerrainBrush.ShowDone`).
 
-**UI-06 — Start screen and standalone app** · Planned (M34) · Base
+**UI-06 — Start screen and standalone app** · Implemented (M34: PR #89) · Base
 **Intent:** The app opens to a start screen (New World, Open World, Recent Worlds, Settings,
 Quit) and can be launched on Windows by double-clicking it, without Godot (owner's request,
 2026-10-05).
+**Implementation (M34, PR #89):**
+- **Start screen** (`UI/StartScreen.cs`): a full-window page over everything (the 3D view
+  stops drawing behind it) with the name, New World, Open World…, Settings…, Quit, and the
+  recent worlds. `Main` shows it at launch unless a command-line option says what to do
+  (`--open`, `--map`, `--benchmark`). New World just closes it (a fresh world is already open);
+  Open and Settings use the File menu's own (`FileMenu.ShowOpenDialog`, `ShowSettings`); Quit
+  goes through the same unsaved-changes check as closing the window. It closes whenever the
+  world is replaced, so opening, starting, or recovering a world (whose prompt shows on top
+  of it) all leave it.
+- **Recent worlds:** up to 8, newest first, saved per computer in `user://settings.cfg`
+  (`AppSettings.RecentWorldPaths`, `RememberWorld` after every open and save). The rule is in
+  Core (`Storage/RecentWorlds.cs`: moving a world to the top, no duplicates even if the letter
+  case or slashes differ, at most 8; 6 tests). A world file that's gone is shown greyed, with
+  "Not found: … (it may have been moved, renamed, or deleted)" as its tooltip.
+- **The Windows app:** `godot/export_presets.cfg` has a "Windows Desktop" preset (64-bit,
+  release, no resource editing so no extra tools are needed) that builds into
+  `build/windows/` (git-ignored); `project.godot` points Godot at the solution in the repo's
+  root (`dotnet/project/solution_directory`). The build is about 183 MB: the .exe, its `.pck`,
+  and the .NET runtime folder. How to build it is in CLAUDE.md §9. Export templates come from
+  Godot's official release, checked against its SHA-512 sums.
+- **Verified:** in the app (behind the owner's windows), the start screen showed at launch, a
+  saved world appeared under Recent Worlds and opened from it, a missing one was greyed with its
+  reason, New World and Settings worked; the exported .exe started on its own without errors.
 
 ### 4.3 Maps & Image Import (`MAP`)
 
