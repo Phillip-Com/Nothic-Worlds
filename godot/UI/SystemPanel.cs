@@ -99,6 +99,9 @@ public partial class SystemPanel : CanvasLayer
     private string _treeSignature = "";
 
     /// <summary>The open world.</summary>
+    /// <summary>The page for designing the night sky (VISION.md REN-07).</summary>
+    [Export] public SkyPage? Sky { get; set; }
+
     [Export] public WorldSession? Session { get; set; }
 
     /// <summary>Where messages go. The panel hides whenever the toolbar does.</summary>
@@ -191,6 +194,10 @@ public partial class SystemPanel : CanvasLayer
         _asteroids = new AsteroidEventsSection { Session = Session, Time = Time };
         layout.AddChild(_asteroids);
         layout.AddChild(new HSeparator());
+        layout.AddChild(new Label { Text = "Night Sky" });
+        layout.AddChild(CreateButton("Design Night Sky…", () => Sky?.Open(),
+            "The world's own stars, the same from every planet: draw and name constellations, " +
+            "or scatter new stars"));
         _nebulas = new NebulasSection { Session = Session };
         layout.AddChild(_nebulas);
 

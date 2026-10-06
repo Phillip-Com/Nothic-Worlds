@@ -7,9 +7,10 @@ namespace NothicWorlds.Rendering;
 
 /// <summary>
 /// Puts the world's nebulas on the sky (VISION.md BOD-03; owner's choice: a backdrop, the same
-/// from every planet). Core paints the sky once, in the background, whenever the nebulas change;
-/// drawing it then costs one texture lookup per background pixel. Without nebulas the
-/// background stays the plain color it has always been.
+/// from every planet), and, when chosen, its designed stars and constellations (REN-07; owner's
+/// choice: optional from orbit). Core paints the nebulas once, in the background, whenever they
+/// change; drawing them then costs one texture lookup per background pixel. Without nebulas or
+/// stars the background stays the plain color it has always been.
 /// </summary>
 public partial class NebulaBackdrop : Node
 {
@@ -22,6 +23,10 @@ public partial class NebulaBackdrop : Node
         Shader = GD.Load<Shader>("res://Rendering/nebula_sky.gdshader"),
     };
 
+    private bool _showStars;
+    private bool _showConstellations = true;
+    private bool _hasNebulas;
+
     // What the sky shows, what's being painted, and whether it needs painting again afterwards.
     private IReadOnlyList<Nebula> _shown = [];
     private bool _painting;
@@ -32,6 +37,36 @@ public partial class NebulaBackdrop : Node
 
     /// <summary>The scene's environment, whose background shows the nebulas.</summary>
     [Export] public WorldEnvironment? Environment { get; set; }
+
+    /// <summary>The world's designed stars and constellations.</summary>
+    [Export] public StarSky? Stars { get; set; }
+
+    /// <summary>
+    /// Whether the designed stars show behind the system (View ▸ Stars from Orbit).
+    /// </summary>
+    public bool ShowStars
+    {
+        get => _showStars;
+        set
+        {
+            _showStars = value;
+            Refresh();
+        }
+    }
+
+    /// <summary>
+    /// Whether constellation lines are drawn with the stars, here and from a world's surface
+    /// (View ▸ Constellation Lines).
+    /// </summary>
+    public bool ShowConstellations
+    {
+        get => _showConstellations;
+        set
+        {
+            _showConstellations = value;
+            Refresh();
+        }
+    }
 
     /// <summary>
     /// The painted sky with the nebulas (laid out as nebula_sky.gdshader reads it), or null when
@@ -56,6 +91,11 @@ public partial class NebulaBackdrop : Node
         // The sky is only a backdrop: lighting and reflections stay as they were.
         environment.ReflectedLightSource = Godot.Environment.ReflectionSource.Disabled;
         Session.Changed += Update;
+        if (Stars is not null)
+        {
+            Stars.Changed += Refresh;
+        }
+
         Update();
     }
 
@@ -108,18 +148,43 @@ public partial class NebulaBackdrop : Node
 
     private void Show(Godot.Environment environment, float[] pixels)
     {
-        if (pixels.Length == 0)
+        _hasNebulas = pixels.Length > 0;
+        if (_hasNebulas)
+        {
+            var bytes = new byte[pixels.Length * sizeof(float)];
+            Buffer.BlockCopy(pixels, 0, bytes, 0, bytes.Length);
+            Image image =
+                Image.CreateFromData(SkyWidth, SkyHeight, false, Image.Format.Rgbf, bytes);
+            SkyTexture = ImageTexture.CreateFromImage(image);
+            _material.SetShaderParameter("nebula_sky", SkyTexture);
+        }
+        else
         {
             SkyTexture = null;
-            environment.BackgroundMode = Godot.Environment.BGMode.Color;
+        }
+
+        Refresh();
+    }
+
+    // The plain background when there's nothing on the sky; the sky shader otherwise.
+    private void Refresh()
+    {
+        if (Environment?.Environment is not Godot.Environment environment)
+        {
             return;
         }
 
-        var bytes = new byte[pixels.Length * sizeof(float)];
-        Buffer.BlockCopy(pixels, 0, bytes, 0, bytes.Length);
-        Image image = Image.CreateFromData(SkyWidth, SkyHeight, false, Image.Format.Rgbf, bytes);
-        SkyTexture = ImageTexture.CreateFromImage(image);
-        _material.SetShaderParameter("nebula_sky", SkyTexture);
-        environment.BackgroundMode = Godot.Environment.BGMode.Sky;
+        bool stars = _showStars && Stars?.Stars is not null;
+        _material.SetShaderParameter("has_nebulas", _hasNebulas);
+        _material.SetShaderParameter("background_color", environment.BackgroundColor);
+        if (Stars is not null)
+        {
+            Stars.ApplyTo(_material, _showConstellations);
+        }
+
+        _material.SetShaderParameter("has_star_field", stars);
+        environment.BackgroundMode = _hasNebulas || stars
+            ? Godot.Environment.BGMode.Sky
+            : Godot.Environment.BGMode.Color;
     }
 }

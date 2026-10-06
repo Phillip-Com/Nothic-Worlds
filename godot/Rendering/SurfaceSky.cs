@@ -117,6 +117,21 @@ public sealed class SurfaceSky
     }
 
     /// <summary>
+    /// Draws the world's designed stars (VISION.md REN-07) on the night sky, with or without
+    /// their constellation lines; none while <paramref name="stars"/> is null.
+    /// </summary>
+    public void ShowStars(StarSky? stars, bool lines)
+    {
+        if (stars is null)
+        {
+            _material.SetShaderParameter("has_star_field", false);
+            return;
+        }
+
+        stars.ApplyTo(_material, lines);
+    }
+
+    /// <summary>
     /// Draws <paramref name="sky"/>, seen from a spot on <paramref name="ground"/> whose east,
     /// north, and up (in the scene's frame) are <paramref name="frame"/>. Small bodies are drawn
     /// bigger with <paramref name="magnify"/>; <paramref name="nebulas"/> is the night sky's

@@ -150,6 +150,17 @@ varying vec3 local_direction;
 // (surface_sky.gdshader draws the clouds overhead; seen from below they aren't on the ground).
 varying float eye_level_ground;
 
+// Fine detail on that ground near the eye (VISION.md REN-06): its position from the point the
+// ground is built around (in globe radii, precise near the eye), where that point is in the
+// detail's noise (FirstPersonMode works it out in double precision, wrapped to the noise's
+// repeat so the pattern stays put as the ground is rebuilt), and the globe's radius in meters.
+varying vec3 ground_offset;
+uniform vec3 ground_detail_origin = vec3(0.0);
+uniform float ground_radius_meters = 6371000.0;
+
+// The detail's coarsest noise is this many meters across.
+const float GROUND_DETAIL_METERS = 4.0;
+
 // On a flat world's top face, distance from the center is the angle from the north pole (the
 // disc's radius is PI), so a point maps back to the globe direction it stands for. Must match
 // FlatDisc in Core.
@@ -700,6 +711,7 @@ void vertex() {
 	// each point's direction from the globe's middle along (CUSTOM0, w = 1) and is lifted
 	// already. Other meshes have no CUSTOM0 (it reads as 0).
 	eye_level_ground = CUSTOM0.w > 0.5 ? 1.0 : 0.0;
+	ground_offset = VERTEX;
 	if (CUSTOM0.w > 0.5) {
 		local_direction = CUSTOM0.xyz;
 	} else {
@@ -709,6 +721,69 @@ void vertex() {
 			VERTEX = direction * (1.0 + height_at(direction, 0.0) * relief_scale);
 		}
 	}
+}
+
+// How much of each kind of ground a color looks like: grass, sand, snow, and water (rock and
+// soil are what's left). Taken from the ground's color, so it works for painted terrain and for
+// maps alike.
+vec4 ground_kinds(vec3 color) {
+	float low = min(color.r, min(color.g, color.b));
+	float grass = smoothstep(0.02, 0.1, color.g - max(color.r, color.b));
+	float water = smoothstep(0.03, 0.12, color.b - max(color.r, color.g));
+	float snow = smoothstep(0.6, 0.8, low);
+	float sand = (1.0 - snow) * smoothstep(0.05, 0.2, (color.r + color.g) * 0.5 - color.b)
+		* smoothstep(0.35, 0.55, color.r);
+	return vec4(grass, sand, snow, water);
+}
+
+// A noise layer's value, faded to its middle where it's finer than a pixel covers (`footprint`:
+// noise units per pixel), so it never shimmers.
+float detail_layer(vec3 q, float footprint) {
+	return mix(0.5, value_noise(q), 1.0 - smoothstep(0.25, 0.6, footprint));
+}
+
+// Fine texture and small bumps underfoot (VISION.md REN-06, owner's choice), matched to the
+// kind of ground: noise about 4 m, 1 m, and 25 cm across, each fading out once a pixel covers
+// more than it, so the detail is sharp by the feet and gone where it would only shimmer.
+// Changes the color and returns the bump height in meters (the caller shades by it).
+float ground_detail(inout vec3 color) {
+	vec3 q = ground_offset * ground_radius_meters / GROUND_DETAIL_METERS + ground_detail_origin;
+	float footprint = length(fwidth(q));
+	if (footprint > 0.6) {
+		return 0.0;
+	}
+
+	float broad = detail_layer(q, footprint);
+	float medium = detail_layer(q * 4.0, footprint * 4.0);
+	float grain = detail_layer(q * 16.0, footprint * 16.0);
+	vec4 kinds = ground_kinds(color);
+	float rock = clamp(1.0 - kinds.x - kinds.y - kinds.z - kinds.w, 0.0, 1.0);
+
+	// Tufts and blades in grass, a fine grain in sand, gentle drifts in snow, mottling on
+	// rock and soil, and almost nothing on water.
+	float shade = kinds.x * (0.3 * (medium - 0.5) + 0.45 * (grain - 0.5))
+		+ kinds.y * (0.2 * (grain - 0.5) + 0.08 * (broad - 0.5))
+		+ kinds.z * 0.06 * (broad - 0.5)
+		+ rock * (0.3 * (broad - 0.5) + 0.25 * (medium - 0.5) + 0.25 * (grain - 0.5))
+		+ kinds.w * 0.03 * (medium - 0.5);
+	color *= 1.0 + shade;
+
+	float bumps = kinds.x * 0.1 + kinds.y * 0.06 + kinds.z * 0.12 + rock * 0.35;
+	return bumps * (0.6 * broad + 0.3 * medium + 0.1 * grain);
+}
+
+// A normal (in the globe's own space) tilted by a height in meters that changes across the
+// ground, from how it changes between neighboring pixels (bump mapping by screen
+// derivatives). Positions are the ground's own, in meters, which keep their precision here.
+vec3 bumped(vec3 normal, float height) {
+	vec3 position = ground_offset * ground_radius_meters;
+	vec3 across = dFdx(position);
+	vec3 down = dFdy(position);
+	vec3 r1 = cross(down, normal);
+	vec3 r2 = cross(normal, across);
+	float det = dot(across, r1);
+	vec3 slope = sign(det) * (dFdx(height) * r1 + dFdy(height) * r2);
+	return normalize(abs(det) * normal - slope);
 }
 
 void fragment() {
@@ -766,6 +841,12 @@ void fragment() {
 		color = mix(color, highlight_color, highlight);
 	}
 
+	// The bump underfoot, in meters (first-person ground only).
+	float bump_meters = 0.0;
+	if (eye_level_ground > 0.5) {
+		bump_meters = ground_detail(color);
+	}
+
 	ALBEDO = color;
 	EMISSION = weather_glow;
 	ROUGHNESS = 0.9;
@@ -781,6 +862,19 @@ void fragment() {
 		} else {
 			NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(normal, 0.0)).xyz);
 		}
+	}
+
+	if (eye_level_ground > 0.5) {
+		// The bumps light and shade the ground's color by how they face the sun, rather than
+		// tilting the normal: the painterly style lights in bands, which would turn small
+		// tilts into stripes. Worked in the globe's own space (a rotation and an even scale
+		// from the view's), where sun_direction is.
+		mat3 to_view = mat3(VIEW_MATRIX) * mat3(MODEL_MATRIX);
+		vec3 normal = normalize(transpose(to_view) * NORMAL);
+		vec3 tilted = bumped(normal, bump_meters);
+		float flat_light = max(dot(normal, sun_direction), 0.0) + 0.15;
+		float bump_light = max(dot(tilted, sun_direction), 0.0) + 0.15;
+		ALBEDO *= clamp(bump_light / flat_light, 0.7, 1.35);
 	}
 
 #ifdef STYLED

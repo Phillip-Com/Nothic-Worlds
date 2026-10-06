@@ -28,6 +28,11 @@ public partial class FirstPersonMode : Node
 {
     private const double EyeHeightMeters = 1.7;
     private const float LookDegreesPerPixel = 0.2f;
+
+    // The ground detail's coarsest noise size, and how many of those the noise repeats over:
+    // GROUND_DETAIL_METERS and PATTERN_NOISE_SIZE in planet_surface.gdshaderinc.
+    private const double GroundDetailMeters = 4;
+    private const double GroundNoiseRepeat = 32;
     private const float FieldOfViewDegrees = 70;
 
     // How close the mouse must come to a body's disc to read it out, in pixels.
@@ -381,6 +386,7 @@ public partial class FirstPersonMode : Node
         }
 
         _sky.ShowBodies(Session.World.Bodies, body, sky, frame, _magnify, Nebulas?.SkyTexture);
+        _sky.ShowStars(Nebulas?.Stars, Nebulas?.ShowConstellations ?? true);
         Basis toBody = BodyBasis(body, time).Transposed();
         double sunAltitude = sky.Star?.AltitudeDegrees ?? -90;
         double unitsPerKm = place.Radius / body.RadiusKm;
@@ -505,6 +511,8 @@ public partial class FirstPersonMode : Node
             ground.Build(globe, _spot, Math.Max(height * 0.5, 2e-7),
                 Math.Clamp(horizon * 4, 0.003, 0.6));
             ground.MaterialOverride = globe.MaterialOverride;
+            SetGroundDetail(ground.MaterialOverride, ground.Center * ground.CenterRadius,
+                body.RadiusKm);
             _groundVersion = globe.ReliefVersion;
             _groundHeightMeters = _heightMeters;
 
@@ -515,6 +523,28 @@ public partial class FirstPersonMode : Node
 
         PlaceRings(ground, body, time, eye, displayRadius);
         PlaceRings(_deck!, body, time, eye, displayRadius);
+    }
+
+    // Tells the ground's material where the point its patch is built around falls in the fine
+    // ground detail's noise (planet_surface.gdshaderinc): worked out here in double precision
+    // and wrapped to the noise's repeat, so the detail stays put on the ground as it's rebuilt.
+    private static void SetGroundDetail(Material? material, Vector3D anchor, double radiusKm)
+    {
+        if (material is not ShaderMaterial shader)
+        {
+            return;
+        }
+
+        double radiusMeters = radiusKm * 1000;
+        float Wrapped(double radii)
+        {
+            double units = radii * radiusMeters / GroundDetailMeters;
+            return (float)(units - Math.Floor(units / GroundNoiseRepeat) * GroundNoiseRepeat);
+        }
+
+        shader.SetShaderParameter("ground_detail_origin",
+            new Vector3(Wrapped(anchor.X), Wrapped(anchor.Y), Wrapped(anchor.Z)));
+        shader.SetShaderParameter("ground_radius_meters", (float)radiusMeters);
     }
 
     // On a flat world, the patch of ground around the eye (the map on top, bare rock on the
@@ -540,6 +570,7 @@ public partial class FirstPersonMode : Node
             ground.MaterialOverride = flat.Face == FlatFace.Top
                 ? globe.MaterialOverride
                 : PlanetSurface.RockMaterial;
+            SetGroundDetail(ground.MaterialOverride, ground.Middle, body.RadiusKm);
             if (flat.Face == FlatFace.Top)
             {
                 // The deck carries each point's map direction, as the globe's deck does.

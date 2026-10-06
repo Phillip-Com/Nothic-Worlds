@@ -32,6 +32,7 @@ uniform float body_shines[MAX_BODIES];
 
 // The live weather's clouds overhead (the cover itself is in cloud_layer.gdshaderinc).
 #include "res://Rendering/cloud_layer.gdshaderinc"
+#include "res://Rendering/star_sky.gdshaderinc"
 uniform bool has_clouds = false;
 
 // The layer of cloud, in the body's own frame and radii: the turn from the scene's frame to
@@ -56,12 +57,6 @@ vec3 to_linear(vec3 color) {
 	return mix(high, low, vec3(lessThanEqual(color, vec3(0.04045))));
 }
 
-float hash(vec3 p) {
-	p = fract(p * 0.1031);
-	p += dot(p, p.zyx + 31.32);
-	return fract((p.x + p.y) * p.z);
-}
-
 // Space behind everything: the nebula backdrop (or the plain background) and stars, fixed to the
 // system, so they wheel overhead as the world turns.
 vec3 space(vec3 direction) {
@@ -74,18 +69,8 @@ vec3 space(vec3 direction) {
 		color = to_linear(space_color);
 	}
 
-	// One star in some cells of a fine grid on the sky, a little off its cell's middle.
-	vec3 cell = floor(direction * 260.0);
-	float chance = hash(cell);
-	if (chance > 0.985) {
-		vec3 spot = (cell + 0.25 + 0.5 * vec3(hash(cell + 3.1), hash(cell + 7.7), hash(cell + 1.9)))
-			/ 260.0;
-		float distance = length(normalize(spot) - direction);
-		float brightness = (chance - 0.985) / 0.015;
-		color += vec3(0.9, 0.93, 1.0) * brightness * brightness * 3.0
-			* (1.0 - smoothstep(0.0006, 0.0016, distance));
-	}
-	return color;
+	// The world's own stars and constellations (VISION.md REN-07).
+	return color + designed_stars(direction, length(fwidth(direction)));
 }
 
 // The sky's own glow by day: deep blue overhead, paler at the horizon, warm toward a low sun.
