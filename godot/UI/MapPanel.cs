@@ -27,6 +27,8 @@ public partial class MapPanel : CanvasLayer
     private const int TopOffset = 56;
     private const int BottomOffset = 130;
     private const float PanelWidth = 320.0f;
+    private const string CutMapTip = "Cut a piece out of the main map, to move it independently";
+    private const string CutImageTip = "Cut a piece out of another image (PNG, JPG, WebP)";
 
     private MapImageSection _mapImage = null!;
 
@@ -94,6 +96,7 @@ public partial class MapPanel : CanvasLayer
             _open = value;
             Weather?.SetSurfaceEditing("Map", value);
             UpdateVisibility();
+            ShowHint();
         }
     }
 
@@ -145,9 +148,7 @@ public partial class MapPanel : CanvasLayer
 
         var cutButtons = new HFlowContainer();
         _cutMapButton = CreateButton("Cut from Map…", () => _ = CutFromMainMapAsync());
-        _cutMapButton.TooltipText = "Cut a piece out of the main map, to move it independently";
         _cutImageButton = CreateButton("Cut from Image…", () => _fileDialog.PopupCentered());
-        _cutImageButton.TooltipText = "Cut a piece out of another image (PNG, JPG, WebP)";
         cutButtons.AddChild(_cutMapButton);
         cutButtons.AddChild(_cutImageButton);
         layout.AddChild(cutButtons);
@@ -249,7 +250,6 @@ public partial class MapPanel : CanvasLayer
             "Drag the points of the cut on the globe; the image stretches to follow " +
             "(or double-click the piece). Esc to finish.";
         _resetPointsButton = CreateButton("Reset Points", ResetPoints);
-        _resetPointsButton.TooltipText = "Undo all stretching: back to the cut as drawn";
         pointButtons.AddChild(_editPointsButton);
         pointButtons.AddChild(_resetPointsButton);
         details.AddChild(pointButtons);
@@ -308,6 +308,7 @@ public partial class MapPanel : CanvasLayer
         }
 
         _listed = [.. Session.Pieces.Reverse()];
+        ShowHint();
         if (_selectedId is Guid id && _listed.All(p => p.Id != id))
         {
             _selectedId = null;
@@ -339,8 +340,13 @@ public partial class MapPanel : CanvasLayer
 
         _heading.Text = $"Map Pieces ({_listed.Count} of {SurfaceSettings.MaxPieces})";
         bool full = _listed.Count >= SurfaceSettings.MaxPieces;
-        _cutMapButton.Disabled = Session.IsBusy || full || Session.MainMapAssetName is null;
-        _cutImageButton.Disabled = Session.IsBusy || full || !Session.SelectedBodyHasSurface;
+        string? cantCut = !Session.SelectedBodyHasSurface ? DisabledTip.NoSurface
+            : Session.IsBusy ? DisabledTip.Busy
+            : full ? $"A body can have up to {SurfaceSettings.MaxPieces} pieces: delete one first"
+            : null;
+        DisabledTip.Apply(_cutMapButton, CutMapTip,
+            cantCut ?? (Session.MainMapAssetName is null ? DisabledTip.NoMap : null));
+        DisabledTip.Apply(_cutImageButton, CutImageTip, cantCut);
         ShowSelected();
     }
 
@@ -391,7 +397,10 @@ public partial class MapPanel : CanvasLayer
         _rotation.ShowValue(piece.RotationDegrees);
         _width.ShowValue(piece.WidthDegrees);
         _editPointsButton.SetPressedNoSignal(IsEditingPoints);
-        _resetPointsButton.Disabled = piece.WarpedPoints is null;
+        DisabledTip.Apply(_resetPointsButton, "Undo all stretching: back to the cut as drawn",
+            piece.WarpedPoints is null
+                ? "This piece isn't stretched: Edit Points stretches it"
+                : null);
         int position = _listed.IndexOf(piece);
         _upButton.Disabled = position == 0;
         _downButton.Disabled = position == _listed.Count - 1;
@@ -437,7 +446,11 @@ public partial class MapPanel : CanvasLayer
     // No confirmation: deleting can be undone (owner decision).
     private void DeleteSelected()
     {
-        if (SelectedPiece() is MapPiece piece && Session is { IsBusy: false })
+        if (Session is { IsBusy: true })
+        {
+            Toolbar?.ShowBusyWarning();
+        }
+        else if (SelectedPiece() is MapPiece piece && Session is not null)
         {
             Session.RemovePiece(piece.Id);
             Toolbar?.ShowInfo($"Deleted {piece.Name} (Ctrl+Z to undo).");
@@ -445,6 +458,33 @@ public partial class MapPanel : CanvasLayer
     }
 
     private MapPiece? SelectedPiece() => _listed.Find(p => p.Id == _selectedId);
+
+    private void ShowHint()
+    {
+        Toolbar?.SetHint(this, _open ? Hint() : null);
+    }
+
+    // The next step on the selected body's map, for the hint bar (VISION.md UI-05).
+    private string Hint()
+    {
+        if (!Session!.SelectedBodyHasSurface)
+        {
+            return "Select a planet or moon to give it a map: click it, or choose it in the " +
+                "System panel.";
+        }
+
+        if (Session.MainMapAssetName is null)
+        {
+            return "Import Map… wraps your map image around the planet. Cut from Image… " +
+                "places a piece of another picture on it.";
+        }
+
+        return _listed.Count == 0
+            ? "Calibrate… lines the map up with the grid. Cut from Map… lifts out a piece " +
+                "to move on its own."
+            : "Drag a piece on the globe to move it, its corner to resize it, and its round " +
+                "handle to turn it. Double-click a piece to stretch it by its points.";
+    }
 
     private void UpdateVisibility()
     {

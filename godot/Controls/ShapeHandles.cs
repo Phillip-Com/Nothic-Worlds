@@ -145,8 +145,14 @@ public partial class ShapeHandles : CanvasLayer
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (!_active || Session is not { SelectedBodyCanBeSculpted: true, IsBusy: false })
+        if (!_active || Session is not { SelectedBodyCanBeSculpted: true })
         {
+            return;
+        }
+
+        if (Session.IsBusy)
+        {
+            WarnIfPressedOnGlobe(@event);
             return;
         }
 
@@ -164,6 +170,18 @@ public partial class ShapeHandles : CanvasLayer
         };
         if (handled)
         {
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    // While the world is busy, says why a press on the globe does nothing (VISION.md UI-05).
+    // A press off it still turns the camera.
+    private void WarnIfPressedOnGlobe(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true } press
+            && SpotAt(press.Position) is not null)
+        {
+            Toolbar?.ShowBusyWarning();
             GetViewport().SetInputAsHandled();
         }
     }

@@ -29,6 +29,13 @@ public partial class SystemPanel : CanvasLayer
     private const int BottomOffset = 48;
 
     private const double KmPerAu = 149_597_870.7;
+    private const string AddMoonTip = "A moon orbiting the selected planet or moon";
+    private const string DeleteTip =
+        "Delete the selected body and everything orbiting it (Ctrl+Z brings them back)";
+    private const string CenterTip =
+        "Put the selected body at the center of its system. The bodies it orbited circle " +
+        "it instead, on the same paths, so everything stays in the same place relative " +
+        "to everything else (e.g. a planet-centered system, with the sun going around it)";
     private const string DayLengthTip = "How long one spin takes, in standard hours (Earth: 24)";
     private const string PeriodTip = "How long one trip around takes (Earth: 365.25 days)";
 
@@ -120,6 +127,7 @@ public partial class SystemPanel : CanvasLayer
         {
             _open = value;
             UpdateVisibility();
+            ShowHint();
         }
     }
 
@@ -198,8 +206,7 @@ public partial class SystemPanel : CanvasLayer
         var buttons = new HFlowContainer();
         buttons.AddChild(CreateButton("Add Planet", () => _ = AddAsync(BodyKind.Planet),
             "A planet orbiting the selected star (or the selected body's star)"));
-        _addMoonButton = CreateButton("Add Moon", () => _ = AddAsync(BodyKind.Moon),
-            "A moon orbiting the selected planet or moon");
+        _addMoonButton = CreateButton("Add Moon", () => _ = AddAsync(BodyKind.Moon), AddMoonTip);
         buttons.AddChild(_addMoonButton);
         buttons.AddChild(CreateButton("Add Star", () => _ = AddAsync(BodyKind.Star),
             "A companion star, far out around the system's central star"));
@@ -209,13 +216,9 @@ public partial class SystemPanel : CanvasLayer
         buttons.AddChild(CreateButton("Add Comet", () => _ = AddAsync(BodyKind.Comet),
             "A comet on a long, elongated orbit around the selected body's star, crossing the " +
             "innermost planet's orbit"));
-        _deleteButton = CreateButton("Delete", () => _ = DeleteAsync(),
-            "Delete the selected body and everything orbiting it (Ctrl+Z brings them back)");
+        _deleteButton = CreateButton("Delete", () => _ = DeleteAsync(), DeleteTip);
         buttons.AddChild(_deleteButton);
-        _centerButton = CreateButton("Make Center", MakeCenter,
-            "Put the selected body at the center of its system. The bodies it orbited circle " +
-            "it instead, on the same paths, so everything stays in the same place relative " +
-            "to everything else (e.g. a planet-centered system, with the sun going around it)");
+        _centerButton = CreateButton("Make Center", MakeCenter, CenterTip);
         buttons.AddChild(_centerButton);
         return buttons;
     }
@@ -397,10 +400,17 @@ public partial class SystemPanel : CanvasLayer
         SelectInTree(Session.SelectedBodyId);
         HighlightPath();
         Body selected = Session.SelectedBody;
-        _addMoonButton.Disabled = !selected.HasSurface;
-        _deleteButton.Disabled = SystemHierarchy.DescendantsOf(bodies, selected.Id).Count + 1
+        DisabledTip.Apply(_addMoonButton, AddMoonTip, selected.HasSurface ? null
+            : "Only planets and moons have moons: select one first");
+        bool wouldEmpty = SystemHierarchy.DescendantsOf(bodies, selected.Id).Count + 1
             >= bodies.Count;
-        _centerButton.Disabled = selected.Orbit is null || selected.Kind == BodyKind.Comet;
+        DisabledTip.Apply(_deleteButton, DeleteTip, wouldEmpty
+            ? "That would delete every body: a system needs at least one"
+            : null);
+        DisabledTip.Apply(_centerButton, CenterTip,
+            selected.Orbit is null ? "It's already at the center"
+            : selected.Kind == BodyKind.Comet ? "A comet can't be the center"
+            : null);
         ShowSelected();
     }
 
@@ -996,6 +1006,14 @@ public partial class SystemPanel : CanvasLayer
         {
             Toolbar?.ShowInfo($"Deleted {what} (Ctrl+Z to undo).");
         }
+    }
+
+    private void ShowHint()
+    {
+        Toolbar?.SetHint(this, _open
+            ? "Choose a body in the list, or click it in the view, to edit it below. The Add " +
+                "buttons add bodies; Ctrl+Z undoes any change."
+            : null);
     }
 
     private void UpdateVisibility()

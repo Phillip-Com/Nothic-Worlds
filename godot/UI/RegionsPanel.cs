@@ -19,6 +19,7 @@ public partial class RegionsPanel : CanvasLayer
     private const int ScreenMargin = 12;
     private const int TopOffset = 56;
     private const int BottomOffset = 130;
+    private const string NewRegionTip = "Click corners around the region on the globe";
     private const float PanelWidth = 340.0f;
 
     private Label _heading = null!;
@@ -77,6 +78,7 @@ public partial class RegionsPanel : CanvasLayer
 
             UpdateVisibility();
             UpdateHighlight();
+            ShowHint();
         }
     }
 
@@ -160,8 +162,7 @@ public partial class RegionsPanel : CanvasLayer
     private Control BuildButtons()
     {
         var row = new HBoxContainer();
-        _newButton = CreateButton("New Region", () => Editor?.StartDrawing(),
-            "Click corners around the region on the globe");
+        _newButton = CreateButton("New Region", () => Editor?.StartDrawing(), NewRegionTip);
         row.AddChild(_newButton);
         _deleteButton = CreateButton("Delete", DeleteRegion,
             "Delete the selected region (Ctrl+Z brings it back); what's placed in it stays");
@@ -305,6 +306,10 @@ public partial class RegionsPanel : CanvasLayer
             : regions.Count == 0 ? "No regions yet: New Region draws one." : "";
         _noRegions.Visible = _noRegions.Text != "";
         _newButton.Disabled = !canHaveRegions;
+        _newButton.TooltipText = canHaveRegions
+            ? NewRegionTip
+            : "Stars and comets have no surface: select a planet or moon first";
+        ShowHint();
         ShowList(regions);
         ShowRegion(force: false);
         UpdateHighlight();
@@ -422,6 +427,16 @@ public partial class RegionsPanel : CanvasLayer
         {
             Renderer.HighlightedRegionId = _open ? _selectedId : null;
         }
+    }
+
+    private void ShowHint()
+    {
+        Toolbar?.SetHint(this, !_open ? null
+            : !Session!.SelectedBodyHasSurface
+                ? "Select a planet or moon to outline regions on it: click it, or choose it in " +
+                    "the System panel."
+                : "New Region, then click corners around it on the globe. Choose a region in " +
+                    "the list to rename, recolor, or reshape it.");
     }
 
     private void UpdateVisibility()

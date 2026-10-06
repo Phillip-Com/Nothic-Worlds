@@ -21,6 +21,15 @@ public partial class DiagramPage : CanvasLayer
     // The longest side a saved picture can have, in pixels: a size every graphics chip can
     // draw.
     private const float MaxPicturePixels = 8_192;
+    private const string NoDiagram = "There's no diagram yet: New makes one";
+    private const string DeleteTip =
+        "Delete this diagram (Ctrl+Z brings it back); its entries and ties stay";
+    private const string AddTip = "Put the chosen entries on the diagram, in the middle of the " +
+        "view (or drag them onto it, or double-click one)";
+    private const string ArrangeTip =
+        "Lay the diagram out tidily: a family tree, then the rest below (Ctrl+Z puts it back)";
+    private const string SaveImageTip =
+        "Save the whole diagram as a PNG picture, to share or print";
 
     private Control _root = null!;
     private ItemList _diagrams = null!;
@@ -230,7 +239,7 @@ public partial class DiagramPage : CanvasLayer
         _delete = new Button
         {
             Text = "Delete",
-            TooltipText = "Delete this diagram (Ctrl+Z brings it back); its entries and ties stay",
+            TooltipText = DeleteTip,
         };
         _delete.Pressed += () =>
         {
@@ -277,8 +286,7 @@ public partial class DiagramPage : CanvasLayer
         _add = new Button
         {
             Text = "Add to Diagram",
-            TooltipText = "Put the chosen entries on the diagram, in the middle of the view " +
-                "(or drag them onto it, or double-click one)",
+            TooltipText = AddTip,
         };
         _add.Pressed += AddSelectedEntries;
         list.AddChild(_add);
@@ -335,8 +343,7 @@ public partial class DiagramPage : CanvasLayer
         _arrange = new Button
         {
             Text = "Arrange",
-            TooltipText = "Lay the diagram out tidily: a family tree, then the rest below " +
-                "(Ctrl+Z puts it back)",
+            TooltipText = ArrangeTip,
         };
         _arrange.Pressed += () =>
         {
@@ -350,7 +357,7 @@ public partial class DiagramPage : CanvasLayer
         _saveImage = new Button
         {
             Text = "Save as Image…",
-            TooltipText = "Save the whole diagram as a PNG picture, to share or print",
+            TooltipText = SaveImageTip,
         };
         _saveImage.Pressed += AskWhereToSaveImage;
         list.AddChild(_saveImage);
@@ -413,10 +420,13 @@ public partial class DiagramPage : CanvasLayer
             _name.Text = current.Name;
         }
 
-        _delete.Disabled = current is null;
+        string? noDiagram = current is null ? NoDiagram : null;
+        DisabledTip.Apply(_delete, DeleteTip, noDiagram);
         _name.Editable = current is not null;
-        _arrange.Disabled = current is null || current.Placements.Count == 0;
-        _saveImage.Disabled = _arrange.Disabled;
+        string? empty = noDiagram
+            ?? (current!.Placements.Count == 0 ? "The diagram is empty: add entries first" : null);
+        DisabledTip.Apply(_arrange, ArrangeTip, empty);
+        DisabledTip.Apply(_saveImage, SaveImageTip, empty);
         _refreshing = false;
         ShowEntries();
         ShowSelection();
@@ -428,7 +438,7 @@ public partial class DiagramPage : CanvasLayer
     {
         _entries.Clear();
         LoreDiagram? diagram = CurrentDiagram();
-        _add.Disabled = diagram is null;
+        DisabledTip.Apply(_add, AddTip, diagram is null ? NoDiagram : null);
         if (diagram is null)
         {
             return;

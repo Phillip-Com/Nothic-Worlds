@@ -111,6 +111,7 @@ public partial class PieceHandles : CanvasLayer
     {
         if (!IsActive)
         {
+            WarnIfPressedOnPieceWhileBusy(@event);
             return;
         }
 
@@ -126,6 +127,19 @@ public partial class PieceHandles : CanvasLayer
 
         if (handled)
         {
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    // While the world is busy, says why a piece won't move (VISION.md UI-05).
+    private void WarnIfPressedOnPieceWhileBusy(InputEvent @event)
+    {
+        if (Panel is { Visible: true } && Session is { IsBusy: true }
+            && @event is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: true }
+                press
+            && PieceUnder(press.Position) is not null)
+        {
+            Panel.Toolbar?.ShowBusyWarning();
             GetViewport().SetInputAsHandled();
         }
     }

@@ -183,7 +183,7 @@ public partial class FileMenu : Node
     {
         if (Session is null || Session.IsBusy)
         {
-            Toolbar?.ShowInfo("Please wait until the current save or open finishes.");
+            Toolbar?.ShowBusyWarning();
             return;
         }
 

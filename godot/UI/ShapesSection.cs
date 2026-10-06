@@ -56,13 +56,6 @@ public partial class ShapesSection : VBoxContainer
             Handles.PlaceOperation = (ShapeOperation)_placeOperation.GetSelectedId());
         placeRow.AddChild(_placeOperation);
         AddChild(placeRow);
-        AddChild(new Label
-        {
-            Text = "Click the planet to place one. Drag its middle to move it, its square to " +
-                "resize it, and its round handle to turn it; the world is carved when you let go.",
-            AutowrapMode = TextServer.AutowrapMode.WordSmart,
-            Modulate = new Color(1, 1, 1, 0.6f),
-        });
 
         _list = new ItemList
         {
