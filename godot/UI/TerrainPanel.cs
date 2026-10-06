@@ -58,6 +58,12 @@ public partial class TerrainPanel : CanvasLayer
     private LineEdit _name = null!;
     private ColorPickerButton _color = null!;
     private OptionButton _climate = null!;
+    private CheckButton _shapesGround = null!;
+    private SpinBox _height = null!;
+    private HSlider _edge = null!;
+    private Label _edgeName = null!;
+    private Label _shapingNote = null!;
+    private bool _edgeDragging;
     private Label _problem = null!;
     private readonly Dictionary<RgbColor, ImageTexture> _swatches = [];
     private byte? _selectedCode;
@@ -131,6 +137,15 @@ public partial class TerrainPanel : CanvasLayer
         layout.AddChild(_tools);
         layout.AddChild(new HSeparator());
         layout.AddChild(new Label { Text = "Terrain Types" });
+        _shapesGround = new CheckButton
+        {
+            Text = "Terrain shapes the ground",
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Painting a type also sets the ground to its height (mountains rise, " +
+                "oceans sink), merging where types meet; sculpting adds on top",
+        };
+        _shapesGround.Toggled += on => Session?.SetTerrainShapesGround(on);
+        layout.AddChild(_shapesGround);
         layout.AddChild(BuildTypeList());
         layout.AddChild(BuildTypeEditor());
 
@@ -338,6 +353,7 @@ public partial class TerrainPanel : CanvasLayer
         _climate.ItemSelected += _ => Commit();
         climateRow.AddChild(_climate);
         box.AddChild(climateRow);
+        box.AddChild(BuildShapingRows());
         _problem = new Label
         {
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
@@ -375,6 +391,79 @@ public partial class TerrainPanel : CanvasLayer
         }
     }
 
+    // The type's height and edge, for when the terrain shapes the ground (VISION.md BOD-07).
+    private Control BuildShapingRows()
+    {
+        var box = new VBoxContainer();
+        var heightRow = new HBoxContainer();
+        heightRow.AddChild(new Label { Text = "Height" });
+        _height = new SpinBox
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "How high the ground is where this terrain is painted (negative: " +
+                "below the planet's radius, as for seas)",
+        }.WithUnit(Quantity.Length, TerrainType.MinHeightMeters, TerrainType.MaxHeightMeters,
+            10, 50);
+        _height.ValueChanged += _ => Commit();
+        heightRow.AddChild(_height);
+        box.AddChild(heightRow);
+
+        var edgeRow = new HBoxContainer
+        {
+            TooltipText = "How this terrain meets others: long gentle slopes, steeper ones, or " +
+                "a sheer cliff. Where two meet, the steeper edge wins.",
+        };
+        edgeRow.AddChild(new Label { Text = "Edge" });
+        _edge = new HSlider
+        {
+            MinValue = 0,
+            MaxValue = 1,
+            Step = 0.05,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            FocusMode = Control.FocusModeEnum.None,
+        };
+
+        // Re-shaping a whole planet can take a moment, so a drag applies when it's let go.
+        _edge.DragStarted += () => _edgeDragging = true;
+        _edge.DragEnded += _ =>
+        {
+            _edgeDragging = false;
+            Commit();
+        };
+        _edge.ValueChanged += value =>
+        {
+            _edgeName.Text = EdgeName(value);
+            if (!_edgeDragging)
+            {
+                Commit();
+            }
+        };
+        edgeRow.AddChild(_edge);
+        _edgeName = new Label { CustomMinimumSize = new Vector2(70, 0) };
+        edgeRow.AddChild(_edgeName);
+        box.AddChild(edgeRow);
+
+        _shapingNote = new Label
+        {
+            Text = "These raise the ground once \"Terrain shapes the ground\" is on.",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+            Modulate = new Color(1, 1, 1, 0.6f),
+        };
+        box.AddChild(_shapingNote);
+        return box;
+    }
+
+    // What an edge setting is called: from gentle slopes to a cliff.
+    private static string EdgeName(double edge) => edge switch
+    {
+        < 0.2 => "Gentle",
+        < 0.45 => "Moderate",
+        < 0.75 => "Steep",
+        < 0.95 => "Very steep",
+        _ => "Cliff",
+    };
+
     private void Commit()
     {
         if (_syncing || Session is null || Selected is not TerrainType type)
@@ -387,6 +476,8 @@ public partial class TerrainPanel : CanvasLayer
             Name = _name.Text,
             Color = _color.Color.ToRgbColor(),
             Climate = (ClimateKind)_climate.GetSelectedId(),
+            HeightMeters = (int)Math.Round(_height.MetricValue()),
+            Edge = Math.Round(_edge.Value, 2),
         });
         _problem.Text = problem is null ? "" : $"Not saved yet: {problem}.";
     }
@@ -419,6 +510,8 @@ public partial class TerrainPanel : CanvasLayer
         {
             _shapes.Visible = _shapesButton.ButtonPressed && Session.SelectedBodyCanBeSculpted;
         }
+        _shapesGround.SetPressedNoSignal(Session.TerrainShapesGround);
+        _shapingNote.Visible = !Session.TerrainShapesGround;
         ShowList();
         ShowSelected(force: false);
         ShowSize();
@@ -456,10 +549,18 @@ public partial class TerrainPanel : CanvasLayer
                     "Here.";
         }
 
-        return _eraseButton.ButtonPressed
-            ? "Drag across the planet to take painted terrain off it."
-            : $"Drag across the planet to paint {Selected?.Name ?? "the chosen type"}; choose " +
-                "another type in the list. Drag off the planet to turn the view.";
+        if (_eraseButton.ButtonPressed)
+        {
+            return "Drag across the planet to take painted terrain off it.";
+        }
+
+        string name = Selected?.Name ?? "the chosen type";
+        return Session.TerrainShapesGround && canSculpt
+            ? $"Drag across the planet to paint {name}; the ground rises or sinks to its " +
+                "height, merging where types meet. Heights are true to scale: raise View ▸ " +
+                "Relief to see them from afar."
+            : $"Drag across the planet to paint {name}; choose another type in the list. " +
+                "Drag off the planet to turn the view.";
     }
 
     private void ShowList()
@@ -494,6 +595,8 @@ public partial class TerrainPanel : CanvasLayer
         _name.Editable = type is not null;
         _color.Disabled = type is null;
         _climate.Disabled = type is null;
+        _height.Editable = type is not null;
+        _edge.Editable = type is not null;
         if (type is null)
         {
             return;
@@ -507,6 +610,13 @@ public partial class TerrainPanel : CanvasLayer
 
         _color.Color = type.Color.ToGodot();
         _climate.Select(_climate.GetItemIndex((int)type.Climate));
+        _height.ShowMetric(type.HeightMeters);
+        if (!_edgeDragging)
+        {
+            _edge.SetValueNoSignal(type.Edge);
+        }
+
+        _edgeName.Text = EdgeName(_edge.Value);
         _syncing = false;
     }
 
