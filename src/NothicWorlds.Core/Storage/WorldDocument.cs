@@ -24,6 +24,7 @@ internal sealed class WorldDocument
     public List<DiagramDocument>? Diagrams { get; init; }  // Added in format version 27
     public List<NebulaDocument?>? Nebulas { get; init; }  // Added in format version 19
     public required int StarSeed { get; init; }  // Added in format version 28
+    public bool? TerrainShapesGround { get; init; }  // Added in format version 29; omitted if off
     public List<ConstellationDocument?>? Constellations { get; init; }  // Added in version 28
     public ViewDocument? View { get; init; }
 }
@@ -53,6 +54,8 @@ internal sealed class TerrainTypeDocument
     public required string Name { get; init; }
     public required string Color { get; init; }
     public required string Climate { get; init; }  // Added in format version 12
+    public int? Height { get; init; }  // Added in format version 29; omitted for 0
+    public double? Edge { get; init; }  // Added in format version 29; omitted for 0
 }
 
 internal sealed class JournalEntryDocument

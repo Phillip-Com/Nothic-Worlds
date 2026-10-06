@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 28** (see **Version history** at the end)
+**Current format version: 29** (see **Version history** at the end)
 
 ## Container
 
@@ -32,7 +32,7 @@ list them all.
 
 ```json
 {
-  "formatVersion": 28,
+  "formatVersion": 29,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -126,10 +126,13 @@ list them all.
     }
   ],
   "terrainTypes": [
-    { "code": 1, "name": "Ocean", "color": "#1F4E79", "climate": "water" },
-    { "code": 5, "name": "Forest", "color": "#2F6B35", "climate": "forest" },
-    { "code": 13, "name": "Crystal Wastes", "color": "#B0E0E6", "climate": "desert" }
+    { "code": 1, "name": "Ocean", "color": "#1F4E79", "climate": "water",
+      "height": -3000, "edge": 0.3 },
+    { "code": 5, "name": "Forest", "color": "#2F6B35", "climate": "forest", "height": 300 },
+    { "code": 13, "name": "Crystal Wastes", "color": "#B0E0E6", "climate": "desert",
+      "height": 1200, "edge": 0.8 }
   ],
+  "terrainShapesGround": true,
   "weatherPins": [
     { "id": "3c3c3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       "name": "Aster Bay", "latitude": 42.5, "longitude": -71.25 }
@@ -285,6 +288,8 @@ list them all.
 | `…terrainTypes[].code` | yes | 1 to 255, unique among terrain types: the value painted cells store. 0 means unpainted. |
 | `…terrainTypes[].name` | yes | Not empty, up to 60 characters |
 | `…terrainTypes[].color` | yes | `#RRGGBB`: how the terrain is drawn |
+| `…terrainTypes[].height` | no | Meters, a whole number from −12,000 to 12,000: how high the ground is where the type is painted, when `terrainShapesGround` is on (`BOD-07`). Omitted for 0. |
+| `…terrainTypes[].edge` | no | 0 (gentle) to 1 (a cliff): how it meets other terrain; the steeper of two wins. Omitted for 0. See **Terrain-shaped ground** below. |
 | `…terrainTypes[].climate` | yes | How it affects weather pins (`WTH-03`): `"open-land"`, `"water"`, `"forest"`, `"desert"`, `"wetland"`, `"mountains"`, or `"ice"` |
 | `weatherPins` | no | Named spots whose weather is shown (`WTH-01`), in the order added. Omitted when there are none. Up to 1,000. |
 | `…weatherPins[].id`, `name` | yes | GUID, unique among weather pins; name not empty, up to 100 characters |
@@ -327,6 +332,7 @@ list them all.
 | `…diagrams[].id`, `name` | yes | GUID, unique among diagrams; name not empty, up to 100 characters |
 | `…diagrams[].entries` | no | The journal entries it shows, in drawing order, each once (every one must exist), up to 1,000: `entry` (its `id`) and `x`, `y` (where its box's middle sits, in diagram units of about a pixel, rightward and down, each within ±1,000,000). Omitted when empty. |
 | `nebulas` | no | Nebulas on the sky around the system (`BOD-03`), at most 20; omitted for none. Each: `id` (GUID, unique), `name` (1–100 characters), `latitude` (−90 to 90°, above or below the system's reference plane) and `longitude` (any, measured like orbit angles), `size` (its radius on the sky, 2–120°), `brightness` (0.05–1), `color` and `secondColor` (`#RRGGBB`). |
+| `terrainShapesGround` | no | `true` if painted terrain shapes the ground (`BOD-07`): each type's `height`, with the body's sculpted `heights` added on top. Omitted when off. |
 | `starSeed` | yes | Where the night sky's stars come from (`REN-07`): a whole number from 0 to 2,147,483,647. The same seed always gives the same stars (see below). |
 | `constellations` | no | Named star patterns (`REN-07`), at most 200, in list order; omitted for none. Each: `id` (GUID, unique), `name` (1–100 characters), and `lines`: up to 200 pairs `[a, b]` of star ids, each joining two different stars of this sky, no pair twice (in either order). |
 | `view` | no | Camera when saved. Omitted means the default view. |
@@ -391,6 +397,18 @@ radius down goes right through the world; a sphere with its middle a radius down
 
 Names written for enums (`kind`, `projection`) are fixed strings. They're not the code's enum
 names, so renaming code never changes the format.
+
+## Terrain-shaped ground (`terrainShapesGround`)
+
+When it's on, the ground a body shows is its terrain's height plus its sculpted `heights`
+(`Model/TerrainRelief.cs`); only the sculpted part is saved. Each cell takes its type's
+`height` (unpainted: 0, gentle). Near another type it eases toward halfway between the two:
+with `d` the distance in cells from the line between them (half a cell for a cell beside the
+other type, otherwise found through cells of its own type, a diagonal step counting √2), and
+`w = 24 × (1 − e)²` cells for the steeper edge `e` of the two, it's
+`middle + (own − middle) × s(d / (w / 2))`, where `s(x)` is the smoothstep `3x² − 2x³` (1 at
+or past 1; a cliff, `w = 0`, keeps every cell at its own height). The nearest other type, within
+13 cells, decides; heights round to whole meters.
 
 ## The star field (`starSeed`)
 
@@ -520,6 +538,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 29 | Terrain shapes the ground (M35): terrain types gain optional `height` and `edge`; optional `terrainShapesGround` | Off for older worlds. Types named like the defaults (Ocean, Shallow Water, Plains, Fields, Forest, Jungle, Hills, Mountains, Desert, Swamp, Tundra, Ice; any case) get the default heights and edges (−3,000/0.3, −150, 150, 150, 300, 200, 800/0.15, 2,500/0.5, 400, 20, 300, 1,000/0.3); others 0 and gentle |
 | 28 | Designed night skies (M34): `starSeed`; optional `constellations` | Each world gets the seed made from its `id` (its first four bytes, as a little-endian whole number, without the sign bit), so it keeps one fixed sky; no constellations |
 | 27 | Lore diagrams (M31): journal entries gain an optional `kind`; optional `relationships` and `diagrams` | Nothing to change: version 26 worlds have none |
 | 26 | Live weather (M27): planets and moons gain `atmosphere` | Nothing to change: a missing `atmosphere` means planets have air and moons don't |

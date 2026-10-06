@@ -397,6 +397,9 @@ public sealed class TerrainGrid
         return tile.AsSpan().ContainsAnyExcept((byte)0) ? tile : null;
     }
 
+    // A tile's codes (null if unpainted), for TerrainRelief. Never change the array.
+    internal byte[]? Tile(int index) => _tiles[index];
+
     private static int TileIndex(int face, int tileColumn, int tileRow) =>
         CubeGridBrush.TileIndex(face, tileColumn, tileRow);
 

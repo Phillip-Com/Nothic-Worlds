@@ -55,6 +55,13 @@ public sealed class HeightGrid
         _tiles = tiles;
     }
 
+    // A grid from tiles (null for all zero), for TerrainRelief: the arrays are kept, not copied,
+    // so they must never change afterwards.
+    internal static HeightGrid FromTiles(short[]?[] tiles) => new(tiles);
+
+    // A tile's heights (null if all zero), for TerrainRelief. Never change the array.
+    internal short[]? Tile(int index) => _tiles[index];
+
     /// <summary>A grid with nothing sculpted: every cell at height 0.</summary>
     public static HeightGrid Empty { get; } = new(new short[]?[TileCount]);
 
@@ -148,13 +155,24 @@ public sealed class HeightGrid
     /// <summary>
     /// Levels the ground along a stroke through <paramref name="path"/>'s points.
     /// </summary>
+    /// <param name="path">The stroke's points, in order.</param>
+    /// <param name="radiusDegrees">The brush's radius, in degrees of arc.</param>
+    /// <param name="targetMeters">The height to level the ground to.</param>
+    /// <param name="amount">How far (0 to 1) to go, at the stroke's middle.</param>
+    /// <param name="under">
+    /// Heights this grid sits on (terrain that shapes the ground, VISION.md BOD-07), so the
+    /// ground seen, both together, is what's levelled; null for none.
+    /// </param>
     public HeightGrid Flatten(IReadOnlyList<Vector3D> path, double radiusDegrees,
-        double targetMeters, double amount)
+        double targetMeters, double amount, HeightGrid? under = null)
     {
         RequireFinite(targetMeters, nameof(targetMeters));
         RequireAmount(amount);
-        return Sculpt(path, radiusDegrees, (_, _, _, height, weight) =>
-            height + (targetMeters - height) * amount * weight);
+        return Sculpt(path, radiusDegrees, (face, column, row, height, weight) =>
+        {
+            double goal = targetMeters - (under?.HeightAt(new CubeCell(face, column, row)) ?? 0);
+            return height + (goal - height) * amount * weight;
+        });
     }
 
     /// <summary>
@@ -168,15 +186,26 @@ public sealed class HeightGrid
     public HeightGrid Smooth(Vector3D from, Vector3D to, double radiusDegrees, double amount) =>
         Smooth([from, to], radiusDegrees, amount);
 
-    /// <summary>Evens out bumps along a stroke through <paramref name="path"/>'s points.</summary>
-    public HeightGrid Smooth(IReadOnlyList<Vector3D> path, double radiusDegrees, double amount)
+    /// <summary>
+    /// Evens out bumps along a stroke through <paramref name="path"/>'s points. With
+    /// <paramref name="under"/> (see <see cref="Flatten(IReadOnlyList{Vector3D}, double,
+    /// double, double, HeightGrid?)"/>), the ground seen, both grids together, is evened out.
+    /// </summary>
+    public HeightGrid Smooth(IReadOnlyList<Vector3D> path, double radiusDegrees, double amount,
+        HeightGrid? under = null)
     {
         RequireAmount(amount);
         double cellDegrees = 90.0 / FaceSize;
         int reach = (int)Math.Clamp(Math.Round(radiusDegrees * SmoothingReach / cellDegrees),
             1, MaxSmoothingCells);
         return Sculpt(path, radiusDegrees, (face, column, row, height, weight) =>
-            height + (Average(face, column, row, reach) - height) * amount * weight);
+        {
+            // The average of both together, less what's underneath here.
+            double goal = Average(face, column, row, reach) + (under is null ? 0
+                : under.Average(face, column, row, reach)
+                    - under.HeightAt(new CubeCell(face, column, row)));
+            return height + (goal - height) * amount * weight;
+        });
     }
 
     /// <summary>True if both grids have the same height in every cell.</summary>
