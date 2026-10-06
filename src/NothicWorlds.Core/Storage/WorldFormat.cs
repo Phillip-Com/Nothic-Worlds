@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 27;
+    public const int CurrentVersion = 28;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -239,6 +239,11 @@ internal static partial class WorldFormat
         // 26 → 27: journal entries gained an optional "kind", and worlds optional
         // "relationships" and "diagrams" (M31, lore diagrams). Older worlds have none.
         document => document,
+
+        // 27 → 28: worlds gained a "starSeed" and optional "constellations" (M34, designed
+        // night skies). Older worlds get a seed made from their id, so each keeps one fixed
+        // sky, and have no constellations.
+        AddStarSeed,
     ];
 
     // The climates the version 12 upgrade gives types by name. Deliberately a copy, like
@@ -276,6 +281,18 @@ internal static partial class WorldFormat
     ];
 
     public static string ProjectionName(MapProjection projection) => _projectionNames[projection];
+
+    // A damaged id is left for loading to refuse, with its usual message.
+    private static JsonObject AddStarSeed(JsonObject document)
+    {
+        if (document["id"]?.GetValueKind() == System.Text.Json.JsonValueKind.String
+            && Guid.TryParse((string?)document["id"], out Guid id))
+        {
+            document["starSeed"] ??= Simulation.StarField.SeedFor(id);
+        }
+
+        return document;
+    }
 
     private static JsonObject SetOnEveryBody(JsonObject document, string name, double value)
     {

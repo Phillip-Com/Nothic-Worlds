@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 27** (see **Version history** at the end)
+**Current format version: 28** (see **Version history** at the end)
 
 ## Container
 
@@ -32,7 +32,7 @@ list them all.
 
 ```json
 {
-  "formatVersion": 27,
+  "formatVersion": 28,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -197,6 +197,11 @@ list them all.
       ]
     }
   ],
+  "starSeed": 424242,
+  "constellations": [
+    { "id": "c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1", "name": "The Kestrel",
+      "lines": [[22, 121], [121, 139]] }
+  ],
   "view": {
     "latitude": 20,
     "longitude": -45.5,
@@ -322,6 +327,8 @@ list them all.
 | `…diagrams[].id`, `name` | yes | GUID, unique among diagrams; name not empty, up to 100 characters |
 | `…diagrams[].entries` | no | The journal entries it shows, in drawing order, each once (every one must exist), up to 1,000: `entry` (its `id`) and `x`, `y` (where its box's middle sits, in diagram units of about a pixel, rightward and down, each within ±1,000,000). Omitted when empty. |
 | `nebulas` | no | Nebulas on the sky around the system (`BOD-03`), at most 20; omitted for none. Each: `id` (GUID, unique), `name` (1–100 characters), `latitude` (−90 to 90°, above or below the system's reference plane) and `longitude` (any, measured like orbit angles), `size` (its radius on the sky, 2–120°), `brightness` (0.05–1), `color` and `secondColor` (`#RRGGBB`). |
+| `starSeed` | yes | Where the night sky's stars come from (`REN-07`): a whole number from 0 to 2,147,483,647. The same seed always gives the same stars (see below). |
+| `constellations` | no | Named star patterns (`REN-07`), at most 200, in list order; omitted for none. Each: `id` (GUID, unique), `name` (1–100 characters), and `lines`: up to 200 pairs `[a, b]` of star ids, each joining two different stars of this sky, no pair twice (in either order). |
 | `view` | no | Camera when saved. Omitted means the default view. |
 | `view.latitude`, `longitude` | yes | Degrees; camera direction from the focus point. Below an altitude of 0.25 (the local view, `REN-04`) they're the focused body's own coordinates, since the camera rides with its spin; otherwise they're fixed in space. |
 | `view.altitude` | yes | In planet radii above the surface |
@@ -384,6 +391,28 @@ radius down goes right through the world; a sphere with its middle a radius down
 
 Names written for enums (`kind`, `projection`) are fixed strings. They're not the code's enum
 names, so renaming code never changes the format.
+
+## The star field (`starSeed`)
+
+Constellations name stars by id, so every reader must make exactly the same stars from a seed
+(`Simulation/StarField.cs` does it; this never changes):
+
+- **Cells.** The sky is split into the cells of a cube's six faces, 128 × 128 each. A direction
+  `(x, y, z)` meets the face of its largest component, at `(a, b)` from −1 to 1: face 0 (+X)
+  `a = −z/|x|, b = y/|x|`; face 1 (−X) `a = z/|x|, b = y/|x|`; face 2 (+Y) `a = x/|y|, b = −z/|y|`;
+  face 3 (−Y) `a = x/|y|, b = z/|y|`; face 4 (+Z) `a = x/|z|, b = y/|z|`; face 5 (−Z)
+  `a = −x/|z|, b = y/|z|` (ties go to X, then Y). The cell is `col = floor((a + 1) / 2 × 128)`,
+  `row = floor((b + 1) / 2 × 128)` (each at most 127), and its id
+  `(face × 128 + row) × 128 + col`. +Y is the system's north, as for nebulas.
+- **Random numbers.** Each cell has its own SplitMix64 stream: the state starts at
+  `(seed << 32) | id` (both as unsigned 32-bit), and each number adds `0x9E3779B97F4A7C15` to
+  the state, mixes it (`z ^= z >> 30; z *= 0xBF58476D1CE4E5B9; z ^= z >> 27;
+  z *= 0x94D049BB133111EB; z ^= z >> 31`), and takes `(z >> 11) / 2^53`.
+- **A star or not.** With `a`, `b` at the cell's middle, the cell holds a star if the first
+  number is below `0.05 × 6 / (π × (1 + a² + b²)^1.5)` (so stars spread evenly).
+- **The star.** The next two numbers place it across and down its cell, each
+  `0.2 + 0.6 × n` of the way; its brightness is `0.08 + 0.92 × n⁷`; its temperature (color, 0
+  red, 0.5 white, 1 blue) is `0.5 + 0.5 × (n₁ − n₂)` from the next two.
 
 ## Versioning
 
@@ -491,6 +520,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 28 | Designed night skies (M34): `starSeed`; optional `constellations` | Each world gets the seed made from its `id` (its first four bytes, as a little-endian whole number, without the sign bit), so it keeps one fixed sky; no constellations |
 | 27 | Lore diagrams (M31): journal entries gain an optional `kind`; optional `relationships` and `diagrams` | Nothing to change: version 26 worlds have none |
 | 26 | Live weather (M27): planets and moons gain `atmosphere` | Nothing to change: a missing `atmosphere` means planets have air and moons don't |
 | 25 | Visual styles (M26): worlds gain a `style` | Nothing to change: version 24 worlds are painterly, which a missing `style` means |

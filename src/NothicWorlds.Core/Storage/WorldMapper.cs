@@ -44,6 +44,14 @@ internal static class WorldMapper
                     Color = nebula.Color.ToHex(),
                     SecondColor = nebula.SecondColor.ToHex(),
                 })],
+            StarSeed = world.StarSeed,
+            Constellations = NullIfEmpty(world.Constellations.Select(c =>
+                (ConstellationDocument?)new ConstellationDocument
+                {
+                    Id = c.Id,
+                    Name = c.Name,
+                    Lines = [.. c.Lines.Select(line => (int[]?)[line.From, line.To])],
+                })),
             View = world.View is null ? null : ToDocument(world.View),
         };
     }
@@ -69,6 +77,7 @@ internal static class WorldMapper
             ModifiedUtc = document.ModifiedUtc,
             View = document.View is null ? null : ToView(document.View),
             TimeDays = document.TimeDays ?? 0,
+            StarSeed = document.StarSeed,
             Style = document.Style is null
                 ? VisualStyle.Painterly
                 : WorldFormat.ParseStyle(document.Style),
@@ -87,6 +96,8 @@ internal static class WorldMapper
         world.WeatherPins.AddRange((document.WeatherPins ?? []).Select(ToWeatherPin));
         world.Nebulas.AddRange((document.Nebulas ?? []).Select(ToNebula));
         RequireNoProblem(Nebula.Problem(world.Nebulas));
+        world.Constellations.AddRange((document.Constellations ?? []).Select(ToConstellation));
+        RequireNoProblem(Constellation.Problem(world.Constellations, world.StarSeed));
         RequireNoProblem(WeatherPin.Problem(world));
         world.Journal.AddRange((document.Journal ?? []).Select(ToEntry));
         world.Timelines.AddRange((document.Timelines ?? []).Select(ToTimeline));
@@ -786,6 +797,19 @@ internal static class WorldMapper
             $"invalid belt color '{document.Color}'");
         return new AsteroidBelt(document.Id, document.Name ?? "", document.InnerKm,
             document.OuterKm, document.Thickness, document.Density, color);
+    }
+
+    private static Constellation ToConstellation(ConstellationDocument? document)
+    {
+        Require(document is { Lines: not null }, "a constellation is empty");
+        Require(document!.Lines.All(line => line is { Length: 2 }),
+            "a constellation's line doesn't join two stars");
+        return new Constellation
+        {
+            Id = document.Id,
+            Name = document.Name ?? "",
+            Lines = [.. document.Lines.Select(line => new StarLink(line![0], line[1]))],
+        };
     }
 
     private static Nebula ToNebula(NebulaDocument? document)
