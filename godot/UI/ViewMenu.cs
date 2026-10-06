@@ -48,6 +48,9 @@ public partial class ViewMenu : Node
     /// <summary>Standing on a world in first person (VISION.md REN-06).</summary>
     [Export] public FirstPersonMode? Standing { get; set; }
 
+    /// <summary>The sky behind the system: its stars and constellation lines.</summary>
+    [Export] public NebulaBackdrop? Backdrop { get; set; }
+
     private enum MenuItem
     {
         Pins,
@@ -62,6 +65,8 @@ public partial class ViewMenu : Node
         OrbitGuide,
         Clouds,
         Wind,
+        StarsFromOrbit,
+        ConstellationLines,
     }
 
     private const int StyleMenuId = 100;
@@ -102,6 +107,12 @@ public partial class ViewMenu : Node
             "Live weather on planets and moons with air: clouds, rain, and snow");
         menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.Wind),
             "Streaks flowing with the wind over planets and moons with air");
+        menu.AddCheckItem("Stars from Orbit", (int)MenuItem.StarsFromOrbit);
+        menu.AddCheckItem("Constellation Lines", (int)MenuItem.ConstellationLines);
+        menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.StarsFromOrbit),
+            "The world's own stars behind the system, as they're seen from its worlds");
+        menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.ConstellationLines),
+            "The lines of the constellations, on the night sky and with the stars from orbit");
         menu.AddSeparator();
         menu.AddCheckItem("Season Markers", (int)MenuItem.SeasonMarkers);
         menu.AddCheckItem("Meteor Shower Markers", (int)MenuItem.ShowerMarkers);
@@ -154,6 +165,8 @@ public partial class ViewMenu : Node
         MenuItem.OrbitGuide => System?.ShowOrbitGuide ?? false,
         MenuItem.Clouds => LiveWeather?.ShowClouds ?? false,
         MenuItem.Wind => LiveWeather?.ShowWind ?? false,
+        MenuItem.StarsFromOrbit => Backdrop?.ShowStars ?? false,
+        MenuItem.ConstellationLines => Backdrop?.ShowConstellations ?? false,
         _ => System?.DisplayScale == SystemScale.True,
     };
 
@@ -197,6 +210,12 @@ public partial class ViewMenu : Node
                 break;
             case MenuItem.Wind when LiveWeather is not null:
                 LiveWeather.ShowWind = on;
+                break;
+            case MenuItem.StarsFromOrbit when Backdrop is not null:
+                Backdrop.ShowStars = on;
+                break;
+            case MenuItem.ConstellationLines when Backdrop is not null:
+                Backdrop.ShowConstellations = on;
                 break;
         }
     }

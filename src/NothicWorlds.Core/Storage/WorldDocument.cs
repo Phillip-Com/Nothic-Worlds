@@ -23,7 +23,16 @@ internal sealed class WorldDocument
     public List<RelationshipDocument>? Relationships { get; init; }  // Added in version 27
     public List<DiagramDocument>? Diagrams { get; init; }  // Added in format version 27
     public List<NebulaDocument?>? Nebulas { get; init; }  // Added in format version 19
+    public required int StarSeed { get; init; }  // Added in format version 28
+    public List<ConstellationDocument?>? Constellations { get; init; }  // Added in version 28
     public ViewDocument? View { get; init; }
+}
+
+internal sealed class ConstellationDocument
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required List<int[]?> Lines { get; init; }  // Each a pair of star ids
 }
 
 internal sealed class NebulaDocument

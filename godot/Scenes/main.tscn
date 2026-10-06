@@ -40,6 +40,8 @@
 [ext_resource type="Script" uid="uid://cbe50wlgeuodc" path="res://Controls/FirstPersonMode.cs" id="38_first_person"]
 [ext_resource type="Script" uid="uid://v0mroiw8us84" path="res://UI/DiagramPage.cs" id="39_diagram_page"]
 [ext_resource type="Script" uid="uid://cekut15kuxtr5" path="res://UI/StartScreen.cs" id="40_start_screen"]
+[ext_resource type="Script" uid="uid://b671nd37ojvfm" path="res://Rendering/StarSky.cs" id="41_star_sky"]
+[ext_resource type="Script" uid="uid://dfnfodhejd5f0" path="res://UI/SkyPage.cs" id="42_sky_page"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -189,8 +191,9 @@ script = ExtResource("15_edit")
 Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 
-[node name="ViewMenu" type="Node" parent="." node_paths=PackedStringArray("Toolbar", "Pins", "Weather", "Regions", "Bodies", "Eclipses", "System", "Session", "LiveWeather", "Standing")]
+[node name="ViewMenu" type="Node" parent="." node_paths=PackedStringArray("Toolbar", "Pins", "Weather", "Regions", "Bodies", "Eclipses", "System", "Session", "LiveWeather", "Standing", "Backdrop")]
 script = ExtResource("29_view_menu")
+Backdrop = NodePath("../NebulaBackdrop")
 Standing = NodePath("../FirstPersonMode")
 LiveWeather = NodePath("../WeatherDisplay")
 Session = NodePath("../WorldSession")
@@ -236,10 +239,11 @@ script = ExtResource("24_region_renderer")
 Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 
-[node name="NebulaBackdrop" type="Node" parent="." node_paths=PackedStringArray("Session", "Environment")]
+[node name="NebulaBackdrop" type="Node" parent="." node_paths=PackedStringArray("Session", "Environment", "Stars")]
 script = ExtResource("34_nebula_backdrop")
 Session = NodePath("../WorldSession")
 Environment = NodePath("../WorldEnvironment")
+Stars = NodePath("../StarSky")
 
 [node name="RegionMarkers" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "System", "Camera", "Toolbar", "Renderer", "Editor", "Placer", "Map", "Terrain", "Panel", "Journal", "Timeline")]
 script = ExtResource("25_region_markers")
@@ -274,8 +278,9 @@ Camera = NodePath("../PlanetCamera")
 Toolbar = NodePath("../MapToolbar")
 Placer = NodePath("../PinPlacer")
 
-[node name="SystemPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "System", "Time")]
+[node name="SystemPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "System", "Time", "Sky")]
 script = ExtResource("18_system_panel")
+Sky = NodePath("../SkyPage")
 Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 System = NodePath("../SystemView")
@@ -336,3 +341,12 @@ HideWhileStanding = [NodePath("../MapToolbar"), NodePath("../CameraModeIndicator
 script = ExtResource("40_start_screen")
 Session = NodePath("../WorldSession")
 Files = NodePath("../FileMenu")
+
+[node name="StarSky" type="Node" parent="." node_paths=PackedStringArray("Session")]
+script = ExtResource("41_star_sky")
+Session = NodePath("../WorldSession")
+
+[node name="SkyPage" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "GlobeCamera")]
+script = ExtResource("42_sky_page")
+Session = NodePath("../WorldSession")
+GlobeCamera = NodePath("../PlanetCamera")

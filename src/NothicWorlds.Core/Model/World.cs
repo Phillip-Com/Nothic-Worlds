@@ -77,6 +77,18 @@ public sealed class World
     public List<Nebula> Nebulas { get; } = [];
 
     /// <summary>
+    /// Where the night sky's stars come from (VISION.md REN-07; see
+    /// <c>Simulation.StarField</c>): the same seed always gives the same stars.
+    /// </summary>
+    public int StarSeed { get; set; }
+
+    /// <summary>
+    /// The named star patterns on the night sky (VISION.md REN-07), in list order. Their lines
+    /// join stars of the sky from <see cref="StarSeed"/>.
+    /// </summary>
+    public List<Constellation> Constellations { get; } = [];
+
+    /// <summary>
     /// Where the camera was looking when the world was saved, or null for the default.
     /// </summary>
     public CameraView? View { get; set; }
@@ -99,11 +111,12 @@ public sealed class World
             View = View,  // Immutable record, safe to share.
             TimeDays = TimeDays,
             Style = Style,
+            StarSeed = StarSeed,
         };
         copy.Bodies.AddRange(Bodies.Select(body => body.Clone()));
 
         // Terrain types, regions, weather pins, entries, timelines, events, relationships,
-        // diagrams, and nebulas are immutable records, safe to share.
+        // diagrams, nebulas, and constellations are immutable records, safe to share.
         copy.TerrainTypes.AddRange(TerrainTypes);
         copy.Regions.AddRange(Regions);
         copy.WeatherPins.AddRange(WeatherPins);
@@ -113,6 +126,7 @@ public sealed class World
         copy.Relationships.AddRange(Relationships);
         copy.Diagrams.AddRange(Diagrams);
         copy.Nebulas.AddRange(Nebulas);
+        copy.Constellations.AddRange(Constellations);
         return copy;
     }
 
@@ -123,7 +137,7 @@ public sealed class World
     /// </summary>
     public static World CreateNew(string name = "Untitled World")
     {
-        var world = new World { Name = name };
+        var world = new World { Name = name, StarSeed = Simulation.StarField.NewSeed() };
         world.TerrainTypes.AddRange(TerrainType.Defaults);
         var sun = new Body
         {
