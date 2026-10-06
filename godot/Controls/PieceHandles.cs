@@ -11,9 +11,11 @@ namespace NothicWorlds.Controls;
 /// Moving, resizing, and rotating map pieces directly on the globe (VISION.md MAP-02), like
 /// stamps in other map makers. Works while the Map panel is open:
 /// <list type="bullet">
-/// <item>Click a piece to select it; drag it to move it.</item>
+/// <item>Click a piece to select it; drag it to move it (with the Map panel's Snap to Grid on,
+/// its center or an edge lines up with the grid).</item>
 /// <item>Drag a corner square to resize it (it keeps its proportions).</item>
-/// <item>Drag the round handle above it to rotate it (hold Shift to snap to 15°).</item>
+/// <item>Drag the round handle above it to rotate it (hold Shift, or turn Snap to Grid on, to
+/// snap to 15°).</item>
 /// <item>Click empty space, or press Esc, to deselect.</item>
 /// <item>Double-click a piece (or use the panel's Edit Points) to show a handle on every point
 /// of its cut; dragging one stretches the image to follow. Esc leaves Edit Points.</item>
@@ -226,12 +228,12 @@ public partial class PieceHandles : CanvasLayer
             case Part.Body:
                 (GeoCoordinate center, double rotation) = PieceManipulation.Move(
                     _startCenter, _startRotation, _grabbed, target);
-                Session.PlacePiece(_dragId, center, rotation, _startWidth);
+                Session.PlacePiece(_dragId, Snapped(center, rotation), rotation, _startWidth);
                 break;
             case Part.Rotate:
                 double turned = PieceManipulation.Rotate(
                     _startCenter, _startRotation, _grabbed, target);
-                if (motion.ShiftPressed)
+                if (motion.ShiftPressed || Panel!.IsSnapping)
                 {
                     turned = Math.Round(turned / RotationSnapDegrees) * RotationSnapDegrees;
                 }
@@ -251,6 +253,17 @@ public partial class PieceHandles : CanvasLayer
         }
 
         return true;
+    }
+
+    // With Snap to Grid on, where a dragged piece's center goes so it or an edge lies on the
+    // grid (VISION.md MAP-02).
+    private GeoCoordinate Snapped(GeoCoordinate center, double rotation)
+    {
+        return Panel!.IsSnapping
+            && Session!.Pieces.FirstOrDefault(p => p.Id == _dragId) is MapPiece piece
+            ? GridSnap.SnapPiece(center, rotation, _startWidth, piece.Outline.BoxAspectRatio,
+                Panel.GridStepDegrees)
+            : center;
     }
 
     // Esc leaves Edit Points first, then deselects.

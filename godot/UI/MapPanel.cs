@@ -31,6 +31,8 @@ public partial class MapPanel : CanvasLayer
     private const string CutImageTip = "Cut a piece out of another image (PNG, JPG, WebP)";
 
     private MapImageSection _mapImage = null!;
+    private CheckButton _snap = null!;
+    private OptionButton _gridStep = null!;
 
     private Label _heading = null!;
     private Button _cutMapButton = null!;
@@ -74,6 +76,14 @@ public partial class MapPanel : CanvasLayer
 
     /// <summary>The selected piece's id, or null.</summary>
     public Guid? SelectedPieceId => _selectedId;
+
+    /// <summary>
+    /// How far apart the grid lines are that pieces and the map snap to, in degrees.
+    /// </summary>
+    public double GridStepDegrees => GridSnap.Steps[Math.Max(_gridStep.Selected, 0)];
+
+    /// <summary>Whether dragged pieces snap to the grid (VISION.md MAP-02).</summary>
+    public bool IsSnapping => _snap.ButtonPressed;
 
     /// <summary>
     /// True while the selected piece shows a handle on every point of its cut (Edit Points),
@@ -139,6 +149,7 @@ public partial class MapPanel : CanvasLayer
             Session = Session,
             Calibration = Calibration,
             Toolbar = Toolbar,
+            GridStep = () => GridStepDegrees,
         };
         layout.AddChild(_mapImage);
         layout.AddChild(new HSeparator());
@@ -152,6 +163,7 @@ public partial class MapPanel : CanvasLayer
         cutButtons.AddChild(_cutMapButton);
         cutButtons.AddChild(_cutImageButton);
         layout.AddChild(cutButtons);
+        layout.AddChild(BuildGridRow());
 
         _list = new ItemList
         {
@@ -202,6 +214,34 @@ public partial class MapPanel : CanvasLayer
         }
     }
 
+    // Snapping to the grid (VISION.md MAP-02): on or off, and how fine the grid is. Not saved:
+    // it's how the user likes to work, not part of the world.
+    private Control BuildGridRow()
+    {
+        var row = new HBoxContainer();
+        _snap = new CheckButton
+        {
+            Text = "Snap to Grid",
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Dragged pieces line their center or an edge up with the grid, and " +
+                "turn in 15° steps",
+        };
+        row.AddChild(_snap);
+        _gridStep = new OptionButton
+        {
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "How far apart the grid lines are that pieces and the map snap to " +
+                "(the globe draws them every 15°)",
+        };
+        foreach (double step in GridSnap.Steps)
+        {
+            _gridStep.AddItem($"{step:0}°");
+        }
+
+        row.AddChild(_gridStep);
+        return row;
+    }
+
     // Name, position, rotation, and size of the selected piece, plus layer and delete buttons.
     private Control BuildDetails()
     {
@@ -236,6 +276,10 @@ public partial class MapPanel : CanvasLayer
         Button delete = CreateButton("Delete", DeleteSelected);
         delete.TooltipText = "Remove this piece (Delete key). Ctrl+Z brings it back.";
         buttons.AddChild(delete);
+        Button center = CreateButton("Center on Grid", CenterSelectedOnGrid);
+        center.TooltipText =
+            "Move the piece's center onto the nearest crossing of the grid's lines";
+        buttons.AddChild(center);
         details.AddChild(buttons);
 
         var pointButtons = new HFlowContainer();
@@ -458,6 +502,20 @@ public partial class MapPanel : CanvasLayer
     }
 
     private MapPiece? SelectedPiece() => _listed.Find(p => p.Id == _selectedId);
+
+    private void CenterSelectedOnGrid()
+    {
+        if (Session is { IsBusy: true })
+        {
+            Toolbar?.ShowBusyWarning();
+        }
+        else if (SelectedPiece() is MapPiece piece && Session is not null)
+        {
+            Toolbar?.ShowInfo(Session.CenterPieceOnGrid(piece.Id, GridStepDegrees)
+                ? $"Centered {piece.Name} on the grid (Ctrl+Z to undo)."
+                : $"{piece.Name} is already centered on the grid.");
+        }
+    }
 
     private void ShowHint()
     {

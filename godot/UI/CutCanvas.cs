@@ -6,8 +6,10 @@ namespace NothicWorlds.UI;
 /// <summary>
 /// Shows an image for cutting a map piece from (VISION.md MAP-02) and lets the user draw the
 /// cut. The wheel zooms around the mouse, and right- or middle-dragging pans. With the
-/// rectangle tool, drag out a box. With the freeform tool, click to add points, then close the
-/// shape by clicking the first point (or pressing Enter); Backspace removes the last point.
+/// rectangle and ellipse tools, drag out a box (Shift for a square or circle). With the regular
+/// shape tool, drag from the center out to a corner (Shift turns it in 15° steps). With the
+/// freeform tool, click to add points, then close the shape by clicking the first point (or
+/// pressing Enter); Backspace removes the last point.
 /// </summary>
 public partial class CutCanvas : Control
 {
@@ -17,6 +19,10 @@ public partial class CutCanvas : Control
     private const float PointHandleSize = 6.0f;
     private const float CloseDistance = 10.0f;
     private const float LineWidth = 2.0f;
+    private const double ShapeTurnSnapDegrees = 15.0;
+
+    /// <summary>How many sides a regular shape starts with: a hexagon.</summary>
+    public const int DefaultSides = 6;
 
     private static readonly Color _lineColor = new(1.0f, 0.85f, 0.2f);
     private static readonly Color _shadeColor = new(0.0f, 0.0f, 0.0f, 0.45f);
@@ -35,8 +41,13 @@ public partial class CutCanvas : Control
     private bool _keepFitted = true;
 
     private bool _panning;
-    private ImagePoint? _rectangleStart;
+    private int _sides = DefaultSides;
+
+    // Where a drag that draws a box or a regular shape started, and whether Shift is held.
+    private ImagePoint? _dragStart;
+    private bool _shiftHeld;
     private Vector2 _mouse;
+    private Vector2 _mouseAtRelease;
 
     /// <summary>Raised whenever the cut changes (drawn, closed, undone, or cleared).</summary>
     public event Action? CutChanged;
@@ -45,6 +56,8 @@ public partial class CutCanvas : Control
     public enum CutTool
     {
         Rectangle,
+        Ellipse,
+        RegularShape,
         Freeform,
     }
 
@@ -56,6 +69,23 @@ public partial class CutCanvas : Control
         {
             _tool = value;
             Clear();
+        }
+    }
+
+    /// <summary>
+    /// How many sides the regular shape tool draws (<see cref="PieceOutline.MinimumSides"/> to
+    /// <see cref="PieceOutline.MaximumSides"/>). Changing it redraws the shape drawn last.
+    /// </summary>
+    public int Sides
+    {
+        get => _sides;
+        set
+        {
+            _sides = Math.Clamp(value, PieceOutline.MinimumSides, PieceOutline.MaximumSides);
+            if (_tool == CutTool.RegularShape && _dragStart is not null && _closed)
+            {
+                UpdateDraggedShape(_mouseAtRelease);
+            }
         }
     }
 
@@ -90,7 +120,7 @@ public partial class CutCanvas : Control
     {
         _points.Clear();
         _closed = false;
-        _rectangleStart = null;
+        _dragStart = null;
         SetOutline(null);
     }
 
@@ -138,7 +168,7 @@ public partial class CutCanvas : Control
             return;
         }
 
-        bool finished = _closed || _rectangleStart is not null;
+        bool finished = _closed || _dragStart is not null;
         if (finished && screenPoints.Count >= 3)
         {
             // Shade outside the cut's bounding box so the cut stands out.
@@ -188,9 +218,9 @@ public partial class CutCanvas : Control
                 return true;
             case MouseButton.Left:
                 GrabFocus();
-                if (_tool == CutTool.Rectangle)
+                if (_tool != CutTool.Freeform)
                 {
-                    DragRectangle(button);
+                    DragShape(button);
                 }
                 else if (button.Pressed)
                 {
@@ -211,9 +241,10 @@ public partial class CutCanvas : Control
             _origin += motion.Relative;
             _keepFitted = false;
         }
-        else if (_tool == CutTool.Rectangle && _rectangleStart is not null && !_closed)
+        else if (_tool != CutTool.Freeform && _dragStart is not null && !_closed)
         {
-            UpdateRectangle(motion.Position);
+            _shiftHeld = motion.ShiftPressed;
+            UpdateDraggedShape(motion.Position);
         }
 
         QueueRedraw();
@@ -241,33 +272,75 @@ public partial class CutCanvas : Control
         }
     }
 
-    // Press starts a new rectangle, dragging sizes it, and release finishes it.
-    private void DragRectangle(InputEventMouseButton button)
+    // Press starts a new shape, dragging sizes it, and release finishes it.
+    private void DragShape(InputEventMouseButton button)
     {
         if (button.Pressed)
         {
             _closed = false;
-            _rectangleStart = ToImage(button.Position);
+            _dragStart = ToImage(button.Position);
             _points.Clear();
             SetOutline(null);
             return;
         }
 
-        if (_rectangleStart is not null)
+        if (_dragStart is not null)
         {
-            UpdateRectangle(button.Position);
+            _shiftHeld = button.ShiftPressed;
+            _mouseAtRelease = button.Position;
+            UpdateDraggedShape(button.Position);
             _closed = true;
         }
     }
 
-    private void UpdateRectangle(Vector2 mouse)
+    // Redraws the box, ellipse, or regular shape from where the drag started to the mouse.
+    private void UpdateDraggedShape(Vector2 mouse)
     {
-        ImagePoint start = _rectangleStart!.Value;
+        ImagePoint start = _dragStart!.Value;
         ImagePoint end = ToImage(mouse);
+        if (_shiftHeld && _tool is CutTool.Rectangle or CutTool.Ellipse)
+        {
+            end = PieceOutline.SquaredCorner(start, end, _sourceAspectRatio);
+        }
+        else if (_shiftHeld && _tool == CutTool.RegularShape)
+        {
+            end = TurnedInSteps(start, end);
+        }
+
+        PieceOutline? outline = TryCreate(() => _tool switch
+        {
+            CutTool.Ellipse => PieceOutline.Ellipse(start, end, _sourceAspectRatio),
+            CutTool.RegularShape =>
+                PieceOutline.RegularShape(start, end, _sides, _sourceAspectRatio),
+            _ => PieceOutline.Rectangle(start, end, _sourceAspectRatio),
+        });
         _points.Clear();
-        _points.AddRange([
-            start, new ImagePoint(end.U, start.V), end, new ImagePoint(start.U, end.V)]);
-        SetOutline(TryCreate(() => PieceOutline.Rectangle(start, end, _sourceAspectRatio)));
+        if (outline is not null)
+        {
+            _points.AddRange(outline.Points);
+        }
+        else
+        {
+            // Too thin to use yet: show the box being dragged.
+            _points.AddRange([
+                start, new ImagePoint(end.U, start.V), end, new ImagePoint(start.U, end.V)]);
+        }
+
+        SetOutline(outline);
+    }
+
+    // The corner `end` turned around `center` to the nearest 15° (as it looks on the image),
+    // keeping its distance.
+    private ImagePoint TurnedInSteps(ImagePoint center, ImagePoint end)
+    {
+        double across = (end.U - center.U) * _sourceAspectRatio;
+        double down = end.V - center.V;
+        double reach = Math.Sqrt(across * across + down * down);
+        double step = double.DegreesToRadians(ShapeTurnSnapDegrees);
+        double angle = Math.Round(Math.Atan2(down, across) / step) * step;
+        return new ImagePoint(
+            center.U + reach * Math.Cos(angle) / _sourceAspectRatio,
+            center.V + reach * Math.Sin(angle));
     }
 
     private void AddFreeformPoint(Vector2 mouse)

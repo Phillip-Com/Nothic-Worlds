@@ -1129,6 +1129,41 @@ public partial class WorldSession : Node
     }
 
     /// <summary>
+    /// Moves the map so the middle of the image sits on the nearest grid crossing (see
+    /// <see cref="MapCalibration.CenteredOnGrid"/>). Does nothing if there's no map.
+    /// </summary>
+    /// <param name="stepDegrees">The grid's spacing (see <see cref="GridSnap.Steps"/>).</param>
+    /// <returns>
+    /// True if the map moved; false if it was already centered (or there's none).
+    /// </returns>
+    public bool CenterMapOnGrid(double stepDegrees)
+    {
+        if (SelectedBody.Surface.Map is not SurfaceMap map)
+        {
+            return false;
+        }
+
+        MapCalibration before = map.Calibration ?? MapCalibration.CreateDefault();
+        MapCalibration centered = before.CenteredOnGrid(stepDegrees);
+        if (SameMiddle(before, centered))
+        {
+            return false;
+        }
+
+        RecordUndo("Center Map on Grid");
+        map.Calibration = centered;
+        Surface?.SetCalibration(centered);
+        MarkChanged();
+        return true;
+    }
+
+    // Whether two calibrations put the middle of the image at the same place on the globe.
+    private static bool SameMiddle(MapCalibration a, MapCalibration b) =>
+        Math.Abs(a.TrueLatitude(0) - b.TrueLatitude(0)) < 1e-6
+        && Math.Abs(SphericalCoordinates.LongitudeDelta(a.TrueLongitude(0), b.TrueLongitude(0)))
+            < 1e-6;
+
+    /// <summary>
     /// True while the Calibrate workspace is open (New and Open wait until it closes).
     /// </summary>
     public bool IsCalibrating { get; private set; }
@@ -1289,6 +1324,34 @@ public partial class WorldSession : Node
             PieceProjection.MinimumWidthDegrees, PieceProjection.MaximumWidthDegrees);
         ShowPieces(SelectedBody);
         MarkChanged();
+    }
+
+    /// <summary>
+    /// Moves a piece so its center sits on the nearest grid crossing, keeping its turn and size.
+    /// </summary>
+    /// <param name="id">The piece to move.</param>
+    /// <param name="stepDegrees">The grid's spacing (see <see cref="GridSnap.Steps"/>).</param>
+    /// <returns>
+    /// True if it moved; false if it was already there (or there's no such piece).
+    /// </returns>
+    public bool CenterPieceOnGrid(Guid id, double stepDegrees)
+    {
+        if (FindPiece(id) is not MapPiece piece)
+        {
+            return false;
+        }
+
+        GeoCoordinate crossing = GridSnap.NearestCrossing(piece.Center, stepDegrees);
+        if (crossing == piece.Center)
+        {
+            return false;
+        }
+
+        RecordUndo($"Center {piece.Name} on Grid");
+        piece.Center = crossing;
+        ShowPieces(SelectedBody);
+        MarkChanged();
+        return true;
     }
 
     /// <summary>Renames a piece. Empty names are ignored.</summary>

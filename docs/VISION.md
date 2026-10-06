@@ -1266,6 +1266,36 @@ earlier ones.
 - **Benchmark (32 large pieces, all warped):** ~120 → ~92 fps, video memory unchanged. Still
   Base.
 
+**Implementation (cutting shapes and grid snapping, M34, PR #88):**
+- **More cutting shapes** (owner's choice): **Ellipse** (drag a box; Shift for a circle) and
+  **Regular Shape** (drag from the middle out to a corner; 3 to 12 sides, a hexagon to start;
+  Shift turns it in 15° steps). Shift on **Rectangle** makes a square. In Core:
+  `PieceOutline.Ellipse` (96 points), `RegularShape` (worked out in the image's true
+  proportions, corners past the edge pulled onto it), and `SquaredCorner`. They're ordinary
+  outlines, so the file format doesn't change. `CutCanvas` shares one drag path for the
+  three box-like tools.
+- **Snap to Grid** (owner's choice: the center *or* an edge snaps, to a chosen step): a toggle
+  and a step (15°, the drawn grid; 5°; or 1°) under the cut buttons. While dragging a piece,
+  `GridSnap.SnapPiece` moves its center so the center or the middle of one of its edges lies on
+  a latitude line, and likewise for longitude, by whichever is nearest. On a large or turned
+  piece, moving the center doesn't move the edges by exactly as much, so the move is refined
+  until the chosen points are on their lines. With Snap on, turning snaps to 15° as Shift does.
+  The setting isn't saved (it's how the user works, not part of the world).
+- **Center on Grid:** for a piece, `WorldSession.CenterPieceOnGrid` moves its center to the
+  nearest crossing. For the main map (owner's choice: its middle on a crossing), the map has
+  no position of its own, so `MapCalibration.CenteredOnGrid` moves every calibration guide
+  instead: longitude guides all shift (wrapping past 180°), and latitude guides shift with a
+  guide pinned where the image's middle is drawn, so the middle lands exactly (guides pushed
+  next to a pole are dropped). An uncalibrated map's middle is already at 0°, 0°, so the button
+  says so. Each is one undo step.
+- Tests (20 new): shapes in true proportions, clamping, sides limits, snapping by center or edge,
+  exactness on an 80° turned piece, and centering a calibrated map (including the wrap).
+- **Verified in the running app** (behind the owner's windows): an ellipse (96 points) and a
+  hexagon cut from a test map and added as pieces; with Snap at 5°, dragging a piece put its
+  center on 20°W, and then its west edge exactly on 55°W; Center on Grid moved it to 15°N
+  15°W; and the map's Center on Grid moved a calibrated map's middle from about 6°S 9°E to 5°S
+  10°E.
+
 **MAP-05 — Grid calibration (adjust how the map's lines project)** · Implemented (M3) · Base
 **Intent:** Raised by the owner while testing `MAP-04`. The built-in map types require the image
 to follow their layout exactly, but most maps aren't that precise, and even a Gall–Peters map
