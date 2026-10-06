@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 34: Polish Round Two** · In progress (owner's request, 2026-10-05)
+**Milestone 34: Polish Round Two** · In progress (owner's request, 2026-10-05; PRs #87–#90)
 Owner's requests after trying the app: ground detail up close, designed night skies, more map
 cutting shapes, grid snapping, a start screen and a way to launch without Godot, and tools that
 are easier to pick up. A run-through of every tool (2026-10-05) found them all working.
@@ -882,11 +882,67 @@ as realistic or simple.
   (its level of detail had been measured from the set-aside globe camera), and places the
   eye through `ShapeToSystem`.
 
-**REN-07 — Designed night skies** · Planned (M34) · Base
+**Implementation (ground detail, M34, PR #90):**
+- **Owner's choice:** a fine texture and small bumps near the feet that match the kind of
+  ground, fading with distance, in the Base tier.
+- **Where it's drawn:** only on the ground patch around the eye (`eye_level_ground` in
+  `planet_surface.gdshaderinc`). Three layers of the shared pattern noise, about 4 m, 1 m, and
+  25 cm across, each fading out once a pixel covers more than it (so it's sharp underfoot and
+  never shimmers far off).
+- **Precision:** the noise is read at the patch's own positions (relative to the point it's
+  built around, so precise to well under a millimeter) plus that point's place in the noise,
+  which `FirstPersonMode.SetGroundDetail` works out in double precision and wraps to the
+  noise's 32-unit repeat. The pattern stays put as the patch is rebuilt while walking. Reading
+  the globe's own directions instead would only resolve about 0.4 m on an Earth-sized world.
+- **Matched to the ground by its color** (`ground_kinds`): green → grass (tufts and blades),
+  sandy → sand (fine grain), white → snow (soft drifts), blue → water (almost nothing), and
+  the rest rock and soil (mottling and the strongest bumps). By color rather than terrain type,
+  so it works the same on painted terrain and on map images.
+- **Bumps** are a height in meters whose slopes (from screen derivatives of the precise
+  positions) light and shade the ground's color by how they face the sun, rather than tilting
+  the normal: the painterly style lights in bands, and small tilts came out as stripes.
+- Checked in the app on painted plains, desert, and mountains at midday and at night. The
+  benchmark (orbit view) is unchanged: 154, 140, 153, 154 fps against `main`'s 157, 155, 151,
+  156, back to back.
+
+**REN-07 — Designed night skies** · Implemented (M34: PR #90) · Base
 **Intent:** Each world has its own fixed night sky that the user designs: the stars stay put
 from night to night, and the user draws and names constellations in them (owner's request,
 2026-10-05; owner's choice: a star field from a seed that can be re-rolled, with named
 constellations drawn by joining stars).
+**Implementation (M34, PR #90):**
+- **The stars** (`Core/Simulation/StarField.cs`): the sky is split into the cells of a
+  cube's six faces, 128 × 128 each, and each cell holds at most one star, which has the cell
+  as its id. Whether a cell has a star, and the star's place, brightness, and color, come from
+  a random stream seeded by the world's seed and the cell, so a seed always gives the same
+  stars (about 4,900). A cell's chance follows how much sky it covers, so they're spread
+  evenly. **This must never change**, as constellations name stars by id; the exact rules are
+  in docs/world-format.md.
+- **Constellations** (`Model/Constellation.cs`, `StarLink.cs`): a name and lines joining two
+  stars each (up to 200 lines, 200 constellations). Format version 28 saves `starSeed` and
+  `constellations`. Older worlds get a seed made from their id, so each keeps one fixed sky.
+  Loading refuses a line to a star that isn't on the sky.
+- **Drawing them:** `StarSky` (Rendering) has Core make two images in the background
+  whenever the sky changes. One has a texel per cell (where the star is, its brightness and
+  color); the other has the constellation lines (`ConstellationLines`, 512 × 512 a face).
+  `star_sky.gdshaderinc` finds a direction's cell the same way Core does and draws its star
+  about a pixel or two across, plus the lines. It's used by the sky seen from a world's surface
+  (in place of the old made-up stars) and the sky behind the system.
+- **Owner's choice, "optionally from orbit":** View ▸ **Stars from Orbit** (off at first)
+  shows them behind the system, and View ▸ **Constellation Lines** (on) shows or hides the
+  lines in both views.
+- **Designing them:** System panel ▸ Night Sky ▸ **Design Night Sky…** opens a full-window
+  page (`UI/SkyPage.cs`, `UI/SkyCanvas.cs`). It shows the whole sky laid flat like a world
+  map, every star sized by brightness, with wheel zoom and right-drag pan. Clicking a star and
+  then another joins them in the chosen constellation, and clicking on keeps drawing from the
+  last star. Clicking one of its lines erases it, and Esc stops drawing, then closes. Next to
+  it: New, Delete, and the name. **New Stars** re-rolls the seed, but only once there are no
+  constellations (its tooltip says why), since they're drawn on these stars. Every change is
+  undoable (`WorldSession.Sky.cs`; the sky is part of `LoreState`).
+- Tests: 13 for the star field and lines (the same stars forever, evenly spread, ids matching
+  cells, cube faces round-tripping), and the version 28 golden file with damaged-sky refusals.
+- Checked in the app: drawing a 3-line constellation by clicking stars and renaming it, the
+  stars and line behind the system, and the stars by night (gone by day) from the ground.
 
 ### 4.2 Interface Layout (`UI`)
 
