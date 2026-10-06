@@ -114,6 +114,13 @@ code should be easy to follow for anyone.
 - YAGNI: build what is needed now. No speculative features or options that nobody asked for.
 - Prefer simple, well-understood solutions over clever or trendy ones.
 
+**Usability** (owner's decision, M34: someone new should be able to pick up every tool)
+- Every tool says in one line how to use it: set its hint with `MapToolbar.SetHint` while it's
+  open.
+- A tool never just does nothing. When it can't act, it says why and what to do instead: a
+  disabled button gets the reason as its tooltip (`DisabledTip.Apply`), and an action that has
+  to wait or is refused shows a message (e.g. `MapToolbar.ShowBusyWarning`).
+
 **Errors and data safety**
 - Worlds are the user's creative work, and **losing user data is the worst possible bug.**
   - Never silently discard or overwrite data.

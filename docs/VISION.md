@@ -882,7 +882,6 @@ as realistic or simple.
   (its level of detail had been measured from the set-aside globe camera), and places the
   eye through `ShapeToSystem`.
 
-
 **REN-07 — Designed night skies** · Planned (M34) · Base
 **Intent:** Each world has its own fixed night sky that the user designs: the stars stay put
 from night to night, and the user draws and names constellations in them (owner's request,
@@ -1070,11 +1069,36 @@ measuring distance, mass, volume, area, temperature, and so on (owner's idea, 20
   the radius at exactly 6,371 km; typing 4,000 mi stored 6,437.376 km; 50 °F stored 10 °C;
   and switching back to metric kept everything as stored.
 
-**UI-05 — Tool help** · Planned (M34) · Base
+**UI-05 — Tool help** · Implemented (M34: PR #87) · Base
 **Intent:** Someone picking up the app for the first time can use every tool: each tool says
 in one line how to use it, and when a tool can't do something, it says why and what to do
 instead of doing nothing (owner's request, 2026-10-05, after painting and sculpting seemed not
 to work).
+**Implementation (M34, PR #87):**
+- **What the run-through found** (every tool clicked through in the app, 2026-10-05): all of
+  them worked. Painting and sculpting only looked broken. The default Ocean barely shows on
+  an unmapped, ocean-blue planet. A 500 m sculpt is far too small to see from orbit, even at
+  10× relief. And nothing said why a tool did nothing when it couldn't act.
+- **The hint bar:** `MapToolbar.SetHint(tool, text)` shows one line on how to use the open
+  tool, in a dark strip centered along the bottom (between the camera text and the time
+  bar). The tool given a hint last is shown; closing it brings back the one before. The
+  System, Map, Terrain, Regions, and Journal panels set theirs when they open, and change it
+  as they need: the Map panel's says the next step (import a map, then calibrate or cut, then
+  drag pieces); the Terrain panel's follows its mode, and for sculpting explains true scale
+  and how to see small heights (zoom in, View ▸ Relief, View ▸ Stand Here). The Terrain and
+  Shapes how-to paragraphs moved into it. The timeline strip, diagrams page, and cut editor
+  keep the hint lines they already had.
+- **Disabled buttons say why** (`UI/DisabledTip.cs`: `Apply(button, tip, whyNot)` with shared
+  reasons `Busy`, `NoMap`, `NoSurface`): the map's Import, Clear, Calibrate, Cut from Map,
+  Cut from Image, and Reset Points; the System panel's Add Moon, Delete, and Make Center;
+  New Region; Add Relationship; the event editor's Pin on Globe; Add Nebula; and the diagram
+  page's Delete, Add to Diagram, Arrange, and Save as Image.
+- **Edits that wait say so:** `MapToolbar.ShowBusyWarning()` when the world is saving,
+  opening, or loading a map and the user paints, sculpts, places or drags a shape, drags or
+  deletes a piece, imports a map, opens the cut editor, or uses the File menu.
+- **Each brush stroke says what it did:** "Done: Paint Ocean. Ctrl+Z takes it back.", with
+  the height for Raise and Lower, or "Nothing changed" when the ground was already like that
+  (`TerrainBrush.ShowDone`).
 
 **UI-06 — Start screen and standalone app** · Planned (M34) · Base
 **Intent:** The app opens to a start screen (New World, Open World, Recent Worlds, Settings,
