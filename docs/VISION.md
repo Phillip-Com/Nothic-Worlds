@@ -108,7 +108,17 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 34: Polish Round Two** · In progress (owner's request, 2026-10-05; PRs #87–#90)
+**Milestone 35: Terrain Shapes the Ground** · In progress (owner's request, 2026-10-06)
+Painting a terrain type raises or lowers the ground to that type's height, and where types
+meet, the heights merge from gentle slopes to sheer cliffs (`BOD-07`). Owner's decisions:
+- **Layered:** each terrain type gives the ground a base height, and sculpting adds on top;
+  changing a type's height later re-shapes everything painted with it, keeping the sculpting.
+- **Edges:** each type has an Edge setting from Gentle through Steep to Cliff; where two
+  types meet, the steeper edge wins.
+- **A per-world setting** in the Terrain panel, off for existing worlds; each type gets a
+  Height and an Edge. Save format version 29.
+
+**Milestone 34: Polish Round Two** · Complete (PR #90 merged 2026-10-06; owner's request, 2026-10-05; PRs #87–#90)
 Owner's requests after trying the app: ground detail up close, designed night skies, more map
 cutting shapes, grid snapping, a start screen and a way to launch without Godot, and tools that
 are easier to pick up. A run-through of every tool (2026-10-05) found them all working.
@@ -2077,6 +2087,13 @@ built from both. Heights come first (M24), shapes next.
   through the dropdown, a color change and its undo, a new moon grey and rocky, the Sun as a red
   dwarf (its color and light), and save/reopen. Benchmark (baseline laptop): the default world
   unchanged against `main` (~194 fps); the same world plain ~179 fps against patterned ~174.
+
+**BOD-07 — Terrain shapes the ground** · Planned (M35) · Base
+**Intent:** Terrain painting and sculpting work together: painting a type (a mountain range,
+an ocean) raises or lowers the ground to that type's default height, custom types set their
+own, and where different types meet the heights merge, anything from a smooth slope to a
+sheer cliff, so the world looks real without sculpting every slope by hand (owner's request,
+2026-10-06).
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
