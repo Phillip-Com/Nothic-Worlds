@@ -2,8 +2,9 @@ namespace NothicWorlds.Core.Maps;
 
 /// <summary>
 /// The cut-out shape of a map piece (VISION.md MAP-02): a closed outline of points on the source
-/// image, each 0–1 from its top-left. A rectangle cut is four points, and a freeform cut is
-/// however many the user clicked. Immutable.
+/// image, each 0–1 from its top-left. A rectangle cut is four points, an ellipse many points
+/// around it, a regular shape one per corner, and a freeform cut however many the user clicked.
+/// Immutable.
 /// </summary>
 public sealed class PieceOutline
 {
@@ -12,6 +13,15 @@ public sealed class PieceOutline
 
     /// <summary>The most points an outline can have (keeps files and editing manageable).</summary>
     public const int MaximumPoints = 1000;
+
+    /// <summary>How many points go around an ellipse cut: smooth even when it's large.</summary>
+    public const int EllipsePoints = 96;
+
+    /// <summary>The fewest sides a regular shape can have (a triangle).</summary>
+    public const int MinimumSides = 3;
+
+    /// <summary>The most sides a regular shape can have.</summary>
+    public const int MaximumSides = 12;
 
     private PieceOutline(IReadOnlyList<ImagePoint> points, double sourceAspectRatio)
     {
@@ -59,6 +69,77 @@ public sealed class PieceOutline
         return Create(
             [new(left, top), new(right, top), new(right, bottom), new(left, bottom)],
             sourceAspectRatio);
+    }
+
+    /// <summary>
+    /// Creates an elliptical cut filling the box between two opposite corners (see
+    /// <see cref="SquaredCorner"/> for a circle).
+    /// </summary>
+    /// <exception cref="ArgumentException">The box is empty.</exception>
+    public static PieceOutline Ellipse(
+        ImagePoint corner, ImagePoint oppositeCorner, double sourceAspectRatio)
+    {
+        double centerU = (corner.U + oppositeCorner.U) / 2;
+        double centerV = (corner.V + oppositeCorner.V) / 2;
+        double radiusU = Math.Abs(oppositeCorner.U - corner.U) / 2;
+        double radiusV = Math.Abs(oppositeCorner.V - corner.V) / 2;
+        return Create(
+            Enumerable.Range(0, EllipsePoints).Select(i =>
+            {
+                double angle = 2 * Math.PI * i / EllipsePoints;
+                return new ImagePoint(
+                    Math.Clamp(centerU + radiusU * Math.Cos(angle), 0, 1),
+                    Math.Clamp(centerV + radiusV * Math.Sin(angle), 0, 1));
+            }),
+            sourceAspectRatio);
+    }
+
+    /// <summary>
+    /// Creates a regular shape (equal sides and angles, as seen on the image) around
+    /// <paramref name="center"/>, with one corner at <paramref name="corner"/>. Corners past the
+    /// image's edge are pulled back onto it.
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Too few or many sides, or the shape has no size.
+    /// </exception>
+    public static PieceOutline RegularShape(
+        ImagePoint center, ImagePoint corner, int sides, double sourceAspectRatio)
+    {
+        Require(sides is >= MinimumSides and <= MaximumSides,
+            $"a regular shape needs {MinimumSides} to {MaximumSides} sides");
+        Require(double.IsFinite(sourceAspectRatio) && sourceAspectRatio > 0,
+            "the image's aspect ratio must be a positive number");
+
+        // Worked out in the image's true proportions, so the shape isn't squashed on a wide one.
+        double across = (corner.U - center.U) * sourceAspectRatio;
+        double down = corner.V - center.V;
+        double radius = Math.Sqrt(across * across + down * down);
+        double firstAngle = Math.Atan2(down, across);
+        return Create(
+            Enumerable.Range(0, sides).Select(i =>
+            {
+                double angle = firstAngle + 2 * Math.PI * i / sides;
+                return new ImagePoint(
+                    Math.Clamp(center.U + radius * Math.Cos(angle) / sourceAspectRatio, 0, 1),
+                    Math.Clamp(center.V + radius * Math.Sin(angle), 0, 1));
+            }),
+            sourceAspectRatio);
+    }
+
+    /// <summary>
+    /// The corner opposite <paramref name="corner"/> that makes the box square on the image
+    /// (as wide as it is tall in pixels), toward <paramref name="toward"/> and no bigger than
+    /// the box to it: for drawing squares and circles.
+    /// </summary>
+    public static ImagePoint SquaredCorner(
+        ImagePoint corner, ImagePoint toward, double sourceAspectRatio)
+    {
+        double across = (toward.U - corner.U) * sourceAspectRatio;
+        double down = toward.V - corner.V;
+        double side = Math.Min(Math.Abs(across), Math.Abs(down));
+        return new ImagePoint(
+            corner.U + Math.Sign(across) * side / sourceAspectRatio,
+            corner.V + Math.Sign(down) * side);
     }
 
     /// <summary>Creates a cut from an outline, checking that it's usable.</summary>

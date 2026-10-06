@@ -24,6 +24,7 @@ public partial class CutEditor : CanvasLayer
     private Label _title = null!;
     private Button _rectangleTool = null!;
     private Button _freeformTool = null!;
+    private HBoxContainer _sidesRow = null!;
     private Button _addButton = null!;
     private Label _hint = null!;
     private string? _assetName;
@@ -69,13 +70,18 @@ public partial class CutEditor : CanvasLayer
         var buttons = new HFlowContainer();
         var tools = new ButtonGroup();
         _rectangleTool = CreateButton("Rectangle", () => SetTool(CutCanvas.CutTool.Rectangle));
+        Button ellipseTool = CreateButton("Ellipse", () => SetTool(CutCanvas.CutTool.Ellipse));
+        Button shapeTool = CreateButton(
+            "Regular Shape", () => SetTool(CutCanvas.CutTool.RegularShape));
         _freeformTool = CreateButton("Freeform", () => SetTool(CutCanvas.CutTool.Freeform));
-        foreach (Button tool in new[] { _rectangleTool, _freeformTool })
+        foreach (Button tool in new[] { _rectangleTool, ellipseTool, shapeTool, _freeformTool })
         {
             tool.ToggleMode = true;
             tool.ButtonGroup = tools;
             buttons.AddChild(tool);
         }
+
+        buttons.AddChild(BuildSidesRow());
 
         buttons.AddChild(CreateButton("Fit to View", () => _canvas.FitToView()));
         buttons.AddChild(CreateButton("Cancel", Close));
@@ -216,14 +222,41 @@ public partial class CutEditor : CanvasLayer
             ?? new GeoCoordinate(0, 0);
     }
 
+    // How many sides the regular shape has: shown only while that tool is chosen.
+    private HBoxContainer BuildSidesRow()
+    {
+        _sidesRow = new HBoxContainer { Visible = false };
+        _sidesRow.AddChild(new Label { Text = "Sides" });
+        var sides = new SpinBox
+        {
+            MinValue = PieceOutline.MinimumSides,
+            MaxValue = PieceOutline.MaximumSides,
+            Step = 1,
+            Value = CutCanvas.DefaultSides,
+            TooltipText = "3 for a triangle, 4 a diamond, 6 a hexagon, up to 12",
+        };
+        sides.ValueChanged += value => _canvas.Sides = (int)value;
+        _sidesRow.AddChild(sides);
+        return _sidesRow;
+    }
+
     private void SetTool(CutCanvas.CutTool tool)
     {
         _canvas.Tool = tool;
-        _hint.Text = tool == CutCanvas.CutTool.Rectangle
-            ? "Drag a box around the part you want. Scroll to zoom, right-drag to pan."
-            : "Click to place points around the part you want, then click the first point (or " +
-              "press Enter) to close the shape. Backspace removes the last point. Scroll to " +
-              "zoom, right-drag to pan.";
+        _sidesRow.Visible = tool == CutCanvas.CutTool.RegularShape;
+        const string view = " Scroll to zoom, right-drag to pan.";
+        _hint.Text = tool switch
+        {
+            CutCanvas.CutTool.Rectangle =>
+                "Drag a box around the part you want (hold Shift for a square)." + view,
+            CutCanvas.CutTool.Ellipse =>
+                "Drag a box for the ellipse to fill (hold Shift for a circle)." + view,
+            CutCanvas.CutTool.RegularShape =>
+                "Drag from the middle out to a corner (hold Shift to turn it in 15° steps). " +
+                "Set the number of sides beside the buttons." + view,
+            _ => "Click to place points around the part you want, then click the first point " +
+                "(or press Enter) to close the shape. Backspace removes the last point." + view,
+        };
         UpdateButtons();
     }
 

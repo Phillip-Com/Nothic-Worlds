@@ -34,6 +34,44 @@ public class MapCalibrationTests
     }
 
     [Fact]
+    public void CenteredOnGrid_LeavesAnUncalibratedMapWhereItIs()
+    {
+        MapCalibration centered = MapCalibration.CreateDefault().CenteredOnGrid(15);
+
+        Assert.True(centered.IsIdentity);
+    }
+
+    [Fact]
+    public void CenteredOnGrid_PutsTheMiddleOfTheImageOnTheNearestCrossing()
+    {
+        MapCalibration calibration = MapCalibration.CreateDefault();
+        calibration = calibration.WithLatitudeDrawnAs(LatIndex(calibration, 0), 6.0);
+        calibration = calibration.WithLongitudeDrawnAs(LonIndex(calibration, 0), -9.0);
+        // The equator drawn 6° north and the prime meridian 9° west put the image's middle
+        // somewhat south and east of 0°, 0°, off the 5° grid.
+        Assert.InRange(calibration.TrueLatitude(0), -7.0, -5.5);
+        Assert.InRange(calibration.TrueLongitude(0), 8.0, 10.0);
+
+        MapCalibration centered = calibration.CenteredOnGrid(5);
+
+        Assert.Equal(-5.0, centered.TrueLatitude(0), 1e-6);
+        Assert.Equal(10.0, centered.TrueLongitude(0), 1e-6);
+        Assert.Equal(calibration.Longitudes.Count, centered.Longitudes.Count);
+    }
+
+    [Fact]
+    public void CenteredOnGrid_WrapsLongitudeGuidesAcross180Degrees()
+    {
+        MapCalibration calibration = MapCalibration.CreateDefault();
+        calibration = calibration.WithLongitudeDrawnAs(LonIndex(calibration, 0), 8.0);
+
+        MapCalibration centered = calibration.CenteredOnGrid(15);
+
+        Assert.Equal(-15.0, centered.TrueLongitude(0), 1e-6);
+        Assert.All(centered.Longitudes, guide => Assert.InRange(guide.Degrees, -180.0, 179.999));
+    }
+
+    [Fact]
     public void MovingALatitudeGuide_PassesThroughIt_AndKeepsPolesFixed()
     {
         MapCalibration start = MapCalibration.CreateDefault();

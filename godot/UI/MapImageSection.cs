@@ -21,11 +21,15 @@ public partial class MapImageSection : VBoxContainer
     private const string ClearTip = "Remove the map and show the grid";
     private const string CalibrateTip =
         "Line the map up with the globe by dragging its latitude/longitude lines";
+    private const string CenterTip =
+        "Move the whole map so the middle of the image sits on the nearest crossing of the " +
+        "grid's lines (at the step chosen below)";
 
     private Label _noMap = null!;
     private Button _importButton = null!;
     private Button _clearButton = null!;
     private Button _calibrateButton = null!;
+    private Button _centerButton = null!;
     private OptionButton _mapType = null!;
     private ColorPickerButton _fillColor = null!;
     private Label _fillColorLabel = null!;
@@ -42,6 +46,9 @@ public partial class MapImageSection : VBoxContainer
 
     /// <summary>Where messages go.</summary>
     public MapToolbar? Toolbar { get; init; }
+
+    /// <summary>The grid step chosen in the Map panel, for Center on Grid.</summary>
+    public Func<double> GridStep { get; init; } = () => GridSnap.Steps[0];
 
     public override void _Ready()
     {
@@ -60,9 +67,12 @@ public partial class MapImageSection : VBoxContainer
         _clearButton.Pressed += () => Session.ClearMap();
         _calibrateButton = CreateButton("Calibrate…", CalibrateTip);
         _calibrateButton.Pressed += () => Calibration?.Open();
+        _centerButton = CreateButton("Center on Grid", CenterTip);
+        _centerButton.Pressed += CenterOnGrid;
         buttons.AddChild(_importButton);
         buttons.AddChild(_clearButton);
         buttons.AddChild(_calibrateButton);
+        buttons.AddChild(_centerButton);
         AddChild(buttons);
 
         var grid = new GridContainer { Columns = 2 };
@@ -133,6 +143,13 @@ public partial class MapImageSection : VBoxContainer
         }
     }
 
+    private void CenterOnGrid()
+    {
+        Toolbar?.ShowInfo(Session.CenterMapOnGrid(GridStep())
+            ? "Moved the map so its middle is on a grid crossing (Ctrl+Z to undo)."
+            : "The map's middle is already on a grid crossing.");
+    }
+
     private void OnWorldClosed(Guid _)
     {
         _mapFileName = null;
@@ -158,6 +175,7 @@ public partial class MapImageSection : VBoxContainer
             : null;
         DisabledTip.Apply(_clearButton, ClearTip, noMap);
         DisabledTip.Apply(_calibrateButton, CalibrateTip, noMap);
+        DisabledTip.Apply(_centerButton, CenterTip, noMap);
     }
 
     private void OnMapTypeSelected(long index)

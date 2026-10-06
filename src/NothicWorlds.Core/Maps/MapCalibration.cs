@@ -208,6 +208,39 @@ public sealed class MapCalibration
             Latitudes, [.. Longitudes.Append(guide).OrderBy(g => g.Degrees)]);
     }
 
+    /// <summary>
+    /// Moves the whole map so that the middle of the image lands on the nearest crossing of
+    /// the grid's latitude and longitude lines (VISION.md MAP-02; owner's choice). Every guide
+    /// moves with it; latitude guides pushed within <see cref="MinimumGapDegrees"/> of a pole
+    /// are dropped, since the poles stay fixed.
+    /// </summary>
+    /// <param name="stepDegrees">The grid's spacing, more than 0 and at most 90.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The step is out of range.</exception>
+    public MapCalibration CenteredOnGrid(double stepDegrees)
+    {
+        var middle = new Geometry.GeoCoordinate(TrueLatitude(0), TrueLongitude(0));
+        Geometry.GeoCoordinate target = GridSnap.NearestCrossing(middle, stepDegrees);
+        double north = target.LatitudeDegrees - middle.LatitudeDegrees;
+        double east = Geometry.SphericalCoordinates.LongitudeDelta(
+            middle.LongitudeDegrees, target.LongitudeDegrees);
+
+        // A guide where the middle is drawn pins it exactly, however the curve bends.
+        MapCalibration pinned = AddLatitude(middle.LatitudeDegrees);
+        IEnumerable<CalibrationGuide> latitudes = pinned.Latitudes
+            .Select(guide => guide with { Degrees = guide.Degrees + north })
+            .Where(guide => Math.Abs(guide.Degrees) < 90.0 - MinimumGapDegrees);
+
+        // Longitude wraps: a guide pushed past 180° comes round to the other end, its drawn
+        // place turned with it so the guides still run in order.
+        IEnumerable<CalibrationGuide> longitudes = Longitudes.Select(guide =>
+        {
+            double moved = guide.Degrees + east;
+            double turn = moved >= 180.0 ? -360.0 : moved < -180.0 ? 360.0 : 0.0;
+            return new CalibrationGuide(moved + turn, guide.DrawnAsDegrees + turn);
+        });
+        return Create(latitudes, longitudes);
+    }
+
     /// <summary>Removes latitude guide <paramref name="index"/>.</summary>
     public MapCalibration RemoveLatitude(int index)
     {
