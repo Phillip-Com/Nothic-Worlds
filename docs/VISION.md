@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 35: Terrain Shapes the Ground** · In progress (owner's request, 2026-10-06)
+**Milestone 35: Terrain Shapes the Ground** · In progress (owner's request, 2026-10-06; PR #91)
 Painting a terrain type raises or lowers the ground to that type's height, and where types
 meet, the heights merge from gentle slopes to sheer cliffs (`BOD-07`). Owner's decisions:
 - **Layered:** each terrain type gives the ground a base height, and sculpting adds on top;
@@ -2109,12 +2109,57 @@ built from both. Heights come first (M24), shapes next.
   dwarf (its color and light), and save/reopen. Benchmark (baseline laptop): the default world
   unchanged against `main` (~194 fps); the same world plain ~179 fps against patterned ~174.
 
-**BOD-07 — Terrain shapes the ground** · Planned (M35) · Base
+**BOD-07 — Terrain shapes the ground** · Implemented (M35: PR #91) · Base
 **Intent:** Terrain painting and sculpting work together: painting a type (a mountain range,
 an ocean) raises or lowers the ground to that type's default height, custom types set their
 own, and where different types meet the heights merge, anything from a smooth slope to a
 sheer cliff, so the world looks real without sculpting every slope by hand (owner's request,
 2026-10-06).
+**Implementation (M35, PR #91):**
+- **Model:**
+  - Each `TerrainType` gains `HeightMeters` (−12,000 to 12,000) and `Edge` (0 gentle to 1
+    cliff). The defaults: Ocean −3,000 m, Shallow Water −150, Plains and Fields 150, Forest
+    300, Jungle 200, Hills 800, Mountains 2,500 (steep), Desert 400, Swamp 20, Tundra 300, Ice
+    1,000.
+  - `World.TerrainShapesGround` (off by default, for new worlds too).
+  - Format **version 29**. Older worlds keep it off, and their types named like the defaults
+    get the default heights.
+- **`TerrainRelief`** (Core) works out the ground the painting shapes, a 64-cell tile at a
+  time, reading the codes 13 cells around it (across a face's edge, from the next face):
+  - A two-sweep chamfer distance transform finds each cell's distance to the nearest other
+    type, through cells of its own type, and which type that is.
+  - Each cell eases from halfway between the two heights (at the line between them) to its
+    own height over half the transition width, `24 × (1 − e)²` cells for the steeper edge
+    `e`. A cliff (`e` = 1) jumps.
+  - Tiles with nothing painted near them are skipped.
+  - A paint stroke re-works only the tiles near it (`Update`): about 10–20 ms. A whole
+    planet takes 2–700 ms, depending on how much is painted.
+  - `Shaped` adds the sculpting on top, sharing tiles where one side is flat. Only the
+    sculpting is saved.
+- **Sculpting on shaped ground:** Raise and Lower are unchanged. `HeightGrid.Flatten` and
+  `Smooth` take the ground underneath, so they level and smooth what's seen. `HeightAt` (the
+  Flatten target and shapes' depth) is the ground seen.
+- **App:**
+  - `WorldSession` keeps each body's shaped ground, keyed by its painting and the types'
+    codes, heights, and edges (a new name or color re-works nothing).
+  - `ShowTerrain` sends the globe the shaped ground with the sculpting on top. First person,
+    shapes, and carving use it.
+  - The switch is part of undo (`LoreState`).
+  - **Terrain panel:** a **Terrain shapes the ground** switch over the types, and each type's
+    **Height** (in m or ft) and **Edge** (a slider, named Gentle, Moderate, Steep, Very
+    steep, or Cliff, applied when the drag ends).
+  - The paint hint says the ground follows the type when it's on. A note under Height and
+    Edge says they apply once the switch is on.
+- Tests (26 new): uniform areas, cliffs that jump in one cell, gentle slopes rising smoothly
+  through halfway, the steeper edge winning, continuity over a cube face's edge, stroke
+  updates matching a full re-work, sculpting added and clamped, Flatten levelling the ground
+  seen, and the version 29 golden file with its upgrade and refusals.
+- **Verified in the app** (behind the owner's windows):
+  - switched on by a click; painting plains, then mountains, gave 2,500 m in the middle;
+  - a cliff edge gave 150, 150, 150, 2,058 (between two cells), 2,500 across the line;
+  - Mountains made a raised plateau with its walls seen from orbit at 50× relief;
+  - four undos turned it off and flattened the ground, and four redos brought it back;
+  - save and reload kept the switch and the edge.
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
