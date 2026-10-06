@@ -15,6 +15,18 @@ public partial class WorldSession
     private readonly Dictionary<Guid, (TerrainGrid Terrain, TerrainType[] Types, HeightGrid Ground)>
         _terrainGround = [];
 
+    // Each body's ground seen (terrain and sculpting together), kept with what it came from, so
+    // the next can share every tile that didn't change and the globe redraws only what did:
+    // making it afresh each time redrew the whole globe on every keystroke and brush move.
+    private readonly Dictionary<Guid, (HeightGrid Base, HeightGrid Sculpted, HeightGrid Shaped)>
+        _shownGround = [];
+
+    // While a stroke paints, when each body's ground last went to its globe, and the bodies
+    // whose newest ground hasn't yet (see ShowPainting).
+    private const double ReshapeSeconds = 0.5;
+    private readonly Dictionary<Guid, ulong> _reshapedAt = [];
+    private readonly HashSet<Guid> _reshapeWaiting = [];
+
     // Colors offered in turn for new terrain types: distinct from the defaults.
     private static readonly RgbColor[] _newTerrainColors =
     [
@@ -150,7 +162,7 @@ public partial class WorldSession
 
         RecordUndo(code == 0 ? "Erase Terrain" : "Paint Terrain");
         body.Surface.Terrain = painted;
-        ShowTerrain(body);
+        ShowPainting(body);
         MarkChanged(systemChanged: false);
     }
 
@@ -223,6 +235,48 @@ public partial class WorldSession
         return World.TerrainTypes.Find(type => type.Code == code);
     }
 
+    // Shows a stroke's painting straight away. When the terrain shapes the ground, the ground
+    // goes to the globe at most every ReshapeSeconds during the stroke, and when it ends:
+    // sending heights redraws a whole face of the globe (about a tenth of a second), which
+    // on every brush move made painting stall.
+    private void ShowPainting(Body body)
+    {
+        if (!World.TerrainShapesGround || _gesture is null
+            || System?.SurfaceFor(body.Id) is not PlanetSurface surface)
+        {
+            ShowTerrain(body);
+            return;
+        }
+
+        surface.SetTerrain(body.Surface.Terrain);
+        ulong now = Godot.Time.GetTicksMsec();
+        _reshapedAt.TryGetValue(body.Id, out ulong last);
+        if (now - last >= ReshapeSeconds * 1000)
+        {
+            surface.SetHeights(ShownGround(body));
+            _reshapedAt[body.Id] = now;
+            _reshapeWaiting.Remove(body.Id);
+        }
+        else
+        {
+            _reshapeWaiting.Add(body.Id);
+        }
+    }
+
+    // Sends the ground of bodies painted since it was last sent, as a stroke ends.
+    private void ShowWaitingGround()
+    {
+        foreach (Guid id in _reshapeWaiting.ToList())
+        {
+            if (FindBody(id) is Body body)
+            {
+                ShowTerrain(body);
+            }
+        }
+
+        _reshapeWaiting.Clear();
+    }
+
     // Sends a body's terrain, and the colors to draw it in, to its globe.
     private void ShowTerrain(Body body)
     {
@@ -230,7 +284,8 @@ public partial class WorldSession
         {
             surface.SetTerrainColors(World.TerrainTypes);
             surface.SetTerrain(body.Surface.Terrain);
-            surface.SetHeights(TerrainRelief.Shaped(TerrainGround(body), body.Surface.Heights));
+            surface.SetHeights(ShownGround(body));
+            _reshapeWaiting.Remove(body.Id);
             surface.SetShapes(body.Surface.Shapes, body.RadiusKm);
         }
     }
@@ -246,21 +301,51 @@ public partial class WorldSession
 
         TerrainGrid terrain = body.Surface.Terrain;
         TerrainType[] types = [.. World.TerrainTypes];
-        if (_terrainGround.TryGetValue(body.Id, out var known) && SameShaping(known.Types, types))
+        if (_terrainGround.TryGetValue(body.Id, out var known))
         {
-            if (ReferenceEquals(known.Terrain, terrain))
+            if (SameShaping(known.Types, types))
             {
-                return known.Ground;
+                if (ReferenceEquals(known.Terrain, terrain))
+                {
+                    return known.Ground;
+                }
+
+                HeightGrid updated =
+                    TerrainRelief.Update(known.Ground, known.Terrain, terrain, types);
+                _terrainGround[body.Id] = (terrain, types, updated);
+                return updated;
             }
 
-            HeightGrid updated = TerrainRelief.Update(known.Ground, known.Terrain, terrain, types);
-            _terrainGround[body.Id] = (terrain, types, updated);
-            return updated;
+            if (ReferenceEquals(known.Terrain, terrain))
+            {
+                // A type's height or edge changed: only the ground near it is re-worked.
+                HeightGrid reworked =
+                    TerrainRelief.Rework(known.Ground, terrain, known.Types, types);
+                _terrainGround[body.Id] = (terrain, types, reworked);
+                return reworked;
+            }
         }
 
         HeightGrid ground = TerrainRelief.BaseHeights(terrain, types);
         _terrainGround[body.Id] = (terrain, types, ground);
         return ground;
+    }
+
+    // The ground a body shows: its sculpting, on the ground its terrain shapes when that's on.
+    private HeightGrid ShownGround(Body body)
+    {
+        HeightGrid under = TerrainGround(body), sculpted = body.Surface.Heights;
+        _shownGround.TryGetValue(body.Id, out var before);
+        if (before.Shaped is not null && ReferenceEquals(before.Base, under)
+            && ReferenceEquals(before.Sculpted, sculpted))
+        {
+            return before.Shaped;
+        }
+
+        HeightGrid shown = TerrainRelief.Shaped(under, sculpted,
+            before.Shaped is null ? null : before);
+        _shownGround[body.Id] = (under, sculpted, shown);
+        return shown;
     }
 
     // Whether two lists of types shape the ground the same (names and colors don't matter).

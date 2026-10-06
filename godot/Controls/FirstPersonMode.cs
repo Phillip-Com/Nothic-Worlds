@@ -79,6 +79,13 @@ public partial class FirstPersonMode : Node
     private double _heading;  // Radians clockwise from north
     private double _pitch;    // Radians above level
     private double _heightMeters = EyeHeightMeters;  // Above the ground
+
+    // Flying over a globe: the height kept, above the body's radius rather than the ground
+    // (owner's choice), so a cliff passing underneath doesn't drop the eye; the ground only
+    // pushes it up where it rises higher. And the ground's height under the eye.
+    private double _altitudeMeters;
+    private double _groundMeters;
+    private bool _descending;
     private bool _flying;
     private bool _magnify;
     private bool _dragging;
@@ -390,6 +397,7 @@ public partial class FirstPersonMode : Node
                 _heightMeters = _flying
                     ? Math.Max(_heightMeters, EyeHeightMeters)
                     : EyeHeightMeters;
+                _altitudeMeters = _groundMeters + _heightMeters;
                 ShowHelp();
                 break;
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.M }:
@@ -423,7 +431,27 @@ public partial class FirstPersonMode : Node
         Move(body, delta);
         _sinceGroundBuilt += delta;
         double radiusMeters = body.RadiusKm * 1000;
+        if (_flat is null)
+        {
+            KeepGroundBuilt(globe, body);
+        }
+
         double groundRadius = _flat is null ? GroundRadius(globe, body) : 1;
+        if (_flat is null)
+        {
+            _groundMeters = (groundRadius - 1) * radiusMeters;
+            if (_flying)
+            {
+                // Descending stops at the ground; otherwise the ground only lifts the eye.
+                if (_descending)
+                {
+                    _altitudeMeters = Math.Max(_altitudeMeters, _groundMeters + EyeHeightMeters);
+                }
+
+                _heightMeters = Math.Max(EyeHeightMeters, _altitudeMeters - _groundMeters);
+            }
+        }
+
         Vector3D eye = _flat is FlatSpot standing
             ? FlatWalk.Point(standing, FlatGroundLift + _heightMeters / radiusMeters)
             : _spot * (groundRadius + _heightMeters / radiusMeters);
@@ -439,7 +467,7 @@ public partial class FirstPersonMode : Node
         }
         else
         {
-            PlaceGround(globe, body, time, eye, place.Radius);
+            PlaceGround(body, time, eye, place.Radius);
         }
 
         UpdateWeather(id, time, delta);
@@ -486,11 +514,19 @@ public partial class FirstPersonMode : Node
         double rise = _flying ? Held(Key.Space) - Held(Key.C) : 0;
         double speed = _speeds[_speed].MetersPerSecond
             * (Input.IsKeyPressed(Key.Shift) ? 10 : 1) * delta;
+        _descending = rise < 0;
         if (rise != 0)
         {
             // Rising goes faster the higher you are, so flying up off a world doesn't take hours.
-            _heightMeters = Math.Max(EyeHeightMeters,
-                _heightMeters + rise * Math.Max(speed, _heightMeters * delta));
+            double step = rise * Math.Max(speed, _heightMeters * delta);
+            if (_flat is null)
+            {
+                _altitudeMeters += step;
+            }
+            else
+            {
+                _heightMeters = Math.Max(EyeHeightMeters, _heightMeters + step);
+            }
         }
 
         if (forward == 0 && sideways == 0)
@@ -527,7 +563,10 @@ public partial class FirstPersonMode : Node
             }
         }
 
-        return globe.GroundRadiusAt(_spot, body.RadiusKm);
+        // Never under the drawn ground, which can stand above the ground's height between its
+        // points (see FirstPersonGround.HighestAround).
+        double ground = globe.GroundRadiusAt(_spot, body.RadiusKm);
+        return _ground?.HighestAround(_spot) is double drawn ? Math.Max(ground, drawn) : ground;
     }
 
     // The camera at the scene's middle (the eye), looking along the heading and pitch.
@@ -542,7 +581,9 @@ public partial class FirstPersonMode : Node
 
         // The near distance follows the eye's height; far stays within the depth range the
         // engine can build (see SystemView.FitCamera).
-        float near = (float)Math.Max(eyeHeight * 0.3, 1e-9);
+        // A tenth of it (about 17 cm standing), so ground or a cliff right in front isn't
+        // cut away; the view still reaches 170 km, past the horizon from the ground.
+        float near = (float)Math.Max(eyeHeight * 0.1, 1e-9);
         _camera.Near = near;
         _camera.Far = near * 1e6f;
     }
@@ -560,8 +601,16 @@ public partial class FirstPersonMode : Node
     // relative to the eye. Moving fast, that would be every frame, which took the frame rate
     // down to a dozen a second: then they're built at most every MinGroundRebuildSeconds,
     // unless the eye has gone a good way out across them.
-    private void PlaceGround(PlanetSurface globe, Body body, double time, Vector3D eye,
-        double displayRadius)
+    private void PlaceGround(Body body, double time, Vector3D eye, double displayRadius)
+    {
+        PlaceRings(_ground!, body, time, eye, displayRadius);
+        PlaceRings(_deck!, body, time, eye, displayRadius);
+    }
+
+    // Builds the ground (and cloud deck) again when needed (see PlaceGround). Done before the
+    // eye is placed on it, so the eye is always measured against the ground that's drawn:
+    // built after, the eye could be a frame below the new ground and see through it.
+    private void KeepGroundBuilt(PlanetSurface globe, Body body)
     {
         FirstPersonGround ground = _ground!;
         ground.Visible = !globe.IsCarved;  // A carved globe draws its own carving
@@ -598,9 +647,6 @@ public partial class FirstPersonMode : Node
             double layer = ground.CenterRadius + SurfaceSky.CloudHeightKm / body.RadiusKm;
             _deck!.Build(_ => layer, ground.Center, 2e-7, outer);
         }
-
-        PlaceRings(ground, body, time, eye, displayRadius);
-        PlaceRings(_deck!, body, time, eye, displayRadius);
     }
 
     // Tells the ground's material where the point its patch is built around falls in the fine

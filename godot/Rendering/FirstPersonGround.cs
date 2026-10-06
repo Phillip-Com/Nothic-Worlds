@@ -19,6 +19,12 @@ public partial class FirstPersonGround : MeshInstance3D
     private const int Rings = 96;
     private const int Segments = 72;
 
+    // How far out each point was put (in radii), and what's needed to find the points around a
+    // direction: the rings' angles from the center, and the center's east and north.
+    private double[] _radii = [];
+    private double _innerAngle, _outerAngle;
+    private Vector3D _east, _north;
+
     public FirstPersonGround()
     {
         Name = "FirstPersonGround";
@@ -53,8 +59,10 @@ public partial class FirstPersonGround : MeshInstance3D
         CenterRadius = radiusAt(center);
         Vector3D middle = center * CenterRadius;
         (Vector3D east, Vector3D north) = Tangents(center);
+        (_innerAngle, _outerAngle, _east, _north) = (innerAngle, outerAngle, east, north);
 
         int count = 1 + Rings * Segments;
+        _radii = new double[count];
         var positions = new Vector3[count];
         var normals = new Vector3[count];
         var directions = new float[count * 4];
@@ -86,7 +94,8 @@ public partial class FirstPersonGround : MeshInstance3D
         // Each point, lifted to the drawn ground and kept relative to the middle point.
         void Add(int index, Vector3D direction)
         {
-            Vector3D point = direction * radiusAt(direction) - middle;
+            _radii[index] = radiusAt(direction);
+            Vector3D point = direction * _radii[index] - middle;
             positions[index] = new Vector3((float)point.X, (float)point.Y, (float)point.Z);
             normals[index] = new Vector3((float)direction.X, (float)direction.Y,
                 (float)direction.Z);
@@ -95,6 +104,41 @@ public partial class FirstPersonGround : MeshInstance3D
             directions[index * 4 + 2] = (float)direction.Z;
             directions[index * 4 + 3] = 1;
         }
+    }
+
+    /// <summary>
+    /// The highest the drawn ground reaches around a direction, in radii: the highest corner of
+    /// the mesh's cell it falls in. The mesh is flat between its points, so where the ground
+    /// curves or steps it can stand above the ground's own height; an eye kept above this
+    /// never sinks into it. Null if the direction is off the rings (or nothing is built).
+    /// </summary>
+    public double? HighestAround(Vector3D direction)
+    {
+        if (_radii.Length == 0)
+        {
+            return null;
+        }
+
+        double angle = Math.Acos(Math.Clamp(direction.Dot(Center), -1, 1));
+        if (angle >= _outerAngle)
+        {
+            return null;
+        }
+
+        double bearing = Math.Atan2(direction.Dot(_east), direction.Dot(_north));
+        double around = (bearing / Math.Tau + 1) % 1 * Segments;
+        int segment = (int)around % Segments, next = (segment + 1) % Segments;
+        if (angle < _innerAngle)
+        {
+            // In the fan around the middle.
+            return Math.Max(_radii[0], Math.Max(_radii[1 + segment], _radii[1 + next]));
+        }
+
+        int ring = Math.Clamp((int)(Math.Log(angle / _innerAngle)
+            / Math.Log(_outerAngle / _innerAngle) * (Rings - 1)), 0, Rings - 2);
+        int inner = 1 + ring * Segments, outer = inner + Segments;
+        return Math.Max(Math.Max(_radii[inner + segment], _radii[inner + next]),
+            Math.Max(_radii[outer + segment], _radii[outer + next]));
     }
 
     // A fan around the middle, then a strip between each ring and the next, wound clockwise

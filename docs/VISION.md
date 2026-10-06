@@ -2172,6 +2172,36 @@ sheer cliff, so the world looks real without sculpting every slope by hand (owne
     (about 7°), the change is squeezed toward the line between them, by up to 40 times as it
     grows: a 2,350 m step becomes a sheer wall, and ordinary slopes are unchanged. Seen from
     3 km, a 2,500 m cliff stands as a wall with a ragged top.
+- **Second review (2026-10-06):**
+  - **The brush "stopped working" after editing a type.** With the switch on, every edit to
+    a type (each keystroke of its name, each step of a color being picked) made the ground
+    seen afresh as all-new tiles, so the globe re-sent all six faces of heights.
+    - `TerrainRelief.Shaped` now takes what it made before and shares every tile where
+      neither side changed; the session keeps each body's last one.
+    - A type's height or edge re-works only the tiles near ground painted with it
+      (`TerrainRelief.Rework`).
+    - Recoloring also re-made the averaged terrain copy of all six faces every step, which
+      was there before this milestone. Now it's done at most four times a second and only
+      on faces with paint (`PlanetSurface.RedoFarColors`).
+    - While a stroke paints, the ground goes to the globe at most twice a second and when
+      the stroke ends (`ShowPainting`).
+    - Ten recolors went from 2.4 s to 16 ms, and a paint step on a sculpted world from
+      276 ms to 62 ms (outside a stroke).
+  - **Flying keeps its height above the planet's radius**, not the ground (owner's
+    request), so a cliff passing underneath doesn't drop the eye; the ground only pushes it
+    up where it rises higher. Descending stops at the ground. In the app, flying north at
+    1,000 m kept 1,000 m: 600 m over the plains, then lifted over the 2,650 m plateau.
+    Flat worlds, being flat, keep their height above the face.
+  - **No more seeing through the ground.**
+    - The eye is kept above the highest corner of the ground mesh's cell under it
+      (`FirstPersonGround.HighestAround`): the mesh is flat between its points, so on curves
+      and steps it stood above the ground's own height.
+    - The ground is rebuilt before the eye is placed, not after, so the eye is never
+      measured against an old mesh.
+    - The near clipping distance is a tenth of the eye's height (17 cm standing), not
+      0.3, so a wall in front isn't cut away; the view still reaches 170 km.
+    - Walking into a cliff for 240 frames, the eye never came within 1.7 m of the drawn
+      ground.
 
 ### 4.5 Orbits & Simulation (`SIM`)
 

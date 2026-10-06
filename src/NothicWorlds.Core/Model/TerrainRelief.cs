@@ -93,10 +93,57 @@ public static class TerrainRelief
     }
 
     /// <summary>
-    /// The ground seen: the terrain's heights with the sculpting on top (each cell kept within
-    /// what a height can hold). Tiles with nothing on one side are shared, not copied.
+    /// The ground <paramref name="terrain"/> shapes after its types' heights or edges changed
+    /// from <paramref name="before"/> to <paramref name="after"/>, worked out from
+    /// <paramref name="previous"/> (what it shaped with <paramref name="before"/>) by
+    /// re-working only the tiles near ground painted with a type that changed.
     /// </summary>
-    public static HeightGrid Shaped(HeightGrid baseHeights, HeightGrid sculpted)
+    public static HeightGrid Rework(HeightGrid previous, TerrainGrid terrain,
+        IReadOnlyList<TerrainType> before, IReadOnlyList<TerrainType> after)
+    {
+        Lookup was = new(before), now = new(after);
+        var changed = new bool[256];
+        bool any = false;
+        for (int code = 1; code < 256; code++)
+        {
+            changed[code] = was.Height[code] != now.Height[code]
+                || was.Edge[code] != now.Edge[code];
+            any |= changed[code];
+        }
+
+        if (!any)
+        {
+            return previous;
+        }
+
+        var affected = new HashSet<int>();
+        for (int index = 0; index < CubeGridBrush.TileCount; index++)
+        {
+            if (terrain.Tile(index) is byte[] codes && Array.Exists(codes, code => changed[code]))
+            {
+                affected.UnionWith(_near.Value[index]);
+            }
+        }
+
+        var tiles = new short[]?[CubeGridBrush.TileCount];
+        for (int index = 0; index < tiles.Length; index++)
+        {
+            tiles[index] = affected.Contains(index)
+                ? WorkTile(terrain, now, index)
+                : previous.Tile(index);
+        }
+
+        return HeightGrid.FromTiles(tiles);
+    }
+
+    /// <summary>
+    /// The ground seen: the terrain's heights with the sculpting on top (each cell kept within
+    /// what a height can hold). Tiles with nothing on one side are shared, not copied; and
+    /// given what was shaped <paramref name="previously"/>, so are tiles where neither side
+    /// changed, so the globe only redraws what did.
+    /// </summary>
+    public static HeightGrid Shaped(HeightGrid baseHeights, HeightGrid sculpted,
+        (HeightGrid Base, HeightGrid Sculpted, HeightGrid Shaped)? previously = null)
     {
         if (baseHeights.IsEmpty)
         {
@@ -115,6 +162,14 @@ public static class TerrainRelief
             if (under is null || over is null)
             {
                 tiles[index] = under ?? over;
+                continue;
+            }
+
+            if (previously is var (oldBase, oldSculpted, oldShaped)
+                && ReferenceEquals(under, oldBase.Tile(index))
+                && ReferenceEquals(over, oldSculpted.Tile(index)))
+            {
+                tiles[index] = oldShaped.Tile(index);
                 continue;
             }
 

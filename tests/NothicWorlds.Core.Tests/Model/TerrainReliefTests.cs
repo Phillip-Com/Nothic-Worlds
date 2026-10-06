@@ -103,6 +103,36 @@ public class TerrainReliefTests
     }
 
     [Fact]
+    public void Rework_MatchesWorkingItAllOut_AndKeepsTilesFarFromTheChangedType()
+    {
+        IReadOnlyList<TerrainType> before = Types(0, 0.5);
+        TerrainGrid terrain = TerrainGrid.Empty
+            .Paint(_faceMiddle, 10, Low)
+            .Paint(new Vector3D(0, 1, 0), 5, High);  // Far away, on another face
+        HeightGrid previous = TerrainRelief.BaseHeights(terrain, before);
+        IReadOnlyList<TerrainType> after = [before[0], before[1] with { HeightMeters = 3_000 }];
+
+        HeightGrid reworked = TerrainRelief.Rework(previous, terrain, before, after);
+
+        Assert.True(reworked.HasSameCells(TerrainRelief.BaseHeights(terrain, after)));
+        Assert.DoesNotContain(4, reworked.FacesChangedFrom(previous));  // The low ground's face
+    }
+
+    [Fact]
+    public void Shaped_GivenWhatCameBefore_SharesWhatDidntChange()
+    {
+        HeightGrid ground = Island(edge: 0.5);
+        HeightGrid sculpted = HeightGrid.Empty.Raise(_faceMiddle, _faceMiddle, 15, 300);
+        HeightGrid first = TerrainRelief.Shaped(ground, sculpted);
+        HeightGrid touched = sculpted.Raise(new Vector3D(0, 1, 0), new Vector3D(0, 1, 0), 1, 50);
+
+        HeightGrid second = TerrainRelief.Shaped(ground, touched, (ground, sculpted, first));
+
+        Assert.True(second.HasSameCells(TerrainRelief.Shaped(ground, touched)));
+        Assert.DoesNotContain(4, second.FacesChangedFrom(first));
+    }
+
+    [Fact]
     public void Shaped_AddsTheSculptingOnTop_WithinWhatAHeightHolds()
     {
         HeightGrid ground = TerrainRelief.BaseHeights(
