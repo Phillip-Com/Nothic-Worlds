@@ -92,10 +92,10 @@ public partial class ViewMenu : Node
         PopupMenu menu = _button.GetPopup();
         // Explicit ids: one left out is the item's position, which would clash with MenuItem's.
         menu.AddSubmenuNodeItem("Style", BuildStyleMenu(), StyleMenuId);
-        menu.AddItem("Stand Here", StandMenuId);
+        menu.AddItem("Stand Here…", StandMenuId);
         menu.SetItemTooltip(menu.GetItemIndex(StandMenuId),
-            "Stand on the selected planet or moon at the middle of the view, and look around " +
-            "in first person: walk, fly, and watch the sky (Esc to come back)");
+            "Click a spot on the selected planet or moon to stand there, and look around in " +
+            "first person: walk, fly, and watch the sky (Esc to come back)");
         menu.AddSeparator(id: StyleMenuId + 1);
         menu.AddCheckItem("Pins", (int)MenuItem.Pins);
         menu.AddCheckItem("Weather Pins", (int)MenuItem.WeatherPins);
@@ -134,7 +134,7 @@ public partial class ViewMenu : Node
         {
             if (id == StandMenuId)
             {
-                Standing?.StandOnSelected();
+                Standing?.ChooseWhereToStand();
             }
             else
             {

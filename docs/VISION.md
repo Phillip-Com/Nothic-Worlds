@@ -904,6 +904,27 @@ as realistic or simple.
 - Checked in the app on painted plains, desert, and mountains at midday and at night. The
   benchmark (orbit view) is unchanged: 154, 140, 153, 154 fps against `main`'s 157, 155, 151,
   156, back to back.
+- **After the owner's review (2026-10-06):**
+  - About a third stronger, as asked.
+  - Up close, the texture unit's coarse blending (about 1/256 steps) showed as rings and bands,
+    so the detail's noise is blended in the shader at full precision (`fine_noise`, eight
+    texel reads and a smooth curve).
+  - Its finer layers are turned (by three times a rotation, whose whole-number entries keep
+    the noise's repeat that the stay-put trick needs) so the lattice doesn't show as a grid.
+  - Each layer fades by how much ground a pixel covers, worked out from distance and angle,
+    so it's smooth across the mesh's triangles.
+- **Choosing where to stand** (owner's request, 2026-10-06): View ▸ Stand Here… now asks for a
+  click on the selected planet or moon (`FirstPersonMode.ChooseWhereToStand`, through
+  `PinPlacer` with its own prompt; Esc cancels), instead of standing at the middle of the
+  screen. On a flat world the click's map point becomes the spot on the top face.
+- **Moving fast** (owner's report: it seemed to lock up while flicking through speeds):
+  - At the fastest speeds the ground was rebuilt every frame, and each build took 33–50 ms.
+    The cause was `HeightGrid.IsEmpty`, which scanned the whole grid once for every one of the
+    patch's ~6,900 points; it's now worked out once per grid.
+  - The ground is also rebuilt at most ten times a second unless the eye gets well out
+    across it.
+  - The cloud deck is built only once the eye is above the clouds.
+  - Top speed went from about 12–21 frames a second to about 40.
 
 **REN-07 — Designed night skies** · Implemented (M34: PR #90) · Base
 **Intent:** Each world has its own fixed night sky that the user designs: the stars stay put

@@ -50,6 +50,10 @@ public sealed class HeightGrid
     // The highest cell, worked out the first time it's asked for (the grid never changes).
     private short? _highest;
 
+    // Worked out once (the grid never changes): asking was a scan of every tile, and the ground
+    // around a first-person eye asks for each of its thousands of points.
+    private bool? _isEmpty;
+
     private HeightGrid(short[]?[] tiles)
     {
         _tiles = tiles;
@@ -59,7 +63,7 @@ public sealed class HeightGrid
     public static HeightGrid Empty { get; } = new(new short[]?[TileCount]);
 
     /// <summary>True if nothing is sculpted.</summary>
-    public bool IsEmpty => Array.TrueForAll(_tiles, tile => tile is null);
+    public bool IsEmpty => _isEmpty ??= Array.TrueForAll(_tiles, tile => tile is null);
 
     /// <summary>A cell's height, in meters above the body's radius.</summary>
     /// <exception cref="ArgumentOutOfRangeException">The cell isn't on the grid.</exception>

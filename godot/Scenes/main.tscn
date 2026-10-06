@@ -326,8 +326,9 @@ Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 LiveWeather = NodePath("../WeatherDisplay")
 
-[node name="FirstPersonMode" type="Node" parent="." node_paths=PackedStringArray("Session", "System", "GlobeCamera", "Environment", "Nebulas", "Weather", "Toolbar", "HideWhileStanding")]
+[node name="FirstPersonMode" type="Node" parent="." node_paths=PackedStringArray("Session", "System", "GlobeCamera", "Environment", "Nebulas", "Weather", "Toolbar", "HideWhileStanding", "Placer")]
 script = ExtResource("38_first_person")
+Placer = NodePath("../PinPlacer")
 Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 GlobeCamera = NodePath("../PlanetCamera")
