@@ -34,10 +34,12 @@ public partial class FirstPersonGround : MeshInstance3D
     /// <summary>
     /// Builds the rings around <paramref name="center"/> (a unit direction in the globe's own
     /// frame), from <paramref name="innerAngle"/> to <paramref name="outerAngle"/> radians of
-    /// arc away, the drawn ground's height read from <paramref name="globe"/>.
+    /// arc away, the drawn ground's height read from <paramref name="globe"/> (a body
+    /// <paramref name="radiusKm"/> in radius) as seen up close, cliffs kept steep.
     /// </summary>
-    public void Build(PlanetSurface globe, Vector3D center, double innerAngle, double outerAngle)
-        => Build(direction => globe.SurfaceRadiusAt(direction), center, innerAngle, outerAngle);
+    public void Build(PlanetSurface globe, double radiusKm, Vector3D center, double innerAngle,
+        double outerAngle) => Build(direction => globe.GroundRadiusAt(direction, radiusKm),
+            center, innerAngle, outerAngle);
 
     /// <summary>
     /// Builds the rings as <see cref="Build(PlanetSurface, Vector3D, double, double)"/>, at

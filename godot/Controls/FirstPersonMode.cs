@@ -88,6 +88,7 @@ public partial class FirstPersonMode : Node
     private double _groundHeightMeters;  // The eye's height when the ground was built
     private double _sinceGroundBuilt;     // Seconds since the ground was last built
     private bool _deckStale = true;       // The cloud deck doesn't match the ground yet
+    private float _savedRelief = 1;       // View ▸ Relief's exaggeration, back on leaving
     private WeatherSample? _weather;
     private double _weatherAge = double.PositiveInfinity;
 
@@ -241,6 +242,7 @@ public partial class FirstPersonMode : Node
         if (System is not null)
         {
             System.StandingOn = null;
+            System.ReliefExaggeration = _savedRelief;
         }
 
         _ground?.QueueFree();
@@ -288,6 +290,14 @@ public partial class FirstPersonMode : Node
         _groundVersion = -1;
         _weather = null;
         _weatherAge = double.PositiveInfinity;
+
+        // Standing, the ground is always at its true height (owner's choice): View ▸ Relief's
+        // exaggeration comes back on leaving.
+        if (System is not null)
+        {
+            _savedRelief = System.ReliefExaggeration;
+            System.ReliefExaggeration = 1;
+        }
 
         _camera = new Camera3D { Fov = FieldOfViewDegrees, Name = "FirstPersonCamera" };
         AddChild(_camera);
@@ -517,7 +527,7 @@ public partial class FirstPersonMode : Node
             }
         }
 
-        return globe.SurfaceRadiusAt(_spot);
+        return globe.GroundRadiusAt(_spot, body.RadiusKm);
     }
 
     // The camera at the scene's middle (the eye), looking along the heading and pitch.
@@ -571,7 +581,7 @@ public partial class FirstPersonMode : Node
             || drifted || risen > 1.5 || risen < 1 / 1.5)
         {
             _sinceGroundBuilt = 0;
-            ground.Build(globe, _spot, Math.Max(height * 0.5, 2e-7), outer);
+            ground.Build(globe, body.RadiusKm, _spot, Math.Max(height * 0.5, 2e-7), outer);
             ground.MaterialOverride = globe.MaterialOverride;
             SetGroundDetail(ground.MaterialOverride, ground.Center * ground.CenterRadius,
                 body.RadiusKm);

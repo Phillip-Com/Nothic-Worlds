@@ -2160,6 +2160,18 @@ sheer cliff, so the world looks real without sculpting every slope by hand (owne
   - Mountains made a raised plateau with its walls seen from orbit at 50× relief;
   - four undos turned it off and flattened the ground, and four redos brought it back;
   - save and reload kept the switch and the edge.
+- **After the owner's review (2026-10-06):**
+  - **Standing shows true heights** (owner's choice). First person sets View ▸ Relief to
+    1× while standing and puts the chosen exaggeration back on leaving.
+  - **Erase returns the ground to 0** (owner's choice). That's what unpainted ground already
+    was, so nothing changed.
+  - **Cliffs stand up close.** Blending heights evenly between grid cells made even a
+    one-cell cliff a slope a whole cell wide (about 10 km, ~14°, on an Earth-sized world).
+    The ground around a first-person eye now reads `HeightGrid.SampleSteepAt`
+    (`PlanetSurface.GroundRadiusAt`). Where two cells differ by more than a natural slope
+    (about 7°), the change is squeezed toward the line between them, by up to 40 times as it
+    grows: a 2,350 m step becomes a sheer wall, and ordinary slopes are unchanged. Seen from
+    3 km, a 2,500 m cliff stands as a wall with a ragged top.
 
 ### 4.5 Orbits & Simulation (`SIM`)
 

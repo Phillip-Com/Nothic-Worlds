@@ -606,6 +606,17 @@ public partial class PlanetSurface : MeshInstance3D
     public void SetShapePreview(ShapeEdit? shape) => _carved?.ShowPreview(shape);
 
     /// <summary>
+    /// How far out the drawn ground is, in the globe's radii, as seen up close (first person):
+    /// as <see cref="SurfaceRadiusAt"/>, but with cliffs kept steep (see
+    /// <see cref="HeightGrid.SampleSteepAt"/>) on a body <paramref name="radiusKm"/> in radius.
+    /// </summary>
+    public float GroundRadiusAt(Vector3D direction, double radiusKm) =>
+        _shownHeights.IsEmpty || Shape == BodyShape.FlatDisc
+            ? 1.0f
+            : 1.0f + _reliefScale * (float)_shownHeights.SampleSteepAt(direction,
+                radiusKm * 1000 * Math.PI / 2 / HeightGrid.FaceSize);
+
+    /// <summary>
     /// How far out the drawn surface is at a direction, in the globe's radii: 1 on an unsculpted
     /// globe (or a flat world), more on a sculpted hill, less in a basin. Overlays sit on it.
     /// </summary>

@@ -133,6 +133,28 @@ public class TerrainReliefTests
     }
 
     [Fact]
+    public void SampleSteepAt_StandsACliffUp_AndLeavesGentleSlopesAlone()
+    {
+        const double metersPerCell = 9_800;  // An Earth-sized world
+        short[] cliff = Profile(Island(edge: 1));
+        int jump = Array.FindIndex(cliff, h => h == 2_000);
+        int row = HeightGrid.FaceSize / 2, column = HeightGrid.FaceSize / 2 - 120 + jump;
+
+        // Across the cliff's cell gap, in tenths of a cell: the even blend climbs throughout,
+        // the steep one is flat on either side with the wall in the middle.
+        HeightGrid cliffs = Island(edge: 1);
+        double[] even = Across(cliffs, column, row, (h, d) => h.SampleAt(d));
+        double[] steep = Across(cliffs, column, row, (h, d) => h.SampleSteepAt(d, metersPerCell));
+        Assert.True(even[2] > 400);                    // The even blend has begun to climb...
+        Assert.InRange(steep[2], 199, 201);            // ...the steep one is still at the foot
+        Assert.InRange(steep[8], 1_999, 2_001);        // and at the top soon after the middle.
+
+        HeightGrid gentle = Island(edge: 0);
+        Assert.Equal(Across(gentle, column, row, (h, d) => h.SampleAt(d)),
+            Across(gentle, column, row, (h, d) => h.SampleSteepAt(d, metersPerCell)));
+    }
+
+    [Fact]
     public void TransitionCells_RunsFromTheGentlestWidthToACliff()
     {
         Assert.Equal(TerrainRelief.GentlestWidthCells, TerrainRelief.TransitionCells(0, 0));
@@ -162,6 +184,15 @@ public class TerrainReliefTests
         return [.. Enumerable.Range(HeightGrid.FaceSize / 2 - 120, 121)
             .Select(column => heights.HeightAt(new CubeCell(4, column, row)))];
     }
+
+    // Heights from the middle of the cell before `column` to the middle of `column`, in
+    // tenths of a cell, along the +Z face's row `row`.
+    private static double[] Across(HeightGrid heights, int column, int row,
+        Func<HeightGrid, Vector3D, double> sample) =>
+        [.. Enumerable.Range(0, 11).Select(i =>
+            sample(heights, CubeSphere.Direction(4,
+                (column - 0.5 + i / 10.0) / HeightGrid.FaceSize,
+                (row + 0.5) / HeightGrid.FaceSize)))];
 
     // How many cells the ground takes to rise (neither at its low nor its high height).
     private static int Rising(short[] profile) => profile.Count(h => h is > 200 and < 2_000);
