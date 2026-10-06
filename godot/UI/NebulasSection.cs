@@ -12,6 +12,9 @@ namespace NothicWorlds.UI;
 /// </summary>
 public partial class NebulasSection : VBoxContainer
 {
+    private const string AddTip =
+        "A glowing cloud of gas on the sky, far beyond the system (the same from every planet)";
+
     private readonly List<NebulaRow> _rows = [];
     private VBoxContainer _list = null!;
     private Label _none = null!;
@@ -38,8 +41,7 @@ public partial class NebulasSection : VBoxContainer
             Text = "Add Nebula",
             FocusMode = FocusModeEnum.None,
             SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
-            TooltipText = "A glowing cloud of gas on the sky, far beyond the system (the same " +
-                "from every planet)",
+            TooltipText = AddTip,
         };
         _add.Pressed += () => Session.AddNebula();
         AddChild(_add);
@@ -60,7 +62,9 @@ public partial class NebulasSection : VBoxContainer
 
         List<Nebula> nebulas = Session.World.Nebulas;
         _none.Visible = nebulas.Count == 0;
-        _add.Disabled = nebulas.Count >= Nebula.MaxCount;
+        DisabledTip.Apply(_add, AddTip, nebulas.Count >= Nebula.MaxCount
+            ? $"A sky can have up to {Nebula.MaxCount} nebulas: delete one first"
+            : null);
         if (!nebulas.Select(n => n.Id).SequenceEqual(_rows.Select(r => r.Id)))
         {
             foreach (NebulaRow row in _rows)

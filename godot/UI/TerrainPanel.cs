@@ -92,6 +92,7 @@ public partial class TerrainPanel : CanvasLayer
             _open = value;
             Weather?.SetSurfaceEditing("Terrain", value);
             UpdateVisibility();
+            ShowHint();
         }
     }
 
@@ -132,14 +133,6 @@ public partial class TerrainPanel : CanvasLayer
         layout.AddChild(new Label { Text = "Terrain Types" });
         layout.AddChild(BuildTypeList());
         layout.AddChild(BuildTypeEditor());
-        layout.AddChild(new HSeparator());
-        layout.AddChild(new Label
-        {
-            Text = "Drag on the planet to paint or sculpt. To turn the view, drag off the " +
-                "planet or use the arrow keys. Each stroke is one undo step (Ctrl+Z).",
-            AutowrapMode = TextServer.AutowrapMode.WordSmart,
-            Modulate = new Color(1, 1, 1, 0.6f),
-        });
 
         if (Toolbar is not null)
         {
@@ -430,6 +423,43 @@ public partial class TerrainPanel : CanvasLayer
         ShowSelected(force: false);
         ShowSize();
         UpdateBrush();
+        ShowHint();
+    }
+
+    private void ShowHint()
+    {
+        Toolbar?.SetHint(this, _open ? Hint() : null);
+    }
+
+    // How to use the mode that's chosen, for the hint bar (VISION.md UI-05).
+    private string Hint()
+    {
+        if (!Session!.SelectedBodyHasSurface)
+        {
+            return "Select a planet or moon to paint it: click it, or choose it in the System " +
+                "panel.";
+        }
+
+        bool canSculpt = Session.SelectedBodyCanBeSculpted;
+        if (_shapesButton.ButtonPressed)
+        {
+            return !canSculpt ? "Flat worlds can't be sculpted yet; they can still be painted."
+                : "Choose a kind of shape, then click the planet to place one. Drag its middle " +
+                    "to move it, its square to resize it, and its round handle to turn it.";
+        }
+
+        if (_sculptButton.ButtonPressed)
+        {
+            return !canSculpt ? "Flat worlds can't be sculpted yet; they can still be painted."
+                : "Drag across the planet to shape the ground. Heights are true to scale, so " +
+                    "they show best up close: zoom in, raise View ▸ Relief, or View ▸ Stand " +
+                    "Here.";
+        }
+
+        return _eraseButton.ButtonPressed
+            ? "Drag across the planet to take painted terrain off it."
+            : $"Drag across the planet to paint {Selected?.Name ?? "the chosen type"}; choose " +
+                "another type in the list. Drag off the planet to turn the view.";
     }
 
     private void ShowList()

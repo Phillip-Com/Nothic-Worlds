@@ -17,6 +17,11 @@ namespace NothicWorlds.UI;
 /// </remarks>
 public partial class MapImageSection : VBoxContainer
 {
+    private const string ImportTip = "Wrap a map image (PNG, JPG, WebP) onto the planet";
+    private const string ClearTip = "Remove the map and show the grid";
+    private const string CalibrateTip =
+        "Line the map up with the globe by dragging its latitude/longitude lines";
+
     private Label _noMap = null!;
     private Button _importButton = null!;
     private Button _clearButton = null!;
@@ -49,14 +54,11 @@ public partial class MapImageSection : VBoxContainer
         AddChild(_noMap);
 
         var buttons = new HFlowContainer();
-        _importButton = CreateButton(
-            "Import Map…", "Wrap a map image (PNG, JPG, WebP) onto the planet");
+        _importButton = CreateButton("Import Map…", ImportTip);
         _importButton.Pressed += () => _fileDialog.PopupCentered();
-        _clearButton = CreateButton("Clear Map", "Remove the map and show the grid");
+        _clearButton = CreateButton("Clear Map", ClearTip);
         _clearButton.Pressed += () => Session.ClearMap();
-        _calibrateButton = CreateButton(
-            "Calibrate…",
-            "Line the map up with the globe by dragging its latitude/longitude lines");
+        _calibrateButton = CreateButton("Calibrate…", CalibrateTip);
         _calibrateButton.Pressed += () => Calibration?.Open();
         buttons.AddChild(_importButton);
         buttons.AddChild(_clearButton);
@@ -103,6 +105,7 @@ public partial class MapImageSection : VBoxContainer
     {
         if (Session.IsBusy)
         {
+            Toolbar?.ShowBusyWarning();
             return;
         }
 
@@ -145,10 +148,16 @@ public partial class MapImageSection : VBoxContainer
         bool showFill = hasSurface && !MapProjections.CoversWholeGlobe(Session.Projection);
         _fillColorLabel.Visible = showFill;
         _fillColor.Visible = showFill;
-        _importButton.Disabled = Session.IsBusy || !hasSurface;
         _mapType.Disabled = !hasSurface;
-        _clearButton.Disabled = Session.IsBusy || Session.MapCheck is null;
-        _calibrateButton.Disabled = Session.IsBusy || Session.MapCheck is null;
+        DisabledTip.Apply(_importButton, ImportTip, !hasSurface ? DisabledTip.NoSurface
+            : Session.IsBusy ? DisabledTip.Busy
+            : null);
+        string? noMap = !hasSurface ? DisabledTip.NoSurface
+            : Session.IsBusy ? DisabledTip.Busy
+            : Session.MapCheck is null ? DisabledTip.NoMap
+            : null;
+        DisabledTip.Apply(_clearButton, ClearTip, noMap);
+        DisabledTip.Apply(_calibrateButton, CalibrateTip, noMap);
     }
 
     private void OnMapTypeSelected(long index)

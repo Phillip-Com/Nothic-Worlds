@@ -20,6 +20,8 @@ public partial class JournalPanel : CanvasLayer
     private const int TopOffset = 56;
     private const int BottomOffset = 130;
     private const float PanelWidth = 340.0f;
+    private const string AddTieTip =
+        "Tie this entry to another: family, allies, rivals, rulers, members";
 
     private Label _heading = null!;
     private LineEdit _search = null!;
@@ -73,6 +75,7 @@ public partial class JournalPanel : CanvasLayer
         {
             _open = value;
             UpdateVisibility();
+            ShowHint();
         }
     }
 
@@ -286,7 +289,7 @@ public partial class JournalPanel : CanvasLayer
         {
             Text = "Add Relationship…",
             FocusMode = Control.FocusModeEnum.None,
-            TooltipText = "Tie this entry to another: family, allies, rivals, rulers, members",
+            TooltipText = AddTieTip,
         };
         _addTie.Pressed += () =>
         {
@@ -330,7 +333,17 @@ public partial class JournalPanel : CanvasLayer
             _ties.AddChild(button);
         }
 
-        _addTie.Disabled = Session.World.Journal.Count < 2;
+        DisabledTip.Apply(_addTie, AddTieTip, Session.World.Journal.Count < 2
+            ? "A relationship ties two entries: write another entry first"
+            : null);
+    }
+
+    private void ShowHint()
+    {
+        Toolbar?.SetHint(this, _open
+            ? "New Entry starts a page. Set its place, then Pin on Globe… marks the spot; " +
+                "Add Relationship… ties it to other entries."
+            : null);
     }
 
     private void UpdateVisibility()

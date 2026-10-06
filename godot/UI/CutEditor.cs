@@ -106,8 +106,14 @@ public partial class CutEditor : CanvasLayer
     /// </summary>
     public async Task OpenAsync(string assetName, string displayName)
     {
-        if (IsOpen || _opening || Session is null || Session.IsBusy)
+        if (IsOpen || _opening || Session is null)
         {
+            return;
+        }
+
+        if (Session.IsBusy)
+        {
+            Toolbar?.ShowBusyWarning();
             return;
         }
 

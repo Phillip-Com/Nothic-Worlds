@@ -1,5 +1,6 @@
 using Godot;
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Interop;
 using NothicWorlds.Rendering;
@@ -35,6 +36,10 @@ public partial class TerrainBrush : CanvasLayer
     // A sculpting stroke: the heights it started from, its spots so far, and the height
     // Flatten levels to (where it began).
     private HeightGrid _strokeStart = HeightGrid.Empty;
+
+    // What the stroke does (its undo step's name) and the painted terrain when it started.
+    private string _strokeAction = "";
+    private TerrainGrid _terrainAtStart = TerrainGrid.Empty;
     private readonly List<GeoCoordinate> _path = [];
     private double _flattenTo;
 
@@ -145,9 +150,16 @@ public partial class TerrainBrush : CanvasLayer
             return false;  // Missed the globe: let the camera turn.
         }
 
+        if (Session!.IsBusy)
+        {
+            Toolbar?.ShowBusyWarning();
+            return true;
+        }
+
         if (Sculpt is SculptTool tool)
         {
-            Session!.BeginGesture($"{tool} Ground");
+            _strokeAction = $"{tool} Ground";
+            Session.BeginGesture(_strokeAction);
             _painting = true;
             _lastSpot = spot;
             _strokeStart = Session.SelectedBody.Surface.Heights;
@@ -158,10 +170,11 @@ public partial class TerrainBrush : CanvasLayer
             return true;
         }
 
-        string action = Code == 0
+        _strokeAction = Code == 0
             ? "Erase Terrain"
-            : $"Paint {Session!.TerrainTypes.FirstOrDefault(t => t.Code == Code)?.Name}";
-        Session!.BeginGesture(action);
+            : $"Paint {Session.TerrainTypes.FirstOrDefault(t => t.Code == Code)?.Name}";
+        _terrainAtStart = Session.SelectedBody.Surface.Terrain;
+        Session.BeginGesture(_strokeAction);
         _painting = true;
         _lastSpot = spot;
         Session.PaintTerrain(spot, spot, RadiusDegrees, Code);
@@ -199,12 +212,42 @@ public partial class TerrainBrush : CanvasLayer
             ExtendPath(end, final: true);
         }
 
+        ShowDone();
         _painting = false;
         _lastSpot = null;
         _path.Clear();
         _strokeStart = HeightGrid.Empty;
+        _terrainAtStart = TerrainGrid.Empty;
         Session?.EndGesture();
         return true;
+    }
+
+    // Says what a stroke did, so a change too small or too close in color to see still shows
+    // it worked (VISION.md UI-05; painting Ocean on an unmapped ocean-blue planet looks like
+    // nothing happened).
+    private void ShowDone()
+    {
+        if (Session is null)
+        {
+            return;
+        }
+
+        SurfaceSettings surface = Session.SelectedBody.Surface;
+        bool changed = Sculpt is null
+            ? !ReferenceEquals(surface.Terrain, _terrainAtStart)
+            : !ReferenceEquals(surface.Heights, _strokeStart);
+        if (!changed)
+        {
+            Toolbar?.ShowInfo(Sculpt is null
+                ? "Nothing changed: the ground there already looks like that."
+                : "Nothing changed: the ground there is already that shape.");
+            return;
+        }
+
+        string what = Sculpt is SculptTool.Raise or SculptTool.Lower
+            ? $"{_strokeAction} (up to {UnitText.Format(Quantity.Length, Strength)})"
+            : _strokeAction;
+        Toolbar?.ShowInfo($"Done: {what}. Ctrl+Z takes it back.");
     }
 
     // Moves the circle with the mouse and, mid-stroke, paints from the last spot to this one.

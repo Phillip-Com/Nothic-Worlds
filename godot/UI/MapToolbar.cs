@@ -7,13 +7,15 @@ namespace NothicWorlds.UI;
 /// buttons (System, Map, Terrain, Journal, Regions, Diagrams, Timeline), plus a message line
 /// underneath that
 /// other parts of the app use. Success messages fade after a few seconds. Warnings and errors stay
-/// until the next message.
+/// until the next message. Along the bottom of the screen, the hint bar says how to use the tool
+/// that's open (VISION.md UI-05).
 /// </summary>
 public partial class MapToolbar : CanvasLayer
 {
     private const int ScreenMargin = 12;
     private const double InfoMessageSeconds = 6.0;
     private const float MessageWidth = 460.0f;
+    private const float HintWidth = 560.0f;
 
     private static readonly Color _infoColor = new(0.92f, 0.94f, 0.98f);
     private static readonly Color _warningColor = new(1.0f, 0.8f, 0.35f);
@@ -25,6 +27,11 @@ public partial class MapToolbar : CanvasLayer
     private Button _regionsButton = null!;
     private Button _diagramsButton = null!;
     private Label _message = null!;
+    private PanelContainer _hintBar = null!;
+    private Label _hint = null!;
+
+    // The open tools' hints, oldest first: the newest one is shown.
+    private readonly List<(object Tool, string Text)> _hints = [];
 
     // Increases with every message, so an old auto-hide timer doesn't hide a newer message.
     private int _messageVersion;
@@ -179,6 +186,33 @@ public partial class MapToolbar : CanvasLayer
         _message.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         _message.CustomMinimumSize = new Vector2(MessageWidth, 0);
         layout.AddChild(_message);
+        CreateHintBar();
+    }
+
+    /// <summary>
+    /// Shows how to use a tool in the hint bar while it's open, or with null (or ""), takes its
+    /// hint away. The tool given a hint last is the one shown; when it closes, the hint of the
+    /// one before it comes back.
+    /// </summary>
+    /// <param name="tool">The tool the hint belongs to (usually its panel).</param>
+    /// <param name="text">One line on how to use it; null or "" when it closes.</param>
+    public void SetHint(object tool, string? text)
+    {
+        int index = _hints.FindIndex(hint => hint.Tool == tool);
+        if (index >= 0 && !string.IsNullOrEmpty(text))
+        {
+            _hints[index] = (tool, text);  // Same tool, new words: it keeps its place.
+        }
+        else if (index >= 0)
+        {
+            _hints.RemoveAt(index);
+        }
+        else if (!string.IsNullOrEmpty(text))
+        {
+            _hints.Add((tool, text));
+        }
+
+        ShowHint();
     }
 
     /// <summary>Opens the Journal panel (closing the others on the right).</summary>
@@ -223,6 +257,15 @@ public partial class MapToolbar : CanvasLayer
         ShowMessage(text, MessageKind.Warning);
     }
 
+    /// <summary>
+    /// Says that an edit has to wait while the world is saving, opening, or loading a map
+    /// (VISION.md UI-05: tools say why they can't act).
+    /// </summary>
+    public void ShowBusyWarning()
+    {
+        ShowWarning("Wait a moment for the world to finish saving or loading, then try again.");
+    }
+
     /// <summary>Shows an error that stays until the next message.</summary>
     public void ShowError(string text)
     {
@@ -252,6 +295,51 @@ public partial class MapToolbar : CanvasLayer
         {
             _message.Visible = false;
         }
+    }
+
+    // A dark strip centered along the bottom, between the camera text and the time bar.
+    private void CreateHintBar()
+    {
+        _hintBar = new PanelContainer
+        {
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Visible = false,
+        };
+        _hintBar.AddThemeStyleboxOverride("panel", new StyleBoxFlat
+        {
+            BgColor = new Color(0.05f, 0.06f, 0.09f, 0.78f),
+            CornerRadiusTopLeft = 6,
+            CornerRadiusTopRight = 6,
+            CornerRadiusBottomLeft = 6,
+            CornerRadiusBottomRight = 6,
+            ContentMarginLeft = 12,
+            ContentMarginRight = 12,
+            ContentMarginTop = 6,
+            ContentMarginBottom = 6,
+        });
+        var row = new HBoxContainer
+        {
+            Alignment = BoxContainer.AlignmentMode.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        row.SetAnchorsAndOffsetsPreset(
+            Control.LayoutPreset.BottomWide, Control.LayoutPresetMode.Minsize, ScreenMargin);
+        row.GrowVertical = Control.GrowDirection.Begin;
+        row.AddChild(_hintBar);
+        AddChild(row);
+
+        _hint = CreateLabel("");
+        _hint.MouseFilter = Control.MouseFilterEnum.Ignore;
+        _hint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _hint.HorizontalAlignment = HorizontalAlignment.Center;
+        _hint.CustomMinimumSize = new Vector2(HintWidth, 0);
+        _hintBar.AddChild(_hint);
+    }
+
+    private void ShowHint()
+    {
+        _hint.Text = _hints.Count > 0 ? _hints[^1].Text : "";
+        _hintBar.Visible = _hints.Count > 0;
     }
 
     private static Button CreateButton(string text, string tooltip)

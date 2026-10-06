@@ -13,6 +13,7 @@ public partial class EventDialog : ConfirmationDialog
 {
     private const string DeleteAction = "delete";
     private const string GoToAction = "go-to";
+    private const string PinTip = "Click the spot on the place's globe (Esc cancels)";
 
     private LineEdit _title = null!;
     private OptionButton _timeline = null!;
@@ -189,7 +190,7 @@ public partial class EventDialog : ConfirmationDialog
         _pinButton = new Button
         {
             Text = "Pin on Globe…",
-            TooltipText = "Click the spot on the place's globe (Esc cancels)",
+            TooltipText = PinTip,
         };
         _pinButton.Pressed += PlacePin;
         row.AddChild(_pinButton);
@@ -216,7 +217,9 @@ public partial class EventDialog : ConfirmationDialog
             ? $"Pinned at {PlaceText.Describe(pin)}"
             : body is null ? "" : "No pin";
         _pinButton.Visible = Placer is not null && body is not null;
-        _pinButton.Disabled = body is { HasSurface: false };
+        DisabledTip.Apply(_pinButton, PinTip, body is { HasSurface: false }
+            ? "Stars and comets have no surface to pin on: the place can still be one"
+            : null);
         _unpinButton.Visible = _location?.Pin is not null;
     }
 

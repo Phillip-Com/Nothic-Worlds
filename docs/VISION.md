@@ -108,7 +108,29 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 33: Polish and Loose Ends** · In progress (owner's choice, 2026-10-05)
+**Milestone 34: Polish Round Two** · In progress (owner's request, 2026-10-05)
+Owner's requests after trying the app: ground detail up close, designed night skies, more map
+cutting shapes, grid snapping, a start screen and a way to launch without Godot, and tools that
+are easier to pick up. A run-through of every tool (2026-10-05) found them all working.
+Painting and sculpting only looked broken: the default Ocean paint barely shows on an unmapped
+planet, a 500 m sculpt is too small to see from orbit, and no tool said why it did nothing when
+it couldn't act. Owner's decisions:
+- **Tool help** (`UI-05`): every action a tool can't take explains why and what to do, and
+  each tool shows a one-line hint on how to use it.
+- **More cutting shapes** (`MAP-02`): ellipse (Shift for a circle) and regular shapes
+  (hexagon and other set numbers of sides).
+- **Grid snapping** (`MAP-02`): a Snap toggle that snaps dragged pieces to the latitude and
+  longitude grid, and a Center on Grid button for a piece or the map.
+- **Start screen and a standalone app** (`UI-06`): New World, Open World, Recent Worlds,
+  Settings, and Quit, plus a Windows export that builds a double-clickable .exe.
+- **Designed night skies** (`REN-07`): a fixed star field from a seed that can be re-rolled,
+  and named constellations drawn by joining stars (format v28).
+- **Ground detail** (`REN-06`): in first person, a fine texture and small bumps that match
+  the terrain type near the feet, fading with distance (Base tier).
+- **Four PRs:** tool help, then cutting shapes and snapping, then the start screen and
+  export, then skies and ground.
+
+**Milestone 33: Polish and Loose Ends** · Complete (PR #86 merged 2026-10-05; owner's choice, 2026-10-05)
 Owner's decisions:
 - **Standing on flat worlds** (`REN-06`): the **same sky across the disc** (the sun's height is
   its angle above the disc, so day and night come everywhere at once, as flat worlds are
@@ -860,6 +882,11 @@ as realistic or simple.
   (its level of detail had been measured from the set-aside globe camera), and places the
   eye through `ShapeToSystem`.
 
+**REN-07 — Designed night skies** · Planned (M34) · Base
+**Intent:** Each world has its own fixed night sky that the user designs: the stars stay put
+from night to night, and the user draws and names constellations in them (owner's request,
+2026-10-05; owner's choice: a star field from a seed that can be re-rolled, with named
+constellations drawn by joining stars).
 
 ### 4.2 Interface Layout (`UI`)
 
@@ -1041,6 +1068,42 @@ measuring distance, mass, volume, area, temperature, and so on (owner's idea, 20
   region; switching to imperial showed 3,959 mi, 59 °F, and 344 lb/ft³; another edit left
   the radius at exactly 6,371 km; typing 4,000 mi stored 6,437.376 km; 50 °F stored 10 °C;
   and switching back to metric kept everything as stored.
+
+**UI-05 — Tool help** · Implemented (M34: PR #87) · Base
+**Intent:** Someone picking up the app for the first time can use every tool: each tool says
+in one line how to use it, and when a tool can't do something, it says why and what to do
+instead of doing nothing (owner's request, 2026-10-05, after painting and sculpting seemed not
+to work).
+**Implementation (M34, PR #87):**
+- **What the run-through found** (every tool clicked through in the app, 2026-10-05): all of
+  them worked. Painting and sculpting only looked broken. The default Ocean barely shows on
+  an unmapped, ocean-blue planet. A 500 m sculpt is far too small to see from orbit, even at
+  10× relief. And nothing said why a tool did nothing when it couldn't act.
+- **The hint bar:** `MapToolbar.SetHint(tool, text)` shows one line on how to use the open
+  tool, in a dark strip centered along the bottom (between the camera text and the time
+  bar). The tool given a hint last is shown; closing it brings back the one before. The
+  System, Map, Terrain, Regions, and Journal panels set theirs when they open, and change it
+  as they need: the Map panel's says the next step (import a map, then calibrate or cut, then
+  drag pieces); the Terrain panel's follows its mode, and for sculpting explains true scale
+  and how to see small heights (zoom in, View ▸ Relief, View ▸ Stand Here). The Terrain and
+  Shapes how-to paragraphs moved into it. The timeline strip, diagrams page, and cut editor
+  keep the hint lines they already had.
+- **Disabled buttons say why** (`UI/DisabledTip.cs`: `Apply(button, tip, whyNot)` with shared
+  reasons `Busy`, `NoMap`, `NoSurface`): the map's Import, Clear, Calibrate, Cut from Map,
+  Cut from Image, and Reset Points; the System panel's Add Moon, Delete, and Make Center;
+  New Region; Add Relationship; the event editor's Pin on Globe; Add Nebula; and the diagram
+  page's Delete, Add to Diagram, Arrange, and Save as Image.
+- **Edits that wait say so:** `MapToolbar.ShowBusyWarning()` when the world is saving,
+  opening, or loading a map and the user paints, sculpts, places or drags a shape, drags or
+  deletes a piece, imports a map, opens the cut editor, or uses the File menu.
+- **Each brush stroke says what it did:** "Done: Paint Ocean. Ctrl+Z takes it back.", with
+  the height for Raise and Lower, or "Nothing changed" when the ground was already like that
+  (`TerrainBrush.ShowDone`).
+
+**UI-06 — Start screen and standalone app** · Planned (M34) · Base
+**Intent:** The app opens to a start screen (New World, Open World, Recent Worlds, Settings,
+Quit) and can be launched on Windows by double-clicking it, without Godot (owner's request,
+2026-10-05).
 
 ### 4.3 Maps & Image Import (`MAP`)
 
