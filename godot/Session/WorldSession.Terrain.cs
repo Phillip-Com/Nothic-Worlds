@@ -1,4 +1,5 @@
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Rendering;
 
@@ -12,7 +13,8 @@ public partial class WorldSession
     // Each body's ground as its terrain shapes it, kept with the painting and the types'
     // heights and edges it came from, so a paint stroke re-works only the tiles near it and a
     // new name or color re-works nothing.
-    private readonly Dictionary<Guid, (TerrainGrid Terrain, TerrainType[] Types, HeightGrid Ground)>
+    private readonly Dictionary<Guid,
+        (TerrainGrid Terrain, TerrainType[] Types, double RadiusKm, HeightGrid Ground)>
         _terrainGround = [];
 
     // Each body's ground seen (terrain and sculpting together), kept with what it came from, so
@@ -301,7 +303,9 @@ public partial class WorldSession
 
         TerrainGrid terrain = body.Surface.Terrain;
         TerrainType[] types = [.. World.TerrainTypes];
-        if (_terrainGround.TryGetValue(body.Id, out var known))
+        double radiusKm = body.RadiusKm;
+        int seed = TerrainRelief.SeedFor(body.Id);
+        if (_terrainGround.TryGetValue(body.Id, out var known) && known.RadiusKm == radiusKm)
         {
             if (SameShaping(known.Types, types))
             {
@@ -310,24 +314,26 @@ public partial class WorldSession
                     return known.Ground;
                 }
 
-                HeightGrid updated =
-                    TerrainRelief.Update(known.Ground, known.Terrain, terrain, types);
-                _terrainGround[body.Id] = (terrain, types, updated);
+                HeightGrid updated = TerrainRelief.Update(known.Ground, known.Terrain, terrain,
+                    types, radiusKm, seed);
+                _terrainGround[body.Id] = (terrain, types, radiusKm, updated);
                 return updated;
             }
 
             if (ReferenceEquals(known.Terrain, terrain))
             {
-                // A type's height or edge changed: only the ground near it is re-worked.
-                HeightGrid reworked =
-                    TerrainRelief.Rework(known.Ground, terrain, known.Types, types);
-                _terrainGround[body.Id] = (terrain, types, reworked);
+                // A type's height, edge, or variation changed: only the ground near it is
+                // re-worked.
+                HeightGrid reworked = TerrainRelief.Rework(known.Ground, terrain, known.Types,
+                    types, radiusKm, seed);
+                _terrainGround[body.Id] = (terrain, types, radiusKm, reworked);
                 return reworked;
             }
         }
 
-        HeightGrid ground = TerrainRelief.BaseHeights(terrain, types);
-        _terrainGround[body.Id] = (terrain, types, ground);
+        // A new size makes features a different number of cells across: all of it again.
+        HeightGrid ground = TerrainRelief.BaseHeights(terrain, types, radiusKm, seed);
+        _terrainGround[body.Id] = (terrain, types, radiusKm, ground);
         return ground;
     }
 
@@ -350,8 +356,10 @@ public partial class WorldSession
 
     // Whether two lists of types shape the ground the same (names and colors don't matter).
     private static bool SameShaping(TerrainType[] a, TerrainType[] b) =>
-        a.Select(t => (t.Code, t.HeightMeters, t.Edge))
-            .SequenceEqual(b.Select(t => (t.Code, t.HeightMeters, t.Edge)));
+        a.Select(Shaping).SequenceEqual(b.Select(Shaping));
+
+    private static (byte, int, double, int, double) Shaping(TerrainType type) =>
+        (type.Code, type.HeightMeters, type.Edge, type.VariationMeters, type.FeatureSizeKm);
 
     private void TerrainTypesChanged()
     {
@@ -361,5 +369,45 @@ public partial class WorldSession
         }
 
         MarkChanged(systemChanged: false);
+    }
+
+    /// <summary>
+    /// Gives a planet or moon water up to a level in meters (VISION.md BOD-09), changes the
+    /// level, or (null) takes the water away, as one undo step (typing a level merges into
+    /// one). Returns why a level was refused, or null.
+    /// </summary>
+    public string? SetWater(Guid bodyId, int? levelMeters)
+    {
+        if (FindBody(bodyId) is not Body body || !body.HasSurface
+            || body.WaterLevelMeters == levelMeters)
+        {
+            return null;
+        }
+
+        if (levelMeters is < Body.MinWaterLevelMeters or > Body.MaxWaterLevelMeters)
+        {
+            UnitSystem units = AppSettings.Units;
+            return "a water level must be " +
+                $"{Units.Format(Quantity.Length, Body.MinWaterLevelMeters, units)} to " +
+                Units.Format(Quantity.Length, Body.MaxWaterLevelMeters, units);
+        }
+
+        if (levelMeters is null)
+        {
+            RecordUndo($"Take {body.Name}'s Water");
+        }
+        else if (body.WaterLevelMeters is null)
+        {
+            RecordUndo($"Give {body.Name} Water");
+        }
+        else
+        {
+            RecordUndo($"Edit {body.Name}", mergeKey: ("water", bodyId));
+        }
+
+        body.WaterLevelMeters = levelMeters;
+        SyncView();
+        MarkChanged(systemChanged: false);
+        return null;
     }
 }

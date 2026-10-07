@@ -83,6 +83,9 @@ uniform bool has_terrain = false;
 uniform bool show_terrain = true;
 uniform sampler2DArray terrain_cells : filter_nearest, repeat_disable;
 uniform sampler2D terrain_palette : source_color, filter_nearest, repeat_disable;
+// Each code's color as water (alpha 0 for a type whose climate isn't water); see
+// water_tint.gdshaderinc.
+uniform sampler2D water_palette : source_color, filter_nearest, repeat_disable;
 // Seen from far away, cells get smaller than a pixel and would flicker. This copy holds each
 // face's colors averaged over 4 x 4 cells (alpha = how much is painted, colors multiplied by
 // it), with mipmaps, and takes over as cells shrink.
@@ -108,6 +111,11 @@ uniform bool map_shading = false;
 // True when the globe is carved by shapes (ShapedGlobe): its mesh comes already lifted (and
 // flat-faced, from the carving), so the shader neither lifts it nor uses its faces' normals.
 uniform bool lifted_on_cpu = false;
+// Water (VISION.md BOD-09): wherever the ground is below water_level (meters), the globe is
+// drawn as water, level with it. The first-person view draws its own water surface, so the
+// ground around the eye shows the true bottom.
+uniform bool has_water = false;
+uniform float water_level = 0.0;
 
 // The softest edge between terrains up close, in cells (edges sharpen to about a pixel as
 // cells get bigger on screen, and never go softer than this).
@@ -456,28 +464,7 @@ vec3 draw_pieces(vec3 color, vec3 direction, float pixel_angle) {
 	return color;
 }
 
-// Where a direction meets the cube: (across, down, face), with across and down from 0 to 1 over
-// the face (left to right, top to bottom). See CubeSphere.CellAt, whose face axes are written
-// out here as plain components (indexing arrays per pixel is slow on some graphics cards).
-// `on_face` is the point on the flat cube face: (along "right", along "up").
-vec3 terrain_face_position(vec3 d) {
-	vec3 size = abs(d);
-	float face;
-	vec2 on_face;
-	if (size.x >= size.y && size.x >= size.z) {
-		face = d.x >= 0.0 ? 0.0 : 1.0;
-		on_face = vec2(-d.z, d.y) / d.x * vec2(1.0, sign(d.x));
-	} else if (size.y >= size.z) {
-		face = d.y >= 0.0 ? 2.0 : 3.0;
-		on_face = vec2(d.x, -d.z) / d.y * vec2(sign(d.y), 1.0);
-	} else {
-		face = d.z >= 0.0 ? 4.0 : 5.0;
-		on_face = vec2(d.x, d.y) / d.z * vec2(1.0, sign(d.z));
-	}
-
-	vec2 spread = atan(on_face) * (4.0 / PI);  // Equal-angle spacing, -1 to 1
-	return vec3((spread.x + 1.0) * 0.5, (1.0 - spread.y) * 0.5, face);
-}
+#include "res://Rendering/water_tint.gdshaderinc"
 
 // The reverse: the direction to a position on a face (positions a little past the edge give
 // directions over the next face, which terrain_face_position then finds).
@@ -499,6 +486,11 @@ vec3 terrain_direction(int face, vec2 position) {
 float height_at(vec3 direction, float lod) {
 	vec3 position = terrain_face_position(direction);
 	return textureLod(heights, position, lod).r;
+}
+
+// The ground's height in meters (0 where nothing is sculpted).
+float ground_height(vec3 direction, float lod) {
+	return has_heights ? height_at(direction, lod) : 0.0;
 }
 
 // Which way the sculpted ground faces here, in the body's own space: the slopes found by
@@ -722,9 +714,12 @@ void vertex() {
 		local_direction = CUSTOM0.xyz;
 	} else {
 		local_direction = VERTEX;
-		if (has_heights && !flat_disc && !lifted_on_cpu) {
+		if ((has_heights || has_water) && !flat_disc && !lifted_on_cpu) {
+			// Lifted to the ground, or to the water over it.
 			vec3 direction = normalize(VERTEX);
-			VERTEX = direction * (1.0 + height_at(direction, 0.0) * relief_scale);
+			float height = ground_height(direction, 0.0);
+			height = has_water ? max(height, water_level) : height;
+			VERTEX = direction * (1.0 + height * relief_scale);
 		}
 	}
 }
@@ -803,6 +798,33 @@ float ground_detail(inout vec3 color, float meters_per_pixel) {
 	return bumps * (0.6 * broad + 0.3 * medium + 0.1 * grain);
 }
 
+// Water `depth` meters deep over ground of color `bottom`, in the shades of `tint` (see
+// water_shades): clear in the shallows, darker further down, the bottom showing through only
+// where it's very shallow.
+vec3 water_color(vec3 bottom, float depth, vec4 tint) {
+	vec3 shallow, deep;
+	water_shades(tint, shallow, deep);
+	vec3 water = mix(shallow, deep, 1.0 - exp(-depth / 700.0));
+	return mix(bottom, water, clamp(0.55 + depth / 60.0, 0.0, 1.0));
+}
+
+// Ripples of light on the bottom under water (VISION.md BOD-09), `depth` meters down: a web of
+// bright lines where two drifting layers of noise cross their middles, like sunlight focused
+// by the waves above. They fade with depth, and where a pixel covers more than they do
+// (`meters_per_pixel`), so they never shimmer.
+float caustics(float depth, float meters_per_pixel) {
+	float footprint = meters_per_pixel / GROUND_DETAIL_METERS * 3.0;
+	if (footprint > 0.6) {
+		return 0.0;
+	}
+
+	vec3 q = ground_offset * ground_radius_meters / GROUND_DETAIL_METERS + ground_detail_origin;
+	float first = fine_noise(q + vec3(0.0, TIME * 0.3, TIME * 0.2));
+	float second = fine_noise(DETAIL_TURN_A * q + vec3(TIME * 0.25, 0.0, -TIME * 0.2));
+	float lines = max(1.0 - abs(2.0 * first - 1.0), 1.0 - abs(2.0 * second - 1.0));
+	return pow(lines, 12.0) * exp(-depth / 12.0) * (1.0 - smoothstep(0.25, 0.6, footprint));
+}
+
 // A normal (in the globe's own space) tilted by a height in meters that changes across the
 // ground, from how it changes between neighboring pixels (bump mapping by screen
 // derivatives). Positions are the ground's own, in meters, which keep their precision here.
@@ -837,6 +859,18 @@ void fragment() {
 		vec4 terrain = terrain_color(direction, pixel_angle);
 		float strength = over_map ? terrain_over_map : 1.0;
 		color = color * (1.0 - terrain.a * strength) + terrain.rgb * strength;
+	}
+
+	// Water over the ground below its level, its shore smoothed over about a pixel. Not on
+	// the first-person ground, which is the true bottom under its own water surface.
+	float wet = 0.0;
+	if (has_water && !flat_disc && eye_level_ground < 0.5) {
+		float depth = water_level - ground_height(direction, 0.0);
+		wet = clamp(depth / max(fwidth(depth), 1e-3) + 0.5, 0.0, 1.0);
+		vec4 tint = has_terrain
+			? water_tint(terrain_cells, water_palette, direction)
+			: vec4(0.0);
+		color = mix(color, water_color(color, max(depth, 0.0), tint), wet);
 	}
 
 	// The rings' shadow: where the line from here toward the star crosses them. (A flat
@@ -880,18 +914,23 @@ void fragment() {
 		float meters_away = length(VERTEX) / length(MODEL_MATRIX[0].xyz) * ground_radius_meters;
 		float facing = max(abs(dot(normalize(VERTEX), normalize(NORMAL))), 0.1);
 		float pixel_size = 2.0 / (PROJECTION_MATRIX[1][1] * VIEWPORT_SIZE.y);
-		bump_meters = ground_detail(color, meters_away * pixel_size / facing);
+		float meters_per_pixel = meters_away * pixel_size / facing;
+		bump_meters = ground_detail(color, meters_per_pixel);
+		float depth = water_level - ground_height(direction, 0.0);
+		if (has_water && !flat_disc && depth > 0.0) {
+			color *= 1.0 + 0.9 * caustics(depth, meters_per_pixel);
+		}
 	}
 
 	ALBEDO = color;
 	EMISSION = weather_glow;
-	ROUGHNESS = 0.9;
+	ROUGHNESS = mix(0.9, 0.3, wet);  // Water catches the sun
 	if (lifted_on_cpu && !has_heights) {
 		// The carved globe's faces are flat: shade it as the round globe it is.
 		NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(direction, 0.0)).xyz);
 	}
 
-	if (has_heights && !flat_disc) {
+	if (has_heights && !flat_disc && wet < 0.5) {
 		vec3 normal = relief_normal(direction, pixel_angle);
 		if (map_shading) {
 			ALBEDO *= map_shade(normal, direction);

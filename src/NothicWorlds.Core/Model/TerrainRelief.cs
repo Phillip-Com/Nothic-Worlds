@@ -37,6 +37,9 @@ public static class TerrainRelief
     private const int Padded = TileSize + 2 * Pad;
     private const float Diagonal = 1.41421356f;
 
+    // The radius taken when none is given: the Earth's, in km.
+    private const double DefaultRadiusKm = 6_371;
+
     private static readonly (int Dx, int Dy)[] _sides = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
     // Each tile's neighbors within reach of its padding (worked out once: the same for every
@@ -46,17 +49,23 @@ public static class TerrainRelief
             .Select(index => TilesNear(index).ToArray())]);
 
     /// <summary>The ground the painted terrain shapes, everywhere on a body.</summary>
-    public static HeightGrid BaseHeights(TerrainGrid terrain, IReadOnlyList<TerrainType> types)
+    /// <param name="terrain">What's painted where.</param>
+    /// <param name="types">The world's terrain types.</param>
+    /// <param name="radiusKm">The body's radius (it sets how big features are in cells).</param>
+    /// <param name="seed">Gives the body its own features (see <see cref="SeedFor"/>).</param>
+    public static HeightGrid BaseHeights(TerrainGrid terrain, IReadOnlyList<TerrainType> types,
+        double radiusKm = DefaultRadiusKm, int seed = 0)
     {
-        var look = new Lookup(types);
+        var look = new Lookup(types, radiusKm, seed);
         var tiles = new short[]?[CubeGridBrush.TileCount];
-        for (int index = 0; index < tiles.Length; index++)
-        {
-            tiles[index] = WorkTile(terrain, look, index);
-        }
-
+        Parallel.For(0, tiles.Length, index => tiles[index] = WorkTile(terrain, look, index));
         return HeightGrid.FromTiles(tiles);
     }
+
+    /// <summary>
+    /// A body's seed for its terrain's features: the same every time for that body.
+    /// </summary>
+    public static int SeedFor(Guid bodyId) => BitConverter.ToInt32(bodyId.ToByteArray(), 4);
 
     /// <summary>
     /// The ground <paramref name="after"/> shapes, worked out from <paramref name="previous"/>
@@ -64,7 +73,7 @@ public static class TerrainRelief
     /// tiles near those whose painting changed.
     /// </summary>
     public static HeightGrid Update(HeightGrid previous, TerrainGrid before, TerrainGrid after,
-        IReadOnlyList<TerrainType> types)
+        IReadOnlyList<TerrainType> types, double radiusKm = DefaultRadiusKm, int seed = 0)
     {
         var changed = new HashSet<int>();
         for (int index = 0; index < CubeGridBrush.TileCount; index++)
@@ -80,34 +89,28 @@ public static class TerrainRelief
             return previous;
         }
 
-        var look = new Lookup(types);
-        var tiles = new short[]?[CubeGridBrush.TileCount];
-        for (int index = 0; index < tiles.Length; index++)
-        {
-            tiles[index] = changed.Contains(index)
-                ? WorkTile(after, look, index)
-                : previous.Tile(index);
-        }
-
-        return HeightGrid.FromTiles(tiles);
+        return Remake(previous, after, new Lookup(types, radiusKm, seed), changed);
     }
 
     /// <summary>
-    /// The ground <paramref name="terrain"/> shapes after its types' heights or edges changed
-    /// from <paramref name="before"/> to <paramref name="after"/>, worked out from
-    /// <paramref name="previous"/> (what it shaped with <paramref name="before"/>) by
+    /// The ground <paramref name="terrain"/> shapes after its types' heights, edges, or
+    /// variations changed from <paramref name="before"/> to <paramref name="after"/>, worked
+    /// out from <paramref name="previous"/> (what it shaped with <paramref name="before"/>) by
     /// re-working only the tiles near ground painted with a type that changed.
     /// </summary>
     public static HeightGrid Rework(HeightGrid previous, TerrainGrid terrain,
-        IReadOnlyList<TerrainType> before, IReadOnlyList<TerrainType> after)
+        IReadOnlyList<TerrainType> before, IReadOnlyList<TerrainType> after,
+        double radiusKm = DefaultRadiusKm, int seed = 0)
     {
-        Lookup was = new(before), now = new(after);
+        Lookup was = new(before, radiusKm, seed), now = new(after, radiusKm, seed);
         var changed = new bool[256];
         bool any = false;
         for (int code = 1; code < 256; code++)
         {
             changed[code] = was.Height[code] != now.Height[code]
-                || was.Edge[code] != now.Edge[code];
+                || was.Edge[code] != now.Edge[code]
+                || was.Variation[code] != now.Variation[code]
+                || was.Size[code] != now.Size[code];
             any |= changed[code];
         }
 
@@ -125,14 +128,17 @@ public static class TerrainRelief
             }
         }
 
-        var tiles = new short[]?[CubeGridBrush.TileCount];
-        for (int index = 0; index < tiles.Length; index++)
-        {
-            tiles[index] = affected.Contains(index)
-                ? WorkTile(terrain, now, index)
-                : previous.Tile(index);
-        }
+        return Remake(previous, terrain, now, affected);
+    }
 
+    // The previous ground with the given tiles worked out again (in parallel).
+    private static HeightGrid Remake(HeightGrid previous, TerrainGrid terrain, Lookup look,
+        HashSet<int> redo)
+    {
+        var tiles = new short[]?[CubeGridBrush.TileCount];
+        Parallel.For(0, tiles.Length, index => tiles[index] = redo.Contains(index)
+            ? WorkTile(terrain, look, index)
+            : previous.Tile(index));
         return HeightGrid.FromTiles(tiles);
     }
 
@@ -210,14 +216,17 @@ public static class TerrainRelief
         int tileColumn = index % TilesPerSide;
         byte[] codes = PaddedCodes(terrain, face, tileColumn, tileRow);
 
-        // Most tiles are one terrain all around: one height throughout.
-        if (Array.TrueForAll(codes, code => code == codes[0]))
+        // Most tiles are one level terrain all around: one height throughout.
+        bool uniform = Array.TrueForAll(codes, code => code == codes[0]);
+        if (uniform && look.Variation[codes[0]] == 0)
         {
             short height = look.Height[codes[0]];
             return height == 0 ? null : Filled(height);
         }
 
-        (float[] distance, byte[] other) = NearestOther(codes);
+        (float[] distance, byte[] other) = uniform
+            ? (Array.ConvertAll(codes, _ => float.PositiveInfinity), codes)
+            : NearestOther(codes);
         var heights = new short[TileSize * TileSize];
         bool any = false;
         for (int row = 0; row < TileSize; row++)
@@ -225,7 +234,9 @@ public static class TerrainRelief
             for (int column = 0; column < TileSize; column++)
             {
                 int at = (row + Pad) * Padded + column + Pad;
-                short height = HeightAt(look, codes[at], other[at], distance[at]);
+                Vector3D direction = CubeGridBrush.Normalized(CubeGridBrush.CellPoint(face,
+                    tileColumn * TileSize + column, tileRow * TileSize + row));
+                short height = HeightAt(look, codes[at], other[at], distance[at], direction);
                 heights[row * TileSize + column] = height;
                 any |= height != 0;
             }
@@ -235,20 +246,31 @@ public static class TerrainRelief
     }
 
     // A cell's height: its own type's, eased toward halfway to its nearest other type's as it
-    // comes within half the transition's width of the line between them.
-    private static short HeightAt(Lookup look, byte own, byte other, float distance)
+    // comes within half the transition's width of the line between them; with its features
+    // (TerrainNoise) on each side, so they meet half and half at the line without a seam.
+    private static short HeightAt(Lookup look, byte own, byte other, float distance,
+        Vector3D direction)
     {
-        short ownHeight = look.Height[own];
+        double ownHeight = look.Height[own] + look.Offset(own, direction);
         if (own == other || float.IsPositiveInfinity(distance))
         {
-            return ownHeight;
+            return Clamped(ownHeight);
         }
 
         double half = TransitionCells(look.Edge[own], look.Edge[other]) / 2;
-        double middle = (ownHeight + look.Height[other]) / 2.0;
         double t = distance >= half ? 1 : SmoothStep(distance / half);
-        return (short)Math.Round(middle + (ownHeight - middle) * t);
+        if (t >= 1)
+        {
+            return Clamped(ownHeight);
+        }
+
+        double otherHeight = look.Height[other] + look.Offset(other, direction);
+        double middle = (ownHeight + otherHeight) / 2.0;
+        return Clamped(middle + (ownHeight - middle) * t);
     }
+
+    private static short Clamped(double meters) => (short)Math.Round(Math.Clamp(meters,
+        HeightGrid.MinHeightMeters, HeightGrid.MaxHeightMeters));
 
     private static double SmoothStep(double x)
     {
@@ -390,21 +412,47 @@ public static class TerrainRelief
         return tile;
     }
 
-    // Each code's height and edge (0 and gentle for unpainted, or a code with no type).
+    // Each code's height, edge, variation, and feature size (level, gentle, and flat for
+    // unpainted, or a code with no type), and what the features need of the body.
     private sealed class Lookup
     {
-        public Lookup(IReadOnlyList<TerrainType> types)
+        private readonly double _radiusKm;
+        private readonly double _smallestKm;
+        private readonly double _fewestKm;
+        private readonly int _seed;
+
+        public Lookup(IReadOnlyList<TerrainType> types, double radiusKm, int seed)
         {
+            (_radiusKm, _seed) = (radiusKm, seed);
+            double cellKm = radiusKm * Math.PI / 2 / FaceSize;
+            _smallestKm = 3 * cellKm;
+
+            // Features only a few cells across come out as spikes from one cell to the next, so
+            // none is drawn smaller than four cells.
+            _fewestKm = 4 * cellKm;
             foreach (TerrainType type in types)
             {
                 Height[type.Code] = (short)Math.Clamp(type.HeightMeters,
                     TerrainType.MinHeightMeters, TerrainType.MaxHeightMeters);
                 Edge[type.Code] = Math.Clamp(type.Edge, 0, 1);
+                Variation[type.Code] = Math.Clamp(type.VariationMeters, 0,
+                    TerrainType.MaxVariationMeters);
+                Size[type.Code] = type.FeatureSizeKm;
             }
         }
 
         public short[] Height { get; } = new short[256];
 
         public double[] Edge { get; } = new double[256];
+
+        public int[] Variation { get; } = new int[256];
+
+        public double[] Size { get; } = new double[256];
+
+        // How far a type's features lift the ground at a place.
+        public double Offset(byte code, Vector3D direction) => Variation[code] == 0
+            ? 0
+            : TerrainNoise.Offset(direction, _radiusKm, Variation[code],
+                Math.Max(Size[code], _fewestKm), _smallestKm, _seed + code * 7_919);
     }
 }

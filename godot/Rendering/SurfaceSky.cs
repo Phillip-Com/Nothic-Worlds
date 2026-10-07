@@ -303,13 +303,52 @@ public sealed class SurfaceSky
 
         _standing.FogEnabled = air;
         _standing.FogDensity = (float)(Math.Log(2) / (halfKm * unitsPerKm));
+        _standing.FogSkyAffect = 0;
 
         // The sky shader's daylight, at the horizon: pale blue, greyer under cloud.
-        double dawn = SmoothStep(-0.1, 0.1, Math.Sin(double.DegreesToRadians(sunAltitudeDegrees)));
-        float light = (float)(0.03 + 0.97 * dawn * dawn);
+        float light = (float)Daylight(sunAltitudeDegrees);
         Color clear = new(0.77f, 0.86f, 0.96f), overcast = new(0.72f, 0.74f, 0.77f);
         _standing.FogLightColor = clear.Lerp(overcast, (float)Math.Clamp(cloudCover, 0, 1))
             * light;
+    }
+
+    /// <summary>
+    /// Turns the haze into the murk under water (VISION.md BOD-09), in place of
+    /// <see cref="ShowHaze"/>: blue-green, half gone at <see cref="UnderwaterHalfMeters"/>,
+    /// over the sky too, darker the deeper the eye (<paramref name="depthMeters"/>) and the
+    /// lower the sun. <paramref name="unitsPerKm"/> is the scene's scale. The murk is the
+    /// color of <paramref name="water"/> (a water terrain's), or a standard blue-green.
+    /// </summary>
+    public void ShowUnderwater(double unitsPerKm, double depthMeters, double sunAltitudeDegrees,
+        Color? water)
+    {
+        if (_standing is null)
+        {
+            return;
+        }
+
+        _standing.FogEnabled = true;
+        _standing.FogDensity =
+            (float)(Math.Log(2) / (UnderwaterHalfMeters / 1000 * unitsPerKm));
+        _standing.FogSkyAffect = 1;
+        float light = (float)(Daylight(sunAltitudeDegrees) * Math.Exp(-depthMeters / 60));
+        _standing.FogLightColor = (water ?? StandardWater) * Math.Max(light, 0.02f);
+    }
+
+    /// <summary>The color of water over land, which no water terrain colors.</summary>
+    public static readonly Color StandardWater = new(0.1f, 0.32f, 0.36f);
+
+    /// <summary>How far one can see under water: half gone at this many meters.</summary>
+    public const double UnderwaterHalfMeters = 9;
+
+    /// <summary>
+    /// How light the day is, from 0 at night to 1 with the sun well up, for a sun this high
+    /// in degrees.
+    /// </summary>
+    public static double Daylight(double sunAltitudeDegrees)
+    {
+        double dawn = SmoothStep(-0.1, 0.1, Math.Sin(double.DegreesToRadians(sunAltitudeDegrees)));
+        return 0.03 + 0.97 * dawn * dawn;
     }
 
     private static double SmoothStep(double from, double to, double value)

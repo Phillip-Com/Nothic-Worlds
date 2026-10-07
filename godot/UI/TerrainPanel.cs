@@ -62,6 +62,8 @@ public partial class TerrainPanel : CanvasLayer
     private SpinBox _height = null!;
     private HSlider _edge = null!;
     private Label _edgeName = null!;
+    private SpinBox _variation = null!;
+    private SpinBox _featureSize = null!;
     private Label _shapingNote = null!;
     private bool _edgeDragging;
     private Label _problem = null!;
@@ -391,7 +393,8 @@ public partial class TerrainPanel : CanvasLayer
         }
     }
 
-    // The type's height and edge, for when the terrain shapes the ground (VISION.md BOD-07).
+    // The type's height, edge, and variation, for when the terrain shapes the ground
+    // (VISION.md BOD-07, BOD-08).
     private Control BuildShapingRows()
     {
         var box = new VBoxContainer();
@@ -443,6 +446,7 @@ public partial class TerrainPanel : CanvasLayer
         _edgeName = new Label { CustomMinimumSize = new Vector2(70, 0) };
         edgeRow.AddChild(_edgeName);
         box.AddChild(edgeRow);
+        box.AddChild(BuildVariationRow());
 
         _shapingNote = new Label
         {
@@ -452,6 +456,34 @@ public partial class TerrainPanel : CanvasLayer
         };
         box.AddChild(_shapingNote);
         return box;
+    }
+
+    // How far the ground rises and falls within the type, and how far apart its peaks are.
+    private HBoxContainer BuildVariationRow()
+    {
+        var row = new HBoxContainer();
+        row.AddChild(new Label { Text = "Variation" });
+        _variation = new SpinBox
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "How far the ground rises and falls within this terrain, around its " +
+                "height: peaks and valleys in mountains, rolling hills, a gently uneven plain " +
+                "(0: level)",
+        }.WithUnit(Quantity.Length, 0, TerrainType.MaxVariationMeters, 10, 50);
+        _variation.ValueChanged += _ => Commit();
+        row.AddChild(_variation);
+        row.AddChild(new Label { Text = "Size" });
+        _featureSize = new SpinBox
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "How far apart the biggest peaks and valleys are. Features smaller " +
+                "than a few of the terrain grid's cells (about 10 km on an Earth-sized world) " +
+                "are smoothed out",
+        }.WithUnit(Quantity.Distance, TerrainType.MinFeatureSizeKm,
+            TerrainType.MaxFeatureSizeKm, 1);
+        _featureSize.ValueChanged += _ => Commit();
+        row.AddChild(_featureSize);
+        return row;
     }
 
     // What an edge setting is called: from gentle slopes to a cliff.
@@ -478,6 +510,8 @@ public partial class TerrainPanel : CanvasLayer
             Climate = (ClimateKind)_climate.GetSelectedId(),
             HeightMeters = (int)Math.Round(_height.MetricValue()),
             Edge = Math.Round(_edge.Value, 2),
+            VariationMeters = (int)Math.Round(_variation.MetricValue()),
+            FeatureSizeKm = Math.Round(_featureSize.MetricValue(), 1),
         });
         _problem.Text = problem is null ? "" : $"Not saved yet: {problem}.";
     }
@@ -597,6 +631,8 @@ public partial class TerrainPanel : CanvasLayer
         _climate.Disabled = type is null;
         _height.Editable = type is not null;
         _edge.Editable = type is not null;
+        _variation.Editable = type is not null;
+        _featureSize.Editable = type is not null;
         if (type is null)
         {
             return;
@@ -617,6 +653,8 @@ public partial class TerrainPanel : CanvasLayer
         }
 
         _edgeName.Text = EdgeName(_edge.Value);
+        _variation.ShowMetric(type.VariationMeters);
+        _featureSize.ShowMetric(type.FeatureSizeKm);
         _syncing = false;
     }
 

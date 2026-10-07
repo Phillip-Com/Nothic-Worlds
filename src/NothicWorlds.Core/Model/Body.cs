@@ -113,6 +113,19 @@ public sealed class Body
     /// </summary>
     public bool HasAtmosphere { get; set; } = true;
 
+    /// <summary>
+    /// The level of a planet's or moon's water, in meters above (or, negative, below) its
+    /// radius, or null if it has none (VISION.md BOD-09; owner's choice: a switch and a level
+    /// per body). Wherever the ground is lower, there's water.
+    /// </summary>
+    public int? WaterLevelMeters { get; set; }
+
+    /// <summary>The lowest a body's water can be, in meters.</summary>
+    public const int MinWaterLevelMeters = -12_000;
+
+    /// <summary>The highest a body's water can be, in meters.</summary>
+    public const int MaxWaterLevelMeters = 12_000;
+
     /// <summary>The lowest density a body can have, in g/cm³ (thinner than giant stars).</summary>
     public const double MinDensityGramsPerCm3 = 1e-6;
 
@@ -175,6 +188,13 @@ public sealed class Body
         if (!HasSurface && Shape != BodyShape.Sphere)
         {
             return "only planets and moons can be flat";
+        }
+
+        if (WaterLevelMeters is int level
+            && (!HasSurface || level is < MinWaterLevelMeters or > MaxWaterLevelMeters))
+        {
+            return $"only planets and moons can have water, at {MinWaterLevelMeters:N0} to " +
+                $"{MaxWaterLevelMeters:N0} m";
         }
 
         if (!HasSurface && (!Surface.Heights.IsEmpty || Surface.Shapes.Count > 0))
@@ -256,6 +276,7 @@ public sealed class Body
             && AxialTiltDirectionDegrees == other.AxialTiltDirectionDegrees
             && AverageTemperatureC == other.AverageTemperatureC
             && HasAtmosphere == other.HasAtmosphere
+            && WaterLevelMeters == other.WaterLevelMeters
             && DensityGramsPerCm3 == other.DensityGramsPerCm3
             && Orbit == other.Orbit && Calendar == other.Calendar
             && Appearance == other.Appearance && Rings == other.Rings
@@ -278,6 +299,7 @@ public sealed class Body
             AxialTiltDirectionDegrees = AxialTiltDirectionDegrees,
             AverageTemperatureC = AverageTemperatureC,
             HasAtmosphere = HasAtmosphere,
+            WaterLevelMeters = WaterLevelMeters,
             DensityGramsPerCm3 = DensityGramsPerCm3,
             Orbit = Orbit,  // Immutable, safe to share.
             Calendar = Calendar,  // Immutable, safe to share.

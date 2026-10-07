@@ -65,6 +65,8 @@ public partial class PlanetSurface : MeshInstance3D
     private TerrainGrid _shownTerrain = TerrainGrid.Empty;
     private ImageTexture? _terrainPalette;
     private byte[] _paletteBytes = [];
+    private ImageTexture? _waterPalette;
+    private byte[] _waterPaletteBytes = [];
 
     // Sculpted heights (VISION.md BOD-04): the six faces as layers of one texture of
     // half-precision floats with smaller copies (only while something is sculpted, about 16 MB),
@@ -77,6 +79,9 @@ public partial class PlanetSurface : MeshInstance3D
     private HeightGrid _shownHeights = HeightGrid.Empty;
     private float _reliefScale;
     private ReliefDetail _reliefDetail = ReliefDetail.Standard;
+
+    // The body's water level in meters (VISION.md BOD-09), or null for none.
+    private int? _waterLevelMeters;
 
     // Shapes added or cut (VISION.md BOD-04): the body's shapes and radius, and the carved
     // globe drawn instead of the plain one while there are any.
@@ -497,6 +502,33 @@ public partial class PlanetSurface : MeshInstance3D
     }
 
     /// <summary>
+    /// The body's water level in meters (VISION.md BOD-09), or null for none: wherever the
+    /// ground is lower, the globe is drawn as water, level with it. A flat world shows none.
+    /// </summary>
+    public int? WaterLevelMeters
+    {
+        get => _waterLevelMeters;
+        set
+        {
+            if (value != _waterLevelMeters)
+            {
+                _waterLevelMeters = value;
+                SurfaceMaterial.SetShaderParameter("has_water", value is not null);
+                SurfaceMaterial.SetShaderParameter("water_level", (float)(value ?? 0));
+                UpdateBounds();
+            }
+        }
+    }
+
+    /// <summary>
+    /// How far out the water's surface is, in the globe's radii (with the view's relief
+    /// exaggeration), or null with no water (or on a flat world).
+    /// </summary>
+    public double? WaterRadius => _waterLevelMeters is int level && Shape == BodyShape.Sphere
+        ? 1 + _reliefScale * (double)level
+        : null;
+
+    /// <summary>
     /// Whether relief is shaded map-style, from a fixed direction (true), or by the sunlight.
     /// </summary>
     public bool MapShading
@@ -627,21 +659,30 @@ public partial class PlanetSurface : MeshInstance3D
     /// How far out the drawn surface is at a direction, in the globe's radii: 1 on an unsculpted
     /// globe (or a flat world), more on a sculpted hill, less in a basin. Overlays sit on it.
     /// </summary>
-    public float SurfaceRadiusAt(Vector3D direction) =>
-        _shownHeights.IsEmpty || Shape == BodyShape.FlatDisc
+    public float SurfaceRadiusAt(Vector3D direction)
+    {
+        float ground = _shownHeights.IsEmpty || Shape == BodyShape.FlatDisc
             ? 1.0f
             : 1.0f + _reliefScale * (float)_shownHeights.SampleAt(direction);
+        return WaterRadius is double water ? Math.Max(ground, (float)water) : ground;
+    }
 
     /// <summary>
     /// The highest the surface reaches anywhere, in the globe's radii above it (0 unsculpted).
     /// </summary>
     public float HighestRelief => Shape == BodyShape.FlatDisc
         ? 0
-        : Math.Max(Math.Max(0, _reliefScale * _shownHeights.Highest), _carved?.HighestTop ?? 0);
+        : Math.Max(Math.Max(Math.Max(0, _reliefScale * _shownHeights.Highest),
+            _reliefScale * (_waterLevelMeters ?? 0)), _carved?.HighestTop ?? 0);
 
-    /// <summary>Sets the color each terrain code is drawn in (others stay unpainted).</summary>
+    /// <summary>
+    /// Sets the color each terrain code is drawn in (others stay unpainted), and the color of
+    /// water over it: its own for a type with the Water climate (VISION.md BOD-09).
+    /// </summary>
     public void SetTerrainColors(IEnumerable<TerrainType> types)
     {
+        SetWaterColors(types);
+
         // One RGBA pixel per code; alpha 0 (the default) draws as unpainted.
         var bytes = new byte[(byte.MaxValue + 1) * 4];
         foreach (TerrainType type in types)
@@ -671,6 +712,48 @@ public partial class PlanetSurface : MeshInstance3D
         else
         {
             _terrainPalette.Update(image);
+        }
+    }
+
+    /// <summary>
+    /// Gives a first-person water surface's material (water_surface.gdshader) the terrain and
+    /// water colors it tints the water by.
+    /// </summary>
+    public void CopyWaterColorsTo(ShaderMaterial target)
+    {
+        ShaderMaterial material = SurfaceMaterial;
+        foreach (string name in (string[])["has_terrain", "terrain_cells", "water_palette"])
+        {
+            target.SetShaderParameter(name, material.GetShaderParameter(name));
+        }
+    }
+
+    // One RGBA pixel per code: the type's color for water types, alpha 0 for the rest.
+    private void SetWaterColors(IEnumerable<TerrainType> types)
+    {
+        var bytes = new byte[(byte.MaxValue + 1) * 4];
+        foreach (TerrainType type in types.Where(type => type.Climate == ClimateKind.Water))
+        {
+            int at = type.Code * 4;
+            (bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]) =
+                (type.Color.R, type.Color.G, type.Color.B, 255);
+        }
+
+        if (bytes.AsSpan().SequenceEqual(_waterPaletteBytes))
+        {
+            return;
+        }
+
+        _waterPaletteBytes = bytes;
+        Image image = Image.CreateFromData(byte.MaxValue + 1, 1, false, Image.Format.Rgba8, bytes);
+        if (_waterPalette is null)
+        {
+            _waterPalette = ImageTexture.CreateFromImage(image);
+            SurfaceMaterial.SetShaderParameter("water_palette", _waterPalette);
+        }
+        else
+        {
+            _waterPalette.Update(image);
         }
     }
 

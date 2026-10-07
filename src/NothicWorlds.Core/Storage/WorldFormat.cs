@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 29;
+    public const int CurrentVersion = 30;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -250,7 +250,31 @@ internal static partial class WorldFormat
         // their ground (a missing value is off); their types named like the defaults get the
         // default heights and edges, the rest stay level and gentle, ready for when it's on.
         AddTerrainHeights,
+
+        // 29 → 30: terrain types gained a "variation" and a "featureSize", and planets and
+        // moons an optional "waterLevel" (M36, peaks and water). Types named like the defaults
+        // get the default variations and sizes, the rest stay level; no body has water.
+        AddTerrainVariations,
     ];
+
+    // The variations and feature sizes the version 30 upgrade gives types by name. Deliberately
+    // a copy, so later changes to the defaults can't change old upgrades.
+    private static readonly Dictionary<string, (int Variation, double SizeKm)>
+        _version30Variations = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Ocean"] = (800, 200),
+            ["Shallow Water"] = (40, 60),
+            ["Plains"] = (40, 80),
+            ["Fields"] = (30, 80),
+            ["Forest"] = (80, 50),
+            ["Jungle"] = (100, 40),
+            ["Hills"] = (350, 30),
+            ["Mountains"] = (1_500, 40),
+            ["Desert"] = (120, 30),
+            ["Swamp"] = (5, 40),
+            ["Tundra"] = (60, 60),
+            ["Ice"] = (300, 60),
+        };
 
     // The heights and edges the version 29 upgrade gives types by name. Deliberately a copy,
     // like _version12Climates, so later changes to the defaults can't change old upgrades.
@@ -349,6 +373,31 @@ internal static partial class WorldFormat
 
         return document;
     }
+
+    private static JsonObject AddTerrainVariations(JsonObject document)
+    {
+        if (document["terrainTypes"] is JsonArray types)
+        {
+            foreach (JsonObject type in types.OfType<JsonObject>())
+            {
+                if (TypeName(type) is string name
+                    && _version30Variations.TryGetValue(name, out var look))
+                {
+                    type["variation"] ??= look.Variation;
+                    type["featureSize"] ??= look.SizeKm;
+                }
+            }
+        }
+
+        return document;
+    }
+
+    // A terrain type's name in an older document, trimmed, or null if it isn't text (loading
+    // then refuses it with its usual message).
+    private static string? TypeName(JsonObject type) =>
+        type["name"]?.GetValueKind() == System.Text.Json.JsonValueKind.String
+            ? type["name"]!.GetValue<string>().Trim()
+            : null;
 
     private static JsonObject AddTerrainHeights(JsonObject document)
     {
