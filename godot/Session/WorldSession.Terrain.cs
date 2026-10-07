@@ -1,4 +1,5 @@
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Rendering;
 
@@ -368,5 +369,45 @@ public partial class WorldSession
         }
 
         MarkChanged(systemChanged: false);
+    }
+
+    /// <summary>
+    /// Gives a planet or moon water up to a level in meters (VISION.md BOD-09), changes the
+    /// level, or (null) takes the water away, as one undo step (typing a level merges into
+    /// one). Returns why a level was refused, or null.
+    /// </summary>
+    public string? SetWater(Guid bodyId, int? levelMeters)
+    {
+        if (FindBody(bodyId) is not Body body || !body.HasSurface
+            || body.WaterLevelMeters == levelMeters)
+        {
+            return null;
+        }
+
+        if (levelMeters is < Body.MinWaterLevelMeters or > Body.MaxWaterLevelMeters)
+        {
+            UnitSystem units = AppSettings.Units;
+            return "a water level must be " +
+                $"{Units.Format(Quantity.Length, Body.MinWaterLevelMeters, units)} to " +
+                Units.Format(Quantity.Length, Body.MaxWaterLevelMeters, units);
+        }
+
+        if (levelMeters is null)
+        {
+            RecordUndo($"Take {body.Name}'s Water");
+        }
+        else if (body.WaterLevelMeters is null)
+        {
+            RecordUndo($"Give {body.Name} Water");
+        }
+        else
+        {
+            RecordUndo($"Edit {body.Name}", mergeKey: ("water", bodyId));
+        }
+
+        body.WaterLevelMeters = levelMeters;
+        SyncView();
+        MarkChanged(systemChanged: false);
+        return null;
     }
 }

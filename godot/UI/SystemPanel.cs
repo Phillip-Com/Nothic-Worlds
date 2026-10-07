@@ -55,6 +55,10 @@ public partial class SystemPanel : CanvasLayer
     private SpinBox _temperature = null!;
     private CheckBox _atmosphere = null!;
     private Label _atmosphereLabel = null!;
+    private Label _waterLabel = null!;
+    private HBoxContainer _waterRow = null!;
+    private CheckBox _hasWater = null!;
+    private SpinBox _waterLevel = null!;
     private SpinBox _density = null!;
     private Button _typicalDensity = null!;
     private Label _mass = null!;
@@ -288,6 +292,7 @@ public partial class SystemPanel : CanvasLayer
             }
         };
         grid.AddChild(_atmosphere);
+        AddWaterFields(grid);
         AddDensityFields(grid);
         AddAppearanceFields(grid);
         layout.AddChild(grid);
@@ -530,6 +535,7 @@ public partial class SystemPanel : CanvasLayer
             $"(Earth: about {UnitText.Format(Quantity.Temperature, 15)}). Weather pins spread " +
             "it by latitude and season";
         _atmosphere.SetPressedNoSignal(body.HasAtmosphere);
+        ShowWater(body);
         ShowDensity(body);
         ShowAppearance(body);
 
@@ -918,6 +924,50 @@ public partial class SystemPanel : CanvasLayer
         // Leave the field first, or it keeps showing what was typed.
         _density.GetLineEdit().ReleaseFocus();
         Session?.SetDensity(Session.SelectedBodyId, null);
+    }
+
+    // Water (VISION.md BOD-09): a switch, and the level its surface is at.
+    private void AddWaterFields(GridContainer grid)
+    {
+        _waterLabel = new Label { Text = "Water" };
+        grid.AddChild(_waterLabel);
+        _waterRow = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _hasWater = new CheckBox { Text = "Has water", FocusMode = Control.FocusModeEnum.None };
+        _hasWater.Toggled += _ => CommitWater();
+        _waterRow.AddChild(_hasWater);
+        _waterLevel = CreateField(Body.MinWaterLevelMeters, Body.MaxWaterLevelMeters, 1, "",
+                CommitWater)
+            .WithUnit(Quantity.Length, Body.MinWaterLevelMeters, Body.MaxWaterLevelMeters, 1, 5);
+        _waterLevel.TooltipText = "The water's surface, as a height from the body's radius " +
+            "(0: sea level). Ground lower than this is under water";
+        _waterRow.AddChild(_waterLevel);
+        grid.AddChild(_waterRow);
+    }
+
+    private void CommitWater()
+    {
+        if (!_syncing && Session is not null)
+        {
+            ReportProblem(Session.SetWater(Session.SelectedBodyId, _hasWater.ButtonPressed
+                ? (int)Math.Round(_waterLevel.MetricValue())
+                : null));
+        }
+    }
+
+    // Shows the body's water, if it can have any: only globes draw it.
+    private void ShowWater(Body body)
+    {
+        _waterLabel.Visible = _waterRow.Visible = body.HasSurface;
+        _hasWater.SetPressedNoSignal(body.WaterLevelMeters is not null);
+        _waterLevel.ShowMetric(body.WaterLevelMeters ?? 0);
+        _waterLevel.Editable = body.WaterLevelMeters is not null;
+        DisabledTip.Apply(_hasWater,
+            "Fills everything lower than the water level with water, seen from orbit and " +
+            "from the ground, and lets you go under it when standing",
+            body.Shape == BodyShape.FlatDisc && body.WaterLevelMeters is null
+                ? "Flat worlds can't have water yet: they don't draw heights. Make it a globe " +
+                    "(Shape) to add water"
+                : null);
     }
 
     private void CommitTemperature()

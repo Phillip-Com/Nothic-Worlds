@@ -31,7 +31,7 @@ public static class TerrainNoise
     /// <param name="variationMeters">The type's variation (0 gives 0).</param>
     /// <param name="sizeKm">How far apart its biggest features are.</param>
     /// <param name="smallestKm">
-    /// The smallest features worth making (finer ones can't be drawn): about two grid cells.
+    /// The smallest features worth making (finer ones can't be drawn): a few grid cells.
     /// </param>
     /// <param name="seed">Gives each body and type its own features.</param>
     public static double Offset(Vector3D direction, double radiusKm, double variationMeters,
