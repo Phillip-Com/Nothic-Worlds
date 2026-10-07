@@ -17,6 +17,8 @@ public partial class PlanetSurface : MeshInstance3D
 {
     // Samples per calibration lookup table: about 0.09° of latitude and 0.18° of longitude
     // apart, blended smoothly by the GPU in between.
+    // At most this often (seconds), the averaged terrain copy is redone in new colors.
+    private const double FarRecolorSeconds = 0.25;
     private const int TableSamples = 2048;
 
     // The far-away copy of the terrain: each face averaged over FarBlock × FarBlock cells.
@@ -54,6 +56,11 @@ public partial class PlanetSurface : MeshInstance3D
     // the colors of the terrain codes.
     private Texture2DArray? _terrainTexture;
     private Texture2DArray? _farTexture;
+
+    // The averaged terrain copy is waiting to be redone in new colors, and how long since it
+    // last was.
+    private bool _farColorsStale;
+    private double _sinceFarRedone;
     private readonly byte[] _faceCells = new byte[TerrainGrid.CellsPerFace];
     private TerrainGrid _shownTerrain = TerrainGrid.Empty;
     private ImageTexture? _terrainPalette;
@@ -606,6 +613,17 @@ public partial class PlanetSurface : MeshInstance3D
     public void SetShapePreview(ShapeEdit? shape) => _carved?.ShowPreview(shape);
 
     /// <summary>
+    /// How far out the drawn ground is, in the globe's radii, as seen up close (first person):
+    /// as <see cref="SurfaceRadiusAt"/>, but with cliffs kept steep (see
+    /// <see cref="HeightGrid.SampleSteepAt"/>) on a body <paramref name="radiusKm"/> in radius.
+    /// </summary>
+    public float GroundRadiusAt(Vector3D direction, double radiusKm) =>
+        _shownHeights.IsEmpty || Shape == BodyShape.FlatDisc
+            ? 1.0f
+            : 1.0f + _reliefScale * (float)_shownHeights.SampleSteepAt(direction,
+                radiusKm * 1000 * Math.PI / 2 / HeightGrid.FaceSize);
+
+    /// <summary>
     /// How far out the drawn surface is at a direction, in the globe's radii: 1 on an unsculpted
     /// globe (or a flat world), more on a sculpted hill, less in a basin. Overlays sit on it.
     /// </summary>
@@ -639,15 +657,10 @@ public partial class PlanetSurface : MeshInstance3D
         }
 
         _paletteBytes = bytes;
-        if (_farTexture is not null)
-        {
-            // The averaged copy holds colors, so it's redone in the new ones.
-            for (int face = 0; face < CubeSphere.FaceCount; face++)
-            {
-                _shownTerrain.CopyFace(face, _faceCells);
-                _farTexture.UpdateLayer(FarFaceImage(), face);
-            }
-        }
+
+        // The averaged copy holds colors, so it's redone in the new ones: soon, not now, as
+        // redoing it for every step of a color being picked froze the app (see _Process).
+        _farColorsStale = true;
 
         Image image = Image.CreateFromData(byte.MaxValue + 1, 1, false, Image.Format.Rgba8, bytes);
         if (_terrainPalette is null)
@@ -658,6 +671,33 @@ public partial class PlanetSurface : MeshInstance3D
         else
         {
             _terrainPalette.Update(image);
+        }
+    }
+
+    public override void _Process(double delta)
+    {
+        _sinceFarRedone += delta;
+        if (_farColorsStale && _sinceFarRedone >= FarRecolorSeconds)
+        {
+            RedoFarColors();
+        }
+    }
+
+    // Redoes the averaged terrain copy in the current colors, on the faces with any painting
+    // (the rest are unpainted, which no color changes).
+    private void RedoFarColors()
+    {
+        _farColorsStale = false;
+        _sinceFarRedone = 0;
+        if (_farTexture is null)
+        {
+            return;
+        }
+
+        foreach (int face in _shownTerrain.FacesChangedFrom(TerrainGrid.Empty))
+        {
+            _shownTerrain.CopyFace(face, _faceCells);
+            _farTexture.UpdateLayer(FarFaceImage(), face);
         }
     }
 

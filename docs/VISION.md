@@ -108,7 +108,17 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 34: Polish Round Two** · In progress (owner's request, 2026-10-05; PRs #87–#90)
+**Milestone 35: Terrain Shapes the Ground** · In progress (owner's request, 2026-10-06; PR #91)
+Painting a terrain type raises or lowers the ground to that type's height, and where types
+meet, the heights merge from gentle slopes to sheer cliffs (`BOD-07`). Owner's decisions:
+- **Layered:** each terrain type gives the ground a base height, and sculpting adds on top;
+  changing a type's height later re-shapes everything painted with it, keeping the sculpting.
+- **Edges:** each type has an Edge setting from Gentle through Steep to Cliff; where two
+  types meet, the steeper edge wins.
+- **A per-world setting** in the Terrain panel, off for existing worlds; each type gets a
+  Height and an Edge. Save format version 29.
+
+**Milestone 34: Polish Round Two** · Complete (PR #90 merged 2026-10-06; owner's request, 2026-10-05; PRs #87–#90)
 Owner's requests after trying the app: ground detail up close, designed night skies, more map
 cutting shapes, grid snapping, a start screen and a way to launch without Godot, and tools that
 are easier to pick up. A run-through of every tool (2026-10-05) found them all working.
@@ -904,6 +914,27 @@ as realistic or simple.
 - Checked in the app on painted plains, desert, and mountains at midday and at night. The
   benchmark (orbit view) is unchanged: 154, 140, 153, 154 fps against `main`'s 157, 155, 151,
   156, back to back.
+- **After the owner's review (2026-10-06):**
+  - About a third stronger, as asked.
+  - Up close, the texture unit's coarse blending (about 1/256 steps) showed as rings and bands,
+    so the detail's noise is blended in the shader at full precision (`fine_noise`, eight
+    texel reads and a smooth curve).
+  - Its finer layers are turned (by three times a rotation, whose whole-number entries keep
+    the noise's repeat that the stay-put trick needs) so the lattice doesn't show as a grid.
+  - Each layer fades by how much ground a pixel covers, worked out from distance and angle,
+    so it's smooth across the mesh's triangles.
+- **Choosing where to stand** (owner's request, 2026-10-06): View ▸ Stand Here… now asks for a
+  click on the selected planet or moon (`FirstPersonMode.ChooseWhereToStand`, through
+  `PinPlacer` with its own prompt; Esc cancels), instead of standing at the middle of the
+  screen. On a flat world the click's map point becomes the spot on the top face.
+- **Moving fast** (owner's report: it seemed to lock up while flicking through speeds):
+  - At the fastest speeds the ground was rebuilt every frame, and each build took 33–50 ms.
+    The cause was `HeightGrid.IsEmpty`, which scanned the whole grid once for every one of the
+    patch's ~6,900 points; it's now worked out once per grid.
+  - The ground is also rebuilt at most ten times a second unless the eye gets well out
+    across it.
+  - The cloud deck is built only once the eye is above the clouds.
+  - Top speed went from about 12–21 frames a second to about 40.
 
 **REN-07 — Designed night skies** · Implemented (M34: PR #90) · Base
 **Intent:** Each world has its own fixed night sky that the user designs: the stars stay put
@@ -2077,6 +2108,100 @@ built from both. Heights come first (M24), shapes next.
   through the dropdown, a color change and its undo, a new moon grey and rocky, the Sun as a red
   dwarf (its color and light), and save/reopen. Benchmark (baseline laptop): the default world
   unchanged against `main` (~194 fps); the same world plain ~179 fps against patterned ~174.
+
+**BOD-07 — Terrain shapes the ground** · Implemented (M35: PR #91) · Base
+**Intent:** Terrain painting and sculpting work together: painting a type (a mountain range,
+an ocean) raises or lowers the ground to that type's default height, custom types set their
+own, and where different types meet the heights merge, anything from a smooth slope to a
+sheer cliff, so the world looks real without sculpting every slope by hand (owner's request,
+2026-10-06).
+**Implementation (M35, PR #91):**
+- **Model:**
+  - Each `TerrainType` gains `HeightMeters` (−12,000 to 12,000) and `Edge` (0 gentle to 1
+    cliff). The defaults: Ocean −3,000 m, Shallow Water −150, Plains and Fields 150, Forest
+    300, Jungle 200, Hills 800, Mountains 2,500 (steep), Desert 400, Swamp 20, Tundra 300, Ice
+    1,000.
+  - `World.TerrainShapesGround` (off by default, for new worlds too).
+  - Format **version 29**. Older worlds keep it off, and their types named like the defaults
+    get the default heights.
+- **`TerrainRelief`** (Core) works out the ground the painting shapes, a 64-cell tile at a
+  time, reading the codes 13 cells around it (across a face's edge, from the next face):
+  - A two-sweep chamfer distance transform finds each cell's distance to the nearest other
+    type, through cells of its own type, and which type that is.
+  - Each cell eases from halfway between the two heights (at the line between them) to its
+    own height over half the transition width, `24 × (1 − e)²` cells for the steeper edge
+    `e`. A cliff (`e` = 1) jumps.
+  - Tiles with nothing painted near them are skipped.
+  - A paint stroke re-works only the tiles near it (`Update`): about 10–20 ms. A whole
+    planet takes 2–700 ms, depending on how much is painted.
+  - `Shaped` adds the sculpting on top, sharing tiles where one side is flat. Only the
+    sculpting is saved.
+- **Sculpting on shaped ground:** Raise and Lower are unchanged. `HeightGrid.Flatten` and
+  `Smooth` take the ground underneath, so they level and smooth what's seen. `HeightAt` (the
+  Flatten target and shapes' depth) is the ground seen.
+- **App:**
+  - `WorldSession` keeps each body's shaped ground, keyed by its painting and the types'
+    codes, heights, and edges (a new name or color re-works nothing).
+  - `ShowTerrain` sends the globe the shaped ground with the sculpting on top. First person,
+    shapes, and carving use it.
+  - The switch is part of undo (`LoreState`).
+  - **Terrain panel:** a **Terrain shapes the ground** switch over the types, and each type's
+    **Height** (in m or ft) and **Edge** (a slider, named Gentle, Moderate, Steep, Very
+    steep, or Cliff, applied when the drag ends).
+  - The paint hint says the ground follows the type when it's on. A note under Height and
+    Edge says they apply once the switch is on.
+- Tests (26 new): uniform areas, cliffs that jump in one cell, gentle slopes rising smoothly
+  through halfway, the steeper edge winning, continuity over a cube face's edge, stroke
+  updates matching a full re-work, sculpting added and clamped, Flatten levelling the ground
+  seen, and the version 29 golden file with its upgrade and refusals.
+- **Verified in the app** (behind the owner's windows):
+  - switched on by a click; painting plains, then mountains, gave 2,500 m in the middle;
+  - a cliff edge gave 150, 150, 150, 2,058 (between two cells), 2,500 across the line;
+  - Mountains made a raised plateau with its walls seen from orbit at 50× relief;
+  - four undos turned it off and flattened the ground, and four redos brought it back;
+  - save and reload kept the switch and the edge.
+- **After the owner's review (2026-10-06):**
+  - **Standing shows true heights** (owner's choice). First person sets View ▸ Relief to
+    1× while standing and puts the chosen exaggeration back on leaving.
+  - **Erase returns the ground to 0** (owner's choice). That's what unpainted ground already
+    was, so nothing changed.
+  - **Cliffs stand up close.** Blending heights evenly between grid cells made even a
+    one-cell cliff a slope a whole cell wide (about 10 km, ~14°, on an Earth-sized world).
+    The ground around a first-person eye now reads `HeightGrid.SampleSteepAt`
+    (`PlanetSurface.GroundRadiusAt`). Where two cells differ by more than a natural slope
+    (about 7°), the change is squeezed toward the line between them, by up to 40 times as it
+    grows: a 2,350 m step becomes a sheer wall, and ordinary slopes are unchanged. Seen from
+    3 km, a 2,500 m cliff stands as a wall with a ragged top.
+- **Second review (2026-10-06):**
+  - **The brush "stopped working" after editing a type.** With the switch on, every edit to
+    a type (each keystroke of its name, each step of a color being picked) made the ground
+    seen afresh as all-new tiles, so the globe re-sent all six faces of heights.
+    - `TerrainRelief.Shaped` now takes what it made before and shares every tile where
+      neither side changed; the session keeps each body's last one.
+    - A type's height or edge re-works only the tiles near ground painted with it
+      (`TerrainRelief.Rework`).
+    - Recoloring also re-made the averaged terrain copy of all six faces every step, which
+      was there before this milestone. Now it's done at most four times a second and only
+      on faces with paint (`PlanetSurface.RedoFarColors`).
+    - While a stroke paints, the ground goes to the globe at most twice a second and when
+      the stroke ends (`ShowPainting`).
+    - Ten recolors went from 2.4 s to 16 ms, and a paint step on a sculpted world from
+      276 ms to 62 ms (outside a stroke).
+  - **Flying keeps its height above the planet's radius**, not the ground (owner's
+    request), so a cliff passing underneath doesn't drop the eye; the ground only pushes it
+    up where it rises higher. Descending stops at the ground. In the app, flying north at
+    1,000 m kept 1,000 m: 600 m over the plains, then lifted over the 2,650 m plateau.
+    Flat worlds, being flat, keep their height above the face.
+  - **No more seeing through the ground.**
+    - The eye is kept above the highest corner of the ground mesh's cell under it
+      (`FirstPersonGround.HighestAround`): the mesh is flat between its points, so on curves
+      and steps it stood above the ground's own height.
+    - The ground is rebuilt before the eye is placed, not after, so the eye is never
+      measured against an old mesh.
+    - The near clipping distance is a tenth of the eye's height (17 cm standing), not
+      0.3, so a wall in front isn't cut away; the view still reaches 170 km.
+    - Walking into a cliff for 240 frames, the eye never came within 1.7 m of the drawn
+      ground.
 
 ### 4.5 Orbits & Simulation (`SIM`)
 

@@ -50,16 +50,27 @@ public sealed class HeightGrid
     // The highest cell, worked out the first time it's asked for (the grid never changes).
     private short? _highest;
 
+    // Worked out once (the grid never changes): asking was a scan of every tile, and the ground
+    // around a first-person eye asks for each of its thousands of points.
+    private bool? _isEmpty;
+
     private HeightGrid(short[]?[] tiles)
     {
         _tiles = tiles;
     }
 
+    // A grid from tiles (null for all zero), for TerrainRelief: the arrays are kept, not copied,
+    // so they must never change afterwards.
+    internal static HeightGrid FromTiles(short[]?[] tiles) => new(tiles);
+
+    // A tile's heights (null if all zero), for TerrainRelief. Never change the array.
+    internal short[]? Tile(int index) => _tiles[index];
+
     /// <summary>A grid with nothing sculpted: every cell at height 0.</summary>
     public static HeightGrid Empty { get; } = new(new short[]?[TileCount]);
 
     /// <summary>True if nothing is sculpted.</summary>
-    public bool IsEmpty => Array.TrueForAll(_tiles, tile => tile is null);
+    public bool IsEmpty => _isEmpty ??= Array.TrueForAll(_tiles, tile => tile is null);
 
     /// <summary>A cell's height, in meters above the body's radius.</summary>
     /// <exception cref="ArgumentOutOfRangeException">The cell isn't on the grid.</exception>
@@ -99,6 +110,49 @@ public sealed class HeightGrid
         double lower = Height(cell.Face, left, top + 1) * (1 - fx)
             + Height(cell.Face, left + 1, top + 1) * fx;
         return upper * (1 - fy) + lower * fy;
+    }
+
+    /// <summary>
+    /// The height where a direction meets the surface as <see cref="SampleAt"/> gives it, but
+    /// with steep steps between neighboring cells kept steep: blending evenly between cells
+    /// turns even a one-cell cliff into a slope a whole cell wide (about 10 km on an
+    /// Earth-sized world). For the ground seen up close (VISION.md BOD-07, REN-06): where two
+    /// cells differ by more than a natural slope, the change is squeezed toward the line
+    /// between them, the more so the bigger it is, so a cliff stands up as a wall while
+    /// ordinary slopes are drawn as before.
+    /// </summary>
+    /// <param name="direction">Where, from the body's center.</param>
+    /// <param name="metersPerCell">How wide a cell is on this body, in meters.</param>
+    /// <exception cref="ArgumentException">The direction is zero-length or not finite.</exception>
+    public double SampleSteepAt(Vector3D direction, double metersPerCell)
+    {
+        CubeCell cell = CubeSphere.CellAt(direction, FaceSize);
+        (double across, double down) = CubeSphere.FacePosition(cell.Face, direction);
+        double x = Math.Clamp(across * FaceSize - 0.5, 0, FaceSize - 1);
+        double y = Math.Clamp(down * FaceSize - 0.5, 0, FaceSize - 1);
+        int left = Math.Min((int)x, FaceSize - 2);
+        int top = Math.Min((int)y, FaceSize - 2);
+        double topLeft = Height(cell.Face, left, top);
+        double topRight = Height(cell.Face, left + 1, top);
+        double bottomLeft = Height(cell.Face, left, top + 1);
+        double bottomRight = Height(cell.Face, left + 1, top + 1);
+        double fx = Squeezed(x - left, Math.Max(Math.Abs(topRight - topLeft),
+            Math.Abs(bottomRight - bottomLeft)) / metersPerCell);
+        double fy = Squeezed(y - top, Math.Max(Math.Abs(bottomLeft - topLeft),
+            Math.Abs(bottomRight - topRight)) / metersPerCell);
+        double upper = topLeft * (1 - fx) + topRight * fx;
+        double lower = bottomLeft * (1 - fx) + bottomRight * fx;
+        return upper * (1 - fy) + lower * fy;
+    }
+
+    // How far across a cell's blend to be, with the blend squeezed toward the middle by how
+    // much steeper than a natural slope (about 7°) the step between the cells is: not at all
+    // for ordinary slopes, up to 40 times for the biggest cliffs.
+    private static double Squeezed(double fraction, double slope)
+    {
+        const double naturalSlope = 0.12;
+        double squeeze = Math.Clamp(Math.Pow(slope / naturalSlope, 3), 1, 40);
+        return Math.Clamp((fraction - 0.5) * squeeze + 0.5, 0, 1);
     }
 
     /// <summary>The highest cell, in meters (0 if nothing is raised).</summary>
@@ -148,13 +202,24 @@ public sealed class HeightGrid
     /// <summary>
     /// Levels the ground along a stroke through <paramref name="path"/>'s points.
     /// </summary>
+    /// <param name="path">The stroke's points, in order.</param>
+    /// <param name="radiusDegrees">The brush's radius, in degrees of arc.</param>
+    /// <param name="targetMeters">The height to level the ground to.</param>
+    /// <param name="amount">How far (0 to 1) to go, at the stroke's middle.</param>
+    /// <param name="under">
+    /// Heights this grid sits on (terrain that shapes the ground, VISION.md BOD-07), so the
+    /// ground seen, both together, is what's levelled; null for none.
+    /// </param>
     public HeightGrid Flatten(IReadOnlyList<Vector3D> path, double radiusDegrees,
-        double targetMeters, double amount)
+        double targetMeters, double amount, HeightGrid? under = null)
     {
         RequireFinite(targetMeters, nameof(targetMeters));
         RequireAmount(amount);
-        return Sculpt(path, radiusDegrees, (_, _, _, height, weight) =>
-            height + (targetMeters - height) * amount * weight);
+        return Sculpt(path, radiusDegrees, (face, column, row, height, weight) =>
+        {
+            double goal = targetMeters - (under?.HeightAt(new CubeCell(face, column, row)) ?? 0);
+            return height + (goal - height) * amount * weight;
+        });
     }
 
     /// <summary>
@@ -168,15 +233,26 @@ public sealed class HeightGrid
     public HeightGrid Smooth(Vector3D from, Vector3D to, double radiusDegrees, double amount) =>
         Smooth([from, to], radiusDegrees, amount);
 
-    /// <summary>Evens out bumps along a stroke through <paramref name="path"/>'s points.</summary>
-    public HeightGrid Smooth(IReadOnlyList<Vector3D> path, double radiusDegrees, double amount)
+    /// <summary>
+    /// Evens out bumps along a stroke through <paramref name="path"/>'s points. With
+    /// <paramref name="under"/> (see <see cref="Flatten(IReadOnlyList{Vector3D}, double,
+    /// double, double, HeightGrid?)"/>), the ground seen, both grids together, is evened out.
+    /// </summary>
+    public HeightGrid Smooth(IReadOnlyList<Vector3D> path, double radiusDegrees, double amount,
+        HeightGrid? under = null)
     {
         RequireAmount(amount);
         double cellDegrees = 90.0 / FaceSize;
         int reach = (int)Math.Clamp(Math.Round(radiusDegrees * SmoothingReach / cellDegrees),
             1, MaxSmoothingCells);
         return Sculpt(path, radiusDegrees, (face, column, row, height, weight) =>
-            height + (Average(face, column, row, reach) - height) * amount * weight);
+        {
+            // The average of both together, less what's underneath here.
+            double goal = Average(face, column, row, reach) + (under is null ? 0
+                : under.Average(face, column, row, reach)
+                    - under.HeightAt(new CubeCell(face, column, row)));
+            return height + (goal - height) * amount * weight;
+        });
     }
 
     /// <summary>True if both grids have the same height in every cell.</summary>

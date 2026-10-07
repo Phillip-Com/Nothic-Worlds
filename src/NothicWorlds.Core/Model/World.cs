@@ -89,6 +89,13 @@ public sealed class World
     public List<Constellation> Constellations { get; } = [];
 
     /// <summary>
+    /// Whether painted terrain shapes the ground (VISION.md BOD-07): each type sets the ground
+    /// to its height, with sculpting on top (see <see cref="TerrainRelief"/>). Off unless
+    /// turned on.
+    /// </summary>
+    public bool TerrainShapesGround { get; set; }
+
+    /// <summary>
     /// Where the camera was looking when the world was saved, or null for the default.
     /// </summary>
     public CameraView? View { get; set; }
@@ -112,6 +119,7 @@ public sealed class World
             TimeDays = TimeDays,
             Style = Style,
             StarSeed = StarSeed,
+            TerrainShapesGround = TerrainShapesGround,
         };
         copy.Bodies.AddRange(Bodies.Select(body => body.Clone()));
 

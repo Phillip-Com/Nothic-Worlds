@@ -161,6 +161,12 @@ uniform float ground_radius_meters = 6371000.0;
 // The detail's coarsest noise is this many meters across.
 const float GROUND_DETAIL_METERS = 4.0;
 
+// Two turns for the detail's noise layers, each three times a rotation. Their whole-number
+// entries keep the noise repeating as it must (see ground_detail_origin), which any other
+// rotation would break, making the detail jump each time the ground is rebuilt.
+const mat3 DETAIL_TURN_A = mat3(vec3(2.0, -2.0, 1.0), vec3(2.0, 1.0, -2.0), vec3(1.0, 2.0, 2.0));
+const mat3 DETAIL_TURN_B = mat3(vec3(1.0, 2.0, 2.0), vec3(2.0, 1.0, -2.0), vec3(2.0, -2.0, 1.0));
+
 // On a flat world's top face, distance from the center is the angle from the north pole (the
 // disc's radius is PI), so a point maps back to the globe direction it stands for. Must match
 // FlatDisc in Core.
@@ -736,39 +742,64 @@ vec4 ground_kinds(vec3 color) {
 	return vec4(grass, sand, snow, water);
 }
 
+// Smooth noise like value_noise, but blended here at full precision with a gentle curve:
+// the texture unit blends in steps of about 1/256, which seen up close (one noise cell across
+// much of the screen) showed as rings and bands, worst in the bumps' shading.
+float fine_noise(vec3 p) {
+	vec3 cell = floor(p);
+	vec3 f = p - cell;
+	f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+	ivec3 c = ivec3(mod(cell, float(PATTERN_NOISE_SIZE)));
+	ivec3 n = (c + 1) % PATTERN_NOISE_SIZE;
+	float c000 = texelFetch(pattern_noise, ivec3(c.x, c.y, c.z), 0).r;
+	float c100 = texelFetch(pattern_noise, ivec3(n.x, c.y, c.z), 0).r;
+	float c010 = texelFetch(pattern_noise, ivec3(c.x, n.y, c.z), 0).r;
+	float c110 = texelFetch(pattern_noise, ivec3(n.x, n.y, c.z), 0).r;
+	float c001 = texelFetch(pattern_noise, ivec3(c.x, c.y, n.z), 0).r;
+	float c101 = texelFetch(pattern_noise, ivec3(n.x, c.y, n.z), 0).r;
+	float c011 = texelFetch(pattern_noise, ivec3(c.x, n.y, n.z), 0).r;
+	float c111 = texelFetch(pattern_noise, ivec3(n.x, n.y, n.z), 0).r;
+	return mix(mix(mix(c000, c100, f.x), mix(c010, c110, f.x), f.y),
+		mix(mix(c001, c101, f.x), mix(c011, c111, f.x), f.y), f.z);
+}
+
 // A noise layer's value, faded to its middle where it's finer than a pixel covers (`footprint`:
 // noise units per pixel), so it never shimmers.
 float detail_layer(vec3 q, float footprint) {
-	return mix(0.5, value_noise(q), 1.0 - smoothstep(0.25, 0.6, footprint));
+	float shown = 1.0 - smoothstep(0.25, 0.6, footprint);
+	return shown > 0.0 ? mix(0.5, fine_noise(q), shown) : 0.5;
 }
 
 // Fine texture and small bumps underfoot (VISION.md REN-06, owner's choice), matched to the
 // kind of ground: noise about 4 m, 1 m, and 25 cm across, each fading out once a pixel covers
-// more than it, so the detail is sharp by the feet and gone where it would only shimmer.
+// more than it (`meters_per_pixel`, worked out from distance and angle so it's smooth across
+// the mesh's triangles), so the detail is sharp by the feet and gone where it would shimmer.
 // Changes the color and returns the bump height in meters (the caller shades by it).
-float ground_detail(inout vec3 color) {
+float ground_detail(inout vec3 color, float meters_per_pixel) {
 	vec3 q = ground_offset * ground_radius_meters / GROUND_DETAIL_METERS + ground_detail_origin;
-	float footprint = length(fwidth(q));
+	float footprint = meters_per_pixel / GROUND_DETAIL_METERS;
 	if (footprint > 0.6) {
 		return 0.0;
 	}
 
+	// The finer layers are turned different ways, so the noise's square lattice doesn't line
+	// up into a visible grid (each turn is three times a rotation, about 3 and 15 times finer).
 	float broad = detail_layer(q, footprint);
-	float medium = detail_layer(q * 4.0, footprint * 4.0);
-	float grain = detail_layer(q * 16.0, footprint * 16.0);
+	float medium = detail_layer(DETAIL_TURN_A * q, footprint * 3.0);
+	float grain = detail_layer(DETAIL_TURN_B * q * 5.0 + 5.7, footprint * 15.0);
 	vec4 kinds = ground_kinds(color);
 	float rock = clamp(1.0 - kinds.x - kinds.y - kinds.z - kinds.w, 0.0, 1.0);
 
 	// Tufts and blades in grass, a fine grain in sand, gentle drifts in snow, mottling on
 	// rock and soil, and almost nothing on water.
-	float shade = kinds.x * (0.3 * (medium - 0.5) + 0.45 * (grain - 0.5))
-		+ kinds.y * (0.2 * (grain - 0.5) + 0.08 * (broad - 0.5))
-		+ kinds.z * 0.06 * (broad - 0.5)
-		+ rock * (0.3 * (broad - 0.5) + 0.25 * (medium - 0.5) + 0.25 * (grain - 0.5))
-		+ kinds.w * 0.03 * (medium - 0.5);
+	float shade = kinds.x * (0.4 * (medium - 0.5) + 0.6 * (grain - 0.5))
+		+ kinds.y * (0.28 * (grain - 0.5) + 0.12 * (broad - 0.5))
+		+ kinds.z * 0.09 * (broad - 0.5)
+		+ rock * (0.4 * (broad - 0.5) + 0.35 * (medium - 0.5) + 0.35 * (grain - 0.5))
+		+ kinds.w * 0.04 * (medium - 0.5);
 	color *= 1.0 + shade;
 
-	float bumps = kinds.x * 0.1 + kinds.y * 0.06 + kinds.z * 0.12 + rock * 0.35;
+	float bumps = kinds.x * 0.14 + kinds.y * 0.08 + kinds.z * 0.16 + rock * 0.45;
 	return bumps * (0.6 * broad + 0.3 * medium + 0.1 * grain);
 }
 
@@ -844,7 +875,12 @@ void fragment() {
 	// The bump underfoot, in meters (first-person ground only).
 	float bump_meters = 0.0;
 	if (eye_level_ground > 0.5) {
-		bump_meters = ground_detail(color);
+		// How much ground a pixel covers: its width at that distance, stretched where the
+		// ground is seen edge-on.
+		float meters_away = length(VERTEX) / length(MODEL_MATRIX[0].xyz) * ground_radius_meters;
+		float facing = max(abs(dot(normalize(VERTEX), normalize(NORMAL))), 0.1);
+		float pixel_size = 2.0 / (PROJECTION_MATRIX[1][1] * VIEWPORT_SIZE.y);
+		bump_meters = ground_detail(color, meters_away * pixel_size / facing);
 	}
 
 	ALBEDO = color;
@@ -874,7 +910,7 @@ void fragment() {
 		vec3 tilted = bumped(normal, bump_meters);
 		float flat_light = max(dot(normal, sun_direction), 0.0) + 0.15;
 		float bump_light = max(dot(tilted, sun_direction), 0.0) + 0.15;
-		ALBEDO *= clamp(bump_light / flat_light, 0.7, 1.35);
+		ALBEDO *= clamp(bump_light / flat_light, 0.6, 1.45);
 	}
 
 #ifdef STYLED

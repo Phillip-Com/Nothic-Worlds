@@ -5,9 +5,28 @@ using NothicWorlds.Rendering;
 namespace NothicWorlds.Session;
 
 // The terrain part of the open world (VISION.md BOD-05): the world's terrain types and the
-// terrain painted on planets and moons, all undoable.
+// terrain painted on planets and moons, all undoable; and the ground the terrain shapes, when
+// that's on (BOD-07).
 public partial class WorldSession
 {
+    // Each body's ground as its terrain shapes it, kept with the painting and the types'
+    // heights and edges it came from, so a paint stroke re-works only the tiles near it and a
+    // new name or color re-works nothing.
+    private readonly Dictionary<Guid, (TerrainGrid Terrain, TerrainType[] Types, HeightGrid Ground)>
+        _terrainGround = [];
+
+    // Each body's ground seen (terrain and sculpting together), kept with what it came from, so
+    // the next can share every tile that didn't change and the globe redraws only what did:
+    // making it afresh each time redrew the whole globe on every keystroke and brush move.
+    private readonly Dictionary<Guid, (HeightGrid Base, HeightGrid Sculpted, HeightGrid Shaped)>
+        _shownGround = [];
+
+    // While a stroke paints, when each body's ground last went to its globe, and the bodies
+    // whose newest ground hasn't yet (see ShowPainting).
+    private const double ReshapeSeconds = 0.5;
+    private readonly Dictionary<Guid, ulong> _reshapedAt = [];
+    private readonly HashSet<Guid> _reshapeWaiting = [];
+
     // Colors offered in turn for new terrain types: distinct from the defaults.
     private static readonly RgbColor[] _newTerrainColors =
     [
@@ -20,6 +39,25 @@ public partial class WorldSession
 
     /// <summary>The world's terrain types, in list order.</summary>
     public IReadOnlyList<TerrainType> TerrainTypes => World.TerrainTypes;
+
+    /// <summary>
+    /// Whether painted terrain shapes the ground (VISION.md BOD-07): each type's height, with
+    /// sculpting on top.
+    /// </summary>
+    public bool TerrainShapesGround => World.TerrainShapesGround;
+
+    /// <summary>Turns terrain shaping the ground on or off (one undo step).</summary>
+    public void SetTerrainShapesGround(bool on)
+    {
+        if (on == World.TerrainShapesGround)
+        {
+            return;
+        }
+
+        RecordUndo(on ? "Let Terrain Shape the Ground" : "Stop Terrain Shaping the Ground");
+        World.TerrainShapesGround = on;
+        TerrainTypesChanged();
+    }
 
     /// <summary>
     /// Adds a terrain type with a default name and the next color in turn, at the end of the
@@ -124,7 +162,7 @@ public partial class WorldSession
 
         RecordUndo(code == 0 ? "Erase Terrain" : "Paint Terrain");
         body.Surface.Terrain = painted;
-        ShowTerrain(body);
+        ShowPainting(body);
         MarkChanged(systemChanged: false);
     }
 
@@ -160,12 +198,13 @@ public partial class WorldSession
 
         Body body = SelectedBody;
         Vector3D[] points = [.. path.Select(SphericalPolygon.ToUnit)];
+        HeightGrid under = TerrainGround(body);  // So the ground seen is levelled and smoothed
         HeightGrid sculpted = tool switch
         {
             SculptTool.Raise => before.Raise(points, radiusDegrees, strength),
             SculptTool.Lower => before.Raise(points, radiusDegrees, -strength),
-            SculptTool.Smooth => before.Smooth(points, radiusDegrees, strength),
-            _ => before.Flatten(points, radiusDegrees, flattenTo, strength),
+            SculptTool.Smooth => before.Smooth(points, radiusDegrees, strength, under),
+            _ => before.Flatten(points, radiusDegrees, flattenTo, strength, under),
         };
         if (sculpted.HasSameCells(body.Surface.Heights))
         {
@@ -178,15 +217,64 @@ public partial class WorldSession
         MarkChanged(systemChanged: false);
     }
 
-    /// <summary>The sculpted height at a spot on the selected body, in meters.</summary>
-    public double HeightAt(GeoCoordinate spot) =>
-        SelectedBody.Surface.Heights.SampleAt(SphericalPolygon.ToUnit(spot));
+    /// <summary>
+    /// The ground's height at a spot on the selected body, in meters: what's sculpted, on the
+    /// ground the terrain shapes when that's on.
+    /// </summary>
+    public double HeightAt(GeoCoordinate spot)
+    {
+        Vector3D direction = SphericalPolygon.ToUnit(spot);
+        return TerrainGround(SelectedBody).SampleAt(direction)
+            + SelectedBody.Surface.Heights.SampleAt(direction);
+    }
 
     /// <summary>The terrain type painted at a spot on the selected body, or null.</summary>
     public TerrainType? TerrainAt(GeoCoordinate spot)
     {
         byte code = SelectedBody.Surface.Terrain.CodeAt(SphericalPolygon.ToUnit(spot));
         return World.TerrainTypes.Find(type => type.Code == code);
+    }
+
+    // Shows a stroke's painting straight away. When the terrain shapes the ground, the ground
+    // goes to the globe at most every ReshapeSeconds during the stroke, and when it ends:
+    // sending heights redraws a whole face of the globe (about a tenth of a second), which
+    // on every brush move made painting stall.
+    private void ShowPainting(Body body)
+    {
+        if (!World.TerrainShapesGround || _gesture is null
+            || System?.SurfaceFor(body.Id) is not PlanetSurface surface)
+        {
+            ShowTerrain(body);
+            return;
+        }
+
+        surface.SetTerrain(body.Surface.Terrain);
+        ulong now = Godot.Time.GetTicksMsec();
+        _reshapedAt.TryGetValue(body.Id, out ulong last);
+        if (now - last >= ReshapeSeconds * 1000)
+        {
+            surface.SetHeights(ShownGround(body));
+            _reshapedAt[body.Id] = now;
+            _reshapeWaiting.Remove(body.Id);
+        }
+        else
+        {
+            _reshapeWaiting.Add(body.Id);
+        }
+    }
+
+    // Sends the ground of bodies painted since it was last sent, as a stroke ends.
+    private void ShowWaitingGround()
+    {
+        foreach (Guid id in _reshapeWaiting.ToList())
+        {
+            if (FindBody(id) is Body body)
+            {
+                ShowTerrain(body);
+            }
+        }
+
+        _reshapeWaiting.Clear();
     }
 
     // Sends a body's terrain, and the colors to draw it in, to its globe.
@@ -196,10 +284,74 @@ public partial class WorldSession
         {
             surface.SetTerrainColors(World.TerrainTypes);
             surface.SetTerrain(body.Surface.Terrain);
-            surface.SetHeights(body.Surface.Heights);
+            surface.SetHeights(ShownGround(body));
+            _reshapeWaiting.Remove(body.Id);
             surface.SetShapes(body.Surface.Shapes, body.RadiusKm);
         }
     }
+
+    // The ground a body's terrain shapes, or none when that's off (or it's a flat world, which
+    // doesn't draw heights).
+    private HeightGrid TerrainGround(Body body)
+    {
+        if (!World.TerrainShapesGround || !body.HasSurface || body.Shape != BodyShape.Sphere)
+        {
+            return HeightGrid.Empty;
+        }
+
+        TerrainGrid terrain = body.Surface.Terrain;
+        TerrainType[] types = [.. World.TerrainTypes];
+        if (_terrainGround.TryGetValue(body.Id, out var known))
+        {
+            if (SameShaping(known.Types, types))
+            {
+                if (ReferenceEquals(known.Terrain, terrain))
+                {
+                    return known.Ground;
+                }
+
+                HeightGrid updated =
+                    TerrainRelief.Update(known.Ground, known.Terrain, terrain, types);
+                _terrainGround[body.Id] = (terrain, types, updated);
+                return updated;
+            }
+
+            if (ReferenceEquals(known.Terrain, terrain))
+            {
+                // A type's height or edge changed: only the ground near it is re-worked.
+                HeightGrid reworked =
+                    TerrainRelief.Rework(known.Ground, terrain, known.Types, types);
+                _terrainGround[body.Id] = (terrain, types, reworked);
+                return reworked;
+            }
+        }
+
+        HeightGrid ground = TerrainRelief.BaseHeights(terrain, types);
+        _terrainGround[body.Id] = (terrain, types, ground);
+        return ground;
+    }
+
+    // The ground a body shows: its sculpting, on the ground its terrain shapes when that's on.
+    private HeightGrid ShownGround(Body body)
+    {
+        HeightGrid under = TerrainGround(body), sculpted = body.Surface.Heights;
+        _shownGround.TryGetValue(body.Id, out var before);
+        if (before.Shaped is not null && ReferenceEquals(before.Base, under)
+            && ReferenceEquals(before.Sculpted, sculpted))
+        {
+            return before.Shaped;
+        }
+
+        HeightGrid shown = TerrainRelief.Shaped(under, sculpted,
+            before.Shaped is null ? null : before);
+        _shownGround[body.Id] = (under, sculpted, shown);
+        return shown;
+    }
+
+    // Whether two lists of types shape the ground the same (names and colors don't matter).
+    private static bool SameShaping(TerrainType[] a, TerrainType[] b) =>
+        a.Select(t => (t.Code, t.HeightMeters, t.Edge))
+            .SequenceEqual(b.Select(t => (t.Code, t.HeightMeters, t.Edge)));
 
     private void TerrainTypesChanged()
     {

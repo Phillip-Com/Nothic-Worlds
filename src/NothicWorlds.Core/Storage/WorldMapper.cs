@@ -45,6 +45,7 @@ internal static class WorldMapper
                     SecondColor = nebula.SecondColor.ToHex(),
                 })],
             StarSeed = world.StarSeed,
+            TerrainShapesGround = world.TerrainShapesGround ? true : null,
             Constellations = NullIfEmpty(world.Constellations.Select(c =>
                 (ConstellationDocument?)new ConstellationDocument
                 {
@@ -78,6 +79,7 @@ internal static class WorldMapper
             View = document.View is null ? null : ToView(document.View),
             TimeDays = document.TimeDays ?? 0,
             StarSeed = document.StarSeed,
+            TerrainShapesGround = document.TerrainShapesGround ?? false,
             Style = document.Style is null
                 ? VisualStyle.Painterly
                 : WorldFormat.ParseStyle(document.Style),
@@ -123,6 +125,8 @@ internal static class WorldMapper
             Name = type.Name,
             Color = type.Color.ToHex(),
             Climate = WorldFormat.ClimateName(type.Climate),
+            Height = type.HeightMeters == 0 ? null : type.HeightMeters,
+            Edge = type.Edge == 0 ? null : type.Edge,
         };
     }
 
@@ -135,7 +139,8 @@ internal static class WorldMapper
         Require(RgbColor.TryParseHex(document.Color, out RgbColor color),
             $"invalid terrain color '{document.Color}'");
         return new TerrainType((byte)document.Code, document.Name ?? "", color,
-            WorldFormat.ParseClimate(document.Climate));
+            WorldFormat.ParseClimate(document.Climate), document.Height ?? 0,
+            document.Edge ?? 0);
     }
 
     private static WeatherPinDocument ToDocument(WeatherPin pin)

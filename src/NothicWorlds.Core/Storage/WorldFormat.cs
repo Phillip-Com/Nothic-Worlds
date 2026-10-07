@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 28;
+    public const int CurrentVersion = 29;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -244,7 +244,32 @@ internal static partial class WorldFormat
         // night skies). Older worlds get a seed made from their id, so each keeps one fixed
         // sky, and have no constellations.
         AddStarSeed,
+
+        // 28 → 29: terrain types gained a "height" and an "edge", and worlds an optional
+        // "terrainShapesGround" (M35, terrain shapes the ground). Older worlds don't shape
+        // their ground (a missing value is off); their types named like the defaults get the
+        // default heights and edges, the rest stay level and gentle, ready for when it's on.
+        AddTerrainHeights,
     ];
+
+    // The heights and edges the version 29 upgrade gives types by name. Deliberately a copy,
+    // like _version12Climates, so later changes to the defaults can't change old upgrades.
+    private static readonly Dictionary<string, (int Height, double Edge)> _version29Heights =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Ocean"] = (-3_000, 0.3),
+            ["Shallow Water"] = (-150, 0),
+            ["Plains"] = (150, 0),
+            ["Fields"] = (150, 0),
+            ["Forest"] = (300, 0),
+            ["Jungle"] = (200, 0),
+            ["Hills"] = (800, 0.15),
+            ["Mountains"] = (2_500, 0.5),
+            ["Desert"] = (400, 0),
+            ["Swamp"] = (20, 0),
+            ["Tundra"] = (300, 0),
+            ["Ice"] = (1_000, 0.3),
+        };
 
     // The climates the version 12 upgrade gives types by name. Deliberately a copy, like
     // _version10TerrainTypes, so later changes to the defaults can't change old upgrades.
@@ -319,6 +344,26 @@ internal static partial class WorldFormat
                     "moon" => new JsonObject { ["color"] = "#8A8A8A", ["pattern"] = "rocky" },
                     _ => new JsonObject { ["color"] = "#214573", ["pattern"] = "plain" },
                 };
+            }
+        }
+
+        return document;
+    }
+
+    private static JsonObject AddTerrainHeights(JsonObject document)
+    {
+        if (document["terrainTypes"] is JsonArray types)
+        {
+            foreach (JsonObject type in types.OfType<JsonObject>())
+            {
+                string? name = type["name"]?.GetValueKind() == System.Text.Json.JsonValueKind.String
+                    ? type["name"]!.GetValue<string>().Trim()
+                    : null;
+                if (name is not null && _version29Heights.TryGetValue(name, out var look))
+                {
+                    type["height"] ??= look.Height;
+                    type["edge"] ??= look.Edge;
+                }
             }
         }
 

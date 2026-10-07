@@ -1552,6 +1552,8 @@ public partial class WorldSession : Node
             ForgetUnusedTextures();
         }
 
+        ShowWaitingGround();
+
         Changed?.Invoke();
     }
 
@@ -2164,6 +2166,8 @@ public partial class WorldSession : Node
 
     private void CloseCurrentWorld()
     {
+        _terrainGround.Clear();
+        _shownGround.Clear();
         Physics.Stop();
         WorldClosed?.Invoke(World.Id);
     }

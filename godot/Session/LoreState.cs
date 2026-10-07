@@ -21,6 +21,7 @@ internal sealed record LoreState(
     IReadOnlyList<Nebula> Nebulas,
     int StarSeed,
     IReadOnlyList<Constellation> Constellations,
+    bool TerrainShapesGround,
     VisualStyle Style)
 {
     /// <summary>The world's lore as it is now.</summary>
@@ -29,7 +30,7 @@ internal sealed record LoreState(
         return new LoreState([.. world.TerrainTypes], [.. world.Regions],
             [.. world.WeatherPins], [.. world.Journal], [.. world.Timelines], [.. world.Events],
             [.. world.Relationships], [.. world.Diagrams], [.. world.Nebulas], world.StarSeed,
-            [.. world.Constellations], world.Style);
+            [.. world.Constellations], world.TerrainShapesGround, world.Style);
     }
 
     /// <summary>True if the world's lore is exactly this.</summary>
@@ -46,6 +47,7 @@ internal sealed record LoreState(
             && Nebulas.SequenceEqual(world.Nebulas)
             && StarSeed == world.StarSeed
             && Constellations.SequenceEqual(world.Constellations)
+            && TerrainShapesGround == world.TerrainShapesGround
             && Style == world.Style;
     }
 
@@ -73,6 +75,7 @@ internal sealed record LoreState(
         world.StarSeed = StarSeed;
         world.Constellations.Clear();
         world.Constellations.AddRange(Constellations);
+        world.TerrainShapesGround = TerrainShapesGround;
         world.Style = Style;
     }
 }

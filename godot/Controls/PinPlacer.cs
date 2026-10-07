@@ -21,6 +21,9 @@ public partial class PinPlacer : Node
     private (Guid BodyId, Action<GeoCoordinate> Placed, Action? Cancelled)? _placing;
 
     /// <summary>The open world.</summary>
+    // Whether what's being placed is a pin (its messages are shown) or something else.
+    private bool _isPin = true;
+
     [Export] public WorldSession? Session { get; set; }
 
     /// <summary>The system view, for the body's globe.</summary>
@@ -38,9 +41,12 @@ public partial class PinPlacer : Node
     /// <summary>
     /// Starts placing a pin on a body (a planet or moon): flies there, then waits for a click on
     /// its surface. <paramref name="placed"/> gets the spot; <paramref name="cancelled"/> is
-    /// called instead if Esc is pressed or placing becomes impossible.
+    /// called instead if Esc is pressed or placing becomes impossible. With a
+    /// <paramref name="prompt"/>, it's for something other than a pin (e.g. where to stand):
+    /// that's shown instead, and the pin's own messages aren't.
     /// </summary>
-    public async void Start(Guid bodyId, Action<GeoCoordinate> placed, Action? cancelled = null)
+    public async void Start(Guid bodyId, Action<GeoCoordinate> placed, Action? cancelled = null,
+        string? prompt = null)
     {
         Cancel();
         if (Session?.World.Bodies.FirstOrDefault(b => b.Id == bodyId) is not Body body
@@ -51,7 +57,8 @@ public partial class PinPlacer : Node
         }
 
         _placing = (bodyId, placed, cancelled);
-        Toolbar?.ShowInfo($"Click the spot on {body.Name} for the pin (Esc cancels).",
+        _isPin = prompt is null;
+        Toolbar?.ShowInfo(prompt ?? $"Click the spot on {body.Name} for the pin (Esc cancels).",
             autoHide: false);
         if (Session.SelectedBodyId != bodyId
             && await Session.SelectBodyAsync(bodyId) is string warning)
@@ -66,7 +73,7 @@ public partial class PinPlacer : Node
         if (_placing is { } placing)
         {
             _placing = null;
-            Toolbar?.ShowInfo("Pin not placed.");
+            Toolbar?.ShowInfo(_isPin ? "Pin not placed." : "");
             placing.Cancelled?.Invoke();
         }
     }
@@ -95,7 +102,7 @@ public partial class PinPlacer : Node
             && GlobePicker.CoordinateAt(Camera, globe, click.Position) is GeoCoordinate spot)
         {
             _placing = null;
-            Toolbar?.ShowInfo($"Pinned at {PlaceText.Describe(spot)}.");
+            Toolbar?.ShowInfo(_isPin ? $"Pinned at {PlaceText.Describe(spot)}." : "");
             placed(spot);
             GetViewport().SetInputAsHandled();
         }
