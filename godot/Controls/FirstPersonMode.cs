@@ -3,6 +3,7 @@ using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Measurement;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
+using NothicWorlds.Interop;
 using NothicWorlds.Rendering;
 using NothicWorlds.Session;
 using NothicWorlds.UI;
@@ -481,7 +482,8 @@ public partial class FirstPersonMode : Node
 
         double time = Session.World.TimeDays;
         (Vector3D East, Vector3D North, Vector3D Up) frame = Frame(body, time);
-        PlaceCamera(frame, _heightMeters / radiusMeters * place.Radius);
+        double clearance = Clearance(globe, eye.Length, radiusMeters);
+        PlaceCamera(frame, clearance / radiusMeters * place.Radius);
         if (_flat is FlatSpot flat)
         {
             PlaceFlatGround(globe, body, time, eye, place.Radius, flat);
@@ -591,6 +593,21 @@ public partial class FirstPersonMode : Node
         return _ground?.HighestAround(_spot) is double drawn ? Math.Max(ground, drawn) : ground;
     }
 
+    // How far the eye is from the nearest surface it could look at closely, in meters: the
+    // ground below, or the water's surface above or below it (never under eye height). The
+    // near clipping distance follows it, so over deep water the surface just below isn't cut
+    // away by a near distance set by the bottom, kilometers down.
+    private double Clearance(PlanetSurface globe, double eyeRadius, double radiusMeters)
+    {
+        if (_flat is not null || globe.IsCarved || globe.WaterRadius is not double water)
+        {
+            return _heightMeters;
+        }
+
+        double fromWater = Math.Abs(eyeRadius - water) * radiusMeters;
+        return Math.Min(_heightMeters, Math.Max(fromWater, EyeHeightMeters));
+    }
+
     // The camera at the scene's middle (the eye), looking along the heading and pitch.
     private void PlaceCamera((Vector3D East, Vector3D North, Vector3D Up) frame,
         double eyeHeight)
@@ -601,7 +618,7 @@ public partial class FirstPersonMode : Node
         _camera!.GlobalTransform = new Transform3D(
             new Basis(ToGodot(right), ToGodot(cameraUp), ToGodot(look * -1)), Vector3.Zero);
 
-        // The near distance follows the eye's height; far stays within the depth range the
+        // The near distance follows the eye's clearance; far stays within the depth range the
         // engine can build (see SystemView.FitCamera).
         // A tenth of it (about 17 cm standing), so ground or a cliff right in front isn't
         // cut away; the view still reaches 170 km, past the horizon from the ground.
@@ -638,17 +655,34 @@ public partial class FirstPersonMode : Node
         _waterMaterial.SetShaderParameter("meters_per_unit",
             (float)(radiusMeters / displayRadius));
         _waterMaterial.SetShaderParameter("daylight", (float)SurfaceSky.Daylight(sunAltitude));
+        globe.CopyWaterColorsTo(_waterMaterial);
         if (_flat is null && !globe.IsCarved && globe.WaterRadius is double water
             && eyeRadius < water)
         {
             double depthMeters = (water - eyeRadius) * radiusMeters;
-            _sky.ShowUnderwater(unitsPerKm, depthMeters, sunAltitude);
+            Color? color = WaterColorHere();
+            _sky.ShowUnderwater(unitsPerKm, depthMeters, sunAltitude, color);
+            _underwater.SetWaterColor(color);
             _underwater.Visible = true;
         }
         else
         {
             _underwater.Visible = false;
         }
+    }
+
+    // The color of the water the eye is in: its terrain's, where a water terrain is painted
+    // underfoot, else null (the standard blue-green).
+    private Color? WaterColorHere()
+    {
+        if (Session?.World.Bodies.Find(b => b.Id == _bodyId) is not Body body)
+        {
+            return null;
+        }
+
+        byte code = body.Surface.Terrain.CodeAt(_spot);
+        TerrainType? underfoot = Session.World.TerrainTypes.Find(type => type.Code == code);
+        return underfoot?.Climate == ClimateKind.Water ? underfoot.Color.ToGodot() : null;
     }
 
     // Builds the ground (and cloud deck) again when needed (see PlaceGround). Done before the

@@ -65,6 +65,8 @@ public partial class PlanetSurface : MeshInstance3D
     private TerrainGrid _shownTerrain = TerrainGrid.Empty;
     private ImageTexture? _terrainPalette;
     private byte[] _paletteBytes = [];
+    private ImageTexture? _waterPalette;
+    private byte[] _waterPaletteBytes = [];
 
     // Sculpted heights (VISION.md BOD-04): the six faces as layers of one texture of
     // half-precision floats with smaller copies (only while something is sculpted, about 16 MB),
@@ -673,9 +675,14 @@ public partial class PlanetSurface : MeshInstance3D
         : Math.Max(Math.Max(Math.Max(0, _reliefScale * _shownHeights.Highest),
             _reliefScale * (_waterLevelMeters ?? 0)), _carved?.HighestTop ?? 0);
 
-    /// <summary>Sets the color each terrain code is drawn in (others stay unpainted).</summary>
+    /// <summary>
+    /// Sets the color each terrain code is drawn in (others stay unpainted), and the color of
+    /// water over it: its own for a type with the Water climate (VISION.md BOD-09).
+    /// </summary>
     public void SetTerrainColors(IEnumerable<TerrainType> types)
     {
+        SetWaterColors(types);
+
         // One RGBA pixel per code; alpha 0 (the default) draws as unpainted.
         var bytes = new byte[(byte.MaxValue + 1) * 4];
         foreach (TerrainType type in types)
@@ -705,6 +712,48 @@ public partial class PlanetSurface : MeshInstance3D
         else
         {
             _terrainPalette.Update(image);
+        }
+    }
+
+    /// <summary>
+    /// Gives a first-person water surface's material (water_surface.gdshader) the terrain and
+    /// water colors it tints the water by.
+    /// </summary>
+    public void CopyWaterColorsTo(ShaderMaterial target)
+    {
+        ShaderMaterial material = SurfaceMaterial;
+        foreach (string name in (string[])["has_terrain", "terrain_cells", "water_palette"])
+        {
+            target.SetShaderParameter(name, material.GetShaderParameter(name));
+        }
+    }
+
+    // One RGBA pixel per code: the type's color for water types, alpha 0 for the rest.
+    private void SetWaterColors(IEnumerable<TerrainType> types)
+    {
+        var bytes = new byte[(byte.MaxValue + 1) * 4];
+        foreach (TerrainType type in types.Where(type => type.Climate == ClimateKind.Water))
+        {
+            int at = type.Code * 4;
+            (bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]) =
+                (type.Color.R, type.Color.G, type.Color.B, 255);
+        }
+
+        if (bytes.AsSpan().SequenceEqual(_waterPaletteBytes))
+        {
+            return;
+        }
+
+        _waterPaletteBytes = bytes;
+        Image image = Image.CreateFromData(byte.MaxValue + 1, 1, false, Image.Format.Rgba8, bytes);
+        if (_waterPalette is null)
+        {
+            _waterPalette = ImageTexture.CreateFromImage(image);
+            SurfaceMaterial.SetShaderParameter("water_palette", _waterPalette);
+        }
+        else
+        {
+            _waterPalette.Update(image);
         }
     }
 

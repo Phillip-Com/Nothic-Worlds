@@ -446,7 +446,8 @@ center) as follows (`Model/TerrainNoise.cs` does it; this never changes):
 
 A planet or moon with a `waterLevel` is under water wherever its ground (terrain-shaped and
 sculpted) is lower than that many meters from its radius. Only the level is saved; nothing
-about the ground changes.
+about the ground changes. Water over a terrain type whose `climate` is `"water"` is drawn in
+that type's `color`; water over other ground in a standard blue-green.
 
 ## The star field (`starSeed`)
 

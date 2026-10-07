@@ -2252,17 +2252,25 @@ beneath it in first person looks like being underwater (owner's request, 2026-10
   undo step (typing a level merges into one).
 - **System panel:** a Water row with Has water and the level, under Has air. Flat worlds
   can't turn it on yet: they don't draw heights. The disabled switch says so.
+- **Color** (owner's choice): water over a terrain type with the Water climate (Ocean,
+  Shallow Water, or the user's own) takes that type's color, darker with depth; water over
+  land or unpainted ground is a standard blue-green. Where kinds of water meet, the colors
+  blend over a cell (`water_tint.gdshaderinc`, shared by the globe and the water surface;
+  `PlanetSurface.SetTerrainColors` makes the water palette). Changing a type's color or
+  climate recolors its water. The murk and tint under water follow the water underfoot.
 - **From orbit** (`planet_surface.gdshaderinc`): the globe is lifted to the water wherever
-  the ground is lower, and drawn as water there. It is clear blue-green in the shallows and
-  deep blue further down, flat, and catches the sun. Its shore is smoothed over a pixel.
+  the ground is lower, and drawn as water there: flat, darker with depth, and catching the
+  sun. Its shore is smoothed over a pixel.
   `PlanetSurface.WaterLevelMeters` / `WaterRadius`; `SurfaceRadiusAt` (pins, regions,
   picking) sits on the water.
 - **From the ground:** a water surface is built around the eye like the cloud deck (a
   `FirstPersonGround` at the water's radius, `water_surface.gdshader`). It darkens with the
   depth behind it (from the depth buffer), so the shallows show the bottom. Small waves are
   fixed to the place, and the sun shines off it. The ground under it is the true bottom.
+  The camera's near clipping distance follows the nearer of the ground and the water's
+  surface, so over deep water the surface below isn't cut away.
 - **Underwater:** with the eye below the level:
-  - the haze becomes a blue-green murk, half gone at 9 m, over the sky too, darker deeper
+  - the haze becomes a murk in the water's color, half gone at 9 m, over the sky too, darker deeper
     down and at night (`SurfaceSky.ShowUnderwater`);
   - a full-screen layer tints the view and makes it waver (`UnderwaterView`,
     `underwater.gdshader`);

@@ -8,6 +8,14 @@ render_mode blend_mix, cull_disabled, depth_draw_opaque, shadows_disabled;
 
 uniform sampler2D depth_texture : hint_depth_texture, filter_nearest, repeat_disable;
 
+// The globe's terrain and water colors (PlanetSurface.CopyWaterColorsTo), for the water's
+// color over each kind of terrain.
+uniform bool has_terrain = false;
+uniform sampler2DArray terrain_cells : filter_nearest, repeat_disable;
+uniform sampler2D water_palette : source_color, filter_nearest, repeat_disable;
+
+#include "res://Rendering/water_tint.gdshaderinc"
+
 // The scene's units in meters, and the body's radius in meters (the mesh's units are radii).
 uniform float meters_per_unit = 1.0;
 uniform float radius_meters = 6371000.0;
@@ -21,8 +29,6 @@ uniform vec3 wave_origin = vec3(0.0);
 uniform float daylight = 1.0;
 
 const float WAVE_REPEAT_METERS = 1000.0;
-const vec3 SHALLOW = vec3(0.1, 0.38, 0.42);
-const vec3 DEEP = vec3(0.01, 0.07, 0.17);
 
 varying vec3 up;
 varying vec3 wave_place;
@@ -61,6 +67,9 @@ void fragment() {
 	float fresnel = 0.04 + 0.96 * pow(1.0 - facing, 5.0);
 	ROUGHNESS = 0.08;
 	SPECULAR = 0.6;
+	vec4 tint = has_terrain ? water_tint(terrain_cells, water_palette, normal_up) : vec4(0.0);
+	vec3 shallow, deep;
+	water_shades(tint, shallow, deep);
 
 	if (FRONT_FACING) {
 		// How much water the view passes through to the ground behind: deeper looks darker
@@ -69,7 +78,7 @@ void fragment() {
 		vec4 behind = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, depth, 1.0);
 		float through = max(-behind.z / behind.w + VERTEX.z, 0.0) * meters_per_unit;
 		float murk = 1.0 - exp(-through / 6.0);
-		ALBEDO = mix(SHALLOW, DEEP, 1.0 - exp(-through / 40.0));
+		ALBEDO = mix(shallow, deep, 1.0 - exp(-through / 40.0));
 		ALPHA = clamp(max(0.25 + 0.75 * murk, fresnel), 0.0, 0.97);
 	} else {
 		// Looking up from under the water: lit from above, so it glows rather than being
@@ -77,8 +86,8 @@ void fragment() {
 		// darker mirror of the water toward the edge.
 		ALBEDO = vec3(0.0);
 		SPECULAR = 0.0;
-		vec3 through = vec3(0.55, 0.85, 0.88) * (0.3 + 0.7 * facing);
-		EMISSION = mix(through, vec3(0.06, 0.2, 0.23), fresnel) * daylight;
+		vec3 through = min(shallow * 1.8, vec3(1.0)) * (0.3 + 0.7 * facing);
+		EMISSION = mix(through, shallow * 0.5, fresnel) * daylight;
 		ALPHA = mix(0.6, 0.95, fresnel);
 	}
 }

@@ -4,8 +4,8 @@ namespace NothicWorlds.Rendering;
 
 /// <summary>
 /// The look of being under water in the first-person view (VISION.md BOD-09): a layer over
-/// the whole screen that tints the scene blue-green, makes it waver, and plays ripples of
-/// light over it. It sits under the view's readouts, which stay sharp.
+/// the whole screen that tints the scene the water's color and makes it waver. Show it by
+/// making it visible. It sits under the view's readouts, which stay sharp.
 /// </summary>
 public partial class UnderwaterView : CanvasLayer
 {
@@ -26,5 +26,17 @@ public partial class UnderwaterView : CanvasLayer
         };
         cover.SetAnchorsPreset(Control.LayoutPreset.FullRect);
         AddChild(cover);
+    }
+
+    /// <summary>
+    /// Tints the view toward <paramref name="water"/> (a water terrain's color), or the
+    /// standard blue-green: its hue at full strength, kept light so the scene shows through.
+    /// </summary>
+    public void SetWaterColor(Color? water)
+    {
+        Color color = water ?? SurfaceSky.StandardWater;
+        float brightest = Math.Max(Math.Max(color.R, color.G), Math.Max(color.B, 0.01f));
+        Color hue = new(color.R / brightest, color.G / brightest, color.B / brightest);
+        _material.SetShaderParameter("tint", Colors.White.Lerp(hue, 0.75f));
     }
 }

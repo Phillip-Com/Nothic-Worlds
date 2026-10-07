@@ -83,6 +83,9 @@ uniform bool has_terrain = false;
 uniform bool show_terrain = true;
 uniform sampler2DArray terrain_cells : filter_nearest, repeat_disable;
 uniform sampler2D terrain_palette : source_color, filter_nearest, repeat_disable;
+// Each code's color as water (alpha 0 for a type whose climate isn't water); see
+// water_tint.gdshaderinc.
+uniform sampler2D water_palette : source_color, filter_nearest, repeat_disable;
 // Seen from far away, cells get smaller than a pixel and would flicker. This copy holds each
 // face's colors averaged over 4 x 4 cells (alpha = how much is painted, colors multiplied by
 // it), with mipmaps, and takes over as cells shrink.
@@ -461,28 +464,7 @@ vec3 draw_pieces(vec3 color, vec3 direction, float pixel_angle) {
 	return color;
 }
 
-// Where a direction meets the cube: (across, down, face), with across and down from 0 to 1 over
-// the face (left to right, top to bottom). See CubeSphere.CellAt, whose face axes are written
-// out here as plain components (indexing arrays per pixel is slow on some graphics cards).
-// `on_face` is the point on the flat cube face: (along "right", along "up").
-vec3 terrain_face_position(vec3 d) {
-	vec3 size = abs(d);
-	float face;
-	vec2 on_face;
-	if (size.x >= size.y && size.x >= size.z) {
-		face = d.x >= 0.0 ? 0.0 : 1.0;
-		on_face = vec2(-d.z, d.y) / d.x * vec2(1.0, sign(d.x));
-	} else if (size.y >= size.z) {
-		face = d.y >= 0.0 ? 2.0 : 3.0;
-		on_face = vec2(d.x, -d.z) / d.y * vec2(sign(d.y), 1.0);
-	} else {
-		face = d.z >= 0.0 ? 4.0 : 5.0;
-		on_face = vec2(d.x, d.y) / d.z * vec2(1.0, sign(d.z));
-	}
-
-	vec2 spread = atan(on_face) * (4.0 / PI);  // Equal-angle spacing, -1 to 1
-	return vec3((spread.x + 1.0) * 0.5, (1.0 - spread.y) * 0.5, face);
-}
+#include "res://Rendering/water_tint.gdshaderinc"
 
 // The reverse: the direction to a position on a face (positions a little past the edge give
 // directions over the next face, which terrain_face_position then finds).
@@ -816,11 +798,12 @@ float ground_detail(inout vec3 color, float meters_per_pixel) {
 	return bumps * (0.6 * broad + 0.3 * medium + 0.1 * grain);
 }
 
-// Water `depth` meters deep over ground of `color`: clear and blue-green in the shallows, a
-// deep blue further down, the bottom showing through only where it's very shallow.
-vec3 water_color(vec3 bottom, float depth) {
-	vec3 shallow = vec3(0.13, 0.42, 0.47);
-	vec3 deep = vec3(0.02, 0.09, 0.24);
+// Water `depth` meters deep over ground of color `bottom`, in the shades of `tint` (see
+// water_shades): clear in the shallows, darker further down, the bottom showing through only
+// where it's very shallow.
+vec3 water_color(vec3 bottom, float depth, vec4 tint) {
+	vec3 shallow, deep;
+	water_shades(tint, shallow, deep);
 	vec3 water = mix(shallow, deep, 1.0 - exp(-depth / 700.0));
 	return mix(bottom, water, clamp(0.55 + depth / 60.0, 0.0, 1.0));
 }
@@ -884,7 +867,10 @@ void fragment() {
 	if (has_water && !flat_disc && eye_level_ground < 0.5) {
 		float depth = water_level - ground_height(direction, 0.0);
 		wet = clamp(depth / max(fwidth(depth), 1e-3) + 0.5, 0.0, 1.0);
-		color = mix(color, water_color(color, max(depth, 0.0)), wet);
+		vec4 tint = has_terrain
+			? water_tint(terrain_cells, water_palette, direction)
+			: vec4(0.0);
+		color = mix(color, water_color(color, max(depth, 0.0), tint), wet);
 	}
 
 	// The rings' shadow: where the line from here toward the star crosses them. (A flat

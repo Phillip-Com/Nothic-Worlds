@@ -316,9 +316,11 @@ public sealed class SurfaceSky
     /// Turns the haze into the murk under water (VISION.md BOD-09), in place of
     /// <see cref="ShowHaze"/>: blue-green, half gone at <see cref="UnderwaterHalfMeters"/>,
     /// over the sky too, darker the deeper the eye (<paramref name="depthMeters"/>) and the
-    /// lower the sun. <paramref name="unitsPerKm"/> is the scene's scale.
+    /// lower the sun. <paramref name="unitsPerKm"/> is the scene's scale. The murk is the
+    /// color of <paramref name="water"/> (a water terrain's), or a standard blue-green.
     /// </summary>
-    public void ShowUnderwater(double unitsPerKm, double depthMeters, double sunAltitudeDegrees)
+    public void ShowUnderwater(double unitsPerKm, double depthMeters, double sunAltitudeDegrees,
+        Color? water)
     {
         if (_standing is null)
         {
@@ -330,8 +332,11 @@ public sealed class SurfaceSky
             (float)(Math.Log(2) / (UnderwaterHalfMeters / 1000 * unitsPerKm));
         _standing.FogSkyAffect = 1;
         float light = (float)(Daylight(sunAltitudeDegrees) * Math.Exp(-depthMeters / 60));
-        _standing.FogLightColor = new Color(0.1f, 0.32f, 0.36f) * Math.Max(light, 0.02f);
+        _standing.FogLightColor = (water ?? StandardWater) * Math.Max(light, 0.02f);
     }
+
+    /// <summary>The color of water over land, which no water terrain colors.</summary>
+    public static readonly Color StandardWater = new(0.1f, 0.32f, 0.36f);
 
     /// <summary>How far one can see under water: half gone at this many meters.</summary>
     public const double UnderwaterHalfMeters = 9;
