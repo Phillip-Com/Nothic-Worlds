@@ -38,6 +38,9 @@ public partial class FirstPersonMode : Node
     private const double GroundNoiseRepeat = 32;
     private const float FieldOfViewDegrees = 70;
 
+    // How far the water's waves repeat: WAVE_REPEAT_METERS in water_surface.gdshader.
+    private const double WaveRepeatMeters = 1000;
+
     // How close the mouse must come to a body's disc to read it out, in pixels.
     private const float HoverPixels = 8;
 
@@ -59,9 +62,14 @@ public partial class FirstPersonMode : Node
             "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
 
     private readonly SurfaceSky _sky = new();
+    private readonly UnderwaterView _underwater = new();
+    private readonly ShaderMaterial _waterMaterial =
+        new() { Shader = GD.Load<Shader>("res://Rendering/water_surface.gdshader") };
     private Camera3D? _camera;
     private FirstPersonGround? _ground;
     private FirstPersonGround? _deck;  // The clouds below, when flying above them
+    private FirstPersonGround? _water; // The water's surface, on a body with water
+    private double? _waterBuiltRadius; // The water level it was built at, in radii
     private FlatPatch? _flatGround;    // On a flat world, the ground around the eye
     private FlatPatch? _flatDeck;      // ... and the clouds below
     private FlatSpot? _flat;           // Where the eye stands on a flat world (else on a globe)
@@ -95,6 +103,7 @@ public partial class FirstPersonMode : Node
     private double _groundHeightMeters;  // The eye's height when the ground was built
     private double _sinceGroundBuilt;     // Seconds since the ground was last built
     private bool _deckStale = true;       // The cloud deck doesn't match the ground yet
+    private bool _waterStale = true;      // The water's surface doesn't match the ground yet
     private float _savedRelief = 1;       // View ▸ Relief's exaggeration, back on leaving
     private WeatherSample? _weather;
     private double _weatherAge = double.PositiveInfinity;
@@ -142,6 +151,7 @@ public partial class FirstPersonMode : Node
         ProcessPriority = -10;
         _hud = new FirstPersonHud();
         AddChild(_hud);
+        AddChild(_underwater);
         if (Session is not null)
         {
             Session.WorldClosed += _ => Leave();
@@ -256,6 +266,10 @@ public partial class FirstPersonMode : Node
         _ground = null;
         _deck?.QueueFree();
         _deck = null;
+        _water?.QueueFree();
+        _water = null;
+        _waterBuiltRadius = null;
+        _underwater.Visible = false;
         _flatGround?.QueueFree();
         _flatGround = null;
         _flatDeck?.QueueFree();
@@ -325,6 +339,13 @@ public partial class FirstPersonMode : Node
             Visible = false,
         };
         AddChild(_deck);
+        _water = new FirstPersonGround
+        {
+            Name = "WaterSurface",
+            MaterialOverride = _waterMaterial,
+            Visible = false,
+        };
+        AddChild(_water);
         if (flat is not null)
         {
             _flatGround = new FlatPatch { Name = "FlatGround" };
@@ -496,6 +517,7 @@ public partial class FirstPersonMode : Node
         }
         _sky.ShowHaze(body.HasAtmosphere, place.Radius / body.RadiusKm, HazeKm(),
             sky.Star?.AltitudeDegrees ?? -90, _weather?.CloudCover ?? 0);
+        ShowWater(globe, eye.Length, radiusMeters, place.Radius, sunAltitude, unitsPerKm);
         ShowReadouts(body, time, sky, frame);
     }
 
@@ -605,6 +627,28 @@ public partial class FirstPersonMode : Node
     {
         PlaceRings(_ground!, body, time, eye, displayRadius);
         PlaceRings(_deck!, body, time, eye, displayRadius);
+        PlaceRings(_water!, body, time, eye, displayRadius);
+    }
+
+    // Under the water (VISION.md BOD-09), with the eye <paramref name="eyeRadius"/> radii out:
+    // the murk, tint, and ripples of light. Above it, none.
+    private void ShowWater(PlanetSurface globe, double eyeRadius, double radiusMeters,
+        double displayRadius, double sunAltitude, double unitsPerKm)
+    {
+        _waterMaterial.SetShaderParameter("meters_per_unit",
+            (float)(radiusMeters / displayRadius));
+        _waterMaterial.SetShaderParameter("daylight", (float)SurfaceSky.Daylight(sunAltitude));
+        if (_flat is null && !globe.IsCarved && globe.WaterRadius is double water
+            && eyeRadius < water)
+        {
+            double depthMeters = (water - eyeRadius) * radiusMeters;
+            _sky.ShowUnderwater(unitsPerKm, depthMeters, sunAltitude);
+            _underwater.Visible = true;
+        }
+        else
+        {
+            _underwater.Visible = false;
+        }
     }
 
     // Builds the ground (and cloud deck) again when needed (see PlaceGround). Done before the
@@ -614,6 +658,7 @@ public partial class FirstPersonMode : Node
     {
         FirstPersonGround ground = _ground!;
         ground.Visible = !globe.IsCarved;  // A carved globe draws its own carving
+        _water!.Visible = !globe.IsCarved && globe.WaterRadius is not null;
         if (globe.IsCarved)
         {
             return;
@@ -637,6 +682,16 @@ public partial class FirstPersonMode : Node
             _groundVersion = globe.ReliefVersion;
             _groundHeightMeters = _heightMeters;
             _deckStale = true;
+            _waterStale = true;
+        }
+
+        // The water's surface: the same rings at the water level.
+        if (globe.WaterRadius is double water && (_waterStale || water != _waterBuiltRadius))
+        {
+            _waterStale = false;
+            _waterBuiltRadius = water;
+            _water.Build(_ => water, ground.Center, Math.Max(height * 0.5, 2e-7), outer);
+            SetWaveOrigin(ground.Center * water, body.RadiusKm);
         }
 
         // The cloud deck: the same rings at the cloud layer, over the ground here. It's only
@@ -669,6 +724,22 @@ public partial class FirstPersonMode : Node
         shader.SetShaderParameter("ground_detail_origin",
             new Vector3(Wrapped(anchor.X), Wrapped(anchor.Y), Wrapped(anchor.Z)));
         shader.SetShaderParameter("ground_radius_meters", (float)radiusMeters);
+    }
+
+    // Tells the water's material where the point its rings are built around falls in the
+    // waves' repeat, worked out in double precision, so the waves stay put as it's rebuilt.
+    private void SetWaveOrigin(Vector3D anchor, double radiusKm)
+    {
+        double radiusMeters = radiusKm * 1000;
+        float Wrapped(double radii)
+        {
+            double meters = radii * radiusMeters;
+            return (float)(meters - Math.Floor(meters / WaveRepeatMeters) * WaveRepeatMeters);
+        }
+
+        _waterMaterial.SetShaderParameter("wave_origin",
+            new Vector3(Wrapped(anchor.X), Wrapped(anchor.Y), Wrapped(anchor.Z)));
+        _waterMaterial.SetShaderParameter("radius_meters", (float)radiusMeters);
     }
 
     // On a flat world, the patch of ground around the eye (the map on top, bare rock on the
@@ -787,7 +858,9 @@ public partial class FirstPersonMode : Node
         double light = sky.Star is SkyBody star
             ? Math.Clamp((star.AltitudeDegrees + 6) / 12, 0.08, 1)
             : 0.08;
-        if (_weather is WeatherSample weather && body.HasAtmosphere && BelowClouds())
+        // Rain and snow fall through the air, not under the water.
+        if (_weather is WeatherSample weather && body.HasAtmosphere && BelowClouds()
+            && !_underwater.Visible)
         {
             double amount = Math.Clamp(weather.PrecipitationMmPerHour / 4, 0, 1);
             double fall = weather.Precipitation == PrecipitationKind.Snow ? 1.5 : 8;

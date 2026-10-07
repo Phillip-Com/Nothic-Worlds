@@ -303,6 +303,7 @@ public partial class SystemView : Node3D
             if (visual.Surface is PlanetSurface surface)
             {
                 surface.Shape = body.Shape;
+                surface.WaterLevelMeters = body.WaterLevelMeters;
             }
         }
 

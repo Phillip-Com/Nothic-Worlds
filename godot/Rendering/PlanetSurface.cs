@@ -78,6 +78,9 @@ public partial class PlanetSurface : MeshInstance3D
     private float _reliefScale;
     private ReliefDetail _reliefDetail = ReliefDetail.Standard;
 
+    // The body's water level in meters (VISION.md BOD-09), or null for none.
+    private int? _waterLevelMeters;
+
     // Shapes added or cut (VISION.md BOD-04): the body's shapes and radius, and the carved
     // globe drawn instead of the plain one while there are any.
     private IReadOnlyList<ShapeEdit> _shapes = [];
@@ -497,6 +500,33 @@ public partial class PlanetSurface : MeshInstance3D
     }
 
     /// <summary>
+    /// The body's water level in meters (VISION.md BOD-09), or null for none: wherever the
+    /// ground is lower, the globe is drawn as water, level with it. A flat world shows none.
+    /// </summary>
+    public int? WaterLevelMeters
+    {
+        get => _waterLevelMeters;
+        set
+        {
+            if (value != _waterLevelMeters)
+            {
+                _waterLevelMeters = value;
+                SurfaceMaterial.SetShaderParameter("has_water", value is not null);
+                SurfaceMaterial.SetShaderParameter("water_level", (float)(value ?? 0));
+                UpdateBounds();
+            }
+        }
+    }
+
+    /// <summary>
+    /// How far out the water's surface is, in the globe's radii (with the view's relief
+    /// exaggeration), or null with no water (or on a flat world).
+    /// </summary>
+    public double? WaterRadius => _waterLevelMeters is int level && Shape == BodyShape.Sphere
+        ? 1 + _reliefScale * (double)level
+        : null;
+
+    /// <summary>
     /// Whether relief is shaded map-style, from a fixed direction (true), or by the sunlight.
     /// </summary>
     public bool MapShading
@@ -627,17 +657,21 @@ public partial class PlanetSurface : MeshInstance3D
     /// How far out the drawn surface is at a direction, in the globe's radii: 1 on an unsculpted
     /// globe (or a flat world), more on a sculpted hill, less in a basin. Overlays sit on it.
     /// </summary>
-    public float SurfaceRadiusAt(Vector3D direction) =>
-        _shownHeights.IsEmpty || Shape == BodyShape.FlatDisc
+    public float SurfaceRadiusAt(Vector3D direction)
+    {
+        float ground = _shownHeights.IsEmpty || Shape == BodyShape.FlatDisc
             ? 1.0f
             : 1.0f + _reliefScale * (float)_shownHeights.SampleAt(direction);
+        return WaterRadius is double water ? Math.Max(ground, (float)water) : ground;
+    }
 
     /// <summary>
     /// The highest the surface reaches anywhere, in the globe's radii above it (0 unsculpted).
     /// </summary>
     public float HighestRelief => Shape == BodyShape.FlatDisc
         ? 0
-        : Math.Max(Math.Max(0, _reliefScale * _shownHeights.Highest), _carved?.HighestTop ?? 0);
+        : Math.Max(Math.Max(Math.Max(0, _reliefScale * _shownHeights.Highest),
+            _reliefScale * (_waterLevelMeters ?? 0)), _carved?.HighestTop ?? 0);
 
     /// <summary>Sets the color each terrain code is drawn in (others stay unpainted).</summary>
     public void SetTerrainColors(IEnumerable<TerrainType> types)
