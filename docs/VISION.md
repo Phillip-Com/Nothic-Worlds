@@ -108,7 +108,18 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 36: Peaks and Water** · In PR #92 (owner's request, 2026-10-06)
+**Milestone 37: Flat Worlds in Relief** · In progress (owner's request, 2026-10-07)
+Flat worlds get what globes have: heights, water, and shapes (`BOD-10`). Owner's decisions:
+- **Everything globes have:** sculpting brushes, terrain-shaped ground with its peaks, and
+  water, with the water's colors and the underwater look.
+- **A waterfall at the rim:** the rim is the south pole, so the edge is wet all the way round
+  or not at all. When it's wet, water pours off the edge and falls away into space, fading to
+  mist below the disc, from orbit and from the ground.
+- **Shapes too:** spheres, boxes, cylinders, and cones added to or cut out of the disc.
+- **One PR.** No save format change: heights, terrain, water, and shapes are saved whatever a
+  body's shape.
+
+**Milestone 36: Peaks and Water** · Complete (PR #92 merged 2026-10-07; owner's request, 2026-10-06)
 The ground a terrain type shapes gets features of its own, and planets and moons get water
 (`BOD-08`, `BOD-09`). Owner's decisions:
 - **Variation and Size per type:** how far peaks rise and dips sink around the type's
@@ -2215,7 +2226,7 @@ sheer cliff, so the world looks real without sculpting every slope by hand (owne
     - Walking into a cliff for 240 frames, the eye never came within 1.7 m of the drawn
       ground.
 
-**BOD-08 — Variation within terrain** · Implemented (M36, PR #92) · Base
+**BOD-08 — Variation within terrain** · Implemented (M36: PR #92) · Base
 **Intent:** The ground a terrain type shapes isn't one flat height: mountains have peaks,
 hills roll, and plains are a little uneven, with how high and how far apart the features are
 set per type (owner's request, 2026-10-06).
@@ -2242,7 +2253,7 @@ set per type (owner's request, 2026-10-06).
   defaults get the defaults' values; others stay level.
 - **Reuse:** `TerrainNoise` works for any seeded, place-fixed bumpiness on a globe.
 
-**BOD-09 — Water** · Implemented (M36, PR #92) · Base
+**BOD-09 — Water** · Implemented (M36: PR #92) · Base
 **Intent:** A planet or moon can have water at a level the user sets: wherever the ground is
 below it there's a water surface, seen from orbit and from the ground, and standing or flying
 beneath it in first person looks like being underwater (owner's request, 2026-10-06).
@@ -2280,6 +2291,11 @@ beneath it in first person looks like being underwater (owner's request, 2026-10
   - rain and snow stop.
 - **Limits:** a globe carved by shapes isn't raised to the water (its mesh is built on the
   CPU), though it's still colored as water; standing on one shows no water surface.
+
+**BOD-10 — Flat worlds in relief** · Planned (M37) · Base
+**Intent:** A flat world can have everything a globe has on its surface: sculpted and
+terrain-shaped heights with their peaks, water up to a level (with a waterfall where it reaches
+the rim), and shapes added to or cut out of it (owner's request, 2026-10-07).
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
@@ -3189,7 +3205,3 @@ answered, move the answer into the relevant entry above and remove the question 
 
 New raw ideas go here first, then get sorted into a feature area once reviewed.
 
-
-- **Heights and water on flat worlds** (owner, 2026-10-07): flat worlds draw terrain-shaped
-  ground, sculpting, and peaks (`BOD-07`, `BOD-08`) the way globes do, so they can have water
-  (`BOD-09`) too. Wanted as a later milestone.
