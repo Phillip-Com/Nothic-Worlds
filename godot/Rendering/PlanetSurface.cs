@@ -118,6 +118,11 @@ public partial class PlanetSurface : MeshInstance3D
         Plain,    // The coarse sphere, sculpted or not (the shader still lifts the relief)
     }
     private MeshInstance3D? _rock;
+    private RimWaterfall? _waterfall;  // A flat world's water pouring over its rim
+
+    // Where a flat world's whole rim stands on the globe.
+    private static readonly Vector3D _southPole = new(0, -1, 0);
+    private float _rimLift;  // How far the flat world's rim is lifted, in radii (UpdateRim)
     private BodyShape _shape = BodyShape.Sphere;
 
     private static readonly StandardMaterial3D _rockMaterial = new()
@@ -128,6 +133,13 @@ public partial class PlanetSurface : MeshInstance3D
 
     /// <summary>The bare rock of a flat world's rim and underside.</summary>
     public static Material RockMaterial => _rockMaterial;
+
+    /// <summary>
+    /// The deepest a flat world's drawn ground sinks below its face, in globe radii: just above
+    /// its underside, so a deep trench at a high relief exaggeration can't break through
+    /// (VISION.md BOD-10). FLAT_DEEPEST in planet_surface.gdshaderinc.
+    /// </summary>
+    public const float FlatDeepestLift = -0.075f;
 
     /// <summary>
     /// The globe's shape (VISION.md BOD-02): a sphere, or a flat world's disc with bare rock
@@ -152,16 +164,22 @@ public partial class PlanetSurface : MeshInstance3D
                 _rock = new MeshInstance3D
                 {
                     Name = "Rock",
-                    Mesh = FlatDiscMeshes.Rock,
+                    Mesh = FlatDiscMeshes.RockLifted(_rimLift),
                     MaterialOverride = _rockMaterial,
                 };
                 AddChild(_rock);
+                _waterfall = new RimWaterfall();
+                AddChild(_waterfall);
             }
             else if (!flat && _rock is not null)
             {
                 _rock.QueueFree();
                 _rock = null;
+                _waterfall?.QueueFree();
+                _waterfall = null;
             }
+
+            UpdateBounds();
         }
     }
 
@@ -431,6 +449,7 @@ public partial class PlanetSurface : MeshInstance3D
         }
 
         _shownTerrain = terrain;
+        UpdateWaterfall();
     }
 
     /// <summary>
@@ -515,16 +534,43 @@ public partial class PlanetSurface : MeshInstance3D
                 _waterLevelMeters = value;
                 SurfaceMaterial.SetShaderParameter("has_water", value is not null);
                 SurfaceMaterial.SetShaderParameter("water_level", (float)(value ?? 0));
+                ChooseMesh();  // A flat world with water is lifted point by point
                 UpdateBounds();
             }
         }
     }
 
     /// <summary>
-    /// How far out the water's surface is, in the globe's radii (with the view's relief
-    /// exaggeration), or null with no water (or on a flat world).
+    /// Leaves the globe's own mesh at the ground, not raised to the water, around a
+    /// first-person eye (VISION.md BOD-09, BOD-10), where its ground and water are drawn up
+    /// close: within <paramref name="radius"/> of <paramref name="center"/> (on a globe, an
+    /// angle in radians from a direction; on a flat world, a distance across its face from a
+    /// point on it). Null puts it back.
     /// </summary>
-    public double? WaterRadius => _waterLevelMeters is int level && Shape == BodyShape.Sphere
+    public void SetNearEye(Vector3D? center, double radius)
+    {
+        if (center is not Vector3D point)
+        {
+            SurfaceMaterial.SetShaderParameter("near_radius", -1.0f);
+            return;
+        }
+
+        if (Shape == BodyShape.Sphere)
+        {
+            point *= 1 / point.Length;
+        }
+
+        SurfaceMaterial.SetShaderParameter("near_center",
+            new Vector3((float)point.X, (float)point.Y, (float)point.Z));
+        SurfaceMaterial.SetShaderParameter("near_radius", (float)radius);
+    }
+
+    /// <summary>
+    /// How far out the water's surface is, in the globe's radii (with the view's relief
+    /// exaggeration), or null with no water. On a flat world, it's 1 plus the water's height
+    /// above the face, in radii.
+    /// </summary>
+    public double? WaterRadius => _waterLevelMeters is int level
         ? 1 + _reliefScale * (double)level
         : null;
 
@@ -633,10 +679,12 @@ public partial class PlanetSurface : MeshInstance3D
     /// </summary>
     public double TrueHeightKmOf(Vector3 point, double radiusKm)
     {
-        var direction = new Vector3D(point.X, point.Y, point.Z);
-        double groundMeters = _shownHeights.SampleAt(direction);
+        var at = new Vector3D(point.X, point.Y, point.Z);
+        bool flat = Shape == BodyShape.FlatDisc;
+        double groundMeters = _shownHeights.SampleAt(flat ? FlatDisc.DirectionFor(at) : at);
         double lift = groundMeters * (_reliefScale - 1 / (radiusKm * 1000));
-        return (point.Length() - 1 - lift) * radiusKm;
+        double above = flat ? point.Y - FlatDisc.HalfThickness : point.Length() - 1;
+        return (above - lift) * radiusKm;
     }
 
     /// <summary>
@@ -649,31 +697,36 @@ public partial class PlanetSurface : MeshInstance3D
     /// as <see cref="SurfaceRadiusAt"/>, but with cliffs kept steep (see
     /// <see cref="HeightGrid.SampleSteepAt"/>) on a body <paramref name="radiusKm"/> in radius.
     /// </summary>
-    public float GroundRadiusAt(Vector3D direction, double radiusKm) =>
-        _shownHeights.IsEmpty || Shape == BodyShape.FlatDisc
-            ? 1.0f
-            : 1.0f + _reliefScale * (float)_shownHeights.SampleSteepAt(direction,
-                radiusKm * 1000 * Math.PI / 2 / HeightGrid.FaceSize);
+    public float GroundRadiusAt(Vector3D direction, double radiusKm) => 1.0f + Lifted(
+        _shownHeights.IsEmpty ? 0 : _reliefScale * (float)_shownHeights.SampleSteepAt(
+            direction, radiusKm * 1000 * Math.PI / 2 / HeightGrid.FaceSize));
 
     /// <summary>
     /// How far out the drawn surface is at a direction, in the globe's radii: 1 on an unsculpted
-    /// globe (or a flat world), more on a sculpted hill, less in a basin. Overlays sit on it.
+    /// globe, more on a sculpted hill or over water, less in a basin. Overlays sit on it. On a
+    /// flat world it's 1 plus how far the face is lifted there (VISION.md BOD-10), so
+    /// <see cref="GlobeShape.SurfacePoint"/> puts overlays on the ground there too.
     /// </summary>
     public float SurfaceRadiusAt(Vector3D direction)
     {
-        float ground = _shownHeights.IsEmpty || Shape == BodyShape.FlatDisc
-            ? 1.0f
-            : 1.0f + _reliefScale * (float)_shownHeights.SampleAt(direction);
-        return WaterRadius is double water ? Math.Max(ground, (float)water) : ground;
+        float ground = _shownHeights.IsEmpty ? 0 : _reliefScale * (float)_shownHeights.SampleAt(
+            direction);
+        return 1.0f + Lifted(WaterRadius is double water
+            ? Math.Max(ground, (float)(water - 1))
+            : ground);
     }
 
     /// <summary>
     /// The highest the surface reaches anywhere, in the globe's radii above it (0 unsculpted).
     /// </summary>
-    public float HighestRelief => Shape == BodyShape.FlatDisc
-        ? 0
-        : Math.Max(Math.Max(Math.Max(0, _reliefScale * _shownHeights.Highest),
-            _reliefScale * (_waterLevelMeters ?? 0)), _carved?.HighestTop ?? 0);
+    public float HighestRelief => Math.Max(Math.Max(Math.Max(0,
+        _reliefScale * _shownHeights.Highest), _reliefScale * (_waterLevelMeters ?? 0)),
+        _carved?.HighestTop ?? 0);
+
+    // A lift of the drawn ground, in radii, as it's drawn: on a flat world, never deeper than
+    // FlatDeepestLift.
+    private float Lifted(float lift) =>
+        Shape == BodyShape.FlatDisc ? Math.Max(lift, FlatDeepestLift) : lift;
 
     /// <summary>
     /// Sets the color each terrain code is drawn in (others stay unpainted), and the color of
@@ -745,6 +798,7 @@ public partial class PlanetSurface : MeshInstance3D
         }
 
         _waterPaletteBytes = bytes;
+        UpdateWaterfall();
         Image image = Image.CreateFromData(byte.MaxValue + 1, 1, false, Image.Format.Rgba8, bytes);
         if (_waterPalette is null)
         {
@@ -949,13 +1003,17 @@ public partial class PlanetSurface : MeshInstance3D
     private void ChooseMesh()
     {
         _sphereMesh ??= Mesh;
-        bool carved = Shape == BodyShape.Sphere && _shapes.Count > 0;
+        bool carved = _shapes.Count > 0;
         Mesh? sphere = _detailLevel == DetailLevel.Plain ? _coarseSphere : _sphereMesh;
         ReliefDetail relief = _detailLevel == DetailLevel.Light
             ? (ReliefDetail)Math.Min((int)_reliefDetail, (int)ReliefDetail.Low)
             : _reliefDetail;
-        Mesh = Shape == BodyShape.FlatDisc ? FlatDiscMeshes.Top
-            : carved ? null
+        bool lifted = !_shownHeights.IsEmpty || _waterLevelMeters is not null;
+        Mesh = carved ? null
+            : Shape == BodyShape.FlatDisc
+                ? lifted && _detailLevel != DetailLevel.Plain
+                    ? FlatDiscMeshes.TopRelief(relief)
+                    : FlatDiscMeshes.Top
             : _shownHeights.IsEmpty || _detailLevel == DetailLevel.Plain ? sphere
             : CubeSphereMesh.For(relief);
         SurfaceMaterial.SetShaderParameter("lifted_on_cpu", carved);
@@ -967,12 +1025,18 @@ public partial class PlanetSurface : MeshInstance3D
                 AddChild(_carved);
             }
 
-            _carved.Show(_shapes, _shownHeights, _radiusKm, _reliefScale, SurfaceMaterial);
+            _carved.Show(_shapes, _shownHeights, _radiusKm, _reliefScale, SurfaceMaterial,
+                Shape);
         }
         else if (_carved is not null)
         {
             _carved.QueueFree();
             _carved = null;
+        }
+
+        if (_rock is not null)
+        {
+            _rock.Visible = !carved;  // The carved disc has its own rim and underside
         }
     }
 
@@ -981,10 +1045,73 @@ public partial class PlanetSurface : MeshInstance3D
     private void UpdateBounds()
     {
         ReliefVersion++;
+        UpdateRim();
         float reach = 1.0f + HighestRelief;
+        if (Shape == BodyShape.FlatDisc)
+        {
+            // The disc, from its underside up to its highest peak.
+            float across = (float)FlatDisc.Radius, half = (float)FlatDisc.HalfThickness;
+            CustomAabb = HighestRelief > 0
+                ? new Aabb(new Vector3(-across, -half, -across),
+                    new Vector3(2 * across, 2 * half + HighestRelief, 2 * across))
+                : default;
+            return;
+        }
+
         CustomAabb = HighestRelief > 0
             ? new Aabb(-Vector3.One * reach, Vector3.One * (2 * reach))
             : default;
+    }
+
+    /// <summary>
+    /// How far a flat world's rim is lifted to meet the ground (or water) at its edge, in globe
+    /// radii above the top face's own height (VISION.md BOD-10); 0 on a globe.
+    /// </summary>
+    public float RimLift => _rimLift;
+
+    // A flat world's rim (VISION.md BOD-10): its whole length stands for the south pole, so
+    // the ground (or water) there lifts the face's outermost ring and the rim wall's top edge
+    // alike, and the two always meet. Where the water stands above the ground there, it pours
+    // over the edge.
+    private void UpdateRim()
+    {
+        float lift = Shape == BodyShape.FlatDisc ? SurfaceRadiusAt(_southPole) - 1.0f : 0;
+        if (lift != _rimLift)
+        {
+            _rimLift = lift;
+            SurfaceMaterial.SetShaderParameter("rim_lift", lift);
+            if (_rock is not null)
+            {
+                _rock.Mesh = FlatDiscMeshes.RockLifted(lift);
+            }
+        }
+
+        UpdateWaterfall();
+    }
+
+    // Shows the water pouring over a flat world's rim if its water reaches the edge, in the
+    // color of the water there.
+    private void UpdateWaterfall()
+    {
+        if (_waterfall is null)
+        {
+            return;
+        }
+
+        float ground = Lifted(_shownHeights.IsEmpty ? 0
+            : _reliefScale * (float)_shownHeights.SampleAt(_southPole));
+        if (WaterRadius is not double water || Lifted((float)(water - 1)) <= ground)
+        {
+            _waterfall.Visible = false;
+            return;
+        }
+
+        int at = _shownTerrain.CodeAt(_southPole) * 4;
+        Color? color = _waterPaletteBytes.Length > at && _waterPaletteBytes[at + 3] > 0
+            ? Color.Color8(_waterPaletteBytes[at], _waterPaletteBytes[at + 1],
+                _waterPaletteBytes[at + 2])
+            : null;
+        _waterfall.Show((float)FlatDisc.HalfThickness + _rimLift, color);
     }
 
     private static ImageTexture UpdateTable(ImageTexture? texture, float[] values)

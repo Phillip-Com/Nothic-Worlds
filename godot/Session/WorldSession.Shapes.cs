@@ -23,9 +23,9 @@ public partial class WorldSession
     public (ShapeEdit? Shape, string? Problem) AddShape(
         GeoCoordinate spot, ShapeKind kind, ShapeOperation operation, double? groundKm = null)
     {
-        if (!SelectedBodyCanBeSculpted)
+        if (!SelectedBodyHasSurface)
         {
-            return (null, "shapes go on planets and moons shaped as globes");
+            return (null, "shapes go on planets and moons");
         }
 
         Body body = SelectedBody;

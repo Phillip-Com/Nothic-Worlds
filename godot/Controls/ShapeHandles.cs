@@ -145,7 +145,7 @@ public partial class ShapeHandles : CanvasLayer
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (!_active || Session is not { SelectedBodyCanBeSculpted: true })
+        if (!_active || Session is not { SelectedBodyHasSurface: true })
         {
             return;
         }
@@ -222,8 +222,9 @@ public partial class ShapeHandles : CanvasLayer
 
         // On a carved globe the click may land in a hole or hollow: the shape goes there. (The
         // carving's flat facets sit a little off the round ground, so near it, the ground.)
-        GeoCoordinate spot = SphericalCoordinates.FromDirection(
-            new System.Numerics.Vector3(point.X, point.Y, point.Z));
+        Vector3D direction = GlobeShape.DirectionAt(globe.Shape, point);
+        GeoCoordinate spot = SphericalCoordinates.FromDirection(new System.Numerics.Vector3(
+            (float)direction.X, (float)direction.Y, (float)direction.Z));
         double radiusKm = Session!.SelectedBody.RadiusKm;
         double? groundKm = globe.IsCarved ? globe.TrueHeightKmOf(point, radiusKm) : null;
         if (groundKm is double clicked

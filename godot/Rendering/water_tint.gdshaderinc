@@ -1,11 +1,26 @@
-// Shared by the globe (planet_surface.gdshaderinc) and the first-person water surface
-// (water_surface.gdshader): where a direction falls on the terrain grid, and what color water
-// is over the terrain there (VISION.md BOD-09; owner's choice: water over a terrain type with
-// the Water climate takes that type's color, and water over land a standard blue-green).
+// Shared by the globe (planet_surface.gdshaderinc), the first-person water surface
+// (water_surface.gdshader), and the rim's waterfall (rim_waterfall.gdshader): where a flat
+// world's point stands on the globe, where a direction falls on the terrain grid, and what
+// color water is over the terrain there (VISION.md BOD-09; owner's choice: water over a
+// terrain type with the Water climate takes that type's color, and water over land a standard
+// blue-green).
 
 const int WATER_TINT_CELLS = 1024;  // Cells across a face, as TERRAIN_FACE_SIZE
 const vec3 WATER_SHALLOW = vec3(0.13, 0.42, 0.47);
 const vec3 WATER_DEEP = vec3(0.02, 0.09, 0.24);
+
+// On a flat world's top face, distance from the center is the angle from the north pole (the
+// disc's radius is PI), so a point maps back to the globe direction it stands for. Must match
+// FlatDisc in Core.
+vec3 flat_disc_direction(vec3 point) {
+	float across = length(point.xz);
+	if (across < 1e-6) {
+		return vec3(0.0, 1.0, 0.0);
+	}
+	float from_pole = min(across, PI);
+	vec2 sideways = point.xz / across * sin(from_pole);
+	return vec3(sideways.x, cos(from_pole), sideways.y);
+}
 
 // Where a direction meets the cube: (across, down, face), with across and down from 0 to 1 over
 // the face (left to right, top to bottom). See CubeSphere.CellAt, whose face axes are written
