@@ -3181,3 +3181,7 @@ answered, move the answer into the relevant entry above and remove the question 
 
 New raw ideas go here first, then get sorted into a feature area once reviewed.
 
+
+- **Heights and water on flat worlds** (owner, 2026-10-07): flat worlds draw terrain-shaped
+  ground, sculpting, and peaks (`BOD-07`, `BOD-08`) the way globes do, so they can have water
+  (`BOD-09`) too. Wanted as a later milestone.
