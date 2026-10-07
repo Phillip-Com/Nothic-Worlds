@@ -400,6 +400,14 @@ base and `heightKm` tall. The body is the sculpted globe, then each shape in tur
 cut out of it; the faces a shape makes are bare rock. A cylinder 2 radii tall with its middle a
 radius down goes right through the world; a sphere with its middle a radius down hollows it.
 
+**On a flat world** (`BOD-10`) the same fields mean the same things on the disc: a shape's
+middle is `depthKm` straight up (+y) from its spot on the top face (see `bodies[].shape`), its
+height runs straight up, and its length runs north, toward the face's center (at the center
+itself, +z), turned by `turn` toward east (*e* = *n* × up). The body is the disc, its top face
+lifted by its ground, then each shape added or cut in turn. The disc is 0.08 of the matching
+globe's radius thick, so a cylinder a tenth of a radius tall with its middle 0.04 radii below
+the face (the disc's middle) cuts right through it.
+
 Names written for enums (`kind`, `projection`) are fixed strings. They're not the code's enum
 names, so renaming code never changes the format.
 
@@ -448,6 +456,11 @@ A planet or moon with a `waterLevel` is under water wherever its ground (terrain
 sculpted) is lower than that many meters from its radius. Only the level is saved; nothing
 about the ground changes. Water over a terrain type whose `climate` is `"water"` is drawn in
 that type's `color`; water over other ground in a standard blue-green.
+
+On a flat world the ground and the water stand on its top face as they would on a globe, and a
+point's height is the ground's height at the latitude and longitude it stands for. The whole
+rim stands for the south pole, so where the water there is above the ground, it pours over the
+edge all the way round (drawn only; nothing more is saved).
 
 ## The star field (`starSeed`)
 
