@@ -38,6 +38,30 @@ public sealed class ShapeEditTests
     }
 
     [Fact]
+    public void OnAFlatWorld_AShapeStandsStraightUpFromTheFace_FacingTheCenter()
+    {
+        // Latitude 0 is a quarter turn from the north pole: π/2 from the face's center.
+        ShapeFrame frame = Shape(new GeoCoordinate(0, 0), depthKm: 637.1)
+            .FrameOn(RadiusKm, BodyShape.FlatDisc);
+
+        AssertNear(new Vector3D(0, FlatDisc.HalfThickness + 0.1, Math.PI / 2), frame.Center);
+        AssertNear(new Vector3D(0, 1, 0), frame.Up);
+        AssertNear(new Vector3D(0, 0, -1), frame.Along);  // North: toward the center
+        AssertNear(new Vector3D(1, 0, 0), frame.Across);  // East, as on a globe
+    }
+
+    [Fact]
+    public void OnAFlatWorld_AShapeAtTheCenter_StillHasAFrame()
+    {
+        ShapeFrame frame = Shape(new GeoCoordinate(90, 0)).FrameOn(RadiusKm, BodyShape.FlatDisc);
+
+        // As at a globe's pole, +Z stands in for north there.
+        AssertNear(new Vector3D(0, FlatDisc.HalfThickness, 0), frame.Center);
+        AssertNear(new Vector3D(0, 0, 1), frame.Along);
+        AssertNear(new Vector3D(-1, 0, 0), frame.Across);
+    }
+
+    [Fact]
     public void ACylinderThroughTheWorld_AndAHollowCenter_AreAllowed()
     {
         ShapeEdit hole = Shape(new GeoCoordinate(10, 20), depthKm: -RadiusKm,

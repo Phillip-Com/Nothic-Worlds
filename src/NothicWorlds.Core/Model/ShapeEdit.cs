@@ -72,16 +72,26 @@ public sealed record ShapeEdit(Guid Id, ShapeKind Kind, ShapeOperation Operation
     }
 
     /// <summary>
-    /// Where the shape sits on a body of <paramref name="radiusKm"/>, in the body's radii.
+    /// Where the shape sits on a body of <paramref name="radiusKm"/> and
+    /// <paramref name="shape"/>, in the body's radii. On a flat world (VISION.md BOD-10) it
+    /// stands straight up from its spot on the top face (see <see cref="FlatDisc"/>), with
+    /// north toward the face's center, the north pole.
     /// </summary>
-    public ShapeFrame FrameOn(double radiusKm)
+    public ShapeFrame FrameOn(double radiusKm, BodyShape shape = BodyShape.Sphere)
     {
         System.Numerics.Vector3 spot = SphericalCoordinates.ToDirection(Spot);
-        var up = new Vector3D(spot.X, spot.Y, spot.Z);
-        up *= 1 / up.Length;
+        var direction = new Vector3D(spot.X, spot.Y, spot.Z);
+        direction *= 1 / direction.Length;
+        Vector3D surface = shape == BodyShape.FlatDisc
+            ? FlatDisc.TopPointFor(direction)
+            : direction;
+        Vector3D up = shape == BodyShape.FlatDisc ? new Vector3D(0, 1, 0) : direction;
 
-        // North along the surface (at a pole, where north is everywhere, +Z stands in).
-        Vector3D toPole = new Vector3D(0, 1, 0) - up * up.Y;
+        // North along the surface (at a pole, where north is everywhere, +Z stands in). On a
+        // flat world, that's toward the center.
+        Vector3D toPole = shape == BodyShape.FlatDisc
+            ? new Vector3D(-surface.X, 0, -surface.Z)
+            : new Vector3D(0, 1, 0) - up * up.Y;
         Vector3D north = toPole.Length > 1e-9 ? toPole * (1 / toPole.Length) : new(0, 0, 1);
         Vector3D east = Cross(north, up);
 
@@ -89,7 +99,7 @@ public sealed record ShapeEdit(Guid Id, ShapeKind Kind, ShapeOperation Operation
         double turn = double.DegreesToRadians(TurnDegrees);
         Vector3D along = north * Math.Cos(turn) + east * Math.Sin(turn);
         Vector3D across = east * Math.Cos(turn) - north * Math.Sin(turn);
-        return new ShapeFrame(up * (1 + DepthKm / radiusKm), across, up, along);
+        return new ShapeFrame(surface + up * (DepthKm / radiusKm), across, up, along);
     }
 
     private static Vector3D Cross(Vector3D a, Vector3D b) =>
