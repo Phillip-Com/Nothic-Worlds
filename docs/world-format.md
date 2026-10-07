@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 29** (see **Version history** at the end)
+**Current format version: 30** (see **Version history** at the end)
 
 ## Container
 
@@ -32,7 +32,7 @@ list them all.
 
 ```json
 {
-  "formatVersion": 29,
+  "formatVersion": 30,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -80,6 +80,7 @@ list them all.
       "axialTilt": 23.5,
       "axialTiltDirection": 45,
       "averageTemperature": 12.5,
+      "waterLevel": 120,
       "orbit": { "parent": "51515151-5151-5151-5151-515151515151", "distanceKm": 149600000,
         "periodDays": 365.25, "startAngle": 90 },
       "calendar": {
@@ -127,10 +128,11 @@ list them all.
   ],
   "terrainTypes": [
     { "code": 1, "name": "Ocean", "color": "#1F4E79", "climate": "water",
-      "height": -3000, "edge": 0.3 },
-    { "code": 5, "name": "Forest", "color": "#2F6B35", "climate": "forest", "height": 300 },
+      "height": -3000, "edge": 0.3, "variation": 800, "featureSize": 200 },
+    { "code": 5, "name": "Forest", "color": "#2F6B35", "climate": "forest", "height": 300,
+      "variation": 80 },
     { "code": 13, "name": "Crystal Wastes", "color": "#B0E0E6", "climate": "desert",
-      "height": 1200, "edge": 0.8 }
+      "height": 1200, "edge": 0.8, "variation": 900, "featureSize": 25 }
   ],
   "terrainShapesGround": true,
   "weatherPins": [
@@ -237,6 +239,7 @@ list them all.
 | `bodies[].axialTiltDirection` | yes | Degrees: which way the north pole leans (see the axis rule below) |
 | `bodies[].appearance` | yes | How the body looks (`BOD-06`). Stars: `starType`, one of `"red-dwarf"`, `"orange"`, `"yellow"`, `"white"`, `"blue"` (it sets the star's color and its light's). Planets and moons: `color` (`#RRGGBB`) and `pattern`, one of `"plain"`, `"rocky"`, `"banded"`, `"icy"`, `"cloudy"`, shown where there's no map. |
 | `bodies[].atmosphere` | no | Planets and moons only: `true` if the body has air, and so live weather (`WTH-02`). Always written for them; omitted (files before version 26) means `true` for a planet and `false` for a moon. Refused on other kinds of body. |
+| `bodies[].waterLevel` | no | Planets and moons only: meters, a whole number from −12,000 to 12,000, where the body's water stands (`BOD-09`): wherever the ground is lower, it's under water. Omitted for no water. Refused on other kinds of body. |
 | `bodies[].averageTemperature` | yes | °C, −270 to 2,000: the body's average surface temperature over a year (`WTH-01`; Earth about 15). Weather pins spread it by latitude and season. |
 | `bodies[].density` | no | g/cm³, 0.000001 to 10,000,000: how dense the body is (`SIM-04`; Earth 5.5), which with its radius gives its mass, as if it were a globe. Omitted for the typical density of its kind and size (see `BodyMass` in the code). |
 | `bodies[].calendar` | no | The body's own calendar (`CAL-01`). Omitted to count plain days. |
@@ -290,6 +293,8 @@ list them all.
 | `…terrainTypes[].color` | yes | `#RRGGBB`: how the terrain is drawn |
 | `…terrainTypes[].height` | no | Meters, a whole number from −12,000 to 12,000: how high the ground is where the type is painted, when `terrainShapesGround` is on (`BOD-07`). Omitted for 0. |
 | `…terrainTypes[].edge` | no | 0 (gentle) to 1 (a cliff): how it meets other terrain; the steeper of two wins. Omitted for 0. See **Terrain-shaped ground** below. |
+| `…terrainTypes[].variation` | no | Meters, a whole number from 0 to 8,000: how far the ground rises and falls within the type, around its `height` (`BOD-08`). Omitted for 0 (level). See **Variation within terrain** below. |
+| `…terrainTypes[].featureSize` | no | km, 1 to 5,000: how far apart the type's biggest features are. Omitted for 50. |
 | `…terrainTypes[].climate` | yes | How it affects weather pins (`WTH-03`): `"open-land"`, `"water"`, `"forest"`, `"desert"`, `"wetland"`, `"mountains"`, or `"ice"` |
 | `weatherPins` | no | Named spots whose weather is shown (`WTH-01`), in the order added. Omitted when there are none. Up to 1,000. |
 | `…weatherPins[].id`, `name` | yes | GUID, unique among weather pins; name not empty, up to 100 characters |
@@ -408,7 +413,40 @@ other type, otherwise found through cells of its own type, a diagonal step count
 `w = 24 × (1 − e)²` cells for the steeper edge `e` of the two, it's
 `middle + (own − middle) × s(d / (w / 2))`, where `s(x)` is the smoothstep `3x² − 2x³` (1 at
 or past 1; a cliff, `w = 0`, keeps every cell at its own height). The nearest other type, within
-13 cells, decides; heights round to whole meters.
+13 cells, decides; heights round to whole meters. Each "height" here is the type's `height` plus
+its variation at the cell (see below), so features carry on to the line between two types.
+
+## Variation within terrain (`variation`, `featureSize`)
+
+A type with a `variation` `V` above 0 rises and falls around its `height` at each cell by
+`offset(direction)`, worked out at the cell's middle (a unit direction from the body's
+center) as follows (`Model/TerrainNoise.cs` does it; this never changes):
+
+- **Sizes.** With `R` the body's radius in km and `c = R × π / 2 / 1024` (one cell), features
+  are `S = max(featureSize, 4c)` km across at most and no finer than `3c` km.
+- **Seed.** The body's seed is bytes 4 to 7 of its `id` (as .NET's `Guid.ToByteArray` orders
+  them) read as a little-endian signed 32-bit number; the type's is that plus `code × 7919`,
+  wrapping as 32-bit numbers do.
+- **Noise.** `value(p, seed)` is value noise: for the lattice corners around `p` (with
+  `x = floor(p.x)` and so on), each corner's number is `hash(x, y, z, seed)`, blended along each
+  axis by `t³(t(6t − 15) + 10)` of the way across (x first, then y, then z). `hash` works in
+  unsigned 32-bit: `h = seed`, `h ^= x × 0x8DA6B343`, `h ^= y × 0xD8163841`,
+  `h ^= z × 0xCB1AB31F`, `h ^= h >> 16`, `h ×= 0x7FEB352D`, `h ^= h >> 15`, `h ×= 0x846CA68B`,
+  `h ^= h >> 16`, giving `h / (2³² − 1)`.
+- **Layers.** Start with `p = direction × R / S`, amplitude 1 and wavelength `S`. For each
+  layer `k` (up to 6; the first always, then only while the wavelength is at least `3c`): with
+  `n = value(p, seed + 101k)`, add `amplitude × (2n − 1)` to `smooth`, and with
+  `r = 1 − |2n − 1|`, add `amplitude × (2r² − 1)` to `sharp`; add the amplitude to `weight`;
+  then halve the amplitude and the wavelength and set `p = 2.03p + (17.1, 3.7, 9.4)`.
+- **Peaks.** With `m = smoothstep((V − 400) / 1100)` (0 up to 400 m, 1 from 1,500 m), the
+  offset is `V × (smooth + (sharp − smooth) × m) / weight`: rolling ground for small
+  variations, ridged peaks for big ones.
+
+## Water (`waterLevel`)
+
+A planet or moon with a `waterLevel` is under water wherever its ground (terrain-shaped and
+sculpted) is lower than that many meters from its radius. Only the level is saved; nothing
+about the ground changes.
 
 ## The star field (`starSeed`)
 
@@ -538,6 +576,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 30 | Peaks and water (M36): terrain types gain optional `variation` and `featureSize`; planets and moons gain an optional `waterLevel` | No water. Types named like the defaults (as for version 29) get their variation and feature size (Ocean 800 m/200 km, Shallow Water 40/60, Plains 40/80, Fields 30/80, Forest 80/50, Jungle 100/40, Hills 350/30, Mountains 1,500/40, Desert 120/30, Swamp 5/40, Tundra 60/60, Ice 300/60); others stay level |
 | 29 | Terrain shapes the ground (M35): terrain types gain optional `height` and `edge`; optional `terrainShapesGround` | Off for older worlds. Types named like the defaults (Ocean, Shallow Water, Plains, Fields, Forest, Jungle, Hills, Mountains, Desert, Swamp, Tundra, Ice; any case) get the default heights and edges (−3,000/0.3, −150, 150, 150, 300, 200, 800/0.15, 2,500/0.5, 400, 20, 300, 1,000/0.3); others 0 and gentle |
 | 28 | Designed night skies (M34): `starSeed`; optional `constellations` | Each world gets the seed made from its `id` (its first four bytes, as a little-endian whole number, without the sign bit), so it keeps one fixed sky; no constellations |
 | 27 | Lore diagrams (M31): journal entries gain an optional `kind`; optional `relationships` and `diagrams` | Nothing to change: version 26 worlds have none |
