@@ -6506,6 +6506,658 @@ public sealed class WorldPackageTests : IDisposable
         }
         """;
 
+    // The format as of version 30. If the format changes, add a version 31, a
+    // migration, and a new golden file. Never edit this.
+    private const string GoldenV30Json = """
+        {
+          "formatVersion": 30,
+          "id": "11111111-2222-3333-4444-555555555555",
+          "name": "Aerth",
+          "createdUtc": "2026-09-30T12:00:00+00:00",
+          "modifiedUtc": "2026-09-30T13:30:00+00:00",
+          "timeDays": 400.5,
+          "style": "realistic",
+          "bodies": [
+            {
+              "id": "51515151-5151-5151-5151-515151515151",
+              "name": "Sol",
+              "kind": "star",
+              "radiusKm": 696000,
+              "dayLengthHours": 609.5,
+              "axialTilt": 0,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "appearance": {
+                "starType": "orange"
+              },
+              "belts": [
+                {
+                  "id": "b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1",
+                  "name": "Main Belt",
+                  "innerKm": 329000000,
+                  "outerKm": 494000000,
+                  "thickness": 12,
+                  "density": 0.6,
+                  "color": "#8A7F72"
+                }
+              ],
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aerth",
+              "kind": "planet",
+              "radiusKm": 6000,
+              "dayLengthHours": 26.5,
+              "axialTilt": 23.5,
+              "axialTiltDirection": 45,
+              "averageTemperature": 12.5,
+              "atmosphere": true,
+              "waterLevel": 120,
+              "orbit": {
+                "parent": "51515151-5151-5151-5151-515151515151",
+                "distanceKm": 149600000,
+                "periodDays": 365.25,
+                "startAngle": 90
+              },
+              "calendar": {
+                "months": [
+                  {
+                    "name": "Frost",
+                    "days": 30
+                  },
+                  {
+                    "name": "Highsun",
+                    "days": 31
+                  }
+                ],
+                "weekdays": [
+                  "Moonday",
+                  "Starday"
+                ],
+                "firstYear": 1203,
+                "era": "of the Third Age",
+                "start": {
+                  "month": 1,
+                  "day": 5,
+                  "weekday": 1
+                },
+                "fit": "year-length",
+                "monthMoon": "70707070-7070-7070-7070-707070707070",
+                "leap": {
+                  "every": 4,
+                  "except": 100,
+                  "exceptAgain": 400,
+                  "month": 1,
+                  "days": 1
+                }
+              },
+              "appearance": {
+                "color": "#336699",
+                "pattern": "banded"
+              },
+              "rings": {
+                "inner": 1.25,
+                "outer": 2.3,
+                "color": "#D8C8A8"
+              },
+              "surface": {
+                "map": {
+                  "asset": "assets/0123456789abcdef0123456789abcdef.png",
+                  "projection": "winkel-tripel",
+                  "calibration": {
+                    "latitudes": [
+                      {
+                        "latitude": 30,
+                        "drawnAs": 33.5
+                      }
+                    ],
+                    "longitudes": [
+                      {
+                        "longitude": -180,
+                        "drawnAs": -185
+                      },
+                      {
+                        "longitude": 0,
+                        "drawnAs": 2
+                      }
+                    ]
+                  }
+                },
+                "pieces": [
+                  {
+                    "id": "99999999-8888-7777-6666-555555555555",
+                    "name": "Northern Isles",
+                    "asset": "assets/fedcba9876543210fedcba9876543210.png",
+                    "outline": {
+                      "sourceAspectRatio": 1.5,
+                      "points": [
+                        [
+                          0.25,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.25
+                        ],
+                        [
+                          0.75,
+                          0.5
+                        ],
+                        [
+                          0.25,
+                          0.5
+                        ]
+                      ]
+                    },
+                    "latitude": 55,
+                    "longitude": -20.5,
+                    "rotation": 15,
+                    "width": 12.5,
+                    "warp": [
+                      [
+                        0,
+                        0
+                      ],
+                      [
+                        1.25,
+                        -0.125
+                      ],
+                      [
+                        1,
+                        1
+                      ],
+                      [
+                        0,
+                        1
+                      ]
+                    ]
+                  }
+                ],
+                "fillColor": "#112233",
+                "terrain": "terrain/aaaaaaaabbbbccccddddeeeeeeeeeeee.png"
+              }
+            },
+            {
+              "id": "70707070-7070-7070-7070-707070707070",
+              "name": "Luna",
+              "kind": "moon",
+              "shape": "flat-disc",
+              "radiusKm": 1737.5,
+              "dayLengthHours": 660,
+              "axialTilt": 1.5,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "atmosphere": true,
+              "orbit": {
+                "parent": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "distanceKm": 384400,
+                "periodDays": 27.5,
+                "startAngle": 0,
+                "eccentricity": 0.25,
+                "closestApproach": 45,
+                "tilt": 5.25,
+                "tiltDirection": 120
+              },
+              "appearance": {
+                "color": "#8A8A8A",
+                "pattern": "rocky"
+              },
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "c0c0c0c0-c0c0-c0c0-c0c0-c0c0c0c0c0c0",
+              "name": "Halley",
+              "kind": "comet",
+              "radiusKm": 5.5,
+              "dayLengthHours": 52.8,
+              "axialTilt": 0,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "orbit": {
+                "parent": "51515151-5151-5151-5151-515151515151",
+                "distanceKm": 2667950000,
+                "periodDays": 27510,
+                "startAngle": 200,
+                "eccentricity": 0.95,
+                "closestApproach": 111,
+                "tilt": 162,
+                "tiltDirection": 58
+              },
+              "appearance": {
+                "color": "#C8C4BC",
+                "pattern": "rocky"
+              },
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "77777777-7777-7777-7777-777777777777",
+              "name": "Yggdrasil",
+              "kind": "world-tree",
+              "radiusKm": 150000,
+              "dayLengthHours": 8766,
+              "axialTilt": 0,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "orbit": {
+                "parent": "51515151-5151-5151-5151-515151515151",
+                "distanceKm": 300000000,
+                "periodDays": 1000,
+                "startAngle": 90
+              },
+              "appearance": {
+                "color": "#214573",
+                "pattern": "plain"
+              },
+              "tree": {
+                "branches": 9,
+                "spread": 0.9,
+                "seed": 7,
+                "bark": "#5A4230",
+                "leaves": "#4F8A4A",
+                "glow": "#FFD98A",
+                "glowStrength": 1.5
+              },
+              "surface": {
+                "fillColor": "#E6EDF5"
+              }
+            },
+            {
+              "id": "88888888-8888-8888-8888-888888888888",
+              "name": "Asgard",
+              "kind": "planet",
+              "radiusKm": 6371,
+              "dayLengthHours": 24,
+              "axialTilt": 0,
+              "axialTiltDirection": 0,
+              "averageTemperature": 15,
+              "atmosphere": false,
+              "density": 2.5,
+              "orbit": {
+                "parent": "77777777-7777-7777-7777-777777777777",
+                "distanceKm": 73069.76232989965,
+                "periodDays": 365.25,
+                "startAngle": 92.78477261611476,
+                "tiltDirection": 90,
+                "height": 53888.88141821377
+              },
+              "appearance": {
+                "color": "#214573",
+                "pattern": "plain"
+              },
+              "branch": 0,
+              "surface": {
+                "fillColor": "#E6EDF5",
+                "heights": "heights/88888888888888888888888888888888.png",
+                "shapes": [
+                  {
+                    "id": "5a5a5a5a-5a5a-5a5a-5a5a-5a5a5a5a5a5a",
+                    "kind": "cylinder",
+                    "operation": "cut",
+                    "latitude": 10,
+                    "longitude": 20,
+                    "depthKm": -100,
+                    "widthKm": 50,
+                    "heightKm": 300,
+                    "lengthKm": 50
+                  },
+                  {
+                    "id": "5b5b5b5b-5b5b-5b5b-5b5b-5b5b5b5b5b5b",
+                    "kind": "box",
+                    "operation": "add",
+                    "latitude": -5,
+                    "longitude": -30,
+                    "depthKm": 2,
+                    "widthKm": 40,
+                    "heightKm": 4,
+                    "lengthKm": 80,
+                    "turn": 30
+                  }
+                ]
+              }
+            }
+          ],
+          "terrainTypes": [
+            {
+              "code": 1,
+              "name": "Ocean",
+              "color": "#1F4E79",
+              "climate": "water",
+              "height": -3000,
+              "edge": 0.3,
+              "variation": 800,
+              "featureSize": 200
+            },
+            {
+              "code": 2,
+              "name": "Shallow Water",
+              "color": "#3A86B8",
+              "climate": "water",
+              "height": -150,
+              "variation": 40,
+              "featureSize": 60
+            },
+            {
+              "code": 3,
+              "name": "Plains",
+              "color": "#A8C66C",
+              "climate": "open-land",
+              "height": 150,
+              "variation": 40,
+              "featureSize": 80
+            },
+            {
+              "code": 4,
+              "name": "Fields",
+              "color": "#D8C878",
+              "climate": "open-land",
+              "height": 150,
+              "variation": 30,
+              "featureSize": 80
+            },
+            {
+              "code": 5,
+              "name": "Forest",
+              "color": "#2F6B35",
+              "climate": "forest",
+              "height": 300,
+              "variation": 80
+            },
+            {
+              "code": 6,
+              "name": "Jungle",
+              "color": "#1E5631",
+              "climate": "forest",
+              "height": 200,
+              "variation": 100,
+              "featureSize": 40
+            },
+            {
+              "code": 7,
+              "name": "Hills",
+              "color": "#8C9A5B",
+              "climate": "open-land",
+              "height": 800,
+              "edge": 0.15,
+              "variation": 350,
+              "featureSize": 30
+            },
+            {
+              "code": 8,
+              "name": "Mountains",
+              "color": "#7D6E62",
+              "climate": "mountains",
+              "height": 2500,
+              "edge": 0.5,
+              "variation": 1500,
+              "featureSize": 40
+            },
+            {
+              "code": 9,
+              "name": "Desert",
+              "color": "#E3C78F",
+              "climate": "desert",
+              "height": 400,
+              "variation": 120,
+              "featureSize": 30
+            },
+            {
+              "code": 10,
+              "name": "Swamp",
+              "color": "#4F6B4A",
+              "climate": "wetland",
+              "height": 20,
+              "variation": 5,
+              "featureSize": 40
+            },
+            {
+              "code": 11,
+              "name": "Tundra",
+              "color": "#A3A88E",
+              "climate": "open-land",
+              "height": 300,
+              "variation": 60,
+              "featureSize": 60
+            },
+            {
+              "code": 12,
+              "name": "Glacier",
+              "color": "#EEF3F7",
+              "climate": "ice"
+            },
+            {
+              "code": 13,
+              "name": "Crystal Wastes",
+              "color": "#B0E0E6",
+              "climate": "desert",
+              "height": 1200,
+              "edge": 0.8,
+              "variation": 900,
+              "featureSize": 25
+            }
+          ],
+          "regions": [
+            {
+              "id": "4e4e4e4e-4e4e-4e4e-4e4e-4e4e4e4e4e4e",
+              "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "The Western Coast",
+              "notes": "Fishing towns.",
+              "color": "#5090D0",
+              "corners": [
+                [
+                  10,
+                  -35
+                ],
+                [
+                  10,
+                  -25
+                ],
+                [
+                  16,
+                  -25
+                ],
+                [
+                  16.5,
+                  -35
+                ]
+              ]
+            },
+            {
+              "id": "4f4f4f4f-4f4f-4f4f-4f4f-4f4f4f4f4f4f",
+              "body": "70707070-7070-7070-7070-707070707070",
+              "name": "Sea of Rain",
+              "color": "#E6C878",
+              "corners": [
+                [
+                  20,
+                  10
+                ],
+                [
+                  25,
+                  30
+                ],
+                [
+                  35,
+                  15
+                ]
+              ]
+            }
+          ],
+          "weatherPins": [
+            {
+              "id": "3c3c3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c",
+              "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+              "name": "Aster Bay",
+              "latitude": 42.5,
+              "longitude": -71.25
+            }
+          ],
+          "journal": [
+            {
+              "id": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+              "title": "The Founding",
+              "text": "First line.\nSecond line.",
+              "kind": "faction",
+              "location": {
+                "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "region": "4e4e4e4e-4e4e-4e4e-4e4e-4e4e4e4e4e4e",
+                "latitude": 12.5,
+                "longitude": -30.25
+              },
+              "createdUtc": "2026-10-02T09:00:00+00:00",
+              "editedUtc": "2026-10-02T10:15:00+00:00"
+            },
+            {
+              "id": "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2",
+              "title": "Notes on Luna",
+              "kind": "place",
+              "location": {
+                "body": "70707070-7070-7070-7070-707070707070"
+              },
+              "createdUtc": "2026-10-02T11:00:00+00:00",
+              "editedUtc": "2026-10-02T11:00:00+00:00"
+            }
+          ],
+          "timelines": [
+            {
+              "id": "7e7e7e7e-7e7e-7e7e-7e7e-7e7e7e7e7e7e",
+              "name": "The Empire",
+              "color": "#C04040"
+            },
+            {
+              "id": "7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f",
+              "name": "House Vael",
+              "color": "#40A060",
+              "hidden": true
+            }
+          ],
+          "events": [
+            {
+              "id": "0e0e0e0e-0e0e-0e0e-0e0e-0e0e0e0e0e0e",
+              "timeline": "7e7e7e7e-7e7e-7e7e-7e7e-7e7e7e7e7e7e",
+              "title": "Coronation",
+              "start": 120.5,
+              "location": {
+                "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                "latitude": 12.5,
+                "longitude": -30.25
+              },
+              "entries": [
+                "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1"
+              ]
+            },
+            {
+              "id": "0f0f0f0f-0f0f-0f0f-0f0f-0f0f0f0f0f0f",
+              "timeline": "7f7f7f7f-7f7f-7f7f-7f7f-7f7f7f7f7f7f",
+              "title": "The Long War",
+              "description": "Twelve years of war.",
+              "start": 400,
+              "end": 4783.25,
+              "entries": [
+                "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+                "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2"
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "id": "a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1",
+              "from": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+              "to": "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2",
+              "kind": "rules",
+              "start": 120.5
+            },
+            {
+              "id": "a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2",
+              "from": "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2",
+              "to": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+              "kind": "other",
+              "label": "pays tribute to",
+              "start": 401,
+              "end": 4783.25
+            }
+          ],
+          "diagrams": [
+            {
+              "id": "d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1",
+              "name": "The Empire and Luna",
+              "entries": [
+                {
+                  "entry": "e1e1e1e1-e1e1-e1e1-e1e1-e1e1e1e1e1e1",
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "entry": "e2e2e2e2-e2e2-e2e2-e2e2-e2e2e2e2e2e2",
+                  "x": 240.5,
+                  "y": -80
+                }
+              ]
+            },
+            {
+              "id": "d2d2d2d2-d2d2-d2d2-d2d2-d2d2d2d2d2d2",
+              "name": "Empty"
+            }
+          ],
+          "nebulas": [
+            {
+              "id": "ebebebeb-ebeb-ebeb-ebeb-ebebebebebeb",
+              "name": "Veil",
+              "latitude": 20,
+              "longitude": 135,
+              "size": 30,
+              "brightness": 0.6,
+              "color": "#B04080",
+              "secondColor": "#4060C0"
+            }
+          ],
+          "starSeed": 424242,
+          "terrainShapesGround": true,
+          "constellations": [
+            {
+              "id": "c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1",
+              "name": "The Kestrel",
+              "lines": [
+                [
+                  22,
+                  121
+                ],
+                [
+                  121,
+                  139
+                ]
+              ]
+            },
+            {
+              "id": "c2c2c2c2-c2c2-c2c2-c2c2-c2c2c2c2c2c2",
+              "name": "Lone Pair",
+              "lines": [
+                [
+                  139,
+                  246
+                ]
+              ]
+            }
+          ],
+          "view": {
+            "latitude": 20,
+            "longitude": -45.5,
+            "altitude": 1.25,
+            "focusOffset": [
+              0.5,
+              0,
+              -0.25
+            ]
+          }
+        }
+        """;
+
     // The format as of version 29. If the format changes, add a version 30, a
     // migration, and a new golden file. Never edit this.
     private const string GoldenV29Json = """
@@ -11013,13 +11665,57 @@ public sealed class WorldPackageTests : IDisposable
     // ----- The file format itself -----
 
     [Fact]
-    public void WrittenJson_MatchesTheGoldenVersion29File()
+    public void WrittenJson_MatchesTheGoldenVersion30File()
     {
         string path = PathFor("golden.nworld");
 
-        WorldPackage.Save(path, ShapedGoldenWorld(), AssetsWithPiece());
+        WorldPackage.Save(path, WaterGoldenWorld(), AssetsWithPiece());
 
-        Assert.Equal(Normalize(GoldenV29Json), Normalize(ReadEntry(path, "world.json")));
+        Assert.Equal(Normalize(GoldenV30Json), Normalize(ReadEntry(path, "world.json")));
+    }
+
+    [Fact]
+    public void GoldenVersion30File_LoadsAsExpected()
+    {
+        AssertSameWorld(WaterGoldenWorld(), WorldPackage.Load(GoldenV30Package()).World);
+    }
+
+    [Fact]
+    public void Version29Files_HaveNoWater_AndGiveDefaultTypesTheirVariations()
+    {
+        World world = WorldPackage.Load(GoldenV29Package()).World;
+
+        Assert.All(world.Bodies, body => Assert.Null(body.WaterLevelMeters));
+        TerrainType mountains = world.TerrainTypes.Single(t => t.Name == "Mountains");
+        Assert.Equal((1_500, 40.0), (mountains.VariationMeters, mountains.FeatureSizeKm));
+        TerrainType own = world.TerrainTypes.Single(t => t.Name == "Crystal Wastes");
+        Assert.Equal((0, TerrainType.DefaultFeatureSizeKm),
+            (own.VariationMeters, own.FeatureSizeKm));
+    }
+
+    [Theory]
+    [InlineData("\"variation\": 900", "\"variation\": 99999")]       // Too varied
+    [InlineData("\"variation\": 900", "\"variation\": -5")]          // Below level
+    [InlineData("\"featureSize\": 25", "\"featureSize\": 0.5")]      // Too small
+    [InlineData("\"waterLevel\": 120", "\"waterLevel\": 99999")]     // Too high
+    [InlineData("\"kind\": \"star\",", "\"kind\": \"star\", \"waterLevel\": 0,")] // A star
+    public void Load_DamagedVariationsAndWater_AreRefused(string find, string replace)
+    {
+        string json = Normalize(GoldenV30Json).Replace(find, replace);
+        Assert.NotEqual(Normalize(GoldenV30Json), json);  // The edit really applied.
+
+        string path = GoldenV30Package(json);
+
+        Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
+    }
+
+    // The golden version 30 file (or a changed copy of its world.json), with its images.
+    private string GoldenV30Package(string? json = null)
+    {
+        return WriteRawPackage("golden-v30.nworld", json ?? GoldenV30Json,
+            (AssetName, _imageBytes), (PieceAssetName, _pieceBytes),
+            (TerrainEntryName, TerrainImageBytes(TerrainGoldenWorld())),
+            (HeightsEntryName, HeightImageBytes(HeightsGoldenWorld())));
     }
 
     [Fact]
@@ -12307,7 +13003,7 @@ public sealed class WorldPackageTests : IDisposable
 
         WorldPackage.Save(newPath, loaded.World, loaded.Assets);
 
-        Assert.Contains("\"formatVersion\": 29", ReadEntry(newPath, "world.json"));
+        Assert.Contains("\"formatVersion\": 30", ReadEntry(newPath, "world.json"));
         AssertSameWorld(GoldenWorld(), WorldPackage.Load(newPath).World);
     }
 
@@ -12413,7 +13109,7 @@ public sealed class WorldPackageTests : IDisposable
     {
         string path = WriteRawPackage(
             "future.nworld",
-            GoldenV29Json.Replace("\"formatVersion\": 29", "\"formatVersion\": 30"),
+            GoldenV30Json.Replace("\"formatVersion\": 30", "\"formatVersion\": 31"),
             (AssetName, _imageBytes));
 
         WorldFileException error = Assert.Throws<WorldFileException>(() => WorldPackage.Load(path));
@@ -12693,6 +13389,21 @@ public sealed class WorldPackageTests : IDisposable
 
     // A version 9 world: the version 8 world with the planet's average temperature set to
     // 12.5 °C (the others keep the default 15) and one weather pin on it.
+    // A version 30 world: the version 29 world with water 120 m up on its planet Aerth, and
+    // Crystal Wastes varying by 900 m with features 25 km apart.
+    private static World WaterGoldenWorld()
+    {
+        World world = ShapedGoldenWorld();
+        world.Bodies.Single(b => b.Name == "Aerth").WaterLevelMeters = 120;
+        int index = world.TerrainTypes.FindIndex(t => t.Name == "Crystal Wastes");
+        world.TerrainTypes[index] = world.TerrainTypes[index] with
+        {
+            VariationMeters = 900,
+            FeatureSizeKm = 25,
+        };
+        return world;
+    }
+
     // A version 29 world: the version 28 world with its terrain shaping the ground, and its own
     // type Crystal Wastes 1,200 m high with a steep edge.
     private static World ShapedGoldenWorld()
@@ -12988,6 +13699,8 @@ public sealed class WorldPackageTests : IDisposable
             Climate = ClimateKind.OpenLand,
             HeightMeters = 0,
             Edge = 0,
+            VariationMeters = 0,
+            FeatureSizeKm = TerrainType.DefaultFeatureSizeKm,
         };
         world.TerrainTypes.Add(
             new TerrainType(13, "Crystal Wastes", new RgbColor(0xB0, 0xE0, 0xE6)));
@@ -13266,6 +13979,8 @@ public sealed class WorldPackageTests : IDisposable
         Assert.Equal(expected.Bodies.Count, actual.Bodies.Count);
         Assert.Equal(expected.Bodies.Select(b => b.HasAtmosphere),
             actual.Bodies.Select(b => b.HasAtmosphere));
+        Assert.Equal(expected.Bodies.Select(b => b.WaterLevelMeters),
+            actual.Bodies.Select(b => b.WaterLevelMeters));
         for (int i = 0; i < expected.Bodies.Count; i++)
         {
             Body e = expected.Bodies[i];

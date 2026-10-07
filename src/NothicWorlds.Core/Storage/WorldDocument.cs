@@ -56,6 +56,8 @@ internal sealed class TerrainTypeDocument
     public required string Climate { get; init; }  // Added in format version 12
     public int? Height { get; init; }  // Added in format version 29; omitted for 0
     public double? Edge { get; init; }  // Added in format version 29; omitted for 0
+    public int? Variation { get; init; }  // Added in format version 30; omitted for 0
+    public double? FeatureSize { get; init; }  // Added in version 30, km; omitted for 50
 }
 
 internal sealed class JournalEntryDocument
@@ -153,6 +155,7 @@ internal sealed class BodyDocument
     public required double AxialTiltDirection { get; init; }  // Added in format version 6
     public required double AverageTemperature { get; init; }  // Added in format version 9
     public bool? Atmosphere { get; init; }  // Added in format version 26; planets and moons
+    public int? WaterLevel { get; init; }  // Added in format version 30; omitted for no water
     public double? Density { get; init; }  // Added in format version 22; omitted when typical
     public OrbitDocument? Orbit { get; init; }  // Added in format version 5
     public CalendarDocument? Calendar { get; init; }  // Added in format version 6

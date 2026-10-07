@@ -185,6 +185,96 @@ public class TerrainReliefTests
     }
 
     [Fact]
+    public void Variation_GivesATypePeaksAndDips_WithinItsRange()
+    {
+        TerrainGrid terrain = TerrainGrid.Empty.Paint(_faceMiddle, 20, High);
+        IReadOnlyList<TerrainType> types =
+            [Types(0, 0)[0], Types(0, 0)[1] with { VariationMeters = 1_000, FeatureSizeKm = 60 }];
+
+        HeightGrid heights = TerrainRelief.BaseHeights(terrain, types, 6_371, seed: 7);
+        short[] row = Profile(heights);
+
+        Assert.All(row, h => Assert.InRange(h, 1_000, 3_000));
+        Assert.True(row.Max() - row.Min() > 400, "it should rise and fall");
+        Assert.True(Neighbors(row).Average() < (row.Max() - row.Min()) / 6.0,
+            "it should rise and fall over many cells, not jump about");
+    }
+
+    [Fact]
+    public void Variation_IsTheSameEveryTime_AndDiffersFromBodyToBody()
+    {
+        TerrainGrid terrain = TerrainGrid.Empty.Paint(_faceMiddle, 20, High);
+        IReadOnlyList<TerrainType> types = [Types(0, 0)[1] with { VariationMeters = 600 }];
+
+        HeightGrid first = TerrainRelief.BaseHeights(terrain, types, 6_371, seed: 7);
+        HeightGrid again = TerrainRelief.BaseHeights(terrain, types, 6_371, seed: 7);
+        HeightGrid other = TerrainRelief.BaseHeights(terrain, types, 6_371, seed: 8);
+
+        Assert.True(first.HasSameCells(again));
+        Assert.False(first.HasSameCells(other));
+    }
+
+    [Fact]
+    public void Variation_MeetsAGentleNeighborWithoutASeam()
+    {
+        // Two types at the same height and variation, with different features: where they
+        // meet, the ground should be no rougher than either is on its own.
+        TerrainType a = Types(0, 0)[0] with
+        {
+            HeightMeters = 1_000,
+            VariationMeters = 500,
+            FeatureSizeKm = 120,
+        };
+        TerrainType b = Types(0, 0)[1] with
+        {
+            HeightMeters = 1_000,
+            VariationMeters = 500,
+            FeatureSizeKm = 50,
+        };
+        TerrainGrid both =
+            TerrainGrid.Empty.Paint(_faceMiddle, 20, Low).Paint(_faceMiddle, 5, High);
+        TerrainGrid allA = TerrainGrid.Empty.Paint(_faceMiddle, 20, Low);
+        TerrainGrid allB = TerrainGrid.Empty.Paint(_faceMiddle, 20, High);
+
+        int Roughest(TerrainGrid terrain) =>
+            Neighbors(Profile(TerrainRelief.BaseHeights(terrain, [a, b], 6_371, seed: 3))).Max();
+
+        Assert.True(Roughest(both) <= Math.Max(Roughest(allA), Roughest(allB)) * 1.2,
+            "no seam where the types meet");
+    }
+
+    [Fact]
+    public void Rework_OfAVariation_MatchesWorkingItAllOut()
+    {
+        IReadOnlyList<TerrainType> before = Types(0, 0.3);
+        TerrainGrid terrain = TerrainGrid.Empty
+            .Paint(_faceMiddle, 10, Low)
+            .Paint(_faceMiddle, 3, High);
+        HeightGrid previous = TerrainRelief.BaseHeights(terrain, before, 3_000, seed: 1);
+        IReadOnlyList<TerrainType> after =
+            [before[0], before[1] with { VariationMeters = 700, FeatureSizeKm = 20 }];
+
+        HeightGrid reworked = TerrainRelief.Rework(previous, terrain, before, after, 3_000, 1);
+
+        Assert.True(reworked.HasSameCells(
+            TerrainRelief.BaseHeights(terrain, after, 3_000, seed: 1)));
+    }
+
+    [Fact]
+    public void Noise_IsLevelWithoutVariation_AndStaysWithinIt()
+    {
+        var place = new Vector3D(0.3, 0.4, 0.866);
+        Assert.Equal(0, TerrainNoise.Offset(place, 6_371, 0, 50, 20, 1));
+        for (int i = 0; i < 200; i++)
+        {
+            var direction = new Vector3D(Math.Sin(i * 0.37), Math.Cos(i * 0.11), 0.5);
+            direction *= 1 / direction.Length;
+            double offset = TerrainNoise.Offset(direction, 6_371, 1_500, 40, 20, 9);
+            Assert.InRange(offset, -1_500, 1_500);
+        }
+    }
+
+    [Fact]
     public void TransitionCells_RunsFromTheGentlestWidthToACliff()
     {
         Assert.Equal(TerrainRelief.GentlestWidthCells, TerrainRelief.TransitionCells(0, 0));
@@ -223,6 +313,10 @@ public class TerrainReliefTests
             sample(heights, CubeSphere.Direction(4,
                 (column - 0.5 + i / 10.0) / HeightGrid.FaceSize,
                 (row + 0.5) / HeightGrid.FaceSize)))];
+
+    // The biggest step between neighboring values.
+    private static IEnumerable<int> Neighbors(short[] row) =>
+        row.Zip(row.Skip(1), (a, b) => Math.Abs(b - a));
 
     // How many cells the ground takes to rise (neither at its low nor its high height).
     private static int Rising(short[] profile) => profile.Count(h => h is > 200 and < 2_000);

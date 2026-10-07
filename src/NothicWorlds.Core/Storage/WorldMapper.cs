@@ -127,6 +127,10 @@ internal static class WorldMapper
             Climate = WorldFormat.ClimateName(type.Climate),
             Height = type.HeightMeters == 0 ? null : type.HeightMeters,
             Edge = type.Edge == 0 ? null : type.Edge,
+            Variation = type.VariationMeters == 0 ? null : type.VariationMeters,
+            FeatureSize = type.FeatureSizeKm == TerrainType.DefaultFeatureSizeKm
+                ? null
+                : type.FeatureSizeKm,
         };
     }
 
@@ -140,7 +144,8 @@ internal static class WorldMapper
             $"invalid terrain color '{document.Color}'");
         return new TerrainType((byte)document.Code, document.Name ?? "", color,
             WorldFormat.ParseClimate(document.Climate), document.Height ?? 0,
-            document.Edge ?? 0);
+            document.Edge ?? 0, document.Variation ?? 0,
+            document.FeatureSize ?? TerrainType.DefaultFeatureSizeKm);
     }
 
     private static WeatherPinDocument ToDocument(WeatherPin pin)
@@ -405,6 +410,7 @@ internal static class WorldMapper
             AxialTiltDirection = body.AxialTiltDirectionDegrees,
             AverageTemperature = body.AverageTemperatureC,
             Atmosphere = body.HasSurface ? body.HasAtmosphere : null,
+            WaterLevel = body.WaterLevelMeters,
             Orbit = body.Orbit is Orbit orbit ? ToDocument(orbit) : null,
             Calendar = body.Calendar is Calendar calendar ? ToDocument(calendar) : null,
             Appearance = body.Kind == BodyKind.Star
@@ -733,6 +739,7 @@ internal static class WorldMapper
             Tree = document.Tree is TreeDocument tree ? ToTree(tree) : null,
             Branch = document.Branch,
             DensityGramsPerCm3 = document.Density,
+            WaterLevelMeters = document.WaterLevel,
         };
         RequireNoProblem(body.Problem());
         Require(body.HasSurface || document.Atmosphere is null,
