@@ -108,7 +108,19 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 35: Terrain Shapes the Ground** · In progress (owner's request, 2026-10-06; PR #91)
+**Milestone 36: Peaks and Water** · In progress (owner's request, 2026-10-06)
+The ground a terrain type shapes gets features of its own, and planets and moons get water
+(`BOD-08`, `BOD-09`). Owner's decisions:
+- **Variation and Size per type:** how far peaks rise and dips sink around the type's
+  height, and how far apart they are; mountains get sharp ridged peaks, hills rolling bumps,
+  plains a little unevenness. Fixed per world.
+- **Water per body:** a Has Water switch and a Water Level (default 0 m). Wherever the
+  ground is below it there's a water surface, from orbit and from the ground, with any
+  terrain. With the eye below it in first person, an underwater look: a blue-green tint, a
+  short murky view, and wavy light.
+- **One PR**, save format version 30.
+
+**Milestone 35: Terrain Shapes the Ground** · Complete (PR #91 merged 2026-10-07; owner's request, 2026-10-06)
 Painting a terrain type raises or lowers the ground to that type's height, and where types
 meet, the heights merge from gentle slopes to sheer cliffs (`BOD-07`). Owner's decisions:
 - **Layered:** each terrain type gives the ground a base height, and sculpting adds on top;
@@ -2202,6 +2214,16 @@ sheer cliff, so the world looks real without sculpting every slope by hand (owne
       0.3, so a wall in front isn't cut away; the view still reaches 170 km.
     - Walking into a cliff for 240 frames, the eye never came within 1.7 m of the drawn
       ground.
+
+**BOD-08 — Variation within terrain** · Planned (M36) · Base
+**Intent:** The ground a terrain type shapes isn't one flat height: mountains have peaks,
+hills roll, and plains are a little uneven, with how high and how far apart the features are
+set per type (owner's request, 2026-10-06).
+
+**BOD-09 — Water** · Planned (M36) · Base
+**Intent:** A planet or moon can have water at a level the user sets: wherever the ground is
+below it there's a water surface, seen from orbit and from the ground, and standing or flying
+beneath it in first person looks like being underwater (owner's request, 2026-10-06).
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
