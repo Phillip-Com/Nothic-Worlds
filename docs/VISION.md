@@ -123,7 +123,7 @@ decisions:
   zones it draws. Nothing is removed.
 - **One PR** (PR #94).
 
-**Milestone 39: The Calendar** · In PR #95 (owner's request, 2026-10-08)
+**Milestone 39: The Calendar** · Complete (PR #95 merged 2026-10-08; owner's request, 2026-10-08)
 Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decisions:
 - **A Calendar tab** in place of Timeline: the selected world's month (or whole year) as a
   grid, each day with the moons' phases, seasons, eclipses, meteor showers, and events; click
@@ -133,9 +133,13 @@ Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decision
   step a day, month, or year either way; Play with its speed. It replaces the step menu and
   the Go to box.
 
-**Milestone 40: Calendars Made Easy** · Planned (owner's request, 2026-10-08)
+**Milestone 40: Calendars Made Easy** · In PR #96 (owner's request, 2026-10-08)
 Ready-made calendars to start from, and dates picked from a calendar everywhere a date is asked
-for (events, Go to, the calendar's own start date) (`CAL-06`).
+for (`CAL-06`). Owner's decisions:
+- **Four starting points** in the calendar editor: fitted to this world (today's starter),
+  Earth (Gregorian), thirteen lunar months, and ten-day weeks.
+- **Date pickers everywhere a date is asked:** events' start and end, and the calendar's own
+  start date: a small month you click, plus the hour.
 
 **Milestone 37: Flat Worlds in Relief** · Complete (PR #93 merged 2026-10-08; owner's request, 2026-10-07)
 Flat worlds get what globes have: heights, water, and shapes (`BOD-10`). Owner's decisions:
@@ -2687,7 +2691,7 @@ without the world being changed to fit.
 - **Verified in the running app** with real clicks, maximized and at 1152 × 648: turning it on,
   Suggest, Save (the leap month gains its day in leap years), and save/reopen.
 
-**CAL-05 — Calendar view** · Implemented (M39, PR #95) · Base
+**CAL-05 — Calendar view** · Implemented (M39: PR #95) · Base
 **Intent:** Time is shown as a calendar, as fantasy-calendar.com does: a month or year grid
 for the selected world with the moons' phases, seasons, eclipses, meteor showers, and events
 on each day, and a time bar that shows the date in the world's own calendar and steps by day,
@@ -2730,9 +2734,31 @@ month, or year (owner's request, 2026-10-08).
 - **Cost:** with the clock playing at a month a second, 122 fps with the calendar open and
   154 closed, on the baseline laptop.
 
-**CAL-06 — Calendar presets and date pickers** · Planned (M40) · Base
+**CAL-06 — Calendar presets and date pickers** · Implemented (M40, PR #96) · Base
 **Intent:** A calendar can start from a ready-made one, and every date is picked from a
 calendar rather than typed as a day number (owner's request, 2026-10-08).
+**Implementation (PR #96):**
+- **Presets** (`Model/CalendarPresets.cs`, owner's choice of four):
+  - **Fitted to This World:** twelve months sharing the body's own year, with leap days in the
+    last month for any part day (`LeapRule.Suggest`); it's also what a body without a calendar
+    starts from;
+  - **Earth (Gregorian):** January to December, Monday to Sunday, leap years 4/100/400;
+  - **Thirteen Months:** 13 × 28 days and one Year's End day;
+  - **Ten-Day Weeks:** 12 × 30 days in three ten-day weeks, and five Festival Days.
+  Each is an ordinary calendar once made; nothing records which one it came from.
+- **The calendar editor** (`CalendarDialog`) has a **Start From** row of the four. Pressing one
+  fills in the months and weekdays (keeping the year number and era); Cancel keeps the old ones.
+- **The date picker** (`UI/DatePicker.cs`): a button showing the date, which opens a small
+  month under it (on screen, so it works inside dialogs):
+  - ‹ › for months, « » for years;
+  - the month to choose and the year to type, for far-off dates;
+  - the weekday names, and the chosen day highlighted;
+  - click a day to pick it.
+- **Where it's used:**
+  - the event and relationship editors' start and end (`DateFields`: the date and the hour,
+    or a day number on a body without a calendar);
+  - the calendar editor's **Start date**, in the edited months' first year (the start weekday
+    is still chosen on its own).
 
 ### 4.7 Events (`EVT`)
 

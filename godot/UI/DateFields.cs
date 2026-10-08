@@ -5,37 +5,31 @@ using NothicWorlds.Core.Simulation;
 namespace NothicWorlds.UI;
 
 /// <summary>
-/// Fields for entering a moment on a body (VISION.md CAL-01, SIM-02): year, month, day, and
-/// hour in the body's calendar, or day and hour without one. Used by the Go to dialog and the
-/// event editor.
+/// Fields for entering a moment on a body (VISION.md CAL-01, CAL-06): the date picked from its
+/// calendar (<see cref="DatePicker"/>) and the hour, or a day number and the hour without a
+/// calendar. Used by the event and relationship editors.
 /// </summary>
 public partial class DateFields : GridContainer
 {
-    private SpinBox _year = null!;
-    private OptionButton _month = null!;
+    private DatePicker _date = null!;
     private SpinBox _day = null!;
     private SpinBox _hour = null!;
-    private Control[] _calendarOnly = [];
+    private Label _dateLabel = null!;
+    private Label _dayLabel = null!;
     private Body? _body;
 
     public override void _Ready()
     {
         Columns = 2;
-        _year = new SpinBox
-        {
-            MinValue = -1e12,
-            MaxValue = 1e12,
-            Step = 1,
-            UpdateOnTextChanged = true,
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-        }.WithArrowKeys();
-        _month = new Dropdown { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        _month.ItemSelected += _ => LimitDayToMonth();
+        _date = new DatePicker();
         _day = new SpinBox
         {
+            MinValue = -1e9,
+            MaxValue = 1e9,
             Step = 1,
             UpdateOnTextChanged = true,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            TooltipText = "The day number (Day 1 is the world's first day)",
         }.WithArrowKeys();
         _hour = new SpinBox
         {
@@ -43,12 +37,11 @@ public partial class DateFields : GridContainer
             Step = 0.25,
             UpdateOnTextChanged = true,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            TooltipText = "The hour of the day, in standard hours from midnight",
         }.WithArrowKeys();
-        Label yearLabel = AddRow("Year", _year);
-        Label monthLabel = AddRow("Month", _month);
-        AddRow("Day", _day);
+        _dateLabel = AddRow("Date", _date);
+        _dayLabel = AddRow("Day", _day);
         AddRow("Hour", _hour);
-        _calendarOnly = [yearLabel, _year, monthLabel, _month];
     }
 
     /// <summary>
@@ -58,29 +51,15 @@ public partial class DateFields : GridContainer
     {
         _body = body;
         LocalTime local = BodyClock.LocalTimeOn(body, timeDays);
-        foreach (Control field in _calendarOnly)
-        {
-            field.Visible = body.Calendar is not null;
-        }
-
+        bool dated = body.Calendar is not null;
+        _date.Visible = _dateLabel.Visible = dated;
+        _day.Visible = _dayLabel.Visible = !dated;
         if (body.Calendar is Calendar calendar)
         {
-            CalendarDate date = CalendarMath.DateOf(calendar, local.Day - 1);
-            _month.Clear();
-            foreach (CalendarMonth month in calendar.Months)
-            {
-                _month.AddItem(month.Name);
-            }
-
-            _year.Value = date.Year;
-            _month.Select(date.Month);
-            LimitDayToMonth();
-            _day.Value = date.Day;
+            _date.Show(calendar, local.Day - 1);
         }
         else
         {
-            _day.MinValue = -1e9;
-            _day.MaxValue = 1e9;
             _day.Value = local.Day;
         }
 
@@ -101,21 +80,8 @@ public partial class DateFields : GridContainer
                 return 0;
             }
 
-            long dayIndex = body.Calendar is Calendar calendar
-                ? CalendarMath.DayIndexOf(calendar, (long)_year.Value,
-                    Math.Max(0, _month.Selected), (int)_day.Value)
-                : (long)_day.Value - 1;
+            long dayIndex = body.Calendar is not null ? _date.DayIndex : (long)_day.Value - 1;
             return BodyClock.TimeAt(body, dayIndex, _hour.Value);
-        }
-    }
-
-    // Limits the day field to the chosen month's days.
-    private void LimitDayToMonth()
-    {
-        if (_body?.Calendar is Calendar calendar && _month.Selected >= 0)
-        {
-            _day.MinValue = 1;
-            _day.MaxValue = calendar.Months[_month.Selected].Days;
         }
     }
 
