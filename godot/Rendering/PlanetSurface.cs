@@ -613,6 +613,26 @@ public partial class PlanetSurface : MeshInstance3D
         ? 1 + _reliefScale * (double)level
         : null;
 
+    /// <summary>Whether the body has lakes (see <see cref="SetLakeLevels"/>).</summary>
+    public bool HasLakes => !_shownLakes.IsEmpty;
+
+    /// <summary>
+    /// How far out the water's surface is at a direction, in the globe's radii (as
+    /// <see cref="WaterRadius"/>): the sea's or a lake's, whichever is higher, or null where
+    /// there's neither. The ground there may be higher (dry land).
+    /// </summary>
+    public double? WaterRadiusAt(Vector3D direction)
+    {
+        double? lake = null;
+        if (!_shownLakes.IsEmpty && _shownLakes.HeightAt(direction) is short level
+            && level > HeightGrid.MinHeightMeters)
+        {
+            lake = 1 + _reliefScale * (double)level;
+        }
+
+        return WaterRadius is double sea ? Math.Max(sea, lake ?? sea) : lake;
+    }
+
     /// <summary>
     /// Whether relief is shaded map-style, from a fixed direction (true), or by the sunlight.
     /// </summary>

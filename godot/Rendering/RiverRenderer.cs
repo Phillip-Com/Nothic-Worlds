@@ -68,6 +68,19 @@ public partial class RiverRenderer : Node
 
     public override void _Process(double delta)
     {
+        // Standing on a body, its rivers are drawn up close instead (FirstPersonMode); these,
+        // lifted to show from orbit, would float in its sky.
+        if (System is not null)
+        {
+            foreach (Guid id in _built.Keys)
+            {
+                if (System.SurfaceFor(id)?.GetNodeOrNull<MeshInstance3D>(MeshName) is { } mesh)
+                {
+                    mesh.Visible = System.StandingOn != id;
+                }
+            }
+        }
+
         // The relief changes with the View menu's exaggeration, not only with edits.
         if (System is not null && _built.Any(pair => System.SurfaceFor(pair.Key) is { } globe
             && globe.ReliefVersion != pair.Value.Relief))
