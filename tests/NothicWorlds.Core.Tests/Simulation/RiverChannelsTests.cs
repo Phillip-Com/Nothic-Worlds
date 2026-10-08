@@ -38,6 +38,16 @@ public sealed class RiverChannelsTests
     }
 
     [Fact]
+    public void UnderTheStrip_TheCoarserGroundSinks_AndBeyondItDoesnt()
+    {
+        RiverChannels channels = Around(Beside(10));
+        double bed = channels.Carve(Beside(0), 100);
+
+        Assert.True(channels.UnderStripMeters(Beside(0), 100) < bed - 0.4);
+        Assert.Equal(100, channels.UnderStripMeters(Beside(1000), 100));
+    }
+
+    [Fact]
     public void FarFromTheEye_TheRiverLiesOnTheGround_Uncarved()
     {
         RiverChannels channels = Around(Beside(10), reachMeters: 100_000);

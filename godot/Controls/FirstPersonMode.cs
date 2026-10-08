@@ -88,6 +88,7 @@ public partial class FirstPersonMode : Node
     private FirstPersonGround? _water; // The water's surface, on a body with water
     private double? _waterBuiltRadius; // The water level it was built at, in radii
     private RiverWater? _rivers;       // The rivers' water around the eye
+    private RiverBankStrip? _banks;    // ... and their beds and banks, drawn finely
     private RiverChannels? _channels;  // ... and the channels they cut, as last built
 
     // Each river's water along its course (VISION.md BOD-11), worked out for the courses and
@@ -319,6 +320,8 @@ public partial class FirstPersonMode : Node
         _waterBuiltRadius = null;
         _rivers?.QueueFree();
         _rivers = null;
+        _banks?.QueueFree();
+        _banks = null;
         _channels = null;
         _profiles = null;
         _underwater.Visible = false;
@@ -426,6 +429,8 @@ public partial class FirstPersonMode : Node
         AddChild(_water);
         _rivers = new RiverWater { Visible = flat is null };
         AddChild(_rivers);
+        _banks = new RiverBankStrip { Visible = flat is null };
+        AddChild(_banks);
         if (flat is not null)
         {
             _flatGround = new FlatPatch { Name = "FlatGround" };
@@ -748,18 +753,42 @@ public partial class FirstPersonMode : Node
         PlaceRivers(body, time, eye, displayRadius);
     }
 
-    // Puts the rivers' water in the scene, relative to the eye.
+    // Puts the rivers' water, beds, and banks in the scene, relative to the eye.
     private void PlaceRivers(Body body, double time, Vector3D eye, double displayRadius)
     {
-        if (_rivers is not { Mesh: not null } rivers)
+        Transform3D At(Vector3D middle) => new(
+            BodyBasis(body, time).Scaled(Vector3.One * (float)displayRadius),
+            ToGodot(ToSystem(body, time, middle - eye) * displayRadius));
+        if (_rivers is { Mesh: not null } rivers)
         {
-            return;
+            rivers.GlobalTransform = At(rivers.Middle);
+            rivers.SetScale(body.RadiusKm * 1000 / displayRadius);
         }
 
-        rivers.GlobalTransform = new Transform3D(
-            BodyBasis(body, time).Scaled(Vector3.One * (float)displayRadius),
-            ToGodot(ToSystem(body, time, rivers.Middle - eye) * displayRadius));
-        rivers.SetScale(body.RadiusKm * 1000 / displayRadius);
+        if (_banks is { Mesh: not null } banks)
+        {
+            banks.GlobalTransform = At(banks.Middle);
+        }
+    }
+
+    // The beds and banks of the rivers around the eye, drawn finely over the coarser ground
+    // (VISION.md BOD-11): `coarseRadius` gives how far out that ground is drawn at a
+    // direction, in radii (or null off it); `pointAt` and `placeAt` as RiverBankStrip.Build.
+    private void BuildBanks(PlanetSurface globe, Body body, Vector3D eye, Vector3D middle,
+        Func<Vector3D, double?> coarseRadius, Func<Vector3D, double, Vector3D> pointAt,
+        Func<Vector3D, double, Vector3D> placeAt)
+    {
+        double radiusMeters = body.RadiusKm * 1000;
+        double GroundMeters(Vector3D direction) =>
+            (globe.GroundRadiusAt(direction, body.RadiusKm) - 1) * radiusMeters;
+        List<List<BankPoint[]>> strips = _channels is null
+            ? []
+            : RiverBanks.Strips(_channels, eye, body.RadiusKm, GroundMeters,
+                direction => coarseRadius(direction) is double coarse
+                    ? (coarse - 1) * radiusMeters
+                    : _channels.Carve(direction, GroundMeters(direction)));
+        _banks!.MaterialOverride = globe.MaterialOverride;
+        _banks.Build(strips, middle, pointAt, placeAt);
     }
 
     // The rivers around `eye` (a direction on the globe, or the one a flat world's spot
@@ -792,6 +821,22 @@ public partial class FirstPersonMode : Node
             direction => (globe.GroundRadiusAt(direction, body.RadiusKm) - 1) * radiusMeters);
     }
 
+    // How far out the coarser ground around the eye is at a direction, in radii: with the
+    // rivers' channels cut in, and sunk out of sight under the fine strip that draws their
+    // beds and banks.
+    private double UnderStripRadius(PlanetSurface globe, Body body, Vector3D direction)
+    {
+        double ground = globe.GroundRadiusAt(direction, body.RadiusKm);
+        if (_channels is null)
+        {
+            return ground;
+        }
+
+        double radiusMeters = body.RadiusKm * 1000;
+        return 1 + _channels.UnderStripMeters(direction, (ground - 1) * radiusMeters)
+            / radiusMeters;
+    }
+
     // How far out the drawn ground is at a direction, in radii, with the rivers' channels
     // cut into it.
     private double CarvedRadius(PlanetSurface globe, Body body, Vector3D direction)
@@ -808,9 +853,9 @@ public partial class FirstPersonMode : Node
 
     // The height the water's surface is built at, in radii above the base: the water's,
     // where it stands above the ground (before rivers' channels are cut: those hold the
-    // river's water, not the sea's), else out of sight just under the drawn (carved) ground,
-    // `away` radii from the eye.
-    private static double WaterOrUnder(double? water, double ground, double carved,
+    // river's water, not the sea's), else out of sight just under the coarser drawn ground
+    // (`under`: carved, and sunk under rivers' banks), `away` radii from the eye.
+    private static double WaterOrUnder(double? water, double ground, double under,
         double away, Body body)
     {
         if (water is double level && level > ground)
@@ -819,7 +864,7 @@ public partial class FirstPersonMode : Node
         }
 
         double radiusMeters = body.RadiusKm * 1000;
-        return carved - Math.Max(MinDryMeters, DryShare * away * radiusMeters) / radiusMeters;
+        return under - Math.Max(MinDryMeters, DryShare * away * radiusMeters) / radiusMeters;
     }
 
     // How far out the water's surface is over the eye, in radii: the sea's, or a lake's
@@ -895,6 +940,7 @@ public partial class FirstPersonMode : Node
         ground.Visible = !globe.IsCarved;  // A carved globe draws its own carving
         _water!.Visible = !globe.IsCarved && (globe.WaterRadius is not null || globe.HasLakes);
         _rivers!.Visible = !globe.IsCarved;
+        _banks!.Visible = !globe.IsCarved;
         if (globe.IsCarved)
         {
             return;
@@ -912,11 +958,15 @@ public partial class FirstPersonMode : Node
         {
             _sinceGroundBuilt = 0;
             _channels = ChannelsAround(globe, body, _spot, outer);
-            ground.Build(direction => CarvedRadius(globe, body, direction), _spot,
+            ground.Build(direction => UnderStripRadius(globe, body, direction), _spot,
                 Math.Max(height * 0.5, 2e-7), outer);
             double radiusMeters = body.RadiusKm * 1000;
-            _rivers!.Build(_channels, ground.Center * ground.CenterRadius,
-                (direction, meters) => direction * (1 + meters / radiusMeters), radiusMeters);
+            Vector3D Lifted(Vector3D direction, double meters) =>
+                direction * (1 + meters / radiusMeters);
+            _rivers!.Build(_channels, ground.Center * ground.CenterRadius, Lifted,
+                radiusMeters);
+            BuildBanks(globe, body, _spot, ground.Center * ground.CenterRadius,
+                ground.SurfaceRadiusAt, Lifted, (direction, _) => direction);
             ground.MaterialOverride = globe.MaterialOverride;
             SetGroundDetail(ground.MaterialOverride, ground.Center * ground.CenterRadius,
                 body.RadiusKm);
@@ -936,7 +986,7 @@ public partial class FirstPersonMode : Node
             Vector3D center = ground.Center;
             _water.Build(direction => WaterOrUnder(globe.WaterRadiusAt(direction) - 1,
                     globe.GroundRadiusAt(direction, body.RadiusKm) - 1,
-                    CarvedRadius(globe, body, direction) - 1,
+                    UnderStripRadius(globe, body, direction) - 1,
                     Math.Acos(Math.Clamp(direction.Dot(center), -1, 1)), body) + 1,
                 center, Math.Max(height * 0.5, 2e-7), outer);
             SetWaveOrigin(ground.Center * _water.CenterRadius, body.RadiusKm);
@@ -1016,12 +1066,25 @@ public partial class FirstPersonMode : Node
                 ? ChannelsAround(globe, body, seen, outer)
                 : null;
             ground.Build(flat, outer, FlatGroundLift, ground: globe.IsCarved ? null
-                : point => FlatCarvedAt(globe, point, body), rimLift: globe.RimLift);
+                : point => FlatUnderStripAt(globe, point, body), rimLift: globe.RimLift);
             double radiusMeters = body.RadiusKm * 1000;
-            _rivers!.Build(_channels, ground.Middle, (direction, meters) =>
+            Vector3D OnTop(Vector3D direction, double meters) =>
                 FlatDisc.TopPointFor(direction) + new Vector3D(0, FlatGroundLift
-                    + Math.Max(meters / radiusMeters, PlanetSurface.FlatDeepestLift), 0),
-                radiusMeters);
+                    + Math.Max(meters / radiusMeters, PlanetSurface.FlatDeepestLift), 0);
+            _rivers!.Build(_channels, ground.Middle, OnTop, radiusMeters);
+            if (_channels is not null && FlatWalk.MapDirection(flat) is Vector3D eyeOnMap)
+            {
+                BuildBanks(globe, body, eyeOnMap, ground.Middle,
+                    direction => ground.TopHeightAt(FlatDisc.TopPointFor(direction))
+                        is double drawn
+                        ? 1 + drawn - FlatDisc.HalfThickness - FlatGroundLift
+                        : null,
+                    OnTop, OnTop);
+            }
+            else
+            {
+                _banks!.Build([], ground.Middle, OnTop, OnTop);
+            }
             globe.SetNearEye(flat.Face == FlatFace.Top ? ground.Middle : null,
                 outer * NearEyeShare);
             _groundVersion = globe.ReliefVersion;
@@ -1047,6 +1110,7 @@ public partial class FirstPersonMode : Node
         water.Visible = flat.Face == FlatFace.Top && !globe.IsCarved
             && (globe.WaterRadius is not null || globe.HasLakes);
         _rivers!.Visible = flat.Face == FlatFace.Top && !globe.IsCarved;
+        _banks!.Visible = _rivers.Visible;
         double sea = globe.WaterRadius ?? 0;
         if (water.Visible && sea != _flatWaterBuilt)
         {
@@ -1054,7 +1118,7 @@ public partial class FirstPersonMode : Node
             Vector3D middle = ground.Middle;
             water.Build(flat, outer, FlatGroundLift, ground: point => Math.Max(WaterOrUnder(
                     globe.WaterRadiusAt(FlatDisc.DirectionFor(point)) - 1,
-                    FlatGroundAt(globe, point, body.RadiusKm), FlatCarvedAt(globe, point, body),
+                    FlatGroundAt(globe, point, body.RadiusKm), FlatUnderStripAt(globe, point, body),
                     new Vector3D(point.X - middle.X, 0, point.Z - middle.Z).Length, body),
                 PlanetSurface.FlatDeepestLift));
             SetWaveOrigin(water.Middle, body.RadiusKm);
@@ -1092,6 +1156,23 @@ public partial class FirstPersonMode : Node
         }
 
         return globe.GroundRadiusAt(FlatDisc.DirectionFor(topPoint), radiusKm) - 1;
+    }
+
+    // How far the coarser ground around the eye is lifted at a point of a flat world's top
+    // face, in radii: with the rivers' channels cut in, and sunk out of sight under the fine
+    // strip that draws their beds and banks.
+    private double FlatUnderStripAt(PlanetSurface globe, Vector3D topPoint, Body body)
+    {
+        double lift = FlatGroundAt(globe, topPoint, body.RadiusKm);
+        if (_channels is null)
+        {
+            return lift;
+        }
+
+        double radiusMeters = body.RadiusKm * 1000;
+        double under = _channels.UnderStripMeters(FlatDisc.DirectionFor(topPoint),
+            lift * radiusMeters);
+        return Math.Max(under / radiusMeters, PlanetSurface.FlatDeepestLift);
     }
 
     // How far the drawn ground is lifted at a point of a flat world's top face, in radii,

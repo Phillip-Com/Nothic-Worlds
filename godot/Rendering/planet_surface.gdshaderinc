@@ -176,6 +176,9 @@ varying vec3 local_direction;
 
 // 1 on the ground around a first-person eye, which leaves the clouds and the grid to the sky
 // (surface_sky.gdshader draws the clouds overhead; seen from below they aren't on the ground).
+// 0 on the globe's own mesh; 1 to 2 on the ground built around a first-person eye, more than
+// 1 on the fine strip along a river (RiverBankStrip, CUSTOM0.w), as far as its shading follows
+// its own slope (its bed and banks) rather than the ground's heights.
 varying float eye_level_ground;
 
 // Fine detail on that ground near the eye (VISION.md REN-06): its position from the point the
@@ -756,7 +759,7 @@ void vertex() {
 	// around the eye, not the globe's middle, so its positions keep their precision; it brings
 	// each point's direction from the globe's middle along (CUSTOM0, w = 1) and is lifted
 	// already. Other meshes have no CUSTOM0 (it reads as 0).
-	eye_level_ground = CUSTOM0.w > 0.5 ? 1.0 : 0.0;
+	eye_level_ground = CUSTOM0.w > 0.5 ? CUSTOM0.w : 0.0;
 	ground_offset = VERTEX;
 	if (CUSTOM0.w > 0.5) {
 		local_direction = CUSTOM0.xyz;
@@ -998,6 +1001,12 @@ void fragment() {
 		vec3 normal = flat_disc
 			? flat_relief_normal(local_direction.xz, pixel_angle)
 			: relief_normal(direction, pixel_angle);
+		float shaped = clamp(eye_level_ground - 1.0, 0.0, 1.0);
+		if (shaped > 0.0) {
+			vec3 own = normalize(transpose(mat3(VIEW_MATRIX) * mat3(MODEL_MATRIX)) * NORMAL);
+			normal = normalize(mix(normal, own, shaped));
+		}
+
 		if (map_shading) {
 			ALBEDO *= map_shade(normal, up);
 		} else {
