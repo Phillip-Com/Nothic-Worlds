@@ -20,7 +20,9 @@ public partial class WorldSession
     private const int BrimSearchCells = 50_000;
 
     // Each body's water as last worked out, and what from.
-    private readonly Dictionary<Guid, (WaterInputs Inputs, BodyWater Water)> _water = [];
+    // (With its lakes' images for the globe, made with it in the background.)
+    private readonly Dictionary<Guid, (WaterInputs Inputs, BodyWater Water, Image[]? Lakes)>
+        _water = [];
 
     // The bodies whose water is being worked out now.
     private readonly HashSet<Guid> _waterUnderway = [];
@@ -265,7 +267,7 @@ public partial class WorldSession
 
         if (_water.TryGetValue(body.Id, out var known) && known.Inputs.Matches(wanted))
         {
-            SendWater(body.Id, known.Water);
+            SendWater(body.Id, known.Water, known.Lakes);
             return;
         }
 
@@ -286,10 +288,15 @@ public partial class WorldSession
         Body snapshot = body.Clone();
         WaterChanged?.Invoke();  // Shows that it's being worked out.
         BodyWater? water = null;
+        Image[]? lakeImages = null;
         try
         {
-            water = await Task.Run(() => BodyWater.For(snapshot, wanted.Ground, wanted.Lakes,
-                wanted.Rivers, wanted.Types));
+            (water, lakeImages) = await Task.Run(() =>
+            {
+                BodyWater water = BodyWater.For(snapshot, wanted.Ground, wanted.Lakes,
+                    wanted.Rivers, wanted.Types);
+                return (water, LakeImages(water.LakeLevels));
+            });
         }
         catch (ArgumentException exception)
         {
@@ -308,19 +315,35 @@ public partial class WorldSession
 
         if (water is not null)
         {
-            _water[bodyId] = (wanted, water);
+            _water[bodyId] = (wanted, water, lakeImages);
         }
 
         ShowWater(now);  // Shows it, or catches up with edits made meanwhile.
         WaterChanged?.Invoke();
     }
 
-    private void SendWater(Guid bodyId, BodyWater? water)
+    private void SendWater(Guid bodyId, BodyWater? water, Image[]? lakes = null)
     {
         if (System?.SurfaceFor(bodyId) is PlanetSurface surface)
         {
-            surface.SetLakeLevels(water?.LakeLevels ?? HeightGrid.Empty);
+            surface.SetLakeLevels(water?.LakeLevels ?? HeightGrid.Empty, lakes);
         }
+    }
+
+    // The images of a body's lake levels for its globe, made side by side on a worker thread
+    // (on the main thread they froze the app for a moment as the water appeared); none for
+    // no lakes.
+    private static Image[]? LakeImages(HeightGrid levels)
+    {
+        if (levels.IsEmpty)
+        {
+            return null;
+        }
+
+        var faces = new Image[6];
+        Parallel.For(0, faces.Length,
+            face => faces[face] = SurfaceImages.HeightFace(levels, face, mipmaps: false));
+        return faces;
     }
 
     private void ForgetWater()

@@ -497,9 +497,11 @@ public partial class PlanetSurface : MeshInstance3D
     /// <summary>
     /// Shows the body's lakes (VISION.md BOD-11): each cell's lake surface in meters (see
     /// <see cref="Core.Simulation.BodyWater.LakeLevels"/>), drawn as water wherever the ground
-    /// is lower, as for <see cref="WaterLevelMeters"/>. Empty for none.
+    /// is lower, as for <see cref="WaterLevelMeters"/>. Empty for none. Given
+    /// <paramref name="faces"/> (each face's image, made ahead off the main thread by
+    /// <see cref="SurfaceImages.HeightFace"/> without smaller copies), they're used as they are.
     /// </summary>
-    public void SetLakeLevels(HeightGrid levels)
+    public void SetLakeLevels(HeightGrid levels, IReadOnlyList<Image>? faces = null)
     {
         if (ReferenceEquals(levels, _shownLakes))
         {
@@ -515,14 +517,14 @@ public partial class PlanetSurface : MeshInstance3D
         else
         {
             // Every lake's water is worked out afresh, so all its faces are sent.
-            var faces = new Godot.Collections.Array<Image>();
+            var images = new Godot.Collections.Array<Image>();
             for (int face = 0; face < CubeSphere.FaceCount; face++)
             {
-                faces.Add(SurfaceImages.HeightFace(levels, face, mipmaps: false));
+                images.Add(faces?[face] ?? SurfaceImages.HeightFace(levels, face, mipmaps: false));
             }
 
             _lakeTexture = new Texture2DArray();
-            _lakeTexture.CreateFromImages(faces);
+            _lakeTexture.CreateFromImages(images);
             SurfaceMaterial.SetShaderParameter("lake_levels", _lakeTexture);
             SurfaceMaterial.SetShaderParameter("has_lakes", true);
         }
