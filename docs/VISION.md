@@ -2463,7 +2463,7 @@ the rim), and shapes added to or cut out of it (owner's request, 2026-10-07).
 - **Limits:** as on globes, a carved disc isn't raised to the water. The disc's map is
   stretched toward the rim, so features painted near the south pole are stretched around it.
 
-**BOD-11 — Rivers and lakes** · Partly implemented (M42 PR 1, #98: from orbit; first-person water is PR 2) · Base
+**BOD-11 — Rivers and lakes** · Partly implemented (M42 PR 1, #98 merged 2026-10-08: from orbit; first-person water is PR 2) · Base
 **Intent:** Rivers you can draw, or that find their own way downhill from a source until they
 reach water, and lakes standing at a height of their own that can flow out into rivers, so a
 world's water looks natural or exactly as designed (owner's request, 2026-10-08).
