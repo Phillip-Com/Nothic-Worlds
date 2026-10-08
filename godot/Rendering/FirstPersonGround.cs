@@ -62,21 +62,29 @@ public partial class FirstPersonGround : MeshInstance3D
         (_innerAngle, _outerAngle, _east, _north) = (innerAngle, outerAngle, east, north);
 
         int count = 1 + Rings * Segments;
-        _radii = new double[count];
-        var positions = new Vector3[count];
-        var normals = new Vector3[count];
-        var directions = new float[count * 4];
-        Add(0, center);
+        var pointDirections = new Vector3D[count];
+        pointDirections[0] = center;
         for (int ring = 0; ring < Rings; ring++)
         {
             double angle = innerAngle * Math.Pow(outerAngle / innerAngle, ring / (Rings - 1.0));
             for (int segment = 0; segment < Segments; segment++)
             {
                 double bearing = Math.Tau * segment / Segments;
-                Vector3D direction = center * Math.Cos(angle)
+                pointDirections[1 + ring * Segments + segment] = center * Math.Cos(angle)
                     + (north * Math.Cos(bearing) + east * Math.Sin(bearing)) * Math.Sin(angle);
-                Add(1 + ring * Segments + segment, direction);
             }
+        }
+
+        // Each point's height is independent of the others' (and, along rivers, takes some
+        // measuring), so they're worked out all at once.
+        _radii = new double[count];
+        Parallel.For(0, count, i => _radii[i] = radiusAt(pointDirections[i]));
+        var positions = new Vector3[count];
+        var normals = new Vector3[count];
+        var directions = new float[count * 4];
+        for (int i = 0; i < count; i++)
+        {
+            Add(i, pointDirections[i]);
         }
 
         var arrays = new Godot.Collections.Array();
@@ -94,7 +102,6 @@ public partial class FirstPersonGround : MeshInstance3D
         // Each point, lifted to the drawn ground and kept relative to the middle point.
         void Add(int index, Vector3D direction)
         {
-            _radii[index] = radiusAt(direction);
             Vector3D point = direction * _radii[index] - middle;
             positions[index] = new Vector3((float)point.X, (float)point.Y, (float)point.Z);
             normals[index] = new Vector3((float)direction.X, (float)direction.Y,
@@ -139,6 +146,18 @@ public partial class FirstPersonGround : MeshInstance3D
         int inner = 1 + ring * Segments, outer = inner + Segments;
         return Math.Max(Math.Max(_radii[inner + segment], _radii[inner + next]),
             Math.Max(_radii[outer + segment], _radii[outer + next]));
+    }
+
+    /// <summary>
+    /// How far out the drawn ground is at a direction, in radii, exactly as the mesh's flat
+    /// triangles lie there; null if the direction is off the rings (or nothing is built).
+    /// </summary>
+    public double? SurfaceRadiusAt(Vector3D direction)
+    {
+        double angle = Math.Acos(Math.Clamp(direction.Dot(Center), -1, 1));
+        double bearing = Math.Atan2(direction.Dot(_east), direction.Dot(_north));
+        return RingGrid.ValueAt(_radii, Rings, Segments, _innerAngle, _outerAngle, angle,
+            bearing / Math.Tau);
     }
 
     // A fan around the middle, then a strip between each ring and the next, wound clockwise
