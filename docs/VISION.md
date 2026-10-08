@@ -133,7 +133,7 @@ Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decision
   step a day, month, or year either way; Play with its speed. It replaces the step menu and
   the Go to box.
 
-**Milestone 40: Calendars Made Easy** · In progress (owner's request, 2026-10-08)
+**Milestone 40: Calendars Made Easy** · In PR #96 (owner's request, 2026-10-08)
 Ready-made calendars to start from, and dates picked from a calendar everywhere a date is asked
 for (`CAL-06`). Owner's decisions:
 - **Four starting points** in the calendar editor: fitted to this world (today's starter),
@@ -2734,9 +2734,31 @@ month, or year (owner's request, 2026-10-08).
 - **Cost:** with the clock playing at a month a second, 122 fps with the calendar open and
   154 closed, on the baseline laptop.
 
-**CAL-06 — Calendar presets and date pickers** · Planned (M40) · Base
+**CAL-06 — Calendar presets and date pickers** · Implemented (M40, PR #96) · Base
 **Intent:** A calendar can start from a ready-made one, and every date is picked from a
 calendar rather than typed as a day number (owner's request, 2026-10-08).
+**Implementation (PR #96):**
+- **Presets** (`Model/CalendarPresets.cs`, owner's choice of four):
+  - **Fitted to This World:** twelve months sharing the body's own year, with leap days in the
+    last month for any part day (`LeapRule.Suggest`); it's also what a body without a calendar
+    starts from;
+  - **Earth (Gregorian):** January to December, Monday to Sunday, leap years 4/100/400;
+  - **Thirteen Months:** 13 × 28 days and one Year's End day;
+  - **Ten-Day Weeks:** 12 × 30 days in three ten-day weeks, and five Festival Days.
+  Each is an ordinary calendar once made; nothing records which one it came from.
+- **The calendar editor** (`CalendarDialog`) has a **Start From** row of the four. Pressing one
+  fills in the months and weekdays (keeping the year number and era); Cancel keeps the old ones.
+- **The date picker** (`UI/DatePicker.cs`): a button showing the date, which opens a small
+  month under it (on screen, so it works inside dialogs):
+  - ‹ › for months, « » for years;
+  - the month to choose and the year to type, for far-off dates;
+  - the weekday names, and the chosen day highlighted;
+  - click a day to pick it.
+- **Where it's used:**
+  - the event and relationship editors' start and end (`DateFields`: the date and the hour,
+    or a day number on a body without a calendar);
+  - the calendar editor's **Start date**, in the edited months' first year (the start weekday
+    is still chosen on its own).
 
 ### 4.7 Events (`EVT`)
 

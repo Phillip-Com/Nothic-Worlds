@@ -28,6 +28,7 @@ public partial class CalendarDialog : ConfirmationDialog
     private LineEdit _era = null!;
     private OptionButton _startMonth = null!;
     private SpinBox _startDay = null!;
+    private DatePicker _startDate = null!;
     private OptionButton _startWeekday = null!;
     private Label _summary = null!;
     private LeapYearSection _leap = null!;
@@ -70,6 +71,9 @@ public partial class CalendarDialog : ConfirmationDialog
         var layout = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         scroll.AddChild(layout);
         AddChild(scroll);
+
+        layout.AddChild(Heading("Start From"));
+        layout.AddChild(BuildPresets());
 
         layout.AddChild(Heading("Months"));
         _monthRows = new VBoxContainer();
@@ -114,21 +118,56 @@ public partial class CalendarDialog : ConfirmationDialog
         _removeButton.Visible = body.Calendar is not null;
         _problem.Text = "";
         ShowMoonChoices(body);
-        ShowCalendar(body.Calendar ?? Starter(_bodyYearDays));
+        ShowCalendar(body.Calendar
+            ?? CalendarPresets.Make(CalendarPresets.Kind.Fitted, _bodyYearDays));
         ShowFit(body);
         PopupCentered();
     }
 
-    // A simple calendar that fits a year of this many of the body's days.
-    private static Calendar Starter(double yearDays)
+    // The ready-made calendars (VISION.md CAL-06): pressing one fills the editor with it,
+    // keeping the year number and era; nothing is saved until Save, so Cancel undoes it.
+    private Control BuildPresets()
     {
-        int totalDays = (int)Math.Clamp(Math.Round(yearDays), 12, 12L * Calendar.MaxMonthDays);
-        return new Calendar
+        var row = new HFlowContainer();
+        foreach ((CalendarPresets.Kind kind, string text, string tip) in new[]
         {
-            Months = [.. Enumerable.Range(0, 12).Select(i => new CalendarMonth(
-                $"Month {i + 1}", totalDays / 12 + (i < totalDays % 12 ? 1 : 0)))],
-            Weekdays = [.. Enumerable.Range(1, 7).Select(i => $"Weekday {i}")],
+            (CalendarPresets.Kind.Fitted, "Fitted to This World",
+                "Twelve months sharing this body's own year, a seven-day week, and leap days " +
+                "for any part day left over"),
+            (CalendarPresets.Kind.Gregorian, "Earth (Gregorian)",
+                "January to December, Monday to Sunday, and a leap day in February every " +
+                "fourth year (but not every hundredth, unless it's every four-hundredth)"),
+            (CalendarPresets.Kind.ThirteenMonths, "Thirteen Months",
+                "Thirteen months of four weeks (364 days), every month starting on the same " +
+                "weekday, and one Year's End day"),
+            (CalendarPresets.Kind.TenDayWeeks, "Ten-Day Weeks",
+                "Twelve months of three ten-day weeks (360 days), and five Festival Days"),
+        })
+        {
+            var button = new Button
+            {
+                Text = text,
+                TooltipText = tip + ". Replaces the months and weekdays below (Cancel keeps " +
+                    "the old ones)",
+                FocusMode = Control.FocusModeEnum.None,
+            };
+            button.Pressed += () => UsePreset(kind);
+            row.AddChild(button);
+        }
+
+        return row;
+    }
+
+    private void UsePreset(CalendarPresets.Kind kind)
+    {
+        Calendar preset = CalendarPresets.Make(kind, _bodyYearDays) with
+        {
+            FirstYear = (long)_firstYear.Value,
+            Era = string.IsNullOrWhiteSpace(_era.Text) ? null : _era.Text,
         };
+        ShowCalendar(preset);
+        RefreshFit();
+        _problem.Text = "";
     }
 
     private void ShowCalendar(Calendar calendar)
@@ -151,6 +190,7 @@ public partial class CalendarDialog : ConfirmationDialog
         _startMonth.Select(calendar.StartMonth);
         RefreshStartDay();
         _startDay.Value = calendar.StartDay;
+        ShowStartDate();
         _startWeekday.Select(calendar.Weekdays.Count == 0 ? 0 : calendar.StartWeekday);
         _leap.Show(calendar.Leap, _months.Select(row => row.Name.Text));
     }
@@ -330,12 +370,25 @@ public partial class CalendarDialog : ConfirmationDialog
             TooltipText = "Words shown after the year number",
         };
         AddLabelled(grid, "Era", _era);
-        _startMonth = new Dropdown { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        // The start month and day are kept here, and picked with the start date below.
+        _startMonth = new Dropdown();
         _startMonth.ItemSelected += _ => RefreshStartDay();
-        AddLabelled(grid, "Start month", _startMonth);
-        _startDay = new SpinBox { MinValue = 1, Step = 1, UpdateOnTextChanged = true }
-            .WithArrowKeys();
-        AddLabelled(grid, "Start day", _startDay);
+        _startDay = new SpinBox { MinValue = 1, Step = 1 };
+        _startDate = new DatePicker
+        {
+            SingleYear = true,
+            TooltipText = "The date at the world's day 1 (time 0), in the first year. Click to " +
+                "pick it from the calendar",
+        };
+        _startDate.DayPicked += OnStartPicked;
+        AddLabelled(grid, "Start date", _startDate);
+        _firstYear.ValueChanged += _ => ShowStartDate();
+        _era.TextChanged += _ => ShowStartDate();
+
+        // Kept in the dialog (hidden), so they're freed with it.
+        _startMonth.Visible = _startDay.Visible = false;
+        grid.AddChild(_startMonth);
+        grid.AddChild(_startDay);
         _startWeekday = new Dropdown();
         AddLabelled(grid, "Start weekday", _startWeekday);
         grid.TooltipText = "The date at the world's day 1 (time 0)";
@@ -472,6 +525,54 @@ public partial class CalendarDialog : ConfirmationDialog
         _startDay.MaxValue = month >= 0 && month < _months.Count
             ? _months[month].Days!.Value
             : 1;
+        ShowStartDate();
+    }
+
+    // The start date, in a calendar of the months as edited, counted from the first year's
+    // first day (weekdays left out: the start weekday is chosen on its own).
+    private Calendar? FirstYearCalendar()
+    {
+        if (_months.Count == 0 || _months.Any(row => row.Days is null))
+        {
+            return null;
+        }
+
+        return new Calendar
+        {
+            Months = [.. _months.Select(row => new CalendarMonth(
+                string.IsNullOrWhiteSpace(row.Name.Text) ? "?" : row.Name.Text.Trim(),
+                Math.Max(1, (int)row.Days!.Value)))],
+            FirstYear = (long)_firstYear.Value,
+            Era = string.IsNullOrWhiteSpace(_era.Text) ? null : _era.Text.Trim(),
+        };
+    }
+
+    private void ShowStartDate()
+    {
+        if (_startDate is null || FirstYearCalendar() is not Calendar calendar)
+        {
+            return;
+        }
+
+        int month = Math.Clamp(_startMonth.Selected, 0, calendar.Months.Count - 1);
+        int day = Math.Clamp((int)_startDay.Value, 1, calendar.Months[month].Days);
+        _startDate.Show(calendar, CalendarMath.DayIndexOf(calendar, calendar.FirstYear, month,
+            day));
+    }
+
+    private void OnStartPicked(long dayIndex)
+    {
+        if (FirstYearCalendar() is not Calendar calendar)
+        {
+            return;
+        }
+
+        CalendarDate date = CalendarMath.DateOf(calendar, dayIndex);
+        _startMonth.Select(date.Month);
+        RefreshStartDay();
+        _startDay.Value = date.Day;
+        ShowStartDate();
+        RefreshFit();
     }
 
     // How the calendar's year compares with the body's real year.
