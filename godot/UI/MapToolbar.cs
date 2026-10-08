@@ -13,6 +13,9 @@ namespace NothicWorlds.UI;
 public partial class MapToolbar : CanvasLayer
 {
     private const int ScreenMargin = 12;
+
+    // How far down the hint bar sits: just under the toolbar's buttons.
+    private const int HintBarTop = 56;
     private const double InfoMessageSeconds = 6.0;
     private const float MessageWidth = 460.0f;
     private const float HintWidth = 560.0f;
@@ -23,7 +26,7 @@ public partial class MapToolbar : CanvasLayer
 
     private Button _systemButton = null!;
     private Button _journalButton = null!;
-    private Button _timelineButton = null!;
+    private Button _calendarButton = null!;
     private Button _regionsButton = null!;
     private Button _diagramsButton = null!;
     private Label _message = null!;
@@ -51,8 +54,11 @@ public partial class MapToolbar : CanvasLayer
     /// </summary>
     [Export] public JournalPanel? Journal { get; set; }
 
-    /// <summary>The timeline strip, shown and hidden by the Timeline button.</summary>
-    [Export] public TimelineStrip? Timeline { get; set; }
+    /// <summary>
+    /// The Calendar tab (VISION.md CAL-05), shown and hidden by the Calendar button; its
+    /// Timeline view holds the timeline of events.
+    /// </summary>
+    [Export] public CalendarPanel? Calendar { get; set; }
 
     /// <summary>The Regions panel, shown and hidden by the Regions button.</summary>
     [Export] public RegionsPanel? RegionsPanel { get; set; }
@@ -110,8 +116,11 @@ public partial class MapToolbar : CanvasLayer
             "Regions", "Outline and name regions on the planet: countries, forests, seas");
         _diagramsButton = CreateButton(
             "Diagrams", "Relationship diagrams: how characters, factions, and nations are tied");
-        Button[] rightPanels =
-            [mapButton, terrainButton, _journalButton, _regionsButton, _diagramsButton];
+        _calendarButton = CreateButton("Calendar",
+            "The selected world's calendar: its months and years, moons, seasons, eclipses, " +
+            "and events; and the timeline of your world's history");
+        Button[] rightPanels = [mapButton, terrainButton, _journalButton, _regionsButton,
+            _diagramsButton, _calendarButton];
         foreach (Button button in rightPanels)
         {
             button.ToggleMode = true;
@@ -169,17 +178,13 @@ public partial class MapToolbar : CanvasLayer
             }
         };
 
-        _timelineButton = CreateButton(
-            "Timeline", "The timeline strip: your world's history, as lanes of events");
-        _timelineButton.ToggleMode = true;
-        _timelineButton.Toggled += open =>
+        _calendarButton.Toggled += open =>
         {
-            if (Timeline is not null)
+            if (Calendar is not null)
             {
-                Timeline.IsStripOpen = open;
+                Calendar.IsPanelOpen = open;
             }
         };
-        controls.AddChild(_timelineButton);
 
         _message = CreateLabel("");
         _message.Visible = false;
@@ -227,10 +232,18 @@ public partial class MapToolbar : CanvasLayer
         _systemButton.ButtonPressed = true;
     }
 
-    /// <summary>Shows the timeline strip.</summary>
+    /// <summary>Opens the Calendar tab on its timeline of events.</summary>
     public void ShowTimeline()
     {
-        _timelineButton.ButtonPressed = true;
+        _calendarButton.ButtonPressed = true;
+        Calendar?.ShowTimelineView();
+    }
+
+    /// <summary>Opens the Calendar tab on the month the clock is in.</summary>
+    public void ShowCalendar()
+    {
+        _calendarButton.ButtonPressed = true;
+        Calendar?.ShowMonthView();
     }
 
     /// <summary>Closes the diagrams page, back to the globe.</summary>
@@ -322,9 +335,11 @@ public partial class MapToolbar : CanvasLayer
             Alignment = BoxContainer.AlignmentMode.Center,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
+        // Along the top, under the toolbar (VISION.md UI-07): the bottom is the time bar's and
+        // the calendar's.
         row.SetAnchorsAndOffsetsPreset(
-            Control.LayoutPreset.BottomWide, Control.LayoutPresetMode.Minsize, ScreenMargin);
-        row.GrowVertical = Control.GrowDirection.Begin;
+            Control.LayoutPreset.TopWide, Control.LayoutPresetMode.Minsize, ScreenMargin);
+        row.OffsetTop = HintBarTop;
         row.AddChild(_hintBar);
         AddChild(row);
 

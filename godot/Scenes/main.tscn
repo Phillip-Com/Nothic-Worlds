@@ -42,6 +42,7 @@
 [ext_resource type="Script" uid="uid://cekut15kuxtr5" path="res://UI/StartScreen.cs" id="40_start_screen"]
 [ext_resource type="Script" uid="uid://b671nd37ojvfm" path="res://Rendering/StarSky.cs" id="41_star_sky"]
 [ext_resource type="Script" uid="uid://dfnfodhejd5f0" path="res://UI/SkyPage.cs" id="42_sky_page"]
+[ext_resource type="Script" path="res://UI/CalendarPanel.cs" id="43_calendar_panel"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -101,13 +102,13 @@ Journal = NodePath("../JournalPanel")
 GlobeCamera = NodePath("../PlanetCamera")
 HideWhileOpen = [NodePath("../CameraModeIndicator"), NodePath("../BodyMarkers"), NodePath("../EclipseMarkers"), NodePath("../RegionMarkers"), NodePath("../PinMarkers"), NodePath("../WeatherMarkers")]
 
-[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("MapPanel", "Terrain", "SystemPanel", "Journal", "Timeline", "RegionsPanel", "Diagrams")]
+[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("MapPanel", "Terrain", "SystemPanel", "Journal", "Calendar", "RegionsPanel", "Diagrams")]
 script = ExtResource("7_toolbar")
 Diagrams = NodePath("../DiagramPage")
 MapPanel = NodePath("../MapPanel")
 Terrain = NodePath("../TerrainPanel")
 Journal = NodePath("../JournalPanel")
-Timeline = NodePath("../TimelineStrip")
+Calendar = NodePath("../CalendarPanel")
 RegionsPanel = NodePath("../RegionsPanel")
 SystemPanel = NodePath("../SystemPanel")
 
@@ -134,6 +135,14 @@ Session = NodePath("../WorldSession")
 Toolbar = NodePath("../MapToolbar")
 Time = NodePath("../TimeControls")
 Placer = NodePath("../PinPlacer")
+
+[node name="CalendarPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "Time", "Timeline", "SystemPanel")]
+script = ExtResource("43_calendar_panel")
+Session = NodePath("../WorldSession")
+Toolbar = NodePath("../MapToolbar")
+Time = NodePath("../TimeControls")
+Timeline = NodePath("../TimelineStrip")
+SystemPanel = NodePath("../SystemPanel")
 
 [node name="RegionsPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Camera", "Toolbar", "Editor", "Renderer", "Journal", "Timeline")]
 script = ExtResource("26_regions_panel")

@@ -6,12 +6,12 @@ using NothicWorlds.Session;
 namespace NothicWorlds.UI;
 
 /// <summary>
-/// The time bar in the bottom-right corner (VISION.md SIM-02, REN-02, CAL-01, CAL-03): play or
-/// pause the world clock, pick how fast it runs, step it back or forward by a chosen amount, see
-/// the date on the selected body (in its calendar, or "Day 1,204, 14:30" in its own days
-/// without one), and jump to a date. (True scale is in the View menu.)
-/// A second line shows the body's seasons and its next solstice or equinox, and a third any
-/// meteor shower under way (EVT-02).
+/// The time bar in the bottom-right corner (VISION.md SIM-02, CAL-05; owner's choice, after
+/// fantasy-calendar.com): the date on the selected body in its own calendar (or "Day 1,204"
+/// without one), with a clock for the time of day and its moons' phases; clicking the date
+/// opens the Calendar tab. Buttons step the clock back or forward a year, a month, a day, or an
+/// hour, and Play runs it at a chosen speed. A second line shows the body's seasons and its
+/// next solstice or equinox, and a third any meteor shower under way (EVT-02).
 /// </summary>
 /// <remarks>
 /// Steps and jumps glide: the clock runs quickly to the new time (owner's request), so bodies
@@ -34,27 +34,34 @@ public partial class TimeControls : CanvasLayer
         ("1 year / second", 365.25),
     ];
 
-    // The step sizes, measured on the selected body (see StepDays).
-    private static readonly string[] _stepLabels =
-        ["1 hour", "1 day", "1 week", "30 days", "1 year"];
+    // The step buttons on each side of Play, biggest outermost: their unit, label, and name.
+    private static readonly (TimeUnit Unit, string Label, string Name)[] _steps =
+    [
+        (TimeUnit.Year, "Y", "year"),
+        (TimeUnit.Month, "M", "month"),
+        (TimeUnit.Day, "D", "day"),
+        (TimeUnit.Hour, "H", "hour"),
+    ];
 
     private CheckButton _physics = null!;
     private Button _playButton = null!;
-    private OptionButton _step = null!;
+    private readonly List<(Button Button, string Tip)> _monthSteps = [];
     private (double From, double To, double Progress)? _glide;
     private OptionButton _speed = null!;
-    private Label _time = null!;
+    private Button _time = null!;
+    private ClockFace _clock = null!;
+    private HBoxContainer _moons = null!;
     private Label _seasons = null!;
     private Label _shower = null!;
-    private ConfirmationDialog _goToDialog = null!;
-    private DateFields _goToDate = null!;
-    private NextEclipseJumps _eclipseJumps = null!;
     private bool _playing;
 
     /// <summary>The open world, whose clock this runs.</summary>
     [Export] public WorldSession? Session { get; set; }
 
-    /// <summary>The toolbar: the time bar hides whenever it does (calibrating, cutting).</summary>
+    /// <summary>
+    /// The toolbar: the time bar hides whenever it does (calibrating, cutting), and clicking
+    /// the date opens its Calendar tab.
+    /// </summary>
     [Export] public MapToolbar? Toolbar { get; set; }
 
     public override void _Ready()
@@ -72,14 +79,29 @@ public partial class TimeControls : CanvasLayer
         stack.AddChild(info);
         var infoRows = new VBoxContainer();
         info.AddChild(infoRows);
-        _time = new Label
+        // The date, with a clock for the time of day and the moons as they look tonight.
+        var dateRow = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.End };
+        _clock = new ClockFace(22)
         {
-            HorizontalAlignment = HorizontalAlignment.Right,
-            MouseFilter = Control.MouseFilterEnum.Pass,
-            TooltipText = "The date on the selected body, counted in its own days (in its " +
-                "calendar, if it has one)",
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            TooltipText = "The time of day: noon at the top, midnight at the bottom",
         };
-        infoRows.AddChild(_time);
+        dateRow.AddChild(_clock);
+        _moons = new HBoxContainer { SizeFlagsVertical = Control.SizeFlags.ShrinkCenter };
+        dateRow.AddChild(_moons);
+        _time = new Button
+        {
+            Flat = true,
+            FocusMode = Control.FocusModeEnum.None,
+            Alignment = HorizontalAlignment.Right,
+            MouseDefaultCursorShape = Control.CursorShape.PointingHand,
+            TooltipText = "The date on the selected body, in its calendar (or counted in its " +
+                "own days). Click to open the calendar",
+        };
+        _time.AddThemeFontSizeOverride("font_size", 17);
+        _time.Pressed += () => Toolbar?.ShowCalendar();
+        dateRow.AddChild(_time);
+        infoRows.AddChild(dateRow);
         _seasons = new Label
         {
             HorizontalAlignment = HorizontalAlignment.Right,
@@ -99,6 +121,18 @@ public partial class TimeControls : CanvasLayer
         var row = new HBoxContainer();
         panel.AddChild(row);
 
+        // Back a year, month, day, hour; Play and its speed; on an hour, day, month, year.
+        foreach ((TimeUnit unit, string label, string name) in _steps)
+        {
+            Button back = CreateButton($"‹ {label}", () => Step(unit, -1),
+                $"Back a {name} (the bodies glide into place)");
+            row.AddChild(back);
+            if (unit == TimeUnit.Month)
+            {
+                _monthSteps.Add((back, back.TooltipText));
+            }
+        }
+
         _playButton = CreateButton(
             "Play", TogglePlaying, "Run the world clock: every body moves and spins");
         row.AddChild(_playButton);
@@ -113,22 +147,17 @@ public partial class TimeControls : CanvasLayer
         _speed.TooltipText = "How fast time passes while playing";
         row.AddChild(_speed);
 
-        row.AddChild(CreateButton("−", () => Step(-1),
-            "Step the clock back (the bodies glide into place)"));
-        _step = new Dropdown { FocusMode = Control.FocusModeEnum.None };
-        foreach (string label in _stepLabels)
+        foreach ((TimeUnit unit, string label, string name) in Enumerable.Reverse(_steps))
         {
-            _step.AddItem(label);
+            Button on = CreateButton($"{label} ›", () => Step(unit, +1),
+                $"On a {name} (the bodies glide into place)");
+            row.AddChild(on);
+            if (unit == TimeUnit.Month)
+            {
+                _monthSteps.Add((on, on.TooltipText));
+            }
         }
 
-        _step.Select(1);
-        _step.TooltipText = "How far each step goes, on the selected body: days and weeks in " +
-            "its own day length; a year is one trip around its star (its planet's, for a moon)";
-        row.AddChild(_step);
-        row.AddChild(CreateButton("+", () => Step(+1),
-            "Step the clock forward (the bodies glide into place)"));
-
-        row.AddChild(CreateButton("Go to…", AskForDate, "Jump to a date and hour"));
         // A switch, so it's plain whether it's on.
         _physics = new CheckButton
         {
@@ -140,8 +169,6 @@ public partial class TimeControls : CanvasLayer
         };
         _physics.Pressed += TogglePhysics;
         row.AddChild(_physics);
-
-        BuildGoToDialog();
 
         if (Toolbar is not null)
         {
@@ -193,32 +220,22 @@ public partial class TimeControls : CanvasLayer
         SetPlaying(!_playing);
     }
 
-    // Moves the clock by one step back (-1) or forward (+1). Clicking again mid-glide adds on
-    // to where the glide is heading.
-    private void Step(int direction)
+    // Moves the clock a step back (-1) or forward (+1), measured on the selected body (a
+    // month or year is the same day of the month in its calendar). Clicking again mid-glide
+    // adds on to where the glide is heading.
+    private void Step(TimeUnit unit, int direction)
     {
         if (Session is null)
         {
             return;
         }
 
-        double target = (_glide?.To ?? Session.TimeDays) + direction * StepDays();
-        GlideTo(target);
-    }
-
-    // The chosen step in standard days, measured on the selected body.
-    private double StepDays()
-    {
-        Body body = Session!.SelectedBody;
-        double day = body.DayLengthHours / 24.0;
-        return _step.Selected switch
+        double from = _glide?.To ?? Session.TimeDays;
+        if (TimeSteps.Apply(Session.World.Bodies, Session.SelectedBody, from, unit, direction)
+            is double target)
         {
-            0 => 1.0 / 24.0,
-            1 => day,
-            2 => 7 * day,
-            3 => 30 * day,
-            _ => BodyClock.YearDays(Session.World.Bodies, body),
-        };
+            GlideTo(target);
+        }
     }
 
     /// <summary>
@@ -252,6 +269,17 @@ public partial class TimeControls : CanvasLayer
         Body body = Session.SelectedBody;
         double now = Session.TimeDays;
         _time.Text = $"{body.Name}: {BodyClock.Describe(body, now)}";
+        LocalTime local = BodyClock.LocalTimeOn(body, now);
+        _clock.DayFraction = (local.Hour + local.Minute / 60.0) / body.DayLengthHours;
+        _clock.Visible = body.Kind != BodyKind.WorldTree;
+        ShowMoons(body, now);
+        foreach ((Button month, string tip) in _monthSteps)
+        {
+            DisabledTip.Apply(month, tip, body.Calendar is null
+                    ? $"{body.Name} has no calendar, so no months: give it one in the Calendar " +
+                        "tab (Edit Calendar…)"
+                    : null);
+        }
 
         SeasonTimeline seasons = Session.SelectedSeasons;
         if (seasons.SeasonAt(now) is { } current && seasons.NextEvent(now) is SeasonEvent next)
@@ -271,6 +299,28 @@ public partial class TimeControls : CanvasLayer
         ShowShower(body, now);
     }
 
+    // The selected body's moons as they look now, in the time bar.
+    private void ShowMoons(Body body, double now)
+    {
+        IReadOnlyList<MoonPhase> phases = MoonPhase.Of(Session!.World.Bodies, body, now);
+        while (_moons.GetChildCount() > phases.Count)
+        {
+            Node extra = _moons.GetChild(_moons.GetChildCount() - 1);
+            _moons.RemoveChild(extra);
+            extra.QueueFree();
+        }
+
+        while (_moons.GetChildCount() < phases.Count)
+        {
+            _moons.AddChild(new MoonIcon(18));
+        }
+
+        for (int i = 0; i < phases.Count; i++)
+        {
+            _moons.GetChild<MoonIcon>(i).Phase = phases[i];
+        }
+    }
+
     private void ShowShower(Body body, double now)
     {
         if (!body.HasSurface || Session!.SelectedMeteorShowers?.ActiveAt(now) is not { } shower)
@@ -284,49 +334,6 @@ public partial class TimeControls : CanvasLayer
             $"along a comet's orbit.\nPeak: {BodyClock.Describe(body, shower.PeakDays)}, " +
             $"{MeteorText.Details(shower, body).ToLowerInvariant()}.";
         _shower.Visible = true;
-    }
-
-    private void AskForDate()
-    {
-        if (Session is null)
-        {
-            return;
-        }
-
-        Body body = Session.SelectedBody;
-        _goToDate.ShowTime(body, Session.TimeDays);
-        _eclipseJumps.Visible = body.HasSurface;
-        _eclipseJumps.Refresh();
-        _goToDialog.Title = $"Go to a Date on {body.Name}";
-        _goToDialog.ResetSize();
-        _goToDialog.PopupCentered(new Vector2I(340, 0));
-    }
-
-    private void BuildGoToDialog()
-    {
-        _goToDate = new DateFields();
-        _goToDialog = new ConfirmationDialog { OkButtonText = "Go" };
-
-        // Owner's request: the next solar and lunar eclipse are always one click away.
-        _eclipseJumps = new NextEclipseJumps
-        {
-            Session = Session!,
-            Jump = peak =>
-            {
-                _goToDialog.Hide();
-                GlideTo(peak);
-            },
-        };
-        var layout = new VBoxContainer();
-        layout.AddChild(_goToDate);
-        if (Session is not null)
-        {
-            layout.AddChild(_eclipseJumps);
-        }
-
-        _goToDialog.AddChild(layout);
-        _goToDialog.Confirmed += () => GlideTo(_goToDate.TimeDays);
-        AddChild(_goToDialog);
     }
 
     // Physics mode on or off (VISION.md SIM-03).

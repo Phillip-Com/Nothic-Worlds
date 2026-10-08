@@ -5,10 +5,11 @@ using NothicWorlds.Session;
 namespace NothicWorlds.UI;
 
 /// <summary>
-/// The timeline strip along the bottom of the screen, above the time bar (VISION.md LORE-03;
-/// owner's choice), shown by the Timeline… toolbar button: the world's timelines as lanes of
-/// events (see <see cref="TimelineCanvas"/>), with buttons to add an event at the current time,
-/// manage the timelines, return to now, and zoom.
+/// The timeline of events (VISION.md LORE-03): the world's timelines as lanes of events (see
+/// <see cref="TimelineCanvas"/>), with buttons to add an event at the current time, manage the
+/// timelines, return to now, and zoom. It's shown as the Timeline view of the Calendar tab
+/// (<see cref="CalendarPanel"/>, CAL-05), which takes its content; this keeps the event and
+/// timeline editors.
 /// </summary>
 public partial class TimelineStrip : CanvasLayer
 {
@@ -17,6 +18,9 @@ public partial class TimelineStrip : CanvasLayer
     // Above the time bar's two panels in the bottom-right corner.
     private const int BottomOffset = 112;
 
+    private PanelContainer _panel = null!;
+    private VBoxContainer _content = null!;
+    private bool _embedded;  // Its content is shown elsewhere (DetachContent)
     private TimelineCanvas _canvas = null!;
     private EventDialog _eventDialog = null!;
     private TimelinesDialog _timelinesDialog = null!;
@@ -57,7 +61,7 @@ public partial class TimelineStrip : CanvasLayer
             return;
         }
 
-        var panel = new PanelContainer();
+        var panel = _panel = new PanelContainer();
         panel.AnchorLeft = 0;
         panel.AnchorRight = 1;
         panel.AnchorTop = 1;
@@ -68,7 +72,7 @@ public partial class TimelineStrip : CanvasLayer
         panel.GrowVertical = Control.GrowDirection.Begin;  // Taller with more lanes, upward.
         AddChild(panel);
 
-        var layout = new VBoxContainer();
+        var layout = _content = new VBoxContainer();
         panel.AddChild(layout);
         layout.AddChild(BuildButtons());
         _canvas = new TimelineCanvas { Session = Session };
@@ -122,6 +126,25 @@ public partial class TimelineStrip : CanvasLayer
         return row;
     }
 
+    /// <summary>
+    /// Hands over the strip's content (its buttons and lanes) to be shown elsewhere (the
+    /// Calendar tab's Timeline view), or null if it isn't built. The strip's own panel stays
+    /// hidden from then on; its editors still open from here.
+    /// </summary>
+    public Control? DetachContent()
+    {
+        if (_content is null || _embedded)
+        {
+            return null;
+        }
+
+        _embedded = true;
+        _panel.RemoveChild(_content);
+        _panel.Visible = false;
+        UpdateVisibility();
+        return _content;
+    }
+
     /// <summary>Opens an event's editor (e.g. from a pin's pop-up).</summary>
     public void EditEvent(TimelineEvent timelineEvent)
     {
@@ -139,7 +162,7 @@ public partial class TimelineStrip : CanvasLayer
 
     private void RedrawIfShown()
     {
-        if (Visible)
+        if (_open)
         {
             _canvas.QueueRedraw();
         }
@@ -147,6 +170,13 @@ public partial class TimelineStrip : CanvasLayer
 
     private void UpdateVisibility()
     {
+        // Shown inside the Calendar tab, which gives the hint; the editors here still open.
+        if (_embedded)
+        {
+            Visible = true;
+            return;
+        }
+
         Visible = _open && (Toolbar?.Visible ?? true);
         Toolbar?.SetHint(this, _open
             ? "New Event adds one at the current date. Drag the strip to scroll through time; " +
