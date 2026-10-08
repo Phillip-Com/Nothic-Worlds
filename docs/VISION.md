@@ -133,7 +133,18 @@ Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decision
   step a day, month, or year either way; Play with its speed. It replaces the step menu and
   the Go to box.
 
-**Milestone 40: Calendars Made Easy** · In PR #96 (owner's request, 2026-10-08)
+**Milestone 41: Map and Time While Standing** · In progress (owner's request, 2026-10-08)
+In first person, a minimap shows where you are on the world, and time and the calendar work as
+they do from orbit (`REN-08`). Owner's decisions:
+- **A zoomable overhead minimap:** round, in a corner, north up, drawn from above the spot as
+  the globe looks, with an arrow for where you stand and which way you face; zoom from your
+  surroundings out to the world.
+- **Click the minimap to travel** there.
+- **The same time bar** (date, clock, moons, steps, Play) stays while standing, and the
+  **Calendar** opens over the view from a button or a key.
+- **One PR.**
+
+**Milestone 40: Calendars Made Easy** · Complete (PR #96 merged 2026-10-08; owner's request, 2026-10-08)
 Ready-made calendars to start from, and dates picked from a calendar everywhere a date is asked
 for (`CAL-06`). Owner's decisions:
 - **Four starting points** in the calendar editor: fitted to this world (today's starter),
@@ -1030,6 +1041,11 @@ constellations drawn by joining stars).
   cells, cube faces round-tripping), and the version 28 golden file with damaged-sky refusals.
 - Checked in the app: drawing a 3-line constellation by clicking stars and renaming it, the
   stars and line behind the system, and the stars by night (gone by day) from the ground.
+
+**REN-08 — Map and time while standing** · Planned (M41) · Base
+**Intent:** Standing on a world, a minimap shows where the view is on the larger map (and can
+take you elsewhere with a click), and the clock and calendar can be run and read just as from
+the system view (owner's request, 2026-10-08).
 
 ### 4.2 Interface Layout (`UI`)
 
@@ -2734,7 +2750,7 @@ month, or year (owner's request, 2026-10-08).
 - **Cost:** with the clock playing at a month a second, 122 fps with the calendar open and
   154 closed, on the baseline laptop.
 
-**CAL-06 — Calendar presets and date pickers** · Implemented (M40, PR #96) · Base
+**CAL-06 — Calendar presets and date pickers** · Implemented (M40: PR #96) · Base
 **Intent:** A calendar can start from a ready-made one, and every date is picked from a
 calendar rather than typed as a day number (owner's request, 2026-10-08).
 **Implementation (PR #96):**
