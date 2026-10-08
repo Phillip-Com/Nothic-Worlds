@@ -123,7 +123,7 @@ decisions:
   zones it draws. Nothing is removed.
 - **One PR** (PR #94).
 
-**Milestone 39: The Calendar** · In progress (owner's request, 2026-10-08)
+**Milestone 39: The Calendar** · In PR #95 (owner's request, 2026-10-08)
 Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decisions:
 - **A Calendar tab** in place of Timeline: the selected world's month (or whole year) as a
   grid, each day with the moons' phases, seasons, eclipses, meteor showers, and events; click
@@ -2687,11 +2687,48 @@ without the world being changed to fit.
 - **Verified in the running app** with real clicks, maximized and at 1152 × 648: turning it on,
   Suggest, Save (the leap month gains its day in leap years), and save/reopen.
 
-**CAL-05 — Calendar view** · Planned (M39) · Base
+**CAL-05 — Calendar view** · Implemented (M39, PR #95) · Base
 **Intent:** Time is shown as a calendar, as fantasy-calendar.com does: a month or year grid
 for the selected world with the moons' phases, seasons, eclipses, meteor showers, and events
 on each day, and a time bar that shows the date in the world's own calendar and steps by day,
 month, or year (owner's request, 2026-10-08).
+**Implementation (PR #95):**
+- **Core** (`Simulation/`):
+  - `MonthPage` lays a month out as a wall calendar's page (its days, its first day's
+    weekday column) and turns to the next or previous month across years;
+  - `CalendarMath.AddMonths` / `AddYears` keep the day of the month, or the month's last day
+    if it's shorter (31 January + 1 month = the end of February);
+  - `TimeSteps.Apply` steps the clock by an hour, a day, a month, or a year on a body, keeping
+    the time of day; without a calendar there are no months and a year is one orbit;
+  - `MoonPhase.Of` gives how lit each of a body's moons is from it, whether it's waxing, and
+    the phase's name.
+- **The Calendar tab** (`UI/CalendarPanel.cs`) replaces the Timeline button. It runs along
+  the bottom, above the time bar, with the globe still in view, and is one of the right-hand
+  panels (opening it closes the others); it leaves room for the System panel.
+  - **Month:** a cell per day under the weekday names (rows of ten for a calendar without
+    weeks), each with its number, its moons as drawn phases (`MoonIcon`), and what happens
+    that day: the world's events in their timeline's color, solstices and equinoxes,
+    eclipses, and meteor showers' peaks. Today is outlined in blue.
+  - **Year:** every month small; a day's number takes the color of what happens on it.
+    Clicking a month's name opens it.
+  - **Timeline:** the timeline of events (`TimelineStrip`'s content, moved into the panel).
+  - Click a day to run the clock there (same time of day); double-click to add an event that
+    day. ‹ › turn months, « » years, Today comes back; the page follows the clock until it's
+    turned by hand.
+  - **Next Solar Eclipse** and **Next Lunar Eclipse** buttons keep the owner's "one click
+    away" from the old Go to box; **Edit Calendar…** opens the calendar editor. A body without
+    a calendar shows why there's no grid, with **Make a Calendar…**.
+- **The time bar** (`UI/TimeControls.cs`):
+  - the date in the body's calendar, with a clock face for the time of day (`ClockFace`:
+    noon at the top, any day length) and its moons' phases; clicking the date opens the
+    Calendar tab;
+  - ‹ Y ‹ M ‹ D ‹ H, Play and its speed, H › D › M › Y › (steps glide, as before); the Month
+    steps are disabled, with the reason, on a body without a calendar;
+  - it replaces the step menu and the Go to box.
+- **The hint bar** moved to the top, under the toolbar: the bottom is the time bar's and the
+  calendar's.
+- **Cost:** with the clock playing at a month a second, 122 fps with the calendar open and
+  154 closed, on the baseline laptop.
 
 **CAL-06 — Calendar presets and date pickers** · Planned (M40) · Base
 **Intent:** A calendar can start from a ready-made one, and every date is picked from a
