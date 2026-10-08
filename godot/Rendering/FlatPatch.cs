@@ -29,6 +29,11 @@ public partial class FlatPatch : MeshInstance3D
     /// </summary>
     public Vector3D Middle { get; private set; }
 
+    // On the top face, each point's height (in the body's own space) and where the rings
+    // are, for TopHeightAt; empty elsewhere.
+    private double[] _topHeights = [];
+    private double _inner, _outer, _spotA, _spotB;
+
     /// <summary>
     /// Builds the patch around <paramref name="spot"/>, out to <paramref name="outer"/> globe
     /// radii, <paramref name="lift"/> radii off the face (the cloud deck's height, or 0), with
@@ -45,17 +50,19 @@ public partial class FlatPatch : MeshInstance3D
         (List<Vector3D> points, List<int> indices) = spot.Face == FlatFace.Rim
             ? RimPatch(spot, outer, lift)
             : FacePatch(spot, outer, lift);
-        for (int i = 0; i < points.Count; i++)
+        // Each point is independent of the others (and, along rivers, takes some measuring),
+        // so they're worked out all at once.
+        Parallel.For(0, points.Count, i => points[i] = spot.Face switch
         {
-            points[i] = spot.Face switch
-            {
-                FlatFace.Top when ground is not null =>
-                    points[i] + new Vector3D(0, ground(points[i]), 0),
-                FlatFace.Rim => OnRim(points[i], FlatFace.Rim, rimLift),
-                _ => points[i],
-            };
-        }
+            FlatFace.Top when ground is not null =>
+                points[i] + new Vector3D(0, ground(points[i]), 0),
+            FlatFace.Rim => OnRim(points[i], FlatFace.Rim, rimLift),
+            _ => points[i],
+        });
 
+        _topHeights = spot.Face == FlatFace.Top ? [.. points.Select(p => p.Y)] : [];
+        (_outer, _spotA, _spotB) = (outer, spot.A, spot.B);
+        _inner = Math.Min(2e-7, outer / 1000);
         if (spot.Face == FlatFace.Top && ground is not null)
         {
             Middle += new Vector3D(0, ground(Middle), 0);
@@ -89,6 +96,18 @@ public partial class FlatPatch : MeshInstance3D
             flags: (Mesh.ArrayFormat)((int)Mesh.ArrayCustomFormat.RgbaFloat
                 << (int)Mesh.ArrayFormat.FormatCustom0Shift));
         Mesh = mesh;
+    }
+
+    /// <summary>
+    /// How high the patch lies over a point of the top face (its height in the body's own
+    /// space), exactly as its flat triangles lie there; null off the patch, or if it isn't on
+    /// the top face.
+    /// </summary>
+    public double? TopHeightAt(Vector3D point)
+    {
+        double dx = point.X - _spotA, dz = point.Z - _spotB;
+        return RingGrid.ValueAt(_topHeights, Rings, Segments, _inner, _outer,
+            Math.Sqrt(dx * dx + dz * dz), Math.Atan2(dx, dz) / Math.Tau);
     }
 
     // Rings around the spot on the top or bottom face, spreading out to the edge of the patch;
