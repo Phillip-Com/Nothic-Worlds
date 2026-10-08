@@ -3,16 +3,18 @@ using NothicWorlds.Core.Model;
 namespace NothicWorlds.Session;
 
 /// <summary>
-/// A copy of a world's regions, weather pins, journal, timelines, events, relationships, and
-/// diagrams, plus its terrain types, nebulas, night sky, and visual style, for undo and for
-/// telling whether the world still matches its saved file (VISION.md LORE-01 to LORE-04,
-/// WTH-01, BOD-05, BOD-03, REN-07, REN-05). They are immutable records, so copying the lists
-/// is enough: the copies share them.
+/// A copy of a world's regions, weather pins, rivers, lakes, journal, timelines, events,
+/// relationships, and diagrams, plus its terrain types, nebulas, night sky, and visual style,
+/// for undo and for telling whether the world still matches its saved file (VISION.md LORE-01
+/// to LORE-04, WTH-01, BOD-05, BOD-11, BOD-03, REN-07, REN-05). They are immutable records,
+/// so copying the lists is enough: the copies share them.
 /// </summary>
 internal sealed record LoreState(
     IReadOnlyList<TerrainType> TerrainTypes,
     IReadOnlyList<Region> Regions,
     IReadOnlyList<WeatherPin> WeatherPins,
+    IReadOnlyList<River> Rivers,
+    IReadOnlyList<Lake> Lakes,
     IReadOnlyList<JournalEntry> Journal,
     IReadOnlyList<Timeline> Timelines,
     IReadOnlyList<TimelineEvent> Events,
@@ -28,9 +30,10 @@ internal sealed record LoreState(
     public static LoreState Of(World world)
     {
         return new LoreState([.. world.TerrainTypes], [.. world.Regions],
-            [.. world.WeatherPins], [.. world.Journal], [.. world.Timelines], [.. world.Events],
-            [.. world.Relationships], [.. world.Diagrams], [.. world.Nebulas], world.StarSeed,
-            [.. world.Constellations], world.TerrainShapesGround, world.Style);
+            [.. world.WeatherPins], [.. world.Rivers], [.. world.Lakes], [.. world.Journal],
+            [.. world.Timelines], [.. world.Events], [.. world.Relationships],
+            [.. world.Diagrams], [.. world.Nebulas], world.StarSeed, [.. world.Constellations],
+            world.TerrainShapesGround, world.Style);
     }
 
     /// <summary>True if the world's lore is exactly this.</summary>
@@ -39,6 +42,8 @@ internal sealed record LoreState(
         return TerrainTypes.SequenceEqual(world.TerrainTypes)
             && Regions.SequenceEqual(world.Regions)
             && WeatherPins.SequenceEqual(world.WeatherPins)
+            && Rivers.SequenceEqual(world.Rivers)
+            && Lakes.SequenceEqual(world.Lakes)
             && Journal.SequenceEqual(world.Journal)
             && Timelines.SequenceEqual(world.Timelines)
             && Events.SequenceEqual(world.Events)
@@ -60,6 +65,10 @@ internal sealed record LoreState(
         world.Regions.AddRange(Regions);
         world.WeatherPins.Clear();
         world.WeatherPins.AddRange(WeatherPins);
+        world.Rivers.Clear();
+        world.Rivers.AddRange(Rivers);
+        world.Lakes.Clear();
+        world.Lakes.AddRange(Lakes);
         world.Journal.Clear();
         world.Journal.AddRange(Journal);
         world.Timelines.Clear();

@@ -77,6 +77,8 @@ public partial class PlanetSurface : MeshInstance3D
     private readonly byte[] _faceHeightBytes = new byte[HeightGrid.CellsPerFace * 2];
     private readonly short[] _faceHeights = new short[HeightGrid.CellsPerFace];
     private HeightGrid _shownHeights = HeightGrid.Empty;
+    private Texture2DArray? _lakeTexture;
+    private HeightGrid _shownLakes = HeightGrid.Empty;
     private float _reliefScale;
     private ReliefDetail _reliefDetail = ReliefDetail.Standard;
 
@@ -498,6 +500,43 @@ public partial class PlanetSurface : MeshInstance3D
     }
 
     /// <summary>
+    /// Shows the body's lakes (VISION.md BOD-11): each cell's lake surface in meters (see
+    /// <see cref="Core.Simulation.BodyWater.LakeLevels"/>), drawn as water wherever the ground
+    /// is lower, as for <see cref="WaterLevelMeters"/>. Empty for none.
+    /// </summary>
+    public void SetLakeLevels(HeightGrid levels)
+    {
+        if (ReferenceEquals(levels, _shownLakes))
+        {
+            return;
+        }
+
+        if (levels.IsEmpty)
+        {
+            SurfaceMaterial.SetShaderParameter("has_lakes", false);
+            SurfaceMaterial.SetShaderParameter("lake_levels", default);
+            _lakeTexture = null;
+        }
+        else
+        {
+            // Every lake's water is worked out afresh, so all its faces are sent.
+            var faces = new Godot.Collections.Array<Image>();
+            for (int face = 0; face < CubeSphere.FaceCount; face++)
+            {
+                faces.Add(HeightFaceImage(levels, face, mipmaps: false));
+            }
+
+            _lakeTexture = new Texture2DArray();
+            _lakeTexture.CreateFromImages(faces);
+            SurfaceMaterial.SetShaderParameter("lake_levels", _lakeTexture);
+            SurfaceMaterial.SetShaderParameter("has_lakes", true);
+        }
+
+        _shownLakes = levels;
+        UpdateBounds();
+    }
+
+    /// <summary>
     /// How far one meter of height lifts the surface, in the globe's radii: the view's relief
     /// exaggeration over the body's radius in meters. Only touches the shader when it changes.
     /// </summary>
@@ -711,6 +750,11 @@ public partial class PlanetSurface : MeshInstance3D
     {
         float ground = _shownHeights.IsEmpty ? 0 : _reliefScale * (float)_shownHeights.SampleAt(
             direction);
+        if (!_shownLakes.IsEmpty)
+        {
+            ground = Math.Max(ground, _reliefScale * _shownLakes.HeightAt(direction));
+        }
+
         return 1.0f + Lifted(WaterRadius is double water
             ? Math.Max(ground, (float)(water - 1))
             : ground);
@@ -970,7 +1014,7 @@ public partial class PlanetSurface : MeshInstance3D
     // texture when there is one (much cheaper while dragging).
     // One face's heights as an image of half-precision floats in meters, with its smaller
     // copies, as the shader reads them.
-    private Image HeightFaceImage(HeightGrid heights, int face)
+    private Image HeightFaceImage(HeightGrid heights, int face, bool mipmaps = true)
     {
         heights.CopyFace(face, _faceHeights);
         for (int index = 0; index < _faceHeights.Length; index++)
@@ -981,7 +1025,11 @@ public partial class PlanetSurface : MeshInstance3D
 
         Image image = Image.CreateFromData(HeightGrid.FaceSize, HeightGrid.FaceSize, false,
             Image.Format.Rh, _faceHeightBytes);
-        image.GenerateMipmaps();
+        if (mipmaps)
+        {
+            image.GenerateMipmaps();
+        }
+
         return image;
     }
 

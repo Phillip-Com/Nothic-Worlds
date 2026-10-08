@@ -16,6 +16,9 @@ namespace NothicWorlds.Controls;
 /// <item><b>Edit Points:</b> drag a corner to move it, drag the small handle in the middle of
 /// an edge to add a corner there, right-click a corner to delete it (keeping at least three).
 /// Each drag is one undo step. Esc stops editing.</item>
+/// <item><b>Drawing a line</b> (a drawn river, VISION.md BOD-11): as drawing, but open, from
+/// its first point to its last: Enter finishes (at least two), and the points go to whoever
+/// asked.</item>
 /// </list>
 /// Clicks that miss the globe and its handles pass through, so the camera still turns.
 /// </summary>
@@ -35,6 +38,10 @@ public partial class RegionEditor : CanvasLayer
     private readonly List<GeoCoordinate> _drawing = [];
     private Control _overlay = null!;
     private Guid? _drawingBodyId;
+
+    // While drawing a line, what's done with it: given its points, it returns what's wrong
+    // (drawing goes on), or null.
+    private Func<IReadOnlyList<GeoCoordinate>, string?>? _lineFinished;
     private Guid? _editingRegionId;
     private int? _dragging;
 
@@ -115,6 +122,26 @@ public partial class RegionEditor : CanvasLayer
         _overlay.QueueRedraw();
     }
 
+    /// <summary>
+    /// Starts drawing an open line on the selected body (a planet or moon), showing
+    /// <paramref name="prompt"/>. Enter finishes it with at least two points, which go to
+    /// <paramref name="finished"/>: it returns what's wrong with them, or null.
+    /// </summary>
+    public void StartDrawingLine(string prompt,
+        Func<IReadOnlyList<GeoCoordinate>, string?> finished)
+    {
+        Stop();
+        if (Session?.SelectedBody is not { HasSurface: true } body)
+        {
+            return;
+        }
+
+        _drawingBodyId = body.Id;
+        _lineFinished = finished;
+        Toolbar?.ShowInfo(prompt, autoHide: false);
+        _overlay.QueueRedraw();
+    }
+
     /// <summary>Starts editing a region's points (it must be on the selected body).</summary>
     public void StartEditing(Guid regionId)
     {
@@ -138,6 +165,7 @@ public partial class RegionEditor : CanvasLayer
         EndDrag();
         _drawing.Clear();
         _drawingBodyId = null;
+        _lineFinished = null;
         _editingRegionId = null;
         _overlay?.QueueRedraw();
         if (wasActive)
@@ -195,7 +223,7 @@ public partial class RegionEditor : CanvasLayer
     // Drawing: a click on the first corner finishes; elsewhere on the globe it adds a corner.
     private bool AddCorner(Vector2 mouse)
     {
-        if (_drawing.Count >= 3 && ScreenOf(_drawing[0]) is Vector2 first
+        if (_lineFinished is null && _drawing.Count >= 3 && ScreenOf(_drawing[0]) is Vector2 first
             && first.DistanceTo(mouse) <= GrabPixels)
         {
             Finish();
@@ -214,6 +242,12 @@ public partial class RegionEditor : CanvasLayer
 
     private void Finish()
     {
+        if (_lineFinished is not null)
+        {
+            FinishLine(_lineFinished);
+            return;
+        }
+
         if (_drawingBodyId is not Guid bodyId || _drawing.Count < 3)
         {
             Toolbar?.ShowWarning("A region needs at least three corners.");
@@ -231,6 +265,27 @@ public partial class RegionEditor : CanvasLayer
         _drawingBodyId = null;
         Toolbar?.ShowInfo($"Added {region.Name}.");
         RegionDrawn?.Invoke(region.Id);
+        Stopped?.Invoke();
+        _overlay.QueueRedraw();
+    }
+
+    private void FinishLine(Func<IReadOnlyList<GeoCoordinate>, string?> finished)
+    {
+        if (_drawing.Count < 2)
+        {
+            Toolbar?.ShowWarning("A line needs at least two points.");
+            return;
+        }
+
+        if (finished([.. _drawing]) is string problem)
+        {
+            Toolbar?.ShowWarning($"Couldn't add it: {problem}.");
+            return;
+        }
+
+        _drawing.Clear();
+        _drawingBodyId = null;
+        _lineFinished = null;
         Stopped?.Invoke();
         _overlay.QueueRedraw();
     }

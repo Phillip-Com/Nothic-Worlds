@@ -283,6 +283,8 @@ public partial class WorldSession
             _reshapeWaiting.Remove(body.Id);
             surface.SetShapes(body.Surface.Shapes, body.RadiusKm);
         }
+
+        ShowWater(body);  // The ground under the rivers and lakes may have changed.
     }
 
     // The ground a body's terrain shapes, or none when that's off.
@@ -399,6 +401,7 @@ public partial class WorldSession
 
         body.WaterLevelMeters = levelMeters;
         SyncView();
+        ShowWater(body);
         MarkChanged(systemChanged: false);
         return null;
     }

@@ -505,9 +505,9 @@ up to 8 around it (sides and corners, across face edges too).
   1, each with columns −1, 0, 1) until one is lower than the hollow or water, and the river
   follows that way. It never steps on a cell it has already crossed. It gives up after 20,000
   cells, or 300,000 searched for one hollow, and ends where it got to.
-- **A lake that flows out** sends a natural river from the lowest cell around it (the first
-  found, if several are equally low), which never crosses the lake itself, 1 km wide at its
-  mouth.
+- **A lake that flows out** sends a natural river from the lowest cell around it (if several
+  are equally low, the first found spreading out from its spot, a ring at a time, neighbors in
+  the order above), which never crosses the lake itself, 1 km wide at its mouth.
 
 ## The star field (`starSeed`)
 
