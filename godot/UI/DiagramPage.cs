@@ -84,6 +84,10 @@ public partial class DiagramPage : CanvasLayer
 
             _isOpen = value;
             Visible = value;
+            Toolbar?.SetHint(this, value
+                ? "New makes a diagram. Add journal entries to it from the list, then drag " +
+                    "from a box's dot onto another box to link them."
+                : null);
             GetViewport().Disable3D = value;
             if (GlobeCamera is not null)
             {

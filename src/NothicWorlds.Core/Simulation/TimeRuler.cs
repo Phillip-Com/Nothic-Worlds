@@ -38,7 +38,7 @@ public static class TimeRuler
         if (body.Calendar is not Calendar calendar)
         {
             long step = NiceStep(spanBodyDays, maxTicks);
-            return DayTicks(body, fromDays, toDays, step, day => $"Day {day + 1:N0}");
+            return DayTicks(body, fromDays, toDays, step, day => LocalTime.DayName(day + 1));
         }
 
         foreach (long days in new long[] { 1, 2, 5, 10 })

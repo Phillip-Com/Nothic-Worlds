@@ -2,6 +2,7 @@ using System.Globalization;
 using Godot;
 using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
+using NothicWorlds.Rendering;
 using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
@@ -32,9 +33,39 @@ public partial class OrbitGuideSection : VBoxContainer
     /// <summary>Shows why an edit was refused (the panel's message line).</summary>
     public Action<string?>? ReportProblem { get; init; }
 
+    // What the guide's colored rings in the view mean (VISION.md UI-07): they're drawn
+    // without words, so they're named here.
+    private static HBoxContainer Legend()
+    {
+        var row = new HBoxContainer
+        {
+            TooltipText = "The rings drawn round the selected body and what it circles " +
+                "(View ▸ Orbit Guide turns them off)",
+            MouseFilter = MouseFilterEnum.Pass,
+        };
+        foreach ((Color color, string name) in new[]
+        {
+            (OrbitGuideVisual.SteadyColor, "Steady orbit"),
+            (OrbitGuideVisual.UnsteadyColor, "Unsteady"),
+        })
+        {
+            row.AddChild(new ColorRect
+            {
+                Color = color.Darkened(0.35f),
+                CustomMinimumSize = new Vector2(14, 14),
+                SizeFlagsVertical = SizeFlags.ShrinkCenter,
+                MouseFilter = MouseFilterEnum.Ignore,
+            });
+            row.AddChild(new Label { Text = name + "   ", MouseFilter = MouseFilterEnum.Ignore });
+        }
+
+        return row;
+    }
+
     public override void _Ready()
     {
         AddChild(new Label { Text = "Stable Orbits" });
+        AddChild(Legend());
         _moons = AddLabel();
         _limits = AddLabel();
         _limits.TooltipText = "Roche limit: closer than this, its tides would tear a moon " +

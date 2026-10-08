@@ -148,6 +148,10 @@ public partial class TimelineStrip : CanvasLayer
     private void UpdateVisibility()
     {
         Visible = _open && (Toolbar?.Visible ?? true);
+        Toolbar?.SetHint(this, _open
+            ? "New Event adds one at the current date. Drag the strip to scroll through time; " +
+                "click an event to go to it, double-click it to edit it."
+            : null);
     }
 
     private static Button CreateButton(string text, Action pressed, string tooltip)

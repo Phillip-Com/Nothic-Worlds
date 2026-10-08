@@ -130,6 +130,7 @@ public partial class TerrainPanel : CanvasLayer
             SizeFlagsVertical = Control.SizeFlags.ExpandFill,
         };
         scroll.AddChild(layout);
+        PanelStyle.FitHeight(panel, layout, TopOffset, BottomOffset);
 
         _heading = new Label();
         layout.AddChild(_heading);

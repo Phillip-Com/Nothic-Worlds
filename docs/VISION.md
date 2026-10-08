@@ -108,7 +108,36 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 37: Flat Worlds in Relief** · In PR #93 (owner's request, 2026-10-07)
+**Milestone 38: Clearer Look** · In PR #94 (owner's request, 2026-10-08)
+The first of three milestones making the app easier to read and use (owner's rules: if it can
+be shown, show it; simplify where nothing is lost; follow apps people already know, such as
+fantasy-calendar.com). From a run-through of every panel, menu, and dialog (`UI-07`). Owner's
+decisions:
+- **Look and small fixes first** (this milestone), then the calendar (M39), then calendar
+  presets and date pickers (M40).
+- **Buttons and switches that look like what they are**, panels laid out the same way, the
+  View menu grouped, the one-line hint on every tool (Diagrams and Timeline had none), and
+  clearer wording (no "Day 0", no "Planet (planet)").
+- **The System panel in folding sections** (the body, its look, orbit, calendar and seasons,
+  events, and the system's night sky), remembering which are open, with a legend for the star's
+  zones it draws. Nothing is removed.
+- **One PR** (PR #94).
+
+**Milestone 39: The Calendar** · Planned (owner's request, 2026-10-08)
+Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decisions:
+- **A Calendar tab** in place of Timeline: the selected world's month (or whole year) as a
+  grid, each day with the moons' phases, seasons, eclipses, meteor showers, and events; click
+  a day to go there, double-click to add an event. The timeline stays as one of its views.
+- **A calendar-style time bar:** the date in the world's calendar (weekday, day, month, year,
+  time) with a small clock and the moons' phases; clicking it opens the calendar; buttons to
+  step a day, month, or year either way; Play with its speed. It replaces the step menu and
+  the Go to box.
+
+**Milestone 40: Calendars Made Easy** · Planned (owner's request, 2026-10-08)
+Ready-made calendars to start from, and dates picked from a calendar everywhere a date is asked
+for (events, Go to, the calendar's own start date) (`CAL-06`).
+
+**Milestone 37: Flat Worlds in Relief** · Complete (PR #93 merged 2026-10-08; owner's request, 2026-10-07)
 Flat worlds get what globes have: heights, water, and shapes (`BOD-10`). Owner's decisions:
 - **Everything globes have:** sculpting brushes, terrain-shaped ground with its peaks, and
   water, with the water's colors and the underwater look.
@@ -1238,6 +1267,49 @@ Quit) and can be launched on Windows by double-clicking it, without Godot (owner
   saved world appeared under Recent Worlds and opened from it, a missing one was greyed with its
   reason, New World and Settings worked; the exported .exe started on its own without errors.
 
+**UI-07 — Clearer look** · Implemented (M38, PR #94) · Base
+**Intent:** Every panel, menu, and dialog is easy to read and operate: buttons and switches
+look like what they are, panels are laid out alike, long panels fold into sections, menus are
+grouped, and whatever can be shown is shown rather than described (owner's request,
+2026-10-08).
+**Implementation (PR #94):**
+- **The audit:** a scripted run through every menu, panel (scrolled through), dialog,
+  setting, and first person, with screenshots. It found:
+  - buttons that read as plain text, and on/off switches drawn as a grey dot;
+  - a System panel 1,900 px long, and a 20-item View menu;
+  - panels at full height however little they held;
+  - no hint on Diagrams or Timeline;
+  - "Day 0" and "Planet (planet)";
+  - an unexplained green and red disc (the Orbit Guide).
+- **One look** (`UI/AppTheme.cs`), merged into Godot's default theme at startup, so every
+  control on every layer and in every dialog takes it:
+  - buttons are filled, outlined boxes;
+  - the chosen mode (the top toolbar, Paint/Sculpt, Raise/Lower) is blue;
+  - buttons that can't be used are dimmed;
+  - on/off switches are drawn as switches, blue when on;
+  - every look of a button keeps the same margins, so nothing shifts or clips when it's
+    pointed at.
+- **Folding sections** (`UI/FoldingSection.cs`): a heading that folds what's under it, and
+  remembers on this computer whether it was open (`AppSettings.IsSectionOpen`). The System
+  panel is now:
+  - **Star System**, the list, and the Add buttons;
+  - the body's name;
+  - **Body** (open at first) and **Appearance** (with rings, belts, and the world tree);
+  - **Orbit** (open), with the stable-orbit guide, its new color key, and physics;
+  - **Calendar & Seasons** (open) and **Eclipses & Showers**;
+  - **Night Sky & Nebulas**, below a line, since it belongs to the whole system.
+- **Panels as tall as what's in them** (`PanelStyle.FitHeight`): Map, Terrain, and System
+  shrink to their contents and scroll only when the window is too short. The Map panel went
+  from full height to 415 px.
+- **The View menu** keeps every item, under the headings On the Globe, Weather, Sky, and
+  Orbits.
+- **Hints** for Diagrams and Timeline, as every other tool has (`UI-05`).
+- **Wording:**
+  - no "Day 0": the day before Day 1 is "Day -1", as years count (`LocalTime.DayName`);
+  - a body named like its kind shows once ("Planet", not "Planet (planet)").
+- **Reuse:** `AppTheme.SectionHeader` and `FoldingSection` for any panel's parts;
+  `PanelStyle.FitHeight` for any side panel.
+
 ### 4.3 Maps & Image Import (`MAP`)
 
 **MAP-01 — Import map image in a supported layout** · Implemented (equirectangular: M1; other layouts: M2, see `MAP-04`) · Base
@@ -2292,7 +2364,7 @@ beneath it in first person looks like being underwater (owner's request, 2026-10
 - **Limits:** a globe carved by shapes isn't raised to the water (its mesh is built on the
   CPU), though it's still colored as water; standing on one shows no water surface.
 
-**BOD-10 — Flat worlds in relief** · Implemented (M37, PR #93) · Base
+**BOD-10 — Flat worlds in relief** · Implemented (M37: PR #93) · Base
 **Intent:** A flat world can have everything a globe has on its surface: sculpted and
 terrain-shaped heights with their peaks, water up to a level (with a waterfall where it reaches
 the rim), and shapes added to or cut out of it (owner's request, 2026-10-07).
@@ -2614,6 +2686,16 @@ without the world being changed to fit.
   **Suggest**, and a line with the average year and how often it drifts a day from the real one.
 - **Verified in the running app** with real clicks, maximized and at 1152 × 648: turning it on,
   Suggest, Save (the leap month gains its day in leap years), and save/reopen.
+
+**CAL-05 — Calendar view** · Planned (M39) · Base
+**Intent:** Time is shown as a calendar, as fantasy-calendar.com does: a month or year grid
+for the selected world with the moons' phases, seasons, eclipses, meteor showers, and events
+on each day, and a time bar that shows the date in the world's own calendar and steps by day,
+month, or year (owner's request, 2026-10-08).
+
+**CAL-06 — Calendar presets and date pickers** · Planned (M40) · Base
+**Intent:** A calendar can start from a ready-made one, and every date is picked from a
+calendar rather than typed as a day number (owner's request, 2026-10-08).
 
 ### 4.7 Events (`EVT`)
 
