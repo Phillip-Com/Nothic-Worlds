@@ -2463,7 +2463,7 @@ the rim), and shapes added to or cut out of it (owner's request, 2026-10-07).
 - **Limits:** as on globes, a carved disc isn't raised to the water. The disc's map is
   stretched toward the rim, so features painted near the south pole are stretched around it.
 
-**BOD-11 — Rivers and lakes** · Partly implemented (M42 PR 1, #98: from orbit; first-person water is PR 2) · Base
+**BOD-11 — Rivers and lakes** · Implemented (M42: PR #98 from orbit; PR #99 up close in first person) · Base
 **Intent:** Rivers you can draw, or that find their own way downhill from a source until they
 reach water, and lakes standing at a height of their own that can flow out into rivers, so a
 world's water looks natural or exactly as designed (owner's request, 2026-10-08).
@@ -2494,9 +2494,27 @@ world's water looks natural or exactly as designed (owner's request, 2026-10-08)
   the body's rivers and lakes are listed, and the selected one's name, width or surface, and
   Flows Out are edited there, with what its water does (area covered, length, whether it
   reaches water, or why a lake has none).
+- **Up close (PR #99; owner's choices: banks carved up close, depth from width, ripples
+  and rapids):**
+  - `Simulation/RiverProfile.cs` (Core): along each river's drawn course (`RiverLine`, shared
+    with orbit), its width, depth (a twentieth of the width, 1 to 20 m), water and bed
+    heights (the water never runs uphill, so it cuts down through rises), flow speed, and
+    rapids from the slope;
+  - `Simulation/RiverChannels.cs` (Core): the stretches near the eye, in steps that shorten
+    toward it, and `Carve`: a bed as wide as the river with banks rising at 1 in 2 to the
+    ground, out to a reach that grows with the river's width (where the ground drawn around
+    the eye is fine enough); farther out the water lies on the ground;
+  - `FirstPersonMode` builds the ground around the eye with the channels cut in (and stands
+    the eye on it), `Rendering/RiverWater.cs` + `river_water.gdshader` draw the water
+    (ripples carried downstream at the river's speed, white water over rapids), and the
+    sea's surface around the eye now stands at the sea's or a lake's level wherever that's
+    above the ground (`PlanetSurface.WaterRadiusAt`), so lakes are water you can swim in.
+    The orbit lines hide on the body you're standing on. Globes and flat worlds alike.
 - **Limits:** courses are a height cell apart (about 10 km on an Earth-sized world). On
-  perfectly level ground (unpainted land) a river's way out runs in straight lines. Up close in
-  first person, lakes and rivers aren't water yet (PR 2).
+  perfectly level ground (unpainted land) a river's way out runs in straight lines. Up close,
+  a channel is cut only as finely as the ground drawn around the eye (rings of 72 points),
+  so banks show facets; on a flat world, rivers away from the north pole are stretched
+  east–west as the disc's map is.
 
 ### 4.5 Orbits & Simulation (`SIM`)
 

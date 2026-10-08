@@ -19,12 +19,6 @@ public partial class RiverRenderer : Node
     private const float RibbonLift = 1.0008f;
     private const float LineLift = 1.0012f;
 
-    // A drawn river's straight stretches are cut into steps this long, so they hug the globe.
-    private const double StepDegrees = 0.5;
-
-    // How many times a natural river's cell-to-cell course is smoothed for drawing.
-    private const int SmoothingPasses = 2;
-
     private static readonly Color _water = new(0.24f, 0.52f, 0.86f);
     private static readonly Color _highlight = new(0.85f, 0.95f, 1f);
 
@@ -74,6 +68,19 @@ public partial class RiverRenderer : Node
 
     public override void _Process(double delta)
     {
+        // Standing on a body, its rivers are drawn up close instead (FirstPersonMode); these,
+        // lifted to show from orbit, would float in its sky.
+        if (System is not null)
+        {
+            foreach (Guid id in _built.Keys)
+            {
+                if (System.SurfaceFor(id)?.GetNodeOrNull<MeshInstance3D>(MeshName) is { } mesh)
+                {
+                    mesh.Visible = System.StandingOn != id;
+                }
+            }
+        }
+
         // The relief changes with the View menu's exaggeration, not only with edits.
         if (System is not null && _built.Any(pair => System.SurfaceFor(pair.Key) is { } globe
             && globe.ReliefVersion != pair.Value.Relief))
@@ -131,7 +138,7 @@ public partial class RiverRenderer : Node
         var lineColors = new List<Color>();
         foreach (RiverCourseShown course in courses)
         {
-            List<Vector3D> path = PathOf(course);
+            List<Vector3D> path = RiverLine.PathOf(course);
             if (path.Count < 2)
             {
                 continue;
@@ -157,62 +164,6 @@ public partial class RiverRenderer : Node
         AddSurface(mesh, Mesh.PrimitiveType.Triangles, ribbon, ribbonColors);
         AddSurface(mesh, Mesh.PrimitiveType.Lines, lines, lineColors);
         return mesh;
-    }
-
-    // The course as drawn: a drawn river's points with its stretches cut into steps, or a
-    // natural river's cells smoothed so it doesn't zigzag from cell to cell.
-    private static List<Vector3D> PathOf(RiverCourseShown course)
-    {
-        if (course.Kind == RiverKind.Drawn)
-        {
-            return Densified(course.Points);
-        }
-
-        List<Vector3D> path = [.. course.Points];
-        for (int pass = 0; pass < SmoothingPasses; pass++)
-        {
-            path = Smoothed(path);
-        }
-
-        return path;
-    }
-
-    private static List<Vector3D> Densified(IReadOnlyList<Vector3D> points)
-    {
-        var path = new List<Vector3D> { points[0] };
-        for (int i = 1; i < points.Count; i++)
-        {
-            int steps = Math.Max(1, (int)Math.Ceiling(Degrees(points[i - 1], points[i])
-                / StepDegrees));
-            for (int step = 1; step <= steps; step++)
-            {
-                Vector3D blend = points[i - 1] * (1 - (double)step / steps)
-                    + points[i] * ((double)step / steps);
-                path.Add(blend * (1 / blend.Length));
-            }
-        }
-
-        return path;
-    }
-
-    // Chaikin's corner cutting: each corner is replaced by two points a quarter of the way
-    // along its sides. The source and the mouth stay where they are.
-    private static List<Vector3D> Smoothed(List<Vector3D> path)
-    {
-        if (path.Count < 3)
-        {
-            return path;
-        }
-
-        var smooth = new List<Vector3D> { path[0] };
-        for (int i = 0; i < path.Count - 1; i++)
-        {
-            smooth.Add(Unit(path[i] * 0.75 + path[i + 1] * 0.25));
-            smooth.Add(Unit(path[i] * 0.25 + path[i + 1] * 0.75));
-        }
-
-        smooth.Add(path[^1]);
-        return smooth;
     }
 
     // A strip along the path, widening from a fifth of the full width (in radians) at the
@@ -251,9 +202,6 @@ public partial class RiverRenderer : Node
 
     private static Vector3D Cross(Vector3D a, Vector3D b) =>
         new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
-
-    private static double Degrees(Vector3D a, Vector3D b) =>
-        double.RadiansToDegrees(Math.Acos(Math.Clamp(a.Dot(b), -1, 1)));
 
     private static void AddSurface(
         ArrayMesh mesh, Mesh.PrimitiveType primitive, List<Vector3> points, List<Color> colors)
