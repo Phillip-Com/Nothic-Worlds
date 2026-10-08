@@ -62,6 +62,25 @@ public static class CalendarMath
         return date.Weekday is int weekday ? $"{text}, {calendar.Weekdays[weekday]}" : text;
     }
 
+    /// <summary>
+    /// The day <paramref name="months"/> months after <paramref name="dayIndex"/> (before, when
+    /// negative): the same day of the month, or the month's last day if it's shorter (as 31
+    /// January plus a month is 28 or 29 February).
+    /// </summary>
+    public static long AddMonths(Calendar calendar, long dayIndex, int months)
+    {
+        CalendarDate date = DateOf(calendar, dayIndex);
+        MonthPage page = MonthPage.Of(calendar, date.Year, date.Month).Moved(calendar, months);
+        return page.FirstDayIndex + Math.Min(date.Day, page.Days) - 1;
+    }
+
+    /// <summary>
+    /// The day <paramref name="years"/> years after <paramref name="dayIndex"/> (before, when
+    /// negative): the same month and day, or the month's last day if it's shorter that year.
+    /// </summary>
+    public static long AddYears(Calendar calendar, long dayIndex, int years) =>
+        AddMonths(calendar, dayIndex, years * calendar.Months.Count);
+
     // How far the start date is into the calendar's first year, in days.
     private static long StartOffset(Calendar calendar) =>
         DaysBeforeMonth(calendar, calendar.FirstYear, calendar.StartMonth)
