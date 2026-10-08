@@ -741,6 +741,31 @@ per-user data folder (`user://settings.cfg`); a missing or damaged file gives th
 - **Verified in the running app:** the meshes stepping down and back up as the camera moves out
   and in (radius 359 → 161 → 72 → 21 px and back), and a generated map switching between
   compressed and uncompressed; the Settings window's Advanced section at 1152 × 648.
+**Opening without freezing, and only what's wanted (owner's choices, 2026-10-08):**
+- **Measured first** on a large world (a planet and a moon painted all over, terrain shaping
+  the ground, three rivers, two lakes): opening froze the app for 6 s run from source (about
+  1–2 s exported), almost all of it working out the ground the terrain shapes
+  (`TerrainRelief.BaseHeights`, 2–3 s a body) and making the globes' first images, on the
+  main thread. Flying around afterwards was already smooth.
+- **Prepared in the background** (`Session/WorldSession.Prepare.cs`): a body's ground and its
+  globe's images (`Rendering/SurfaceImages.cs`, faces made side by side, handed over as a
+  `PreparedSurface` to `PlanetSurface.ShowPrepared`) are worked out on worker threads, one body
+  at a time, the selected one first; until then it's drawn plain, and the toolbar says
+  "Preparing …'s terrain…" if the selected body takes more than a moment. Small edits stay at
+  once: a change of at most 96 tiles of painting (`TerrainRelief.ChangedTiles`) is reshaped
+  straight away, as before; bigger ones (deleting a widely painted type, undoing a large edit,
+  a type's height) go to the background, and then only the faces that changed are remade.
+  Rivers and lakes wait for the ground; a new lake asks to try again while it's prepared.
+- **Only when wanted:** a body is prepared once it's selected, stood on, or big enough on
+  screen to show detail (`PlanetSurface.DetailWanted`, forwarded by `SystemView.DetailWanted`
+  with the body's id); globes start plain until first measured. Bodies never visited are never
+  worked out, saving time and video memory.
+- **Measured after** (same world, run from source): the longest frame while opening went from
+  6,011 ms to 150 ms (the same 150 ms as an empty world's first frame); the world shows after
+  2 s and every body is ready after about 12 s, all in the background (the selected planet
+  first, after 3–4 s). The standard benchmark is unchanged (152/154 fps).
+- **Load benchmark:** `-- --open=<world> --benchmark` first reports how long the world took to
+  open, until every body was prepared, and the slowest frame meanwhile.
 - `godot/Diagnostics/PerformanceOverlay.cs`: F3 shows FPS, video memory, app memory, and draw calls.
 - `godot/Diagnostics/Benchmark.cs`: run with `-- --benchmark`. It orbits and zooms for 10 s
   with VSync off, then prints the results. Use it to catch performance regressions.
