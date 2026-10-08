@@ -294,9 +294,25 @@ public partial class CalendarPanel : CanvasLayer
         ShowHint();
     }
 
+    /// <summary>
+    /// Whether the panel can show while the toolbar is hidden (standing on a world, where the
+    /// calendar opens over the view; VISION.md REN-08).
+    /// </summary>
+    public bool KeepShown
+    {
+        get => _keepShown;
+        set
+        {
+            _keepShown = value;
+            UpdateVisibility();
+        }
+    }
+
+    private bool _keepShown;
+
     private void UpdateVisibility()
     {
-        Visible = _open && (Toolbar?.Visible ?? true);
+        Visible = _open && ((Toolbar?.Visible ?? true) || _keepShown);
         if (Timeline is not null)
         {
             Timeline.IsStripOpen = Visible && _view == View.Timeline;

@@ -133,7 +133,7 @@ Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decision
   step a day, month, or year either way; Play with its speed. It replaces the step menu and
   the Go to box.
 
-**Milestone 41: Map and Time While Standing** · In progress (owner's request, 2026-10-08)
+**Milestone 41: Map and Time While Standing** · In PR #97 (owner's request, 2026-10-08)
 In first person, a minimap shows where you are on the world, and time and the calendar work as
 they do from orbit (`REN-08`). Owner's decisions:
 - **A zoomable overhead minimap:** round, in a corner, north up, drawn from above the spot as
@@ -142,7 +142,7 @@ they do from orbit (`REN-08`). Owner's decisions:
 - **Click the minimap to travel** there.
 - **The same time bar** (date, clock, moons, steps, Play) stays while standing, and the
   **Calendar** opens over the view from a button or a key.
-- **One PR.**
+- **One PR** (PR #97).
 
 **Milestone 40: Calendars Made Easy** · Complete (PR #96 merged 2026-10-08; owner's request, 2026-10-08)
 Ready-made calendars to start from, and dates picked from a calendar everywhere a date is asked
@@ -1042,10 +1042,33 @@ constellations drawn by joining stars).
 - Checked in the app: drawing a 3-line constellation by clicking stars and renaming it, the
   stars and line behind the system, and the stars by night (gone by day) from the ground.
 
-**REN-08 — Map and time while standing** · Planned (M41) · Base
+**REN-08 — Map and time while standing** · Implemented (M41, PR #97) · Base
 **Intent:** Standing on a world, a minimap shows where the view is on the larger map (and can
 take you elsewhere with a click), and the clock and calendar can be run and read just as from
 the system view (owner's request, 2026-10-08).
+**Implementation (PR #97):**
+- **The minimap** (`UI/Minimap.cs`, in `FirstPersonHud`'s top right): a round picture with a
+  ring, a north mark, and an arrow for where you stand and which way you face.
+  - It's drawn by a second camera (`FirstPersonMode.BuildOverhead`) in its own small
+    `SubViewport` (256 px), looking straight down on the spot, north up, orthographic, so the
+    map is the globe as it looks: map image, terrain, water, the grid, clouds.
+  - The camera has its own environment (even ambient light, no haze), so the map reads at
+    night and in rain.
+  - **Zoom:** the wheel over it, or − and +, step from 500 m to 50,000 km across. The widest is
+    the half of the globe facing you, since a globe seen from above can't show its far side.
+    The span shows under it ("31 mi across").
+- **Click to travel:** a click on the map moves you there, keeping your height and heading;
+  the ground is rebuilt there straight away. The map is drawn straight down, so a point d
+  radii out is an arc of asin(d) away (`Geometry/GlobeWalk.FromOverhead`, shared with
+  walking's `GlobeWalk.Walk`). On a flat world it's a walk across the face (`FlatWalk.Walk`).
+- **Time while standing:** the time bar stays (`TimeControls.KeepShown`), and the Calendar tab
+  opens over the view (`CalendarPanel.KeepShown`) from the HUD's **Calendar (T)** button or
+  the T key (C is already "down" while flying). It goes through the toolbar's Calendar button,
+  so it's still right after going back to orbit. Clicking a day runs the clock there, and the
+  sky, light, and weather where you stand follow.
+- **Cost:** about 5–10% of the frame while standing (98 against 102 fps on the baseline
+  laptop).
+- **Reuse:** `Minimap` takes any picture; `GlobeWalk` for moving over a globe.
 
 ### 4.2 Interface Layout (`UI`)
 

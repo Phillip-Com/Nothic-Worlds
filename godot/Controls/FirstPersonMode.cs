@@ -67,6 +67,17 @@ public partial class FirstPersonMode : Node
         ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
             "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
 
+    // The minimap (VISION.md REN-08): a camera above the spot drawing into a small picture,
+    // and how far across it reaches, in meters, stepping through these.
+    private static readonly double[] _mapSpans =
+        [500, 1_000, 2_000, 5_000, 10_000, 20_000, 50_000, 100_000, 200_000, 500_000,
+            1_000_000, 2_000_000, 5_000_000, 10_000_000, 20_000_000, 50_000_000];
+    private const int StartMapSpan = 6;  // 50 km
+    private const int MapPictureSize = 256;
+    private SubViewport? _overhead;
+    private Camera3D? _overheadCamera;
+    private int _mapSpan = StartMapSpan;
+
     private readonly SurfaceSky _sky = new();
     private readonly UnderwaterView _underwater = new();
     private readonly ShaderMaterial _waterMaterial =
@@ -145,6 +156,12 @@ public partial class FirstPersonMode : Node
     /// <summary>The message line, for why standing isn't possible.</summary>
     [Export] public MapToolbar? Toolbar { get; set; }
 
+    /// <summary>The time bar, which stays while standing (VISION.md REN-08).</summary>
+    [Export] public TimeControls? TimeBar { get; set; }
+
+    /// <summary>The Calendar tab, which opens over the view while standing (REN-08).</summary>
+    [Export] public CalendarPanel? Calendar { get; set; }
+
     /// <summary>
     /// What to hide while standing (the globe's markers, labels, panels, and menus).
     /// </summary>
@@ -160,6 +177,10 @@ public partial class FirstPersonMode : Node
         _hud = new FirstPersonHud();
         AddChild(_hud);
         AddChild(_underwater);
+        _hud.Minimap.Zoomed += step =>
+            _mapSpan = Math.Clamp(_mapSpan + step, 0, _mapSpans.Length - 1);
+        _hud.Minimap.Clicked += TravelOnMap;
+        _hud.CalendarButton.Pressed += ToggleCalendar;
         if (Session is not null)
         {
             Session.WorldClosed += _ => Leave();
@@ -292,6 +313,18 @@ public partial class FirstPersonMode : Node
         _flatWaterBuilt = null;
         _camera?.QueueFree();
         _camera = null;
+        _overhead?.QueueFree();
+        _overhead = null;
+        _overheadCamera = null;
+        if (TimeBar is not null)
+        {
+            TimeBar.KeepShown = false;
+        }
+
+        if (Calendar is not null)
+        {
+            Calendar.KeepShown = false;
+        }
         if (GlobeCamera is not null)
         {
             GlobeCamera.ProcessMode = _savedCameraMode;
@@ -340,6 +373,16 @@ public partial class FirstPersonMode : Node
         _camera = new Camera3D { Fov = FieldOfViewDegrees, Name = "FirstPersonCamera" };
         AddChild(_camera);
         _camera.MakeCurrent();
+        BuildOverhead();
+        if (TimeBar is not null)
+        {
+            TimeBar.KeepShown = true;
+        }
+
+        if (Calendar is not null)
+        {
+            Calendar.KeepShown = true;
+        }
         if (GlobeCamera is not null)
         {
             // Paused, or W/A/S/D would pan it off the globe while walking.
@@ -445,6 +488,9 @@ public partial class FirstPersonMode : Node
                 _altitudeMeters = _groundMeters + _heightMeters;
                 ShowHelp();
                 break;
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.T }:
+                ToggleCalendar();
+                break;
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.M }:
                 _magnify = !_magnify;
                 ShowHelp();
@@ -517,6 +563,7 @@ public partial class FirstPersonMode : Node
         (Vector3D East, Vector3D North, Vector3D Up) frame = Frame(body, time);
         double clearance = Clearance(globe, eyeLift, radiusMeters);
         PlaceCamera(frame, clearance / radiusMeters * place.Radius);
+        PlaceOverhead(frame, body, place.Radius);
         if (_flat is FlatSpot flat)
         {
             PlaceFlatGround(globe, body, time, eye, place.Radius, flat);
@@ -603,9 +650,7 @@ public partial class FirstPersonMode : Node
         }
 
         double angle = speed * length / (body.RadiusKm * 1000 + _heightMeters);
-        (Vector3D east, Vector3D north) = Tangents(_spot);
-        Vector3D along = north * Math.Cos(bearing) + east * Math.Sin(bearing);
-        _spot = Unit(_spot * Math.Cos(angle) + along * Math.Sin(angle));
+        _spot = GlobeWalk.Walk(_spot, bearing, angle);
     }
 
     // How far out the drawn ground is under the eye, in the body's radii: the sculpted ground,
@@ -1057,7 +1102,7 @@ public partial class FirstPersonMode : Node
             $"{(_magnify ? " · Magnified" : "")}\n" +
             "Drag to look · W A S D move (Shift: faster) · Wheel: speed · F: " +
             $"{(_flying ? "walk" : "fly")}{(_flying ? " · Space / C: up / down" : "")} · " +
-            "M: magnify · Esc: back");
+            "M: magnify · T: calendar · Esc: back");
     }
 
     private static string Speed(double metersPerSecond) => metersPerSecond < 1000
@@ -1072,6 +1117,103 @@ public partial class FirstPersonMode : Node
     private static string Distance(double km) => UnitText.Distance(km);
 
     private static double Held(Key key) => Input.IsKeyPressed(key) ? 1 : 0;
+
+    // The minimap's camera (VISION.md REN-08): its own small picture of the scene, lit evenly
+    // (its own environment: no haze, and the night side still readable) so it reads as a map.
+    private void BuildOverhead()
+    {
+        _overhead = new SubViewport
+        {
+            Name = "Minimap",
+            Size = new Vector2I(MapPictureSize, MapPictureSize),
+            RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
+            Msaa3D = Viewport.Msaa.Disabled,
+        };
+        _overheadCamera = new Camera3D
+        {
+            Projection = Camera3D.ProjectionType.Orthogonal,
+            Environment = new Godot.Environment
+            {
+                BackgroundMode = Godot.Environment.BGMode.Color,
+                BackgroundColor = new Color(0.02f, 0.02f, 0.04f),
+                AmbientLightSource = Godot.Environment.AmbientSource.Color,
+                AmbientLightColor = Colors.White,
+                AmbientLightEnergy = 0.7f,
+            },
+        };
+        _overhead.AddChild(_overheadCamera);
+        AddChild(_overhead);
+        _overheadCamera.MakeCurrent();
+        _hud!.Minimap.SetPicture(_overhead.GetTexture());
+    }
+
+    // Looks straight down on the spot from above, north up, as wide as the chosen span (but
+    // never wider than the world: then it's the half of the globe facing the eye).
+    private void PlaceOverhead((Vector3D East, Vector3D North, Vector3D Up) frame, Body body,
+        double displayRadius)
+    {
+        if (_overheadCamera is null)
+        {
+            return;
+        }
+
+        double radiusMeters = body.RadiusKm * 1000;
+        double spanMeters = Math.Min(_mapSpans[_mapSpan], 2.2 * radiusMeters);
+        double unitsPerMeter = displayRadius / radiusMeters;
+        double span = spanMeters * unitsPerMeter;
+
+        // Above the eye by the span (well over anything near), and seeing down past the bottom.
+        double height = Math.Max(span, (_heightMeters + 20_000) * unitsPerMeter);
+        double depth = Math.Min(height + span * 2 + 30_000 * unitsPerMeter,
+            height + 3 * displayRadius);
+        _overheadCamera.Size = (float)span;
+        _overheadCamera.Near = (float)(height * 0.01);
+        _overheadCamera.Far = (float)depth;
+        Vector3 up = ToGodot(frame.Up), north = ToGodot(frame.North);
+        _overheadCamera.GlobalTransform = new Transform3D(Basis.LookingAt(-up, north),
+            up * (float)height);
+        _hud!.Minimap.Show(double.RadiansToDegrees(_heading),
+            $"{UnitText.Format(Quantity.Distance, spanMeters / 1000)} across");
+    }
+
+    // Travels to a spot clicked on the minimap (VISION.md REN-08), from -1 to 1 across it (x
+    // east, y north). The map is drawn straight down, so a point that far out on it lies an
+    // arc of asin(distance / radius) from the spot.
+    private void TravelOnMap(Vector2 across)
+    {
+        if (Session?.World.Bodies.Find(b => b.Id == _bodyId) is not Body body)
+        {
+            return;
+        }
+
+        double radiusMeters = body.RadiusKm * 1000;
+        double spanMeters = Math.Min(_mapSpans[_mapSpan], 2.2 * radiusMeters);
+        double meters = across.Length() * spanMeters / 2;
+        double bearing = Math.Atan2(across.X, across.Y);
+        if (_flat is FlatSpot flat)
+        {
+            _flat = FlatWalk.Walk(flat, bearing, meters / radiusMeters);
+            _flatBuiltHeightMeters = 0;  // Build the ground there straight away
+            return;
+        }
+
+        _spot = GlobeWalk.FromOverhead(_spot, bearing, meters / radiusMeters);
+        _groundVersion = -1;  // Build the ground there straight away
+    }
+
+    // Opens or closes the calendar over the view (VISION.md REN-08).
+    private void ToggleCalendar()
+    {
+        // Through the toolbar's Calendar button, so it's still right back in the system view.
+        if (Calendar is { IsPanelOpen: true })
+        {
+            Toolbar?.CloseCalendar();
+        }
+        else
+        {
+            Toolbar?.ShowCalendar();
+        }
+    }
 
     // East, north, and up at the spot, in the system's (and scene's) frame.
     private (Vector3D East, Vector3D North, Vector3D Up) Frame(Body body, double time)
