@@ -108,7 +108,7 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 38: Clearer Look** · In PR #94 (owner's request, 2026-10-08)
+**Milestone 38: Clearer Look** · Complete (PR #94 merged 2026-10-08; owner's request, 2026-10-08)
 The first of three milestones making the app easier to read and use (owner's rules: if it can
 be shown, show it; simplify where nothing is lost; follow apps people already know, such as
 fantasy-calendar.com). From a run-through of every panel, menu, and dialog (`UI-07`). Owner's
@@ -123,7 +123,7 @@ decisions:
   zones it draws. Nothing is removed.
 - **One PR** (PR #94).
 
-**Milestone 39: The Calendar** · Planned (owner's request, 2026-10-08)
+**Milestone 39: The Calendar** · In progress (owner's request, 2026-10-08)
 Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decisions:
 - **A Calendar tab** in place of Timeline: the selected world's month (or whole year) as a
   grid, each day with the moons' phases, seasons, eclipses, meteor showers, and events; click
@@ -1267,7 +1267,7 @@ Quit) and can be launched on Windows by double-clicking it, without Godot (owner
   saved world appeared under Recent Worlds and opened from it, a missing one was greyed with its
   reason, New World and Settings worked; the exported .exe started on its own without errors.
 
-**UI-07 — Clearer look** · Implemented (M38, PR #94) · Base
+**UI-07 — Clearer look** · Implemented (M38: PR #94) · Base
 **Intent:** Every panel, menu, and dialog is easy to read and operate: buttons and switches
 look like what they are, panels are laid out alike, long panels fold into sections, menus are
 grouped, and whatever can be shown is shown rather than described (owner's request,
