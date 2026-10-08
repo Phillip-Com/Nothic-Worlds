@@ -1225,7 +1225,7 @@ public partial class FirstPersonMode : Node
                 ToSystem(body, time, flatUp));
         }
 
-        (Vector3D east, Vector3D north) = Tangents(_spot);
+        (Vector3D east, Vector3D north) = GlobeWalk.Tangents(_spot);
         return (ToSystem(body, time, east), ToSystem(body, time, north),
             ToSystem(body, time, _spot));
     }
@@ -1238,18 +1238,6 @@ public partial class FirstPersonMode : Node
         ToGodot(ToSystem(body, time, new Vector3D(1, 0, 0))),
         ToGodot(ToSystem(body, time, new Vector3D(0, 1, 0))),
         ToGodot(ToSystem(body, time, new Vector3D(0, 0, 1))));
-
-    private static (Vector3D East, Vector3D North) Tangents(Vector3D up)
-    {
-        var east = new Vector3D(up.Z, 0, -up.X);
-        if (east.Length < 1e-9)
-        {
-            east = new Vector3D(1, 0, 0);
-        }
-
-        east *= 1 / east.Length;
-        return (east, Cross(up, east));
-    }
 
     private static Vector3D Cross(Vector3D a, Vector3D b) => new(
         a.Y * b.Z - a.Z * b.Y,
