@@ -117,6 +117,13 @@ uniform bool lifted_on_cpu = false;
 uniform bool has_water = false;
 uniform float water_level = 0.0;
 
+// Around a first-person eye, the globe's own mesh isn't raised to the water or drawn as it:
+// the ground and the water's surface there are drawn up close (FirstPersonGround, FlatPatch),
+// and a globe at water level would hide the bottom. Within near_radius of near_center: an
+// angle from a direction on a globe, a distance on a flat world's face (negative: off).
+uniform vec3 near_center = vec3(0.0, 1.0, 0.0);
+uniform float near_radius = -1.0;
+
 // The softest edge between terrains up close, in cells (edges sharpen to about a pixel as
 // cells get bigger on screen, and never go softer than this).
 const float TERRAIN_EDGE_CELLS = 0.15;
@@ -137,8 +144,15 @@ uniform float grid_spacing_degrees = 15.0;
 uniform float grid_line_pixels = 1.2;
 
 // A flat world (VISION.md BOD-02): the mesh is a disc, and each point stands for the globe
-// direction it maps to (see flat_disc_direction).
+// direction it maps to (see flat_disc_direction). Its top face is lifted by the ground
+// (BOD-10), never lower than FLAT_DEEPEST radii below the face, which keeps it just above the
+// underside; its outermost ring, all of which stands for the south pole, is lifted by
+// rim_lift, as the rim wall's top edge is (PlanetSurface.UpdateRim), so the two always meet.
 uniform bool flat_disc = false;
+uniform float rim_lift = 0.0;
+const float FLAT_DEEPEST = -0.075;  // PlanetSurface.FlatDeepestLift
+const float FLAT_HALF_THICKNESS = 0.04;  // FlatDisc.HalfThickness
+const vec3 ROCK_COLOR = vec3(0.105, 0.089, 0.074);  // PlanetSurface's rock, in linear light
 
 // The planet's rings (VISION.md BOD-03), for the shadow they cast: their radii (in planet
 // radii), their pattern, and the plane they lie in (its normal, in the planet's own space).
@@ -174,19 +188,6 @@ const float GROUND_DETAIL_METERS = 4.0;
 // rotation would break, making the detail jump each time the ground is rebuilt.
 const mat3 DETAIL_TURN_A = mat3(vec3(2.0, -2.0, 1.0), vec3(2.0, 1.0, -2.0), vec3(1.0, 2.0, 2.0));
 const mat3 DETAIL_TURN_B = mat3(vec3(1.0, 2.0, 2.0), vec3(2.0, 1.0, -2.0), vec3(2.0, -2.0, 1.0));
-
-// On a flat world's top face, distance from the center is the angle from the north pole (the
-// disc's radius is PI), so a point maps back to the globe direction it stands for. Must match
-// FlatDisc in Core.
-vec3 flat_disc_direction(vec3 point) {
-	float across = length(point.xz);
-	if (across < 1e-6) {
-		return vec3(0.0, 1.0, 0.0);
-	}
-	float from_pole = min(across, PI);
-	vec2 sideways = point.xz / across * sin(from_pole);
-	return vec3(sideways.x, cos(from_pole), sideways.y);
-}
 
 // 1.0 on a line through multiples of `spacing`, fading to 0.0 over `pixels` screen pixels.
 // `width` is how much `value` changes from pixel to pixel.
@@ -488,6 +489,17 @@ float height_at(vec3 direction, float lod) {
 	return textureLod(heights, position, lod).r;
 }
 
+// True for a point (a direction on a globe, a place on a flat world's face) near the eye.
+bool near_eye(vec3 point) {
+	if (near_radius <= 0.0) {
+		return false;
+	}
+
+	return flat_disc
+		? distance(point.xz, near_center.xz) < near_radius
+		: dot(normalize(point), near_center) > cos(near_radius);
+}
+
 // The ground's height in meters (0 where nothing is sculpted).
 float ground_height(vec3 direction, float lod) {
 	return has_heights ? height_at(direction, lod) : 0.0;
@@ -509,6 +521,24 @@ vec3 relief_normal(vec3 direction, float pixel_angle) {
 		- height_at(normalize(direction - second * step), lod);
 	return normalize(direction
 		- (first * rise_first + second * rise_second) * (relief_scale / (2.0 * step)));
+}
+
+// The height at a point on a flat world's top face, in meters.
+float flat_height(vec2 at, float lod) {
+	return height_at(flat_disc_direction(vec3(at.x, 0.0, at.y)), lod);
+}
+
+// Which way the ground faces on a flat world's top face at a point `at` (x, z) on it, as
+// relief_normal does on a globe: from the slopes across the disc, where a step of one unit is
+// a radian of the globe, so a cell is as wide as on a globe.
+vec3 flat_relief_normal(vec2 at, float pixel_angle) {
+	float cell = HALF_PI / float(TERRAIN_FACE_SIZE);
+	float step = max(cell, pixel_angle);
+	float lod = log2(step / cell);
+	float rise_x = flat_height(at + vec2(step, 0.0), lod) - flat_height(at - vec2(step, 0.0), lod);
+	float rise_z = flat_height(at + vec2(0.0, step), lod) - flat_height(at - vec2(0.0, step), lod);
+	vec2 slope = vec2(rise_x, rise_z) * (relief_scale / (2.0 * step));
+	return normalize(vec3(-slope.x, 1.0, -slope.y));
 }
 
 // A cell's terrain code, and its color with alpha (0 where nothing is painted).
@@ -714,12 +744,18 @@ void vertex() {
 		local_direction = CUSTOM0.xyz;
 	} else {
 		local_direction = VERTEX;
-		if ((has_heights || has_water) && !flat_disc && !lifted_on_cpu) {
+		if ((has_heights || has_water) && !lifted_on_cpu) {
 			// Lifted to the ground, or to the water over it.
-			vec3 direction = normalize(VERTEX);
+			vec3 direction = flat_disc ? flat_disc_direction(VERTEX) : normalize(VERTEX);
 			float height = ground_height(direction, 0.0);
-			height = has_water ? max(height, water_level) : height;
-			VERTEX = direction * (1.0 + height * relief_scale);
+			height = has_water && !near_eye(VERTEX) ? max(height, water_level) : height;
+			if (!flat_disc) {
+				VERTEX = direction * (1.0 + height * relief_scale);
+			} else if (length(VERTEX.xz) < PI - 1e-4) {
+				VERTEX.y += max(height * relief_scale, FLAT_DEEPEST);
+			} else {
+				VERTEX.y += rim_lift;
+			}
 		}
 	}
 }
@@ -864,7 +900,7 @@ void fragment() {
 	// Water over the ground below its level, its shore smoothed over about a pixel. Not on
 	// the first-person ground, which is the true bottom under its own water surface.
 	float wet = 0.0;
-	if (has_water && !flat_disc && eye_level_ground < 0.5) {
+	if (has_water && eye_level_ground < 0.5 && !near_eye(local_direction)) {
 		float depth = water_level - ground_height(direction, 0.0);
 		wet = clamp(depth / max(fwidth(depth), 1e-3) + 0.5, 0.0, 1.0);
 		vec4 tint = has_terrain
@@ -917,7 +953,7 @@ void fragment() {
 		float meters_per_pixel = meters_away * pixel_size / facing;
 		bump_meters = ground_detail(color, meters_per_pixel);
 		float depth = water_level - ground_height(direction, 0.0);
-		if (has_water && !flat_disc && depth > 0.0) {
+		if (has_water && depth > 0.0) {
 			color *= 1.0 + 0.9 * caustics(depth, meters_per_pixel);
 		}
 	}
@@ -925,15 +961,25 @@ void fragment() {
 	ALBEDO = color;
 	EMISSION = weather_glow;
 	ROUGHNESS = mix(0.9, 0.3, wet);  // Water catches the sun
-	if (lifted_on_cpu && !has_heights) {
+	// A carved flat world's disc (ShapedGlobe) comes with its rim and underside, which are
+	// bare rock, as the plain disc's are.
+	bool flat_rock = flat_disc && lifted_on_cpu && eye_level_ground < 0.5
+		&& (local_direction.y < -FLAT_HALF_THICKNESS + 1e-4
+			|| length(local_direction.xz) > PI - 1e-4);
+	if (lifted_on_cpu && !has_heights && !flat_rock) {
 		// The carved globe's faces are flat: shade it as the round globe it is.
-		NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(direction, 0.0)).xyz);
+		vec3 round = flat_disc ? vec3(0.0, 1.0, 0.0) : direction;
+		NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(round, 0.0)).xyz);
 	}
 
-	if (has_heights && !flat_disc && wet < 0.5) {
-		vec3 normal = relief_normal(direction, pixel_angle);
+	if (has_heights && wet < 0.5 && !flat_rock) {
+		// On a flat world, "up" is the face's, and slopes run across the disc.
+		vec3 up = flat_disc ? vec3(0.0, 1.0, 0.0) : direction;
+		vec3 normal = flat_disc
+			? flat_relief_normal(local_direction.xz, pixel_angle)
+			: relief_normal(direction, pixel_angle);
 		if (map_shading) {
-			ALBEDO *= map_shade(normal, direction);
+			ALBEDO *= map_shade(normal, up);
 		} else {
 			NORMAL = normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(normal, 0.0)).xyz);
 		}
@@ -965,4 +1011,9 @@ void fragment() {
 		: normalize((VIEW_MATRIX * MODEL_MATRIX * vec4(normalize(local_direction), 0.0)).xyz);
 	ALBEDO = styled_albedo(ALBEDO, brush, outline_normal, VIEW);
 #endif
+	if (flat_rock) {
+		ALBEDO = ROCK_COLOR;
+		EMISSION = vec3(0.0);
+		ROUGHNESS = 1.0;
+	}
 }

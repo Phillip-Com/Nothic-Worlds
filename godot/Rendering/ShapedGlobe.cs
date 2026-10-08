@@ -1,6 +1,7 @@
 using Godot;
 using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Model;
+using NothicWorlds.Interop;
 
 namespace NothicWorlds.Rendering;
 
@@ -9,6 +10,8 @@ namespace NothicWorlds.Rendering;
 /// mesh lifted on the CPU, with each shape added or cut in turn by Godot's CSG. The globe keeps
 /// the planet material (its map, terrain, and relief shading); every face a shape makes is bare
 /// rock. Lives under the body's <see cref="PlanetSurface"/>, which hides its own mesh meanwhile.
+/// A flat world (BOD-10) is carved the same way, as a closed disc whose rim and underside the
+/// planet material draws as bare rock.
 /// </summary>
 /// <remarks>
 /// <para>Godot re-carves the whole globe whenever anything changes, on the main thread, so the
@@ -23,6 +26,11 @@ public partial class ShapedGlobe : Node3D
 {
     // Squares along each edge of a face of the carved globe.
     private const ReliefDetail CarvedDetail = (ReliefDetail)32;
+
+    // Rings out to the rim, and points round each, of a carved flat world's top face: about as
+    // many points as the carved globe.
+    private const int CarvedRings = 48;
+    private const int CarvedSegments = 160;
 
     private static readonly StandardMaterial3D _rockMaterial = new()
     {
@@ -59,8 +67,8 @@ public partial class ShapedGlobe : Node3D
     private MeshInstance3D? _drawn;
     private TriangleMesh? _triangles;  // The drawn carving, for finding where clicks land
     private bool _waitingForCarving;
-    private (IReadOnlyList<ShapeEdit> Shapes, HeightGrid Heights, double RadiusKm, float Relief)?
-        _built;
+    private (IReadOnlyList<ShapeEdit> Shapes, HeightGrid Heights, double RadiusKm, float Relief,
+        BodyShape Shape)? _built;
 
     /// <summary>
     /// The highest an added shape reaches above the body's radius, in radii (0 if none does),
@@ -76,29 +84,32 @@ public partial class ShapedGlobe : Node3D
     /// <param name="radiusKm">Its radius, for the shapes' sizes.</param>
     /// <param name="reliefScale">How far a meter lifts the drawn surface, in radii.</param>
     /// <param name="globeMaterial">The planet material the globe's own faces keep.</param>
+    /// <param name="bodyShape">A globe, or a flat world's disc.</param>
     public void Show(IReadOnlyList<ShapeEdit> shapes, HeightGrid heights, double radiusKm,
-        float reliefScale, Material globeMaterial)
+        float reliefScale, Material globeMaterial, BodyShape bodyShape)
     {
         if (_built is { } built && built.Shapes.SequenceEqual(shapes)
             && ReferenceEquals(built.Heights, heights) && built.RadiusKm == radiusKm
-            && built.Relief == reliefScale)
+            && built.Relief == reliefScale && built.Shape == bodyShape)
         {
             return;
         }
 
-        _built = ([.. shapes], heights, radiusKm, reliefScale);
+        _built = ([.. shapes], heights, radiusKm, reliefScale, bodyShape);
         _combiner?.QueueFree();
         _combiner = new CsgCombiner3D { Name = "Carved", Visible = false };
         _combiner.AddChild(new CsgMesh3D
         {
             Name = "Globe",
-            Mesh = LiftedGlobe(heights, reliefScale, globeMaterial),
+            Mesh = bodyShape == BodyShape.FlatDisc
+                ? LiftedDisc(heights, reliefScale, globeMaterial)
+                : LiftedGlobe(heights, reliefScale, globeMaterial),
         });
 
         HighestTop = 0;
         foreach (ShapeEdit shape in shapes)
         {
-            _combiner.AddChild(ShapeNode(shape, heights, radiusKm, reliefScale));
+            _combiner.AddChild(ShapeNode(shape, heights, radiusKm, reliefScale, bodyShape));
         }
 
         AddChild(_combiner);
@@ -162,11 +173,83 @@ public partial class ShapedGlobe : Node3D
         return mesh;
     }
 
-    // A shape as a CSG node of unit size, stretched and placed (see Placement).
-    private CsgPrimitive3D ShapeNode(
-        ShapeEdit shape, HeightGrid heights, double radiusKm, float reliefScale)
+    // A flat world as a closed disc (VISION.md BOD-10): its top face lifted by its heights,
+    // as the shader lifts the plain one (never through the underside, and the rim ring by the
+    // ground at the south pole, which it all stands for), its rim, and its underside, sharing
+    // their edges so CSG can carve it. One surface with the planet material, which draws the
+    // rim and underside as bare rock.
+    private static ArrayMesh LiftedDisc(HeightGrid heights, float reliefScale, Material material)
     {
-        Transform3D placement = Placement(shape, heights, radiusKm, reliefScale);
+        float half = (float)FlatDisc.HalfThickness;
+        var points = new List<Vector3>();
+        var normals = new List<Vector3>();
+        float Lift(Vector3 top) => heights.IsEmpty ? 0 : Math.Max(reliefScale * (float)
+            heights.SampleAt(FlatDisc.DirectionFor(new Vector3D(top.X, 0, top.Z))),
+            PlanetSurface.FlatDeepestLift);
+        int Add(Vector3 point, Vector3 normal)
+        {
+            points.Add(point);
+            normals.Add(normal);
+            return points.Count - 1;
+        }
+
+        int topMiddle = Add(new Vector3(0, half + Lift(Vector3.Zero), 0), Vector3.Up);
+        var rings = new int[CarvedRings, CarvedSegments];
+        for (int ring = 0; ring < CarvedRings; ring++)
+        {
+            float across = (float)(FlatDisc.Radius * (ring + 1) / CarvedRings);
+            for (int segment = 0; segment < CarvedSegments; segment++)
+            {
+                float angle = Mathf.Tau * segment / CarvedSegments;
+                var top = new Vector3(Mathf.Sin(angle) * across, 0, Mathf.Cos(angle) * across);
+                rings[ring, segment] = Add(top + Vector3.Up * (half + Lift(top)), Vector3.Up);
+            }
+        }
+
+        var bottom = new int[CarvedSegments];
+        for (int segment = 0; segment < CarvedSegments; segment++)
+        {
+            Vector3 rim = points[rings[CarvedRings - 1, segment]];
+            bottom[segment] = Add(new Vector3(rim.X, -half, rim.Z), Vector3.Down);
+        }
+
+        int bottomMiddle = Add(new Vector3(0, -half, 0), Vector3.Down);
+
+        // Godot's front faces wind clockwise as seen; segments run counterclockwise seen from
+        // above (from +Z toward +X).
+        var indices = new List<int>();
+        for (int segment = 0; segment < CarvedSegments; segment++)
+        {
+            int next = (segment + 1) % CarvedSegments;
+            indices.AddRange([topMiddle, rings[0, next], rings[0, segment]]);
+            for (int ring = 0; ring < CarvedRings - 1; ring++)
+            {
+                int a = rings[ring, segment], b = rings[ring, next];
+                int c = rings[ring + 1, segment], d = rings[ring + 1, next];
+                indices.AddRange([a, b, c, b, d, c]);
+            }
+
+            int topA = rings[CarvedRings - 1, segment], topB = rings[CarvedRings - 1, next];
+            indices.AddRange([topA, topB, bottom[segment], topB, bottom[next], bottom[segment]]);
+            indices.AddRange([bottomMiddle, bottom[segment], bottom[next]]);
+        }
+
+        var arrays = new Godot.Collections.Array();
+        arrays.Resize((int)Mesh.ArrayType.Max);
+        arrays[(int)Mesh.ArrayType.Vertex] = points.ToArray();
+        arrays[(int)Mesh.ArrayType.Normal] = normals.ToArray();
+        arrays[(int)Mesh.ArrayType.Index] = indices.ToArray();
+        var mesh = new ArrayMesh();
+        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+        mesh.SurfaceSetMaterial(0, material);
+        return mesh;
+    }
+
+    // A shape as a CSG node of unit size, stretched and placed (see Placement).
+    private CsgPrimitive3D ShapeNode(ShapeEdit shape, HeightGrid heights, double radiusKm,
+        float reliefScale, BodyShape bodyShape)
+    {
+        Transform3D placement = Placement(shape, heights, radiusKm, reliefScale, bodyShape);
         CsgPrimitive3D node = shape.Kind switch
         {
             ShapeKind.Sphere => new CsgSphere3D
@@ -195,8 +278,11 @@ public partial class ShapedGlobe : Node3D
         node.Transform = placement;
         if (shape.Operation == ShapeOperation.Add)
         {
-            HighestTop = Math.Max(HighestTop,
-                placement.Origin.Length() + placement.Basis.Y.Length() / 2 - 1);
+            // Above the radius on a globe; above the face on a flat world.
+            float top = bodyShape == BodyShape.FlatDisc
+                ? placement.Origin.Y - (float)FlatDisc.HalfThickness
+                : placement.Origin.Length() - 1;
+            HighestTop = Math.Max(HighestTop, top + placement.Basis.Y.Length() / 2);
         }
 
         return node;
@@ -237,17 +323,19 @@ public partial class ShapedGlobe : Node3D
                 Height = 1,
             },
         };
-        _preview.Transform = Placement(shape, built.Heights, built.RadiusKm, built.Relief);
+        _preview.Transform = Placement(shape, built.Heights, built.RadiusKm, built.Relief,
+            built.Shape);
     }
 
     // Where a unit-sized shape goes, stretched to its sizes, in the globe's radii. Its middle
     // rises with the drawn ground under its spot (the relief is exaggerated, the shapes
     // aren't), so a shape sitting on a hill still sits on it.
-    private static Transform3D Placement(
-        ShapeEdit shape, HeightGrid heights, double radiusKm, float reliefScale)
+    private static Transform3D Placement(ShapeEdit shape, HeightGrid heights, double radiusKm,
+        float reliefScale, BodyShape bodyShape)
     {
-        ShapeFrame frame = shape.FrameOn(radiusKm);
-        double groundMeters = heights.SampleAt(frame.Up);
+        ShapeFrame frame = shape.FrameOn(radiusKm, bodyShape);
+        double groundMeters = heights.SampleAt(
+            SphericalCoordinates.ToDirection(shape.Spot).ToVector3D());
         double lift = groundMeters * (reliefScale - 1 / (radiusKm * 1000));
         Vector3D center = frame.Center + frame.Up * lift;
         double width = shape.WidthKm / radiusKm;

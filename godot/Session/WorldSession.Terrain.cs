@@ -169,13 +169,6 @@ public partial class WorldSession
     }
 
     /// <summary>
-    /// True if the selected body can be sculpted (VISION.md BOD-04): a planet or moon shaped as
-    /// a globe (flat worlds don't draw heights yet).
-    /// </summary>
-    public bool SelectedBodyCanBeSculpted =>
-        SelectedBodyHasSurface && SelectedBody.Shape == BodyShape.Sphere;
-
-    /// <summary>
     /// Sculpts the selected body (VISION.md BOD-04) with a whole stroke so far, through
     /// <paramref name="path"/>'s spots, redone from <paramref name="before"/> (its heights when
     /// the stroke began), so a stroke drawn bit by bit has no bumps where the bits join. Wrap a
@@ -193,7 +186,7 @@ public partial class WorldSession
     public void SculptHeights(HeightGrid before, IReadOnlyList<GeoCoordinate> path,
         double radiusDegrees, SculptTool tool, double strength, double flattenTo)
     {
-        if (!SelectedBodyCanBeSculpted || IsBusy || path.Count == 0)
+        if (!SelectedBodyHasSurface || IsBusy || path.Count == 0)
         {
             return;
         }
@@ -292,11 +285,10 @@ public partial class WorldSession
         }
     }
 
-    // The ground a body's terrain shapes, or none when that's off (or it's a flat world, which
-    // doesn't draw heights).
+    // The ground a body's terrain shapes, or none when that's off.
     private HeightGrid TerrainGround(Body body)
     {
-        if (!World.TerrainShapesGround || !body.HasSurface || body.Shape != BodyShape.Sphere)
+        if (!World.TerrainShapesGround || !body.HasSurface)
         {
             return HeightGrid.Empty;
         }

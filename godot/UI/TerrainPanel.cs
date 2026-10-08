@@ -532,17 +532,14 @@ public partial class TerrainPanel : CanvasLayer
         bool canPaint = body.HasSurface;
         _heading.Text = $"Terrain on {body.Name}";
         _note.Text = !canPaint ? "Stars and comets can't be painted. Select a planet or moon."
-            : (_sculptButton.ButtonPressed || _shapesButton.ButtonPressed)
-                && !Session.SelectedBodyCanBeSculpted
-                ? "Flat worlds can't be sculpted yet."
-                : "";
+            : "";
         _note.Visible = _note.Text != "";
         _tools.Visible = canPaint;
         _sculptTools.Visible = _sculptButton.ButtonPressed;
         _brushSize.Visible = !_shapesButton.ButtonPressed;
         if (_shapes is not null)
         {
-            _shapes.Visible = _shapesButton.ButtonPressed && Session.SelectedBodyCanBeSculpted;
+            _shapes.Visible = _shapesButton.ButtonPressed && canPaint;
         }
         _shapesGround.SetPressedNoSignal(Session.TerrainShapesGround);
         _shapingNote.Visible = !Session.TerrainShapesGround;
@@ -567,20 +564,17 @@ public partial class TerrainPanel : CanvasLayer
                 "panel.";
         }
 
-        bool canSculpt = Session.SelectedBodyCanBeSculpted;
         if (_shapesButton.ButtonPressed)
         {
-            return !canSculpt ? "Flat worlds can't be sculpted yet; they can still be painted."
-                : "Choose a kind of shape, then click the planet to place one. Drag its middle " +
-                    "to move it, its square to resize it, and its round handle to turn it.";
+            return "Choose a kind of shape, then click the planet to place one. Drag its middle " +
+                "to move it, its square to resize it, and its round handle to turn it.";
         }
 
         if (_sculptButton.ButtonPressed)
         {
-            return !canSculpt ? "Flat worlds can't be sculpted yet; they can still be painted."
-                : "Drag across the planet to shape the ground. Heights are true to scale, so " +
-                    "they show best up close: zoom in, raise View ▸ Relief, or View ▸ Stand " +
-                    "Here.";
+            return "Drag across the planet to shape the ground. Heights are true to scale, so " +
+                "they show best up close: zoom in, raise View ▸ Relief, or View ▸ Stand " +
+                "Here.";
         }
 
         if (_eraseButton.ButtonPressed)
@@ -589,7 +583,7 @@ public partial class TerrainPanel : CanvasLayer
         }
 
         string name = Selected?.Name ?? "the chosen type";
-        return Session.TerrainShapesGround && canSculpt
+        return Session.TerrainShapesGround
             ? $"Drag across the planet to paint {name}; the ground rises or sinks to its " +
                 "height, merging where types meet. Heights are true to scale: raise View ▸ " +
                 "Relief to see them from afar."
@@ -717,12 +711,10 @@ public partial class TerrainPanel : CanvasLayer
         Brush.RadiusDegrees = _sizeSlider.Value;
         bool shaping = _shapesButton.ButtonPressed;
         Brush.IsActive = Visible && !shaping && Session is { SelectedBodyHasSurface: true }
-            && (sculpting
-                ? Session.SelectedBodyCanBeSculpted
-                : _eraseButton.ButtonPressed || _selectedCode is not null);
+            && (sculpting || _eraseButton.ButtonPressed || _selectedCode is not null);
         if (Shapes is not null)
         {
-            Shapes.IsActive = Visible && shaping && Session is { SelectedBodyCanBeSculpted: true };
+            Shapes.IsActive = Visible && shaping && Session is { SelectedBodyHasSurface: true };
         }
     }
 

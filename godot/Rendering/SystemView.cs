@@ -763,7 +763,7 @@ public partial class SystemView : Node3D
             Camera.MinAltitude = (float)Math.Clamp(
                 ClosestApproachKm / (focused.RadiusKm * ShapeExtent(focused)),
                 MinRelativeAltitude, 0.05)
-                + (SurfaceFor(focused.Id)?.HighestRelief ?? 0);
+                + (float)((SurfaceFor(focused.Id)?.HighestRelief ?? 0) / ShapeExtent(focused));
         }
 
         double extent = 0;

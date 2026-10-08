@@ -28,13 +28,17 @@ uniform vec3 wave_origin = vec3(0.0);
 // below glows with the light coming through it.
 uniform float daylight = 1.0;
 
+// On a flat world (VISION.md BOD-10), the surface lies over the top face: up is the face's,
+// and each point brings its place on the disc (CUSTOM0) rather than a direction.
+uniform bool flat_disc = false;
+
 const float WAVE_REPEAT_METERS = 1000.0;
 
-varying vec3 up;
+varying vec3 up;  // The point's direction from the body's middle, or its place on the disc
 varying vec3 wave_place;
 
 void vertex() {
-	up = CUSTOM0.xyz;  // The point's direction from the body's middle
+	up = CUSTOM0.xyz;
 	wave_place = VERTEX * radius_meters + wave_origin;
 }
 
@@ -56,7 +60,8 @@ vec3 wave_slope(vec3 q, float meters_away) {
 }
 
 void fragment() {
-	vec3 normal_up = normalize(up);
+	vec3 normal_up = flat_disc ? vec3(0.0, 1.0, 0.0) : normalize(up);
+	vec3 on_map = flat_disc ? flat_disc_direction(up) : normal_up;
 	float meters_away = length(VERTEX) * meters_per_unit;
 	vec3 slope = wave_slope(wave_place, meters_away);
 	slope -= normal_up * dot(slope, normal_up);
@@ -67,7 +72,7 @@ void fragment() {
 	float fresnel = 0.04 + 0.96 * pow(1.0 - facing, 5.0);
 	ROUGHNESS = 0.08;
 	SPECULAR = 0.6;
-	vec4 tint = has_terrain ? water_tint(terrain_cells, water_palette, normal_up) : vec4(0.0);
+	vec4 tint = has_terrain ? water_tint(terrain_cells, water_palette, on_map) : vec4(0.0);
 	vec3 shallow, deep;
 	water_shades(tint, shallow, deep);
 

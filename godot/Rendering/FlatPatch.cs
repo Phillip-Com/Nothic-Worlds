@@ -33,14 +33,34 @@ public partial class FlatPatch : MeshInstance3D
     /// Builds the patch around <paramref name="spot"/>, out to <paramref name="outer"/> globe
     /// radii, <paramref name="lift"/> radii off the face (the cloud deck's height, or 0), with
     /// <paramref name="custom"/> giving each point's CUSTOM0 (by default, the point itself).
+    /// On the top face, <paramref name="ground"/> lifts each point further by the ground's
+    /// height there (VISION.md BOD-10), in radii; the rim is stretched to meet the top face's
+    /// edge, <paramref name="rimLift"/> radii above the face (see <see cref="OnRim"/>).
     /// </summary>
     public void Build(FlatSpot spot, double outer, double lift = 0,
-        Func<Vector3D, Vector3D>? custom = null)
+        Func<Vector3D, Vector3D>? custom = null, Func<Vector3D, double>? ground = null,
+        double rimLift = 0)
     {
-        Middle = FlatWalk.Point(spot, lift);
+        Middle = OnRim(FlatWalk.Point(spot, lift), spot.Face, rimLift);
         (List<Vector3D> points, List<int> indices) = spot.Face == FlatFace.Rim
             ? RimPatch(spot, outer, lift)
             : FacePatch(spot, outer, lift);
+        for (int i = 0; i < points.Count; i++)
+        {
+            points[i] = spot.Face switch
+            {
+                FlatFace.Top when ground is not null =>
+                    points[i] + new Vector3D(0, ground(points[i]), 0),
+                FlatFace.Rim => OnRim(points[i], FlatFace.Rim, rimLift),
+                _ => points[i],
+            };
+        }
+
+        if (spot.Face == FlatFace.Top && ground is not null)
+        {
+            Middle += new Vector3D(0, ground(Middle), 0);
+        }
+
         Vector3D up = FlatWalk.Frame(spot).Up;
         FaceOutward(points, indices, up);
 
@@ -156,6 +176,24 @@ public partial class FlatPatch : MeshInstance3D
                 (indices[i + 1], indices[i + 2]) = (indices[i + 2], indices[i + 1]);
             }
         }
+    }
+
+    /// <summary>
+    /// A point on the rim (in the body's own space), with the rim stretched upward so its top
+    /// edge is <paramref name="rimLift"/> globe radii above the top face's own height, to meet
+    /// the ground or water at the edge (VISION.md BOD-10); points on other faces are as they
+    /// are.
+    /// </summary>
+    public static Vector3D OnRim(Vector3D point, FlatFace face, double rimLift)
+    {
+        if (face != FlatFace.Rim || rimLift == 0)
+        {
+            return point;
+        }
+
+        double half = FlatDisc.HalfThickness;
+        double y = -half + (point.Y + half) * (2 * half + rimLift) / (2 * half);
+        return new Vector3D(point.X, y, point.Z);
     }
 
     // A point on the top or bottom face, pulled back onto the rim if it's past it.

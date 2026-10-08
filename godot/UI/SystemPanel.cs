@@ -954,20 +954,18 @@ public partial class SystemPanel : CanvasLayer
         }
     }
 
-    // Shows the body's water, if it can have any: only globes draw it.
+    // Shows the body's water, if it can have any (planets and moons).
     private void ShowWater(Body body)
     {
         _waterLabel.Visible = _waterRow.Visible = body.HasSurface;
         _hasWater.SetPressedNoSignal(body.WaterLevelMeters is not null);
+        _hasWater.TooltipText = "Fills everything lower than the water level with water, seen " +
+            "from orbit and from the ground, and lets you go under it when standing" +
+            (body.Shape == BodyShape.FlatDisc
+                ? ". Where it reaches a flat world's rim, it pours over the edge"
+                : "");
         _waterLevel.ShowMetric(body.WaterLevelMeters ?? 0);
         _waterLevel.Editable = body.WaterLevelMeters is not null;
-        DisabledTip.Apply(_hasWater,
-            "Fills everything lower than the water level with water, seen from orbit and " +
-            "from the ground, and lets you go under it when standing",
-            body.Shape == BodyShape.FlatDisc && body.WaterLevelMeters is null
-                ? "Flat worlds can't have water yet: they don't draw heights. Make it a globe " +
-                    "(Shape) to add water"
-                : null);
     }
 
     private void CommitTemperature()

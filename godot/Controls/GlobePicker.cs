@@ -38,15 +38,15 @@ public static class GlobePicker
         Transform3D toPlanet = planet.GlobalTransform.AffineInverse();
         Vector3 origin = toPlanet * camera.ProjectRayOrigin(screen);
         Vector3 direction = (toPlanet.Basis * camera.ProjectRayNormal(screen)).Normalized();
-        if (ShapeOf(planet) == BodyShape.FlatDisc)
-        {
-            return FacePointHit(origin, direction, nearestWhenMissed);
-        }
-
         if (planet is PlanetSurface { IsCarved: true } carved
             && carved.CarvedHit(origin, direction) is Vector3 inside)
         {
             return inside;
+        }
+
+        if (ShapeOf(planet) == BodyShape.FlatDisc)
+        {
+            return FacePointHit(planet as PlanetSurface, origin, direction, nearestWhenMissed);
         }
 
         return SculptedPointHit(planet, origin, direction, nearestWhenMissed);
@@ -120,9 +120,12 @@ public static class GlobePicker
         return nearest && closest.LengthSquared() > 0 ? closest : null;
     }
 
-    // Ray–face intersection on a flat world: the top face is only seen from above. A miss past
+    // Ray–face intersection on a flat world: the top face is only seen from above. Where the
+    // ground is lifted (VISION.md BOD-10), the ray meets the face at the height of the ground
+    // where it last met it, a few times over, which settles on the ground's height. A miss past
     // the rim gives the rim point in that direction.
-    private static Vector3? FacePointHit(Vector3 origin, Vector3 direction, bool nearest)
+    private static Vector3? FacePointHit(
+        PlanetSurface? surface, Vector3 origin, Vector3 direction, bool nearest)
     {
         float faceHeight = (float)FlatDisc.HalfThickness;
         if (origin.Y <= faceHeight || direction.Y >= 0)
@@ -131,6 +134,18 @@ public static class GlobePicker
         }
 
         Vector3 point = origin + direction * ((faceHeight - origin.Y) / direction.Y);
+        for (int pass = 0; surface is not null && pass < 4; pass++)
+        {
+            Vector3D at = FlatDisc.DirectionFor(new Vector3D(point.X, point.Y, point.Z));
+            float groundHeight = faceHeight + surface.SurfaceRadiusAt(at) - 1;
+            if (origin.Y <= groundHeight)
+            {
+                break;
+            }
+
+            point = origin + direction * ((groundHeight - origin.Y) / direction.Y);
+        }
+
         float across = new Vector2(point.X, point.Z).Length();
         if (across <= FlatDisc.Radius)
         {
