@@ -35,6 +35,7 @@ public static class LakeFill
                 "choose lower ground");
         }
 
+        Span<int> around = stackalloc int[WaterCells.MaxNeighbors];
         var inLake = new HashSet<int> { start };
         var queue = new Queue<int>();
         queue.Enqueue(start);
@@ -43,7 +44,7 @@ public static class LakeFill
         while (queue.Count > 0)
         {
             int cell = queue.Dequeue();
-            foreach (int next in WaterCells.Neighbors(cell))
+            foreach (int next in around[..WaterCells.Neighbors(cell, around)])
             {
                 if (inLake.Contains(next) || isSea(next))
                 {
@@ -75,13 +76,77 @@ public static class LakeFill
 
         return new LakeShape(inLake, spill, null);
     }
-}
 
-/// <summary>
-/// Where a lake's water lies: its cells (see <see cref="WaterCells"/>), the lowest cell of its
-/// shore (where a river flows out), or why it can't be filled.
-/// </summary>
-/// <param name="Cells">The cells under its water.</param>
-/// <param name="Outflow">The lowest cell around it, or null if none (or it can't fill).</param>
-/// <param name="Problem">Why the lake has no water, or null.</param>
-public sealed record LakeShape(IReadOnlySet<int> Cells, int? Outflow, string? Problem);
+    /// <summary>
+    /// The hollow that water at <paramref name="spot"/> collects in, and how high it can rise
+    /// there before it spills out: the water runs downhill from the spot to the bottom of the
+    /// hollow, then rises until it reaches the hollow's lowest pass. A lake at the bottom with
+    /// that surface fills the hollow to its brim. Null if the water runs into the sea, or the
+    /// hollow is wider than <paramref name="maxCells"/> (as on level ground).
+    /// </summary>
+    public static LakeSeat? HollowBelow(HeightGrid ground, Vector3D spot, Func<int, bool> isSea,
+        int maxCells)
+    {
+        double Height(int cell) =>
+            isSea(cell) ? double.NegativeInfinity : ground.HeightAt(WaterCells.CellOf(cell));
+
+        Span<int> around = stackalloc int[WaterCells.MaxNeighbors];
+        int bottom = WaterCells.IndexAt(spot);
+        for (int step = 0; step < maxCells && !isSea(bottom); step++)
+        {
+            int lowest = bottom;
+            foreach (int next in around[..WaterCells.Neighbors(bottom, around)])
+            {
+                if (Height(next) < Height(lowest))
+                {
+                    lowest = next;
+                }
+            }
+
+            if (lowest == bottom)
+            {
+                break;
+            }
+
+            bottom = lowest;
+        }
+
+        if (isSea(bottom))
+        {
+            return null;
+        }
+
+        // Lowest cells first, spreading out from the bottom: the water rises through them
+        // until the next lowest is lower than it has already risen, past the pass.
+        double floor = Height(bottom), highest = floor;
+        var seen = new HashSet<int> { bottom };
+        var open = new PriorityQueue<int, (double Height, int Order)>();
+        int order = 0;
+        open.Enqueue(bottom, (floor, order++));
+        while (open.TryDequeue(out int cell, out (double Height, int Order) at))
+        {
+            if (at.Height < highest)
+            {
+                return highest > floor
+                    ? new LakeSeat(WaterCells.Center(bottom), (int)highest)
+                    : null;
+            }
+
+            highest = at.Height;
+            if (seen.Count > maxCells)
+            {
+                return null;
+            }
+
+            foreach (int next in around[..WaterCells.Neighbors(cell, around)])
+            {
+                if (seen.Add(next))
+                {
+                    open.Enqueue(next, (Height(next), order++));
+                }
+            }
+        }
+
+        return null;
+    }
+}

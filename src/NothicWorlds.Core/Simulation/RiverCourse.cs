@@ -32,13 +32,14 @@ public static class RiverCourse
         int current = WaterCells.IndexAt(source);
         var course = new List<int> { current };
         var visited = new HashSet<int> { current };
+        Span<int> around = stackalloc int[WaterCells.MaxNeighbors];
         double Height(int cell) => ground.HeightAt(WaterCells.CellOf(cell));
 
         while (!isWater(current) && course.Count < MaxCells)
         {
             int lowest = -1;
             double lowestHeight = Height(current);
-            foreach (int next in WaterCells.Neighbors(current))
+            foreach (int next in around[..WaterCells.Neighbors(current, around)])
             {
                 if (isBlocked(next) || visited.Contains(next))
                 {
@@ -81,6 +82,7 @@ public static class RiverCourse
         double bottom = height(hollow);
         var cameFrom = new Dictionary<int, int> { [hollow] = hollow };
         var open = new PriorityQueue<int, (double Highest, int Order)>();
+        Span<int> around = stackalloc int[WaterCells.MaxNeighbors];
         int order = 0;
         open.Enqueue(hollow, (bottom, order++));
         while (open.TryDequeue(out int cell, out (double Highest, int Order) cost))
@@ -102,7 +104,7 @@ public static class RiverCourse
                 return null;
             }
 
-            foreach (int next in WaterCells.Neighbors(cell))
+            foreach (int next in around[..WaterCells.Neighbors(cell, around)])
             {
                 if (cameFrom.ContainsKey(next) || isBlocked(next) || used.Contains(next))
                 {
@@ -122,8 +124,3 @@ public static class RiverCourse
     private static List<Vector3D> Directions(List<int> cells) =>
         [.. cells.Select(WaterCells.Center)];
 }
-
-/// <summary>A river's worked-out course.</summary>
-/// <param name="Points">The cells' middles from the source to the mouth.</param>
-/// <param name="ReachesWater">False if it ended before reaching water.</param>
-public sealed record RiverPath(IReadOnlyList<Vector3D> Points, bool ReachesWater);

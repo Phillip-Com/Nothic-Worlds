@@ -48,26 +48,16 @@ public sealed class BodyWater
         IReadOnlyList<River> rivers, IReadOnlyList<TerrainType> types)
     {
         var sea = new bool[WaterCells.Count];
-        var waterCodes = new HashSet<byte>(types
-            .Where(type => type.Climate == ClimateKind.Water)
-            .Select(type => type.Code));
-        TerrainGrid terrain = body.Surface.Terrain;
-        bool painted = !terrain.IsEmpty && waterCodes.Count > 0;
-        int? level = body.WaterLevelMeters;
-        if (painted || level is not null || !ground.IsEmpty)
+        if (SeaRule(body, ground, types) is Func<int, bool> isSea)
         {
-            Parallel.For(0, WaterCells.Count, cell =>
-            {
-                CubeCell at = WaterCells.CellOf(cell);
-                sea[cell] = (level is int surface && ground.HeightAt(at) < surface)
-                    || (painted && waterCodes.Contains(terrain.CodeAt(at)));
-            });
+            Parallel.For(0, WaterCells.Count, cell => sea[cell] = isSea(cell));
         }
 
         var lake = new bool[WaterCells.Count];
         var levels = new short[WaterCells.Count];
         Array.Fill(levels, HeightGrid.MinHeightMeters);
         var shapes = new Dictionary<Guid, LakeShape>();
+        Span<int> around = stackalloc int[WaterCells.MaxNeighbors];
         foreach (Lake each in lakes.Where(l => l.BodyId == body.Id))
         {
             LakeShape shape = LakeFill.Fill(ground, SphericalPolygon.ToUnit(each.Spot),
@@ -78,7 +68,7 @@ public sealed class BodyWater
             {
                 lake[cell] = true;
                 levels[cell] = Math.Max(levels[cell], surface);
-                foreach (int next in WaterCells.Neighbors(cell))
+                foreach (int next in around[..WaterCells.Neighbors(cell, around)])
                 {
                     if (!sea[next])
                     {
@@ -93,7 +83,7 @@ public sealed class BodyWater
         foreach (River river in rivers.Where(r => r.BodyId == body.Id))
         {
             courses.Add(river.Kind == RiverKind.Drawn
-                ? new RiverCourseShown(river.Id, null, river.WidthKm,
+                ? new RiverCourseShown(river.Id, null, RiverKind.Drawn, river.WidthKm,
                     [.. river.Points.Select(SphericalPolygon.ToUnit)], ReachesWater: true)
                 : Natural(river.Id, null, river.WidthKm,
                     RiverCourse.Trace(ground, SphericalPolygon.ToUnit(river.Points[0]),
@@ -116,18 +106,37 @@ public sealed class BodyWater
         return new BodyWater(sea, lake, shapes, lakeLevels, courses);
     }
 
+    /// <summary>
+    /// Which cells of <paramref name="body"/> are in its sea, on ground of these heights: those
+    /// below its water level, and those painted with a type whose climate is water. Null if it
+    /// has no sea.
+    /// </summary>
+    public static Func<int, bool>? SeaRule(Body body, HeightGrid ground,
+        IReadOnlyList<TerrainType> types)
+    {
+        var waterCodes = new HashSet<byte>(types
+            .Where(type => type.Climate == ClimateKind.Water)
+            .Select(type => type.Code));
+        TerrainGrid terrain = body.Surface.Terrain;
+        bool painted = !terrain.IsEmpty && waterCodes.Count > 0;
+        int? level = body.WaterLevelMeters;
+        if (!painted && level is null)
+        {
+            return null;
+        }
+
+        return cell =>
+        {
+            CubeCell at = WaterCells.CellOf(cell);
+            return (level is int surface && ground.HeightAt(at) < surface)
+                || (painted && waterCodes.Contains(terrain.CodeAt(at)));
+        };
+    }
+
     /// <summary>How wide a lake's outflow is at its mouth, in km.</summary>
     public const double OutflowWidthKm = 1;
 
     private static RiverCourseShown Natural(Guid? riverId, Guid? lakeId, double widthKm,
-        RiverPath path) => new(riverId, lakeId, widthKm, path.Points, path.ReachesWater);
+        RiverPath path) =>
+        new(riverId, lakeId, RiverKind.Natural, widthKm, path.Points, path.ReachesWater);
 }
-
-/// <summary>A river as it's drawn: its course from source to mouth, and how wide it is.</summary>
-/// <param name="RiverId">The river, or null for a lake's outflow.</param>
-/// <param name="LakeId">The lake it flows out of, or null.</param>
-/// <param name="WidthKm">How wide it is at its mouth (a fifth of that at its source).</param>
-/// <param name="Points">Its course, as unit directions, source first.</param>
-/// <param name="ReachesWater">False if it couldn't find its way to water.</param>
-public sealed record RiverCourseShown(Guid? RiverId, Guid? LakeId, double WidthKm,
-    IReadOnlyList<Vector3D> Points, bool ReachesWater);
