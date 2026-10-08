@@ -47,6 +47,18 @@ public partial class Main : Node3D
             GetNode<StartScreen>("StartScreen").Open();
         }
 
+        // Added first, so it sees how long opening the world takes.
+        Benchmark? benchmark = null;
+        if (arguments.Contains(Benchmark.CommandLineFlag))
+        {
+            benchmark = new Benchmark
+            {
+                Camera = GetNode<PlanetCamera>("PlanetCamera"),
+                Session = GetNode<WorldSession>("WorldSession"),
+            };
+            AddChild(benchmark);
+        }
+
         if (ArgumentValue(arguments, OpenArgumentPrefix) is string worldPath)
         {
             await GetNode<FileMenu>("FileMenu").OpenPathAsync(worldPath);
@@ -58,10 +70,7 @@ public partial class Main : Node3D
             await GetNode<MapPanel>("MapPanel").ImportAsync(mapPath);
         }
 
-        if (arguments.Contains(Benchmark.CommandLineFlag))
-        {
-            AddChild(new Benchmark { Camera = GetNode<PlanetCamera>("PlanetCamera") });
-        }
+        benchmark?.Opened();
     }
 
     public override void _Notification(int what)

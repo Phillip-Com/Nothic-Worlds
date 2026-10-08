@@ -184,6 +184,7 @@ public partial class WorldSession : Node
         _savedBodies = CloneBodies(World.Bodies);
         _savedLore = LoreState.Of(World);
         Changed += () => Physics.RestartIfRedesigned(World.Bodies, TimeDays);
+        WatchForWantedBodies();
         ShowWorld();
     }
 
@@ -2169,6 +2170,7 @@ public partial class WorldSession : Node
         _terrainGround.Clear();
         _shownGround.Clear();
         ForgetWater();
+        ForgetPreparing();
         Physics.Stop();
         WorldClosed?.Invoke(World.Id);
     }

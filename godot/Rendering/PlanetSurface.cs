@@ -21,11 +21,6 @@ public partial class PlanetSurface : MeshInstance3D
     private const double FarRecolorSeconds = 0.25;
     private const int TableSamples = 2048;
 
-    // The far-away copy of the terrain: each face averaged over FarBlock × FarBlock cells.
-    // Must match TERRAIN_FAR_SIZE in planet.gdshader.
-    private const int FarSize = 256;
-    private const int FarBlock = TerrainGrid.FaceSize / FarSize;
-
     // The warp lookup atlas: one WarpLookup tile per piece slot, 8 across and 4 down.
     private const int WarpTilesAcross = 8;
     private const int WarpTilesDown = SurfaceSettings.MaxPieces / WarpTilesAcross;
@@ -74,8 +69,6 @@ public partial class PlanetSurface : MeshInstance3D
     // Half precision rounds the drawn heights by at most 16 m (at 32 km); the saved ones are
     // exact.
     private Texture2DArray? _heightTexture;
-    private readonly byte[] _faceHeightBytes = new byte[HeightGrid.CellsPerFace * 2];
-    private readonly short[] _faceHeights = new short[HeightGrid.CellsPerFace];
     private HeightGrid _shownHeights = HeightGrid.Empty;
     private Texture2DArray? _lakeTexture;
     private HeightGrid _shownLakes = HeightGrid.Empty;
@@ -111,7 +104,9 @@ public partial class PlanetSurface : MeshInstance3D
         Rings = 16,
     };
 
-    private DetailLevel _detailLevel = DetailLevel.Full;
+    // Plain until the globe is first measured on screen (the next frame), so a body's detail
+    // is only prepared once it's seen big enough to show it.
+    private DetailLevel _detailLevel = DetailLevel.Plain;
 
     private enum DetailLevel
     {
@@ -478,7 +473,7 @@ public partial class PlanetSurface : MeshInstance3D
             var faces = new Godot.Collections.Array<Image>();
             for (int face = 0; face < CubeSphere.FaceCount; face++)
             {
-                faces.Add(HeightFaceImage(heights, face));
+                faces.Add(SurfaceImages.HeightFace(heights, face));
             }
 
             _heightTexture = new Texture2DArray();
@@ -490,7 +485,7 @@ public partial class PlanetSurface : MeshInstance3D
         {
             foreach (int face in heights.FacesChangedFrom(_shownHeights))
             {
-                _heightTexture.UpdateLayer(HeightFaceImage(heights, face), face);
+                _heightTexture.UpdateLayer(SurfaceImages.HeightFace(heights, face), face);
             }
         }
 
@@ -523,7 +518,7 @@ public partial class PlanetSurface : MeshInstance3D
             var faces = new Godot.Collections.Array<Image>();
             for (int face = 0; face < CubeSphere.FaceCount; face++)
             {
-                faces.Add(HeightFaceImage(levels, face, mipmaps: false));
+                faces.Add(SurfaceImages.HeightFace(levels, face, mipmaps: false));
             }
 
             _lakeTexture = new Texture2DArray();
@@ -677,10 +672,132 @@ public partial class PlanetSurface : MeshInstance3D
             DetailLevel level = LevelFor(value);
             if (level != _detailLevel)
             {
+                bool wasPlain = _detailLevel == DetailLevel.Plain;
                 _detailLevel = level;
                 ChooseMesh();
+                if (wasPlain)
+                {
+                    DetailWanted?.Invoke();
+                }
             }
         }
+    }
+
+    /// <summary>
+    /// Raised when the globe grows on screen past its plainest level: its terrain and heights
+    /// are worth showing now (they're only prepared then, VISION.md REN-03).
+    /// </summary>
+    public event Action? DetailWanted;
+
+    /// <summary>
+    /// Whether the globe is big enough on screen to show its terrain and heights.
+    /// </summary>
+    public bool WantsDetail => _detailLevel != DetailLevel.Plain;
+
+    /// <summary>
+    /// The colors terrain codes are drawn in, RGBA per code (see SetTerrainColors).
+    /// </summary>
+    public byte[] TerrainPaletteBytes => _paletteBytes;
+
+    /// <summary>Whether the globe has images of its terrain (made once, then updated).</summary>
+    public bool HasTerrainImages => _terrainTexture is not null;
+
+    /// <summary>Whether the globe has images of its heights (made once, then updated).</summary>
+    public bool HasHeightImages => _heightTexture is not null;
+
+    /// <summary>
+    /// Whether showing <paramref name="terrain"/> and <paramref name="heights"/> would need the
+    /// globe's first images of either made: the costly part, done ahead off the main thread
+    /// (<see cref="SurfaceImages.Prepare"/>, then <see cref="ShowPrepared"/>).
+    /// </summary>
+    public bool NeedsFirstImages(TerrainGrid terrain, HeightGrid heights) =>
+        (!terrain.IsEmpty && _terrainTexture is null)
+        || (!heights.IsEmpty && _heightTexture is null);
+
+    /// <summary>The terrain the globe shows.</summary>
+    public TerrainGrid ShownTerrain => _shownTerrain;
+
+    /// <summary>The heights the globe shows.</summary>
+    public HeightGrid ShownHeights => _shownHeights;
+
+    /// <summary>
+    /// Shows terrain and heights from images made ahead (<see cref="SurfaceImages.Prepare"/>):
+    /// all of them where the globe had none, or the faces that changed. Images made against
+    /// what the globe no longer shows are left; the next <see cref="SetTerrain"/> or
+    /// <see cref="SetHeights"/> brings it up to date.
+    /// </summary>
+    public void ShowPrepared(PreparedSurface prepared)
+    {
+        if (prepared is { TerrainFaces: Image?[] faces, FarFaces: Image?[] far })
+        {
+            if (prepared.TerrainBefore is null && _terrainTexture is null)
+            {
+                _terrainTexture = new Texture2DArray();
+                _terrainTexture.CreateFromImages(new Godot.Collections.Array<Image>(faces!));
+                _farTexture = new Texture2DArray();
+                _farTexture.CreateFromImages(new Godot.Collections.Array<Image>(far!));
+                SurfaceMaterial.SetShaderParameter("terrain_cells", _terrainTexture);
+                SurfaceMaterial.SetShaderParameter("terrain_far", _farTexture);
+                SurfaceMaterial.SetShaderParameter("has_terrain", true);
+                ShowPreparedTerrain(prepared);
+            }
+            else if (prepared.TerrainBefore is not null && _terrainTexture is not null
+                && _farTexture is not null
+                && ReferenceEquals(prepared.TerrainBefore, _shownTerrain))
+            {
+                for (int face = 0; face < faces.Length; face++)
+                {
+                    if (faces[face] is Image codes && far[face] is Image colors)
+                    {
+                        _terrainTexture.UpdateLayer(codes, face);
+                        _farTexture.UpdateLayer(colors, face);
+                    }
+                }
+
+                ShowPreparedTerrain(prepared);
+            }
+        }
+
+        if (prepared.HeightFaces is not Image?[] heightFaces)
+        {
+            return;
+        }
+
+        if (prepared.HeightsBefore is null && _heightTexture is null)
+        {
+            _heightTexture = new Texture2DArray();
+            _heightTexture.CreateFromImages(new Godot.Collections.Array<Image>(heightFaces!));
+            SurfaceMaterial.SetShaderParameter("heights", _heightTexture);
+            SurfaceMaterial.SetShaderParameter("has_heights", true);
+        }
+        else if (prepared.HeightsBefore is not null && _heightTexture is not null
+            && ReferenceEquals(prepared.HeightsBefore, _shownHeights))
+        {
+            for (int face = 0; face < heightFaces.Length; face++)
+            {
+                if (heightFaces[face] is Image lifts)
+                {
+                    _heightTexture.UpdateLayer(lifts, face);
+                }
+            }
+        }
+        else
+        {
+            return;
+        }
+
+        _shownHeights = prepared.Heights;
+        ChooseMesh();
+        UpdateBounds();
+    }
+
+    private void ShowPreparedTerrain(PreparedSurface prepared)
+    {
+        _shownTerrain = prepared.Terrain;
+
+        // Colors changed while they were made: they're redone soon.
+        _farColorsStale |= !prepared.Palette.AsSpan().SequenceEqual(_paletteBytes);
+        UpdateWaterfall();
     }
 
     /// <summary>How finely the sculpted shape is drawn (a quality setting).</summary>
@@ -950,45 +1067,8 @@ public partial class PlanetSurface : MeshInstance3D
             TerrainGrid.FaceSize, TerrainGrid.FaceSize, false, Image.Format.R8, _faceCells);
     }
 
-    // The face in _faceCells, averaged over blocks of cells into colors (multiplied by how
-    // much of the block is painted), with mipmaps for ever farther views.
-    private Image FarFaceImage()
-    {
-        var colors = new byte[FarSize * FarSize * 4];
-        bool hasPalette = _paletteBytes.Length > 0;
-        for (int farRow = 0; farRow < FarSize; farRow++)
-        {
-            for (int farColumn = 0; farColumn < FarSize; farColumn++)
-            {
-                int red = 0, green = 0, blue = 0, alpha = 0;
-                for (int row = 0; row < FarBlock && hasPalette; row++)
-                {
-                    int start = (farRow * FarBlock + row) * TerrainGrid.FaceSize
-                        + farColumn * FarBlock;
-                    for (int column = 0; column < FarBlock; column++)
-                    {
-                        int at = _faceCells[start + column] * 4;
-                        int cellAlpha = _paletteBytes[at + 3];
-                        red += _paletteBytes[at] * cellAlpha / 255;
-                        green += _paletteBytes[at + 1] * cellAlpha / 255;
-                        blue += _paletteBytes[at + 2] * cellAlpha / 255;
-                        alpha += cellAlpha;
-                    }
-                }
-
-                const int count = FarBlock * FarBlock;
-                int texel = (farRow * FarSize + farColumn) * 4;
-                colors[texel] = (byte)(red / count);
-                colors[texel + 1] = (byte)(green / count);
-                colors[texel + 2] = (byte)(blue / count);
-                colors[texel + 3] = (byte)(alpha / count);
-            }
-        }
-
-        Image image = Image.CreateFromData(FarSize, FarSize, false, Image.Format.Rgba8, colors);
-        image.GenerateMipmaps();
-        return image;
-    }
+    // The face in _faceCells, averaged into colors (see SurfaceImages.FarFace).
+    private Image FarFaceImage() => SurfaceImages.FarFace(_faceCells, _paletteBytes);
 
     // Copies a lookup into its tile of the atlas, unless that tile already holds it.
     private bool WriteWarpTile(int tile, WarpLookup warp)
@@ -1032,27 +1112,6 @@ public partial class PlanetSurface : MeshInstance3D
 
     // Writes a table of 32-bit floats into a one-pixel-tall texture, reusing the existing
     // texture when there is one (much cheaper while dragging).
-    // One face's heights as an image of half-precision floats in meters, with its smaller
-    // copies, as the shader reads them.
-    private Image HeightFaceImage(HeightGrid heights, int face, bool mipmaps = true)
-    {
-        heights.CopyFace(face, _faceHeights);
-        for (int index = 0; index < _faceHeights.Length; index++)
-        {
-            BitConverter.TryWriteBytes(_faceHeightBytes.AsSpan(index * 2),
-                (Half)_faceHeights[index]);
-        }
-
-        Image image = Image.CreateFromData(HeightGrid.FaceSize, HeightGrid.FaceSize, false,
-            Image.Format.Rh, _faceHeightBytes);
-        if (mipmaps)
-        {
-            image.GenerateMipmaps();
-        }
-
-        return image;
-    }
-
     // The level of detail for a globe this big on screen; leaving a level takes a little more
     // than entering it did.
     private DetailLevel LevelFor(float pixels)

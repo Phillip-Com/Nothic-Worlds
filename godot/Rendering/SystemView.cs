@@ -104,6 +104,12 @@ public partial class SystemView : Node3D
     public event Action? Placed;
 
     /// <summary>
+    /// Raised when a body's globe grows big enough on screen to show its terrain and heights
+    /// (see <see cref="PlanetSurface.DetailWanted"/>), with the body's id.
+    /// </summary>
+    public event Action<Guid>? DetailWanted;
+
+    /// <summary>
     /// How sizes and distances are drawn (owner's choice: readable by default, true scale as a
     /// toggle). The simulation is the same either way.
     /// </summary>
@@ -867,6 +873,8 @@ public partial class SystemView : Node3D
                 MaterialOverride = (ShaderMaterial)PlanetMaterial!.Duplicate(),
             };
             surface.ShowTerrain = _showTerrain;
+            Guid bodyId = body.Id;
+            surface.DetailWanted += () => DetailWanted?.Invoke(bodyId);
             if (body.Kind == BodyKind.Comet)
             {
                 surface.ShowGrid = false;

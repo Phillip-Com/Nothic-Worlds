@@ -142,7 +142,11 @@ public partial class WorldSession
             return (null, $"a world can hold up to {WaterRules.MaxLakes:N0} lakes");
         }
 
-        HeightGrid ground = ShownGround(body);
+        if (ShownGroundAtOnce(body) is not HeightGrid ground)
+        {
+            return (null, $"{body.Name}'s ground is still being prepared: try again in a moment");
+        }
+
         Func<int, bool> isSea = BodyWater.SeaRule(body, ground, World.TerrainTypes)
             ?? (_ => false);
         Vector3D direction = SphericalPolygon.ToUnit(spot);
@@ -230,7 +234,8 @@ public partial class WorldSession
     }
 
     // Brings a body's water up to date with its ground, rivers, and lakes: shows it straight
-    // away if it's known, or starts working it out.
+    // away if it's known, or starts working it out. While the body's ground is still being
+    // prepared, it waits: preparing shows the terrain again when it's done, and so the water.
     private void ShowWater(Body body)
     {
         if (!body.HasSurface)
@@ -238,7 +243,15 @@ public partial class WorldSession
             return;
         }
 
-        var wanted = WaterInputs.Of(body, ShownGround(body), World);
+        bool dry = World.Rivers.All(r => r.BodyId != body.Id)
+            && World.Lakes.All(l => l.BodyId != body.Id);
+        HeightGrid? ground = dry ? HeightGrid.Empty : ShownGroundAtOnce(body);
+        if (ground is null)
+        {
+            return;
+        }
+
+        var wanted = WaterInputs.Of(body, ground, World);
         if (wanted.IsDry)
         {
             if (_water.Remove(body.Id))
