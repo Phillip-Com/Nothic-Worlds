@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 30;
+    public const int CurrentVersion = 31;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -84,6 +84,12 @@ internal static partial class WorldFormat
     {
         [BodyShape.Sphere] = "sphere",
         [BodyShape.FlatDisc] = "flat-disc",
+    };
+
+    private static readonly Dictionary<RiverKind, string> _riverKindNames = new()
+    {
+        [RiverKind.Drawn] = "drawn",
+        [RiverKind.Natural] = "natural",
     };
 
     private static readonly Dictionary<VisualStyle, string> _styleNames = new()
@@ -255,6 +261,10 @@ internal static partial class WorldFormat
         // moons an optional "waterLevel" (M36, peaks and water). Types named like the defaults
         // get the default variations and sizes, the rest stay level; no body has water.
         AddTerrainVariations,
+
+        // 30 → 31: the world gained optional "rivers" and "lakes" (M42, rivers and lakes).
+        // Older worlds have none.
+        document => document,
     ];
 
     // The variations and feature sizes the version 30 upgrade gives types by name. Deliberately
@@ -487,6 +497,11 @@ internal static partial class WorldFormat
         Parse(_shapeOperationNames, name, "shape operation");
 
     public static string StyleName(VisualStyle style) => _styleNames[style];
+
+    public static string RiverKindName(RiverKind kind) => _riverKindNames[kind];
+
+    public static RiverKind ParseRiverKind(string? name) =>
+        Parse(_riverKindNames, name, "river kind");
 
     public static VisualStyle ParseStyle(string? name) => Parse(_styleNames, name, "style");
 

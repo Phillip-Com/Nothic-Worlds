@@ -10,9 +10,10 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The Terrain panel (VISION.md BOD-05; owner's choice: its own panel, one at a time with the
-/// others on the right): Paint, Erase, Sculpt, or Shapes (BOD-04; owner's choice: here), the
-/// brush size, the sculpting brushes and their strength, the shapes (<see cref="ShapesSection"/>),
-/// and the world's terrain types, which can be added, renamed, recolored, and deleted. While
+/// others on the right): Paint, Erase, Sculpt, Shapes (BOD-04; owner's choice: here), or Water
+/// (BOD-11: rivers and lakes, <see cref="WaterSection"/>), the brush size, the sculpting brushes
+/// and their strength, the shapes (<see cref="ShapesSection"/>), and the world's terrain types,
+/// which can be added, renamed, recolored, and deleted. While
 /// it's open, dragging on the selected planet or moon paints with the selected type or sculpts
 /// it (<see cref="TerrainBrush"/>), or, in Shapes mode, clicking places a shape and its handles
 /// shape it (<see cref="ShapeHandles"/>).
@@ -41,6 +42,8 @@ public partial class TerrainPanel : CanvasLayer
     private Button _eraseButton = null!;
     private Button _sculptButton = null!;
     private Button _shapesButton = null!;
+    private Button _waterButton = null!;
+    private WaterSection? _water;
     private Control _brushSize = null!;
     private ShapesSection? _shapes;
     private Control _sculptTools = null!;
@@ -85,6 +88,15 @@ public partial class TerrainPanel : CanvasLayer
     /// <summary>The handles that place and shape shapes, in Shapes mode.</summary>
     [Export] public ShapeHandles? Shapes { get; set; }
 
+    /// <summary>Takes the click that places a lake or a natural river, in Water mode.</summary>
+    [Export] public PinPlacer? Placer { get; set; }
+
+    /// <summary>Draws a drawn river's points, in Water mode.</summary>
+    [Export] public RegionEditor? LineDrawer { get; set; }
+
+    /// <summary>Draws the rivers, the one selected in Water mode lighter.</summary>
+    [Export] public RiverRenderer? Rivers { get; set; }
+
     /// <summary>
     /// The live weather, whose clouds hide while the panel is open (owner's choice), so the
     /// ground shows.
@@ -100,6 +112,7 @@ public partial class TerrainPanel : CanvasLayer
             _open = value;
             Weather?.SetSurfaceEditing("Terrain", value);
             UpdateVisibility();
+            UpdateWater();
             ShowHint();
         }
     }
@@ -186,8 +199,10 @@ public partial class TerrainPanel : CanvasLayer
             "Shape the ground: raise, lower, smooth, or flatten it");
         _shapesButton = CreateButton("Shapes", Refresh,
             "Add or cut spheres, boxes, cylinders, and cones: holes, hollows, craters, structures");
+        _waterButton = CreateButton("Water", Refresh,
+            "Add lakes and rivers: drawn, or running downhill to the sea");
         foreach (Button button in
-            new[] { _paintButton, _eraseButton, _sculptButton, _shapesButton })
+            new[] { _paintButton, _eraseButton, _sculptButton, _shapesButton, _waterButton })
         {
             button.ToggleMode = true;
             button.ButtonGroup = group;
@@ -230,6 +245,20 @@ public partial class TerrainPanel : CanvasLayer
         {
             _shapes = new ShapesSection { Session = Session, Handles = Shapes, Toolbar = Toolbar };
             tools.AddChild(_shapes);
+        }
+
+        if (Session is not null)
+        {
+            _water = new WaterSection
+            {
+                Session = Session,
+                Placer = Placer,
+                LineDrawer = LineDrawer,
+                Rivers = Rivers,
+                Toolbar = Toolbar,
+            };
+            _water.HintChanged += ShowHint;
+            tools.AddChild(_water);
         }
 
         return tools;
@@ -537,11 +566,13 @@ public partial class TerrainPanel : CanvasLayer
         _note.Visible = _note.Text != "";
         _tools.Visible = canPaint;
         _sculptTools.Visible = _sculptButton.ButtonPressed;
-        _brushSize.Visible = !_shapesButton.ButtonPressed;
+        _brushSize.Visible = !_shapesButton.ButtonPressed && !_waterButton.ButtonPressed;
         if (_shapes is not null)
         {
             _shapes.Visible = _shapesButton.ButtonPressed && canPaint;
         }
+
+        UpdateWater();
         _shapesGround.SetPressedNoSignal(Session.TerrainShapesGround);
         _shapingNote.Visible = !Session.TerrainShapesGround;
         ShowList();
@@ -563,6 +594,11 @@ public partial class TerrainPanel : CanvasLayer
         {
             return "Select a planet or moon to paint it: click it, or choose it in the System " +
                 "panel.";
+        }
+
+        if (_waterButton.ButtonPressed && _water is not null)
+        {
+            return _water.Hint();
         }
 
         if (_shapesButton.ButtonPressed)
@@ -711,7 +747,8 @@ public partial class TerrainPanel : CanvasLayer
         Brush.Code = _eraseButton.ButtonPressed ? (byte)0 : _selectedCode ?? 0;
         Brush.RadiusDegrees = _sizeSlider.Value;
         bool shaping = _shapesButton.ButtonPressed;
-        Brush.IsActive = Visible && !shaping && Session is { SelectedBodyHasSurface: true }
+        Brush.IsActive = Visible && !shaping && !_waterButton.ButtonPressed
+            && Session is { SelectedBodyHasSurface: true }
             && (sculpting || _eraseButton.ButtonPressed || _selectedCode is not null);
         if (Shapes is not null)
         {
@@ -723,6 +760,29 @@ public partial class TerrainPanel : CanvasLayer
     {
         Visible = _open && (Toolbar?.Visible ?? true);
         UpdateBrush();
+    }
+
+    // Shows the Water section in Water mode, with its river lit; out of it, stops any placing
+    // or drawing it started, and no river is lit.
+    private void UpdateWater()
+    {
+        if (_water is null)
+        {
+            return;
+        }
+
+        bool shown = _open && _waterButton.ButtonPressed
+            && Session is { SelectedBodyHasSurface: true };
+        if (_water.Visible && !shown)
+        {
+            _water.StopPlacing();
+            if (Rivers is not null)
+            {
+                Rivers.HighlightedId = null;
+            }
+        }
+
+        _water.Visible = shown;
     }
 
     // A small square of a color, for the type list.

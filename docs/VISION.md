@@ -133,7 +133,21 @@ Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decision
   step a day, month, or year either way; Play with its speed. It replaces the step menu and
   the Go to box.
 
-**Milestone 41: Map and Time While Standing** · In PR #97 (owner's request, 2026-10-08)
+**Milestone 42: Rivers and Lakes** · In progress (owner's request, 2026-10-08)
+Rivers that you draw or that find their own way downhill, and lakes at their own height that
+can feed them (`BOD-11`). Owner's decisions:
+- **Rivers are lines** saved with the world, crisp at any zoom, widening downstream (width
+  settable). **Drawn** rivers follow the points you click. **Natural** rivers start where you
+  click and run downhill by the path of least resistance until they reach water, re-tracing
+  themselves when the ground changes.
+- **Lakes:** click a spot and set the surface height; the water fills the low ground joined to
+  it up to that height, separate from the world's sea level.
+- **Flows Out:** a lake can feed a natural river from the lowest point of its shore.
+- **Save format version 31. Two PRs:** first the rivers and lakes themselves, their tools, the
+  downhill tracing, and drawing them from orbit; then real flowing water up close in first
+  person, with banks cut into the ground.
+
+**Milestone 41: Map and Time While Standing** · Complete (PR #97 merged 2026-10-08; owner's request, 2026-10-08)
 In first person, a minimap shows where you are on the world, and time and the calendar work as
 they do from orbit (`REN-08`). Owner's decisions:
 - **A zoomable overhead minimap:** round, in a corner, north up, drawn from above the spot as
@@ -1042,7 +1056,7 @@ constellations drawn by joining stars).
 - Checked in the app: drawing a 3-line constellation by clicking stars and renaming it, the
   stars and line behind the system, and the stars by night (gone by day) from the ground.
 
-**REN-08 — Map and time while standing** · Implemented (M41, PR #97) · Base
+**REN-08 — Map and time while standing** · Implemented (M41: PR #97) · Base
 **Intent:** Standing on a world, a minimap shows where the view is on the larger map (and can
 take you elsewhere with a click), and the clock and calendar can be run and read just as from
 the system view (owner's request, 2026-10-08).
@@ -2448,6 +2462,41 @@ the rim), and shapes added to or cut out of it (owner's request, 2026-10-07).
   - clicks land on the carving, and in first person you stand on it.
 - **Limits:** as on globes, a carved disc isn't raised to the water. The disc's map is
   stretched toward the rim, so features painted near the south pole are stretched around it.
+
+**BOD-11 — Rivers and lakes** · Partly implemented (M42 PR 1, #98: from orbit; first-person water is PR 2) · Base
+**Intent:** Rivers you can draw, or that find their own way downhill from a source until they
+reach water, and lakes standing at a height of their own that can flow out into rivers, so a
+world's water looks natural or exactly as designed (owner's request, 2026-10-08).
+**Implementation (PR #98):**
+- **Data (format v31):** `Model/River.cs` (drawn: its points; natural: one source; a mouth
+  width, a fifth of it at the source), `Model/Lake.cs` (a spot, a surface height, Flows Out),
+  in `World.Rivers`/`World.Lakes`, checked by `Model/WaterRules.cs`. Only these are saved;
+  where the water lies is worked out from the ground each time (rules in docs/world-format.md).
+- **Working it out (Core, `Simulation/`):** on the height grid's cells (`WaterCells`, with
+  `CubeSphere.Neighbors` across face edges and an allocation-free path for the rest):
+  - `LakeFill.Fill`: the cells below a lake's surface joined to its spot, stopping at the sea,
+    and its lowest shore cell (the outflow); `LakeFill.HollowBelow`: where water clicked on a
+    slope collects and the height of that hollow's brim, which new lakes start at;
+  - `RiverCourse.Trace`: steepest descent, and out of a hollow by the way that climbs least
+    (a priority flood), until it reaches the sea or a lake;
+  - `BodyWater.For`: one body's sea (`SeaRule`: below its water level or painted with water
+    terrain), lakes, lake-level grid for drawing, and every river's course, outflows included.
+- **Session:** `WorldSession.Water.cs` adds, edits, and deletes them with undo (in
+  `LoreState`), and works out each body's water **in the background** whenever its ground,
+  rivers, or lakes change (one job per body at a time, catching up when it's done;
+  `WaterChanged`). A new lake sits in the hollow below the click, filled to its brim.
+- **Drawing:** lakes in the planet shader (`has_lakes`, a nearest-filtered `lake_levels`
+  texture from `PlanetSurface.SetLakeLevels`; water stands at the higher of the sea and the
+  lake); `Rendering/RiverRenderer.cs` draws each river as a ribbon of its true width plus a
+  thin line, natural courses smoothed (Chaikin), drawn ones cut into short steps.
+- **Tools:** the Terrain panel's **Water** mode (`UI/WaterSection.cs`): New Lake and Natural
+  River take one click (`PinPlacer`), Drawn River clicks a line (`RegionEditor.StartDrawingLine`);
+  the body's rivers and lakes are listed, and the selected one's name, width or surface, and
+  Flows Out are edited there, with what its water does (area covered, length, whether it
+  reaches water, or why a lake has none).
+- **Limits:** courses are a height cell apart (about 10 km on an Earth-sized world). On
+  perfectly level ground (unpainted land) a river's way out runs in straight lines. Up close in
+  first person, lakes and rivers aren't water yet (PR 2).
 
 ### 4.5 Orbits & Simulation (`SIM`)
 

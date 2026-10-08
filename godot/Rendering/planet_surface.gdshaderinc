@@ -116,6 +116,12 @@ uniform bool lifted_on_cpu = false;
 // ground around the eye shows the true bottom.
 uniform bool has_water = false;
 uniform float water_level = 0.0;
+// Lakes (VISION.md BOD-11): each cell's lake surface in meters, held by a lake's cells and
+// those around them (so its shore follows the ground between) and very low elsewhere. Not
+// blended, so each lake keeps its own level; drawn as water wherever the ground is lower, as
+// for water_level.
+uniform bool has_lakes = false;
+uniform sampler2DArray lake_levels : filter_nearest, repeat_disable;
 
 // Around a first-person eye, the globe's own mesh isn't raised to the water or drawn as it:
 // the ground and the water's surface there are drawn up close (FirstPersonGround, FlatPatch),
@@ -505,6 +511,18 @@ float ground_height(vec3 direction, float lod) {
 	return has_heights ? height_at(direction, lod) : 0.0;
 }
 
+// The water's surface in meters: the sea's or a lake's, whichever is higher (very low with
+// neither).
+float water_surface(vec3 direction) {
+	float surface = has_water ? water_level : -1e9;
+	if (has_lakes) {
+		surface = max(surface,
+			textureLod(lake_levels, terrain_face_position(direction), 0.0).r);
+	}
+
+	return surface;
+}
+
 // Which way the sculpted ground faces here, in the body's own space: the slopes found by
 // comparing the heights a cell either side (or a pixel, once cells are smaller than pixels, so
 // distant ground doesn't shimmer). Comparing both sides keeps the cells' edges from showing.
@@ -744,11 +762,13 @@ void vertex() {
 		local_direction = CUSTOM0.xyz;
 	} else {
 		local_direction = VERTEX;
-		if ((has_heights || has_water) && !lifted_on_cpu) {
+		if ((has_heights || has_water || has_lakes) && !lifted_on_cpu) {
 			// Lifted to the ground, or to the water over it.
 			vec3 direction = flat_disc ? flat_disc_direction(VERTEX) : normalize(VERTEX);
 			float height = ground_height(direction, 0.0);
-			height = has_water && !near_eye(VERTEX) ? max(height, water_level) : height;
+			height = (has_water || has_lakes) && !near_eye(VERTEX)
+				? max(height, water_surface(direction))
+				: height;
 			if (!flat_disc) {
 				VERTEX = direction * (1.0 + height * relief_scale);
 			} else if (length(VERTEX.xz) < PI - 1e-4) {
@@ -900,8 +920,8 @@ void fragment() {
 	// Water over the ground below its level, its shore smoothed over about a pixel. Not on
 	// the first-person ground, which is the true bottom under its own water surface.
 	float wet = 0.0;
-	if (has_water && eye_level_ground < 0.5 && !near_eye(local_direction)) {
-		float depth = water_level - ground_height(direction, 0.0);
+	if ((has_water || has_lakes) && eye_level_ground < 0.5 && !near_eye(local_direction)) {
+		float depth = water_surface(direction) - ground_height(direction, 0.0);
 		wet = clamp(depth / max(fwidth(depth), 1e-3) + 0.5, 0.0, 1.0);
 		vec4 tint = has_terrain
 			? water_tint(terrain_cells, water_palette, direction)

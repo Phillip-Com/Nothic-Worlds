@@ -2168,6 +2168,7 @@ public partial class WorldSession : Node
     {
         _terrainGround.Clear();
         _shownGround.Clear();
+        ForgetWater();
         Physics.Stop();
         WorldClosed?.Invoke(World.Id);
     }

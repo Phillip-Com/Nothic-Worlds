@@ -26,6 +26,8 @@ internal static class WorldMapper
             TerrainTypes = NullIfEmpty(world.TerrainTypes.Select(ToDocument)),
             Regions = NullIfEmpty(world.Regions.Select(ToDocument)),
             WeatherPins = NullIfEmpty(world.WeatherPins.Select(ToDocument)),
+            Rivers = NullIfEmpty(world.Rivers.Select(r => (RiverDocument?)ToDocument(r))),
+            Lakes = NullIfEmpty(world.Lakes.Select(l => (LakeDocument?)ToDocument(l))),
             Journal = NullIfEmpty(world.Journal.Select(ToDocument)),
             Timelines = NullIfEmpty(world.Timelines.Select(ToDocument)),
             Events = NullIfEmpty(world.Events.Select(ToDocument)),
@@ -101,6 +103,9 @@ internal static class WorldMapper
         world.Constellations.AddRange((document.Constellations ?? []).Select(ToConstellation));
         RequireNoProblem(Constellation.Problem(world.Constellations, world.StarSeed));
         RequireNoProblem(WeatherPin.Problem(world));
+        world.Rivers.AddRange((document.Rivers ?? []).Select(ToRiver));
+        world.Lakes.AddRange((document.Lakes ?? []).Select(ToLake));
+        RequireNoProblem(WaterRules.Problem(world));
         world.Journal.AddRange((document.Journal ?? []).Select(ToEntry));
         world.Timelines.AddRange((document.Timelines ?? []).Select(ToTimeline));
         world.Events.AddRange((document.Events ?? []).Select(ToEvent));
@@ -174,6 +179,71 @@ internal static class WorldMapper
             BodyId = document.Body,
             Name = document.Name ?? "",
             Spot = new GeoCoordinate(document.Latitude, document.Longitude),
+        };
+    }
+
+    private static RiverDocument ToDocument(River river)
+    {
+        return new RiverDocument
+        {
+            Id = river.Id,
+            Body = river.BodyId,
+            Name = river.Name,
+            Kind = WorldFormat.RiverKindName(river.Kind),
+            Points = [.. river.Points
+                .Select(p => (double[]?)[p.LatitudeDegrees, p.LongitudeDegrees])],
+            Width = river.WidthKm == 1 ? null : river.WidthKm,
+        };
+    }
+
+    // Checked fully afterwards by WaterRules.Problem (through River.Problem).
+    private static River ToRiver(RiverDocument? document)
+    {
+        Require(document?.Points is not null, "a river is incomplete");
+        Require(document!.Points.All(p => p is { Length: 2 } && IsOnGlobe(p[0], p[1])),
+            "a river's course is invalid");
+        return new River
+        {
+            Id = document.Id,
+            BodyId = document.Body,
+            Name = document.Name ?? "",
+            Kind = WorldFormat.ParseRiverKind(document.Kind),
+            Points = [.. document.Points.Select(p => new GeoCoordinate(p![0], p[1]))],
+            WidthKm = document.Width ?? 1,
+        };
+    }
+
+    private static bool IsOnGlobe(double latitude, double longitude) =>
+        double.IsFinite(latitude) && latitude is >= -90 and <= 90
+        && double.IsFinite(longitude) && longitude is >= -180 and <= 180;
+
+    private static LakeDocument ToDocument(Lake lake)
+    {
+        return new LakeDocument
+        {
+            Id = lake.Id,
+            Body = lake.BodyId,
+            Name = lake.Name,
+            Latitude = lake.Spot.LatitudeDegrees,
+            Longitude = lake.Spot.LongitudeDegrees,
+            Level = lake.LevelMeters,
+            FlowsOut = lake.FlowsOut ? true : null,
+        };
+    }
+
+    // Checked fully afterwards by WaterRules.Problem (through Lake.Problem).
+    private static Lake ToLake(LakeDocument? document)
+    {
+        Require(document is not null, "a lake is empty");
+        Require(IsOnGlobe(document!.Latitude, document.Longitude), "a lake's spot is invalid");
+        return new Lake
+        {
+            Id = document.Id,
+            BodyId = document.Body,
+            Name = document.Name ?? "",
+            Spot = new GeoCoordinate(document.Latitude, document.Longitude),
+            LevelMeters = document.Level,
+            FlowsOut = document.FlowsOut ?? false,
         };
     }
 

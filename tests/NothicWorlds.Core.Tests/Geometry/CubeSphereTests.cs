@@ -107,6 +107,49 @@ public sealed class CubeSphereTests
             () => CubeSphere.CellAt(new Vector3D(0, 0, 1), 0));
     }
 
+    [Fact]
+    public void ACellInsideAFace_HasItsEightNeighbors()
+    {
+        var cell = new CubeCell(2, 100, 200);
+
+        HashSet<CubeCell> around = [.. CubeSphere.Neighbors(cell, Size)];
+
+        Assert.Equal(8, around.Count);
+        Assert.All(around, next => Assert.True(
+            next.Face == 2 && Math.Abs(next.Column - 100) <= 1 && Math.Abs(next.Row - 200) <= 1));
+    }
+
+    [Theory]
+    [InlineData(0, 0, 500)]           // On a face's edge
+    [InlineData(3, 1023, 7)]          // On another edge
+    [InlineData(4, 0, 0)]             // A cube's corner
+    [InlineData(1, 1023, 1023)]       // Another corner
+    public void CellsOnAnEdge_HaveNeighborsAcrossIt_AllClose(int face, int column, int row)
+    {
+        var cell = new CubeCell(face, column, row);
+
+        List<CubeCell> around = [.. CubeSphere.Neighbors(cell, Size)];
+
+        Assert.InRange(around.Count, 7, 8);
+        Assert.Equal(around.Count, around.Distinct().Count());
+        Assert.DoesNotContain(cell, around);
+        Assert.Contains(around, next => next.Face != face);
+        double side = Gap(new CubeCell(0, 512, 512), new CubeCell(0, 513, 512));
+        Assert.All(around, next => Assert.InRange(Gap(cell, next), 0.3 * side, 2 * side));
+    }
+
+    [Theory]
+    [InlineData(0, 0, 500)]
+    [InlineData(4, 0, 0)]
+    [InlineData(2, 300, 1023)]
+    public void Neighbors_AreMutual(int face, int column, int row)
+    {
+        var cell = new CubeCell(face, column, row);
+
+        Assert.All(CubeSphere.Neighbors(cell, Size),
+            next => Assert.Contains(cell, CubeSphere.Neighbors(next, Size)));
+    }
+
     // The angle between two cells' centers, in degrees.
     private static double Gap(CubeCell a, CubeCell b)
     {

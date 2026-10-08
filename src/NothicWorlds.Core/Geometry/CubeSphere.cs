@@ -111,6 +111,38 @@ public static class CubeSphere
         return point * (1 / point.Length);
     }
 
+    /// <summary>
+    /// The up to eight cells around a cell (sides and corners), on a grid of
+    /// <paramref name="size"/> × <paramref name="size"/> cells per face, across the face's
+    /// edges too (VISION.md BOD-11: water running downhill). A cube's corner has only seven.
+    /// </summary>
+    public static IEnumerable<CubeCell> Neighbors(CubeCell cell, int size)
+    {
+        bool inside = cell.Column > 0 && cell.Row > 0
+            && cell.Column < size - 1 && cell.Row < size - 1;
+        var seen = new HashSet<CubeCell>();
+        for (int rows = -1; rows <= 1; rows++)
+        {
+            for (int columns = -1; columns <= 1; columns++)
+            {
+                if (rows == 0 && columns == 0)
+                {
+                    continue;
+                }
+
+                // Off the face, the cell over the edge is found by direction.
+                CubeCell next = inside
+                    ? cell with { Column = cell.Column + columns, Row = cell.Row + rows }
+                    : CellAt(Direction(cell.Face, Spread(cell.Column + columns + 0.5, size),
+                        Spread(cell.Row + rows + 0.5, size)), size);
+                if (next != cell && seen.Add(next))
+                {
+                    yield return next;
+                }
+            }
+        }
+    }
+
     // The face whose outward direction is closest: the largest component wins.
     private static int FaceOf(Vector3D direction)
     {
