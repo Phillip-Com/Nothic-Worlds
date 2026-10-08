@@ -219,7 +219,8 @@ public partial class WorldSession
     public double HeightAt(GeoCoordinate spot)
     {
         Vector3D direction = SphericalPolygon.ToUnit(spot);
-        return TerrainGround(SelectedBody).SampleAt(direction)
+        // While the selected body is prepared, just what's sculpted.
+        return (TerrainGroundAtOnce(SelectedBody)?.SampleAt(direction) ?? 0)
             + SelectedBody.Surface.Heights.SampleAt(direction);
     }
 
@@ -248,7 +249,15 @@ public partial class WorldSession
         _reshapedAt.TryGetValue(body.Id, out ulong last);
         if (now - last >= ReshapeSeconds * 1000)
         {
-            surface.SetHeights(ShownGround(body));
+            if (ShownGroundAtOnce(body) is HeightGrid shown)
+            {
+                surface.SetHeights(shown);
+            }
+            else
+            {
+                ShowTerrain(body);  // Too much changed: reshaped in the background
+            }
+
             _reshapedAt[body.Id] = now;
             _reshapeWaiting.Remove(body.Id);
         }
@@ -272,23 +281,46 @@ public partial class WorldSession
         _reshapeWaiting.Clear();
     }
 
-    // Sends a body's terrain, and the colors to draw it in, to its globe.
+    // Sends a body's terrain, and the colors to draw it in, to its globe: at once when it's
+    // quick, else prepared in the background once the body is wanted (see StartPreparing).
     private void ShowTerrain(Body body)
     {
-        if (System?.SurfaceFor(body.Id) is PlanetSurface surface)
+        if (System?.SurfaceFor(body.Id) is not PlanetSurface surface)
         {
-            surface.SetTerrainColors(World.TerrainTypes);
-            surface.SetTerrain(body.Surface.Terrain);
-            surface.SetHeights(ShownGround(body));
-            _reshapeWaiting.Remove(body.Id);
-            surface.SetShapes(body.Surface.Shapes, body.RadiusKm);
+            ShowWater(body);
+            return;
         }
 
+        surface.SetTerrainColors(World.TerrainTypes);
+        surface.SetShapes(body.Surface.Shapes, body.RadiusKm);
+        TerrainGrid terrain = body.Surface.Terrain;
+        if (ShownGroundAtOnce(body) is not HeightGrid shown
+            || surface.NeedsFirstImages(terrain, shown))
+        {
+            if (IsWanted(body, surface))
+            {
+                _detailWaiting.Remove(body.Id);
+                StartPreparing(body, surface);
+            }
+            else
+            {
+                _detailWaiting.Add(body.Id);
+            }
+
+            return;
+        }
+
+        _detailWaiting.Remove(body.Id);
+        surface.SetTerrain(terrain);
+        surface.SetHeights(shown);
+        _reshapeWaiting.Remove(body.Id);
         ShowWater(body);  // The ground under the rivers and lakes may have changed.
     }
 
-    // The ground a body's terrain shapes, or none when that's off.
-    private HeightGrid TerrainGround(Body body)
+    // The ground a body's terrain shapes (none when that's off), when it can be had at once:
+    // known already, nothing painted, or only a little of the painting changed since it was
+    // known. Null when much has to be worked out, which is done in the background.
+    private HeightGrid? TerrainGroundAtOnce(Body body)
     {
         if (!World.TerrainShapesGround || !body.HasSurface)
         {
@@ -298,43 +330,61 @@ public partial class WorldSession
         TerrainGrid terrain = body.Surface.Terrain;
         TerrainType[] types = [.. World.TerrainTypes];
         double radiusKm = body.RadiusKm;
-        int seed = TerrainRelief.SeedFor(body.Id);
-        if (_terrainGround.TryGetValue(body.Id, out var known) && known.RadiusKm == radiusKm)
+        if (_terrainGround.TryGetValue(body.Id, out var known) && known.RadiusKm == radiusKm
+            && SameShaping(known.Types, types))
         {
-            if (SameShaping(known.Types, types))
+            if (ReferenceEquals(known.Terrain, terrain))
             {
-                if (ReferenceEquals(known.Terrain, terrain))
-                {
-                    return known.Ground;
-                }
+                return known.Ground;
+            }
 
+            if (TerrainRelief.ChangedTiles(known.Terrain, terrain) <= AtOnceTiles)
+            {
                 HeightGrid updated = TerrainRelief.Update(known.Ground, known.Terrain, terrain,
-                    types, radiusKm, seed);
+                    types, radiusKm, TerrainRelief.SeedFor(body.Id));
                 _terrainGround[body.Id] = (terrain, types, radiusKm, updated);
                 return updated;
             }
-
-            if (ReferenceEquals(known.Terrain, terrain))
-            {
-                // A type's height, edge, or variation changed: only the ground near it is
-                // re-worked.
-                HeightGrid reworked = TerrainRelief.Rework(known.Ground, terrain, known.Types,
-                    types, radiusKm, seed);
-                _terrainGround[body.Id] = (terrain, types, radiusKm, reworked);
-                return reworked;
-            }
         }
 
-        // A new size makes features a different number of cells across: all of it again.
-        HeightGrid ground = TerrainRelief.BaseHeights(terrain, types, radiusKm, seed);
-        _terrainGround[body.Id] = (terrain, types, radiusKm, ground);
+        if (terrain.IsEmpty)
+        {
+            _terrainGround[body.Id] = (terrain, types, radiusKm, HeightGrid.Empty);
+            return HeightGrid.Empty;
+        }
+
+        return null;
+    }
+
+    // The ground a body's terrain shapes, worked out now if need be: for an edit that needs it
+    // straight away (sculpting the selected body, which is prepared already but for a moment).
+    private HeightGrid TerrainGround(Body body)
+    {
+        if (TerrainGroundAtOnce(body) is HeightGrid ground)
+        {
+            return ground;
+        }
+
+        TerrainGrid terrain = body.Surface.Terrain;
+        TerrainType[] types = [.. World.TerrainTypes];
+        (TerrainGrid, TerrainType[], double, HeightGrid)? known =
+            _terrainGround.TryGetValue(body.Id, out var had) ? had : null;
+        ground = WorkOutGround(known, terrain, types, body.RadiusKm,
+            TerrainRelief.SeedFor(body.Id));
+        _terrainGround[body.Id] = (terrain, types, body.RadiusKm, ground);
         return ground;
     }
 
-    // The ground a body shows: its sculpting, on the ground its terrain shapes when that's on.
-    private HeightGrid ShownGround(Body body)
+    // The ground a body shows, when it can be had at once (see TerrainGroundAtOnce): its
+    // sculpting, on the ground its terrain shapes when that's on. Null while it's prepared.
+    private HeightGrid? ShownGroundAtOnce(Body body)
     {
-        HeightGrid under = TerrainGround(body), sculpted = body.Surface.Heights;
+        if (TerrainGroundAtOnce(body) is not HeightGrid under)
+        {
+            return null;
+        }
+
+        HeightGrid sculpted = body.Surface.Heights;
         _shownGround.TryGetValue(body.Id, out var before);
         if (before.Shaped is not null && ReferenceEquals(before.Base, under)
             && ReferenceEquals(before.Sculpted, sculpted))

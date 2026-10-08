@@ -9,6 +9,17 @@ public class TerrainReliefTests
     private static readonly Vector3D _faceMiddle = new(0, 0, 1);
 
     [Fact]
+    public void ChangedTiles_CountsOnlyThePaintingThatChanged()
+    {
+        TerrainGrid before = TerrainGrid.Empty.Paint(_faceMiddle, 10, Low);
+
+        Assert.Equal(0, TerrainRelief.ChangedTiles(before, before));
+        int dab = TerrainRelief.ChangedTiles(before, before.Paint(_faceMiddle, 0.2, High));
+        Assert.InRange(dab, 1, 4);
+        Assert.True(TerrainRelief.ChangedTiles(TerrainGrid.Empty, before) > dab);
+    }
+
+    [Fact]
     public void Unpainted_IsFlat()
     {
         Assert.True(TerrainRelief.BaseHeights(TerrainGrid.Empty, Types(0, 0)).IsEmpty);

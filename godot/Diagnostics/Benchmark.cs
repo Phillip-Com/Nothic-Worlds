@@ -1,13 +1,17 @@
 using Godot;
 using NothicWorlds.Controls;
+using NothicWorlds.Session;
 
 namespace NothicWorlds.Diagnostics;
 
 /// <summary>
 /// Automated performance check. It orbits and zooms the camera for a fixed time with VSync
-/// off, prints frame-rate and memory results, then quits. Main adds it when the app is started
-/// with <c>-- --benchmark</c>, e.g.
-/// <c>godot --path godot --resolution 1920x1080 -- --benchmark</c>.
+/// off, prints frame-rate and memory results, then quits. Added before a world given with
+/// <c>--open=</c> opens, it first reports how long that took (VISION.md REN-03): until the
+/// world showed, until every body was prepared, and the slowest frame meanwhile. Main adds it
+/// when the app is started with <c>-- --benchmark</c>, e.g.
+/// <c>godot --path godot --resolution 1920x1080 -- --benchmark</c>, or for a large world
+/// <c>godot --path godot -- --open=world.nworld --benchmark</c>.
 /// </summary>
 public partial class Benchmark : Node
 {
@@ -19,12 +23,25 @@ public partial class Benchmark : Node
     private const float ZoomStepsPerSecond = 8.0f;
 
     private double _elapsed;
+    private double _loadingTime;
+    private double _loadingSlowest;
+    private double? _openedAfter;
+    private bool _loading = true;
     private double _measuredTime;
     private int _measuredFrames;
     private double _slowestFrame;
 
     /// <summary>The camera to move. Must be set before the node is added to the scene.</summary>
     public PlanetCamera? Camera { get; set; }
+
+    /// <summary>The open world, to wait for its bodies to be prepared.</summary>
+    public WorldSession? Session { get; set; }
+
+    /// <summary>
+    /// Call when the world given to open has opened (or straight away with none): the
+    /// benchmark waits for its bodies to be prepared, then measures.
+    /// </summary>
+    public void Opened() => _openedAfter = _loadingTime;
 
     public override void _Ready()
     {
@@ -48,6 +65,12 @@ public partial class Benchmark : Node
 
     public override void _Process(double delta)
     {
+        if (_loading)
+        {
+            Load(delta);
+            return;
+        }
+
         _elapsed += delta;
 
         // Orbit steadily while zooming in and out, to cover near and far views.
@@ -68,6 +91,22 @@ public partial class Benchmark : Node
             Report();
             GetTree().Quit();
         }
+    }
+
+    // While the world opens and its bodies are prepared: the time it takes and the slowest
+    // frame (a frame the app froze for). Reported, then measuring starts.
+    private void Load(double delta)
+    {
+        _loadingTime += delta;
+        _loadingSlowest = Math.Max(_loadingSlowest, delta);
+        if (_openedAfter is not double opened || Session?.IsPreparingAnything == true)
+        {
+            return;
+        }
+
+        _loading = false;
+        GD.Print($"Benchmark loading: opened after {opened:0.00} s, every body prepared " +
+            $"after {_loadingTime:0.00} s, slowest frame meanwhile {_loadingSlowest * 1000:0} ms");
     }
 
     private void Report()

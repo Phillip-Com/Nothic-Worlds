@@ -93,6 +93,25 @@ public static class TerrainRelief
     }
 
     /// <summary>
+    /// How many tiles of painting differ between <paramref name="before"/> and
+    /// <paramref name="after"/>: about what <see cref="Update"/> has to work out again (a
+    /// brush stroke changes a few; deleting a widely painted type, many).
+    /// </summary>
+    public static int ChangedTiles(TerrainGrid before, TerrainGrid after)
+    {
+        int count = 0;
+        for (int index = 0; index < CubeGridBrush.TileCount; index++)
+        {
+            if (!ReferenceEquals(before.Tile(index), after.Tile(index)))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /// <summary>
     /// The ground <paramref name="terrain"/> shapes after its types' heights, edges, or
     /// variations changed from <paramref name="before"/> to <paramref name="after"/>, worked
     /// out from <paramref name="previous"/> (what it shaped with <paramref name="before"/>) by

@@ -1,4 +1,5 @@
 using Godot;
+using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
 
@@ -17,6 +18,9 @@ public partial class MapToolbar : CanvasLayer
     // How far down the hint bar sits: just under the toolbar's buttons.
     private const int HintBarTop = 56;
     private const double InfoMessageSeconds = 6.0;
+
+    // How long the selected body's preparing goes on before it's mentioned (a quick one isn't).
+    private const double PreparingMessageSeconds = 0.3;
     private const float MessageWidth = 460.0f;
     private const float HintWidth = 560.0f;
 
@@ -38,6 +42,7 @@ public partial class MapToolbar : CanvasLayer
 
     // Increases with every message, so an old auto-hide timer doesn't hide a newer message.
     private int _messageVersion;
+    private int _preparingMessage = -1;  // The message saying a body is being prepared
 
     /// <summary>The System panel, shown and hidden by the System button.</summary>
     [Export] public SystemPanel? SystemPanel { get; set; }
@@ -69,6 +74,12 @@ public partial class MapToolbar : CanvasLayer
     /// Journal (to read an entry from a box) closes it, and opening it closes the panels.
     /// </summary>
     [Export] public DiagramPage? Diagrams { get; set; }
+
+    /// <summary>
+    /// The open world, for saying when the selected body's terrain is still being prepared
+    /// (VISION.md REN-03).
+    /// </summary>
+    [Export] public WorldSession? Session { get; set; }
 
     /// <summary>Space at the start of the toolbar row, where the menus go.</summary>
     public HBoxContainer MenuArea { get; } = new();
@@ -192,6 +203,37 @@ public partial class MapToolbar : CanvasLayer
         _message.CustomMinimumSize = new Vector2(MessageWidth, 0);
         layout.AddChild(_message);
         CreateHintBar();
+        if (Session is not null)
+        {
+            Session.Preparing += SayPreparing;
+        }
+    }
+
+    // While the selected body takes a moment to prepare, says so; takes it away when done.
+    private async void SayPreparing(Guid bodyId, bool underway)
+    {
+        if (Session is null || bodyId != Session.SelectedBodyId)
+        {
+            return;
+        }
+
+        if (!underway)
+        {
+            if (_preparingMessage == _messageVersion)
+            {
+                _message.Visible = false;
+            }
+
+            return;
+        }
+
+        await ToSignal(GetTree().CreateTimer(PreparingMessageSeconds),
+            SceneTreeTimer.SignalName.Timeout);
+        if (Session.IsPreparing(bodyId) && bodyId == Session.SelectedBodyId)
+        {
+            ShowInfo($"Preparing {Session.SelectedBody.Name}'s terrain…", autoHide: false);
+            _preparingMessage = _messageVersion;
+        }
     }
 
     /// <summary>

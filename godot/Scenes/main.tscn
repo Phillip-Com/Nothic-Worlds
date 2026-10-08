@@ -103,8 +103,9 @@ Journal = NodePath("../JournalPanel")
 GlobeCamera = NodePath("../PlanetCamera")
 HideWhileOpen = [NodePath("../CameraModeIndicator"), NodePath("../BodyMarkers"), NodePath("../EclipseMarkers"), NodePath("../RegionMarkers"), NodePath("../PinMarkers"), NodePath("../WeatherMarkers")]
 
-[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("MapPanel", "Terrain", "SystemPanel", "Journal", "Calendar", "RegionsPanel", "Diagrams")]
+[node name="MapToolbar" type="CanvasLayer" parent="." node_paths=PackedStringArray("MapPanel", "Terrain", "SystemPanel", "Journal", "Calendar", "RegionsPanel", "Diagrams", "Session")]
 script = ExtResource("7_toolbar")
+Session = NodePath("../WorldSession")
 Diagrams = NodePath("../DiagramPage")
 MapPanel = NodePath("../MapPanel")
 Terrain = NodePath("../TerrainPanel")
