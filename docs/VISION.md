@@ -2510,11 +2510,20 @@ world's water looks natural or exactly as designed (owner's request, 2026-10-08)
     sea's surface around the eye now stands at the sea's or a lake's level wherever that's
     above the ground (`PlanetSurface.WaterRadiusAt`), so lakes are water you can swim in.
     The orbit lines hide on the body you're standing on. Globes and flat worlds alike.
+- **Smooth banks (PR #100; owner's pick from the follow-ups):** `Simulation/RiverBanks.cs`
+  (Core) lays a fine strip across each carved stretch, from bank top down to the bed and up
+  the other side, with a skirt beyond each bank that blends into the coarser ground's own
+  drawn surface; `RiverChannels.UnderStripMeters` sinks that coarser ground under the strip
+  (more with distance, fading across the skirt) so its flat cells never show through.
+  `Rendering/RiverBankStrip.cs` draws it with the ground's own material, lit by its own slope
+  (CUSTOM0.w from 1 to 2 tells the planet shader how far), and `RingGrid` reads the coarser
+  ground's height exactly as its triangles lie, so the skirt's edge meets it. Measuring is
+  quicker too: carving segments at least 10 m long, steps sized by their own distance from
+  the eye, and the points worked out in parallel, so a rebuild of the ground near a river
+  takes tens of milliseconds rather than hundreds.
 - **Limits:** courses are a height cell apart (about 10 km on an Earth-sized world). On
-  perfectly level ground (unpainted land) a river's way out runs in straight lines. Up close,
-  a channel is cut only as finely as the ground drawn around the eye (rings of 72 points),
-  so banks show facets; on a flat world, rivers away from the north pole are stretched
-  east–west as the disc's map is.
+  perfectly level ground (unpainted land) a river's way out runs in straight lines. On a flat
+  world, rivers away from the north pole are stretched east–west as the disc's map is.
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
