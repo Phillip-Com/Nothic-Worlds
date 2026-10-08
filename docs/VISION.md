@@ -133,7 +133,21 @@ Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decision
   step a day, month, or year either way; Play with its speed. It replaces the step menu and
   the Go to box.
 
-**Milestone 41: Map and Time While Standing** · In PR #97 (owner's request, 2026-10-08)
+**Milestone 42: Rivers and Lakes** · In progress (owner's request, 2026-10-08)
+Rivers that you draw or that find their own way downhill, and lakes at their own height that
+can feed them (`BOD-11`). Owner's decisions:
+- **Rivers are lines** saved with the world, crisp at any zoom, widening downstream (width
+  settable). **Drawn** rivers follow the points you click. **Natural** rivers start where you
+  click and run downhill by the path of least resistance until they reach water, re-tracing
+  themselves when the ground changes.
+- **Lakes:** click a spot and set the surface height; the water fills the low ground joined to
+  it up to that height, separate from the world's sea level.
+- **Flows Out:** a lake can feed a natural river from the lowest point of its shore.
+- **Save format version 31. Two PRs:** first the rivers and lakes themselves, their tools, the
+  downhill tracing, and drawing them from orbit; then real flowing water up close in first
+  person, with banks cut into the ground.
+
+**Milestone 41: Map and Time While Standing** · Complete (PR #97 merged 2026-10-08; owner's request, 2026-10-08)
 In first person, a minimap shows where you are on the world, and time and the calendar work as
 they do from orbit (`REN-08`). Owner's decisions:
 - **A zoomable overhead minimap:** round, in a corner, north up, drawn from above the spot as
@@ -1042,7 +1056,7 @@ constellations drawn by joining stars).
 - Checked in the app: drawing a 3-line constellation by clicking stars and renaming it, the
   stars and line behind the system, and the stars by night (gone by day) from the ground.
 
-**REN-08 — Map and time while standing** · Implemented (M41, PR #97) · Base
+**REN-08 — Map and time while standing** · Implemented (M41: PR #97) · Base
 **Intent:** Standing on a world, a minimap shows where the view is on the larger map (and can
 take you elsewhere with a click), and the clock and calendar can be run and read just as from
 the system view (owner's request, 2026-10-08).
@@ -2448,6 +2462,11 @@ the rim), and shapes added to or cut out of it (owner's request, 2026-10-07).
   - clicks land on the carving, and in first person you stand on it.
 - **Limits:** as on globes, a carved disc isn't raised to the water. The disc's map is
   stretched toward the rim, so features painted near the south pole are stretched around it.
+
+**BOD-11 — Rivers and lakes** · Planned (M42) · Base
+**Intent:** Rivers you can draw, or that find their own way downhill from a source until they
+reach water, and lakes standing at a height of their own that can flow out into rivers, so a
+world's water looks natural or exactly as designed (owner's request, 2026-10-08).
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
