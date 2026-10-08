@@ -108,7 +108,36 @@ Your own calendars (`CAL-01`), and solstices, equinoxes, and seasons from the si
 - **Two PRs:** Core (calendar model, dates, season math, format v6) (PR #19), then the app
   (PR #20).
 
-**Milestone 37: Flat Worlds in Relief** · In PR #93 (owner's request, 2026-10-07)
+**Milestone 38: Clearer Look** · In progress (owner's request, 2026-10-08)
+The first of three milestones making the app easier to read and use (owner's rules: if it can
+be shown, show it; simplify where nothing is lost; follow apps people already know, such as
+fantasy-calendar.com). From a run-through of every panel, menu, and dialog (`UI-07`). Owner's
+decisions:
+- **Look and small fixes first** (this milestone), then the calendar (M39), then calendar
+  presets and date pickers (M40).
+- **Buttons and switches that look like what they are**, panels laid out the same way, the
+  View menu grouped, the one-line hint on every tool (Diagrams and Timeline had none), and
+  clearer wording (no "Day 0", no "Planet (planet)").
+- **The System panel in folding sections** (the body, its look, orbit, calendar and seasons,
+  events, and the system's night sky), remembering which are open, with a legend for the star's
+  zones it draws. Nothing is removed.
+- **One PR.**
+
+**Milestone 39: The Calendar** · Planned (owner's request, 2026-10-08)
+Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decisions:
+- **A Calendar tab** in place of Timeline: the selected world's month (or whole year) as a
+  grid, each day with the moons' phases, seasons, eclipses, meteor showers, and events; click
+  a day to go there, double-click to add an event. The timeline stays as one of its views.
+- **A calendar-style time bar:** the date in the world's calendar (weekday, day, month, year,
+  time) with a small clock and the moons' phases; clicking it opens the calendar; buttons to
+  step a day, month, or year either way; Play with its speed. It replaces the step menu and
+  the Go to box.
+
+**Milestone 40: Calendars Made Easy** · Planned (owner's request, 2026-10-08)
+Ready-made calendars to start from, and dates picked from a calendar everywhere a date is asked
+for (events, Go to, the calendar's own start date) (`CAL-06`).
+
+**Milestone 37: Flat Worlds in Relief** · Complete (PR #93 merged 2026-10-08; owner's request, 2026-10-07)
 Flat worlds get what globes have: heights, water, and shapes (`BOD-10`). Owner's decisions:
 - **Everything globes have:** sculpting brushes, terrain-shaped ground with its peaks, and
   water, with the water's colors and the underwater look.
@@ -1238,6 +1267,12 @@ Quit) and can be launched on Windows by double-clicking it, without Godot (owner
   saved world appeared under Recent Worlds and opened from it, a missing one was greyed with its
   reason, New World and Settings worked; the exported .exe started on its own without errors.
 
+**UI-07 — Clearer look** · Planned (M38) · Base
+**Intent:** Every panel, menu, and dialog is easy to read and operate: buttons and switches
+look like what they are, panels are laid out alike, long panels fold into sections, menus are
+grouped, and whatever can be shown is shown rather than described (owner's request,
+2026-10-08).
+
 ### 4.3 Maps & Image Import (`MAP`)
 
 **MAP-01 — Import map image in a supported layout** · Implemented (equirectangular: M1; other layouts: M2, see `MAP-04`) · Base
@@ -2292,7 +2327,7 @@ beneath it in first person looks like being underwater (owner's request, 2026-10
 - **Limits:** a globe carved by shapes isn't raised to the water (its mesh is built on the
   CPU), though it's still colored as water; standing on one shows no water surface.
 
-**BOD-10 — Flat worlds in relief** · Implemented (M37, PR #93) · Base
+**BOD-10 — Flat worlds in relief** · Implemented (M37: PR #93) · Base
 **Intent:** A flat world can have everything a globe has on its surface: sculpted and
 terrain-shaped heights with their peaks, water up to a level (with a waterfall where it reaches
 the rim), and shapes added to or cut out of it (owner's request, 2026-10-07).
@@ -2614,6 +2649,16 @@ without the world being changed to fit.
   **Suggest**, and a line with the average year and how often it drifts a day from the real one.
 - **Verified in the running app** with real clicks, maximized and at 1152 × 648: turning it on,
   Suggest, Save (the leap month gains its day in leap years), and save/reopen.
+
+**CAL-05 — Calendar view** · Planned (M39) · Base
+**Intent:** Time is shown as a calendar, as fantasy-calendar.com does: a month or year grid
+for the selected world with the moons' phases, seasons, eclipses, meteor showers, and events
+on each day, and a time bar that shows the date in the world's own calendar and steps by day,
+month, or year (owner's request, 2026-10-08).
+
+**CAL-06 — Calendar presets and date pickers** · Planned (M40) · Base
+**Intent:** A calendar can start from a ready-made one, and every date is picked from a
+calendar rather than typed as a day number (owner's request, 2026-10-08).
 
 ### 4.7 Events (`EVT`)
 
