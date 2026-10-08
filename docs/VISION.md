@@ -133,7 +133,7 @@ Time shown as a calendar, like fantasy-calendar.com (`CAL-05`). Owner's decision
   step a day, month, or year either way; Play with its speed. It replaces the step menu and
   the Go to box.
 
-**Milestone 42: Rivers and Lakes** · In progress (owner's request, 2026-10-08)
+**Milestone 42: Rivers and Lakes** · Complete (PRs #98 and #99 merged 2026-10-08; owner's request, 2026-10-08)
 Rivers that you draw or that find their own way downhill, and lakes at their own height that
 can feed them (`BOD-11`). Owner's decisions:
 - **Rivers are lines** saved with the world, crisp at any zoom, widening downstream (width
