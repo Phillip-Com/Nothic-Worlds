@@ -239,6 +239,12 @@ public partial class MapToolbar : CanvasLayer
         Calendar?.ShowTimelineView();
     }
 
+    /// <summary>Closes the Calendar tab.</summary>
+    public void CloseCalendar()
+    {
+        _calendarButton.ButtonPressed = false;
+    }
+
     /// <summary>Opens the Calendar tab on the month the clock is in.</summary>
     public void ShowCalendar()
     {

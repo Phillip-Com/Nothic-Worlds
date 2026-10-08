@@ -6,8 +6,9 @@ namespace NothicWorlds.UI;
 /// What's shown over the first-person view (VISION.md REN-06; owner's choice: a compass, readouts
 /// on hover, and a panel for the spot): the controls along the top left, a compass along the
 /// top, the name and place of the body under the mouse, the time and weather at the spot in
-/// the bottom left, and the rain or snow falling over everything. It only shows what it's
-/// given; <see cref="Controls.FirstPersonMode"/> works it out.
+/// the bottom left, the rain or snow falling over everything, and (REN-08) the minimap and a
+/// Calendar button in the top right. It only shows what it's given;
+/// <see cref="Controls.FirstPersonMode"/> works it out.
 /// </summary>
 public partial class FirstPersonHud : CanvasLayer
 {
@@ -64,7 +65,33 @@ public partial class FirstPersonHud : CanvasLayer
             GrowVertical = Control.GrowDirection.Begin,
         });
         AddChild(_info);
+
+        // The minimap and the calendar's button, in the top right (VISION.md REN-08).
+        var corner = new VBoxContainer
+        {
+            AnchorLeft = 1,
+            AnchorRight = 1,
+            OffsetLeft = -Minimap.Diameter - 16,
+            OffsetRight = -16,
+            OffsetTop = 16,
+        };
+        Minimap = new Minimap();
+        corner.AddChild(Minimap);
+        CalendarButton = new Button
+        {
+            Text = "Calendar (T)",
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Open or close the calendar: click a day to run the clock there",
+        };
+        corner.AddChild(CalendarButton);
+        AddChild(corner);
     }
+
+    /// <summary>The minimap in the top right.</summary>
+    public Minimap Minimap { get; }
+
+    /// <summary>Opens or closes the calendar over the view.</summary>
+    public Button CalendarButton { get; }
 
     /// <summary>The controls and what mode the view is in, along the top left.</summary>
     public void SetHelp(string text) => _help.Text = text;

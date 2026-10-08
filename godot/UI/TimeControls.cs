@@ -172,7 +172,7 @@ public partial class TimeControls : CanvasLayer
 
         if (Toolbar is not null)
         {
-            Toolbar.VisibilityChanged += () => Visible = Toolbar.Visible;
+            Toolbar.VisibilityChanged += UpdateVisibility;
         }
 
         if (Session is null)
@@ -212,6 +212,27 @@ public partial class TimeControls : CanvasLayer
         {
             Session.SetTime(Session.TimeDays + delta * _speeds[_speed.Selected].DaysPerSecond);
         }
+    }
+
+    /// <summary>
+    /// Whether the time bar stays shown while the toolbar is hidden (standing on a world, where
+    /// time runs as from orbit; VISION.md REN-08).
+    /// </summary>
+    public bool KeepShown
+    {
+        get => _keepShown;
+        set
+        {
+            _keepShown = value;
+            UpdateVisibility();
+        }
+    }
+
+    private bool _keepShown;
+
+    private void UpdateVisibility()
+    {
+        Visible = (Toolbar?.Visible ?? true) || _keepShown;
     }
 
     private void TogglePlaying()
