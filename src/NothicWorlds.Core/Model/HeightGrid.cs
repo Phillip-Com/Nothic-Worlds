@@ -337,6 +337,49 @@ public sealed class HeightGrid
     }
 
     /// <summary>
+    /// Creates a grid at <paramref name="fill"/> everywhere but <paramref name="cells"/>, which
+    /// take their own heights. Tiles none of them fall in share one array, so a grid with a few
+    /// cells set over a whole planet is quick to make and small (a planet's lakes' levels).
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// A height below <see cref="MinHeightMeters"/>.
+    /// </exception>
+    public static HeightGrid Sparse(short fill, IEnumerable<(CubeCell Cell, short Height)> cells)
+    {
+        if (fill < MinHeightMeters)
+        {
+            throw new ArgumentException($"Heights must be at least {MinHeightMeters} m.",
+                nameof(fill));
+        }
+
+        short[]? shared = fill == 0 ? null : new short[CellsPerTile];
+        shared?.AsSpan().Fill(fill);
+        var tiles = new short[]?[TileCount];
+        Array.Fill(tiles, shared);
+        foreach ((CubeCell cell, short height) in cells)
+        {
+            if (height < MinHeightMeters)
+            {
+                throw new ArgumentException($"Heights must be at least {MinHeightMeters} m.",
+                    nameof(cells));
+            }
+
+            int index = CubeGridBrush.TileIndex(cell.Face, cell.Column / TileSize,
+                cell.Row / TileSize);
+            if (tiles[index] is not short[] tile || ReferenceEquals(tile, shared))
+            {
+                tile = new short[CellsPerTile];
+                tile.AsSpan().Fill(fill);
+                tiles[index] = tile;
+            }
+
+            tile[CubeGridBrush.CellIndex(cell.Column, cell.Row)] = height;
+        }
+
+        return new HeightGrid(tiles);
+    }
+
+    /// <summary>
     /// Creates a grid from every cell's height: the six faces in order, each row by row from
     /// the top (<see cref="CellCount"/> values, the same layout as <see cref="CopyFace"/>).
     /// </summary>
