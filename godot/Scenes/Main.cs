@@ -29,6 +29,11 @@ public partial class Main : Node3D
     {
         // Runs before any child node is ready, so input actions exist before anything reads them.
         InputActions.Register();
+
+        // Every panel, menu, and dialog takes the app's look (VISION.md UI-07). Merged into the
+        // default theme, which every control falls back to: a theme set on the window doesn't
+        // reach controls on canvas layers, which is where the panels are.
+        ThemeDB.GetDefaultTheme().MergeWith(AppTheme.Create());
     }
 
     public override async void _Ready()

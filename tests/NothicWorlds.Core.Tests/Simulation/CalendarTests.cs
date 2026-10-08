@@ -66,6 +66,15 @@ public class CalendarTests
         Assert.Equal("5 Highsun 1203", CalendarMath.Format(plain, CalendarMath.DateOf(plain, 0)));
     }
 
+    [Theory]
+    [InlineData(0.5, "Day 1, 12:00")]
+    [InlineData(-0.25, "Day -1, 18:00")]   // The day before the first: no "Day 0"
+    [InlineData(-1.25, "Day -2, 18:00")]
+    public void PlainDays_CountBackFromDayOne_WithNoDayZero(double time, string expected)
+    {
+        Assert.Equal(expected, BodyClock.Describe(new Body { DayLengthHours = 24 }, time));
+    }
+
     [Fact]
     public void Describe_UsesTheBodysCalendar_OrPlainDays()
     {

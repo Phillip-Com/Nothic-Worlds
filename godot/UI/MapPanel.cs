@@ -143,6 +143,7 @@ public partial class MapPanel : CanvasLayer
             SizeFlagsVertical = Control.SizeFlags.ExpandFill,
         };
         scroll.AddChild(layout);
+        PanelStyle.FitHeight(panel, layout, TopOffset, BottomOffset);
 
         _mapImage = new MapImageSection
         {

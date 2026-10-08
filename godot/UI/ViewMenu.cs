@@ -96,39 +96,41 @@ public partial class ViewMenu : Node
         menu.SetItemTooltip(menu.GetItemIndex(StandMenuId),
             "Click a spot on the selected planet or moon to stand there, and look around in " +
             "first person: walk, fly, and watch the sky (Esc to come back)");
-        menu.AddSeparator(id: StyleMenuId + 1);
+        // Grouped under headings (VISION.md UI-07), so the list reads at a glance.
+        menu.AddSeparator("On the Globe", StyleMenuId + 1);
+        menu.AddCheckItem("Terrain", (int)MenuItem.Terrain);
+        menu.AddCheckItem("Regions", (int)MenuItem.Regions);
         menu.AddCheckItem("Pins", (int)MenuItem.Pins);
         menu.AddCheckItem("Weather Pins", (int)MenuItem.WeatherPins);
-        menu.AddCheckItem("Regions", (int)MenuItem.Regions);
-        menu.AddCheckItem("Terrain", (int)MenuItem.Terrain);
+        menu.AddCheckItem("Grid (G)", (int)MenuItem.Grid);
+        menu.AddSubmenuNodeItem("Relief", BuildReliefMenu());
+        menu.AddSubmenuNodeItem("Relief Shading", BuildReliefShadingMenu());
+        menu.AddSeparator("Weather");
         menu.AddCheckItem("Clouds", (int)MenuItem.Clouds);
         menu.AddCheckItem("Wind", (int)MenuItem.Wind);
         menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.Clouds),
             "Live weather on planets and moons with air: clouds, rain, and snow");
         menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.Wind),
             "Streaks flowing with the wind over planets and moons with air");
+        menu.AddSeparator("Sky");
         menu.AddCheckItem("Stars from Orbit", (int)MenuItem.StarsFromOrbit);
         menu.AddCheckItem("Constellation Lines", (int)MenuItem.ConstellationLines);
         menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.StarsFromOrbit),
             "The world's own stars behind the system, as they're seen from its worlds");
         menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.ConstellationLines),
             "The lines of the constellations, on the night sky and with the stars from orbit");
-        menu.AddSeparator();
+        menu.AddSeparator("Orbits");
         menu.AddCheckItem("Season Markers", (int)MenuItem.SeasonMarkers);
         menu.AddCheckItem("Meteor Shower Markers", (int)MenuItem.ShowerMarkers);
         menu.AddCheckItem("Eclipse Markers", (int)MenuItem.EclipseMarkers);
-        menu.AddSeparator();
-        menu.AddCheckItem("Grid (G)", (int)MenuItem.Grid);
-        menu.AddCheckItem("True Scale", (int)MenuItem.TrueScale);
         menu.AddCheckItem("Orbit Guide", (int)MenuItem.OrbitGuide);
+        menu.AddCheckItem("True Scale", (int)MenuItem.TrueScale);
         menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.TrueScale),
             "Real sizes and distances (most bodies become tiny dots). Off: a readable view " +
             "with distances compressed and small bodies enlarged.");
         menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.OrbitGuide),
             "While the System panel is open: green rings where orbits around the selected " +
             "body (and around what it circles) would stay steady, red where they wouldn't.");
-        menu.AddSubmenuNodeItem("Relief", BuildReliefMenu());
-        menu.AddSubmenuNodeItem("Relief Shading", BuildReliefShadingMenu());
         menu.AboutToPopup += () => ShowChecks(menu);
         menu.IdPressed += id =>
         {

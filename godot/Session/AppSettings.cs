@@ -26,6 +26,7 @@ public static class AppSettings
     private const string HighQualityMapsKey = "high_quality_maps";
     private const string UnitsKey = "units";
     private const string FilesSection = "files";
+    private const string FoldsSection = "folds";
     private const string RecentWorldsKey = "recent_worlds";
 
     // Read once, then kept: it's asked for every time a measurement is shown.
@@ -91,6 +92,22 @@ public static class AppSettings
     {
         get => Load().GetValue(DisplaySection, HighQualityMapsKey, false).AsBool();
         set => Save(HighQualityMapsKey, value);
+    }
+
+    /// <summary>
+    /// Whether a panel's folding section (<paramref name="id"/>) was left open on this
+    /// computer, or <paramref name="fallback"/> if it's never been folded or opened (VISION.md
+    /// UI-07).
+    /// </summary>
+    public static bool IsSectionOpen(string id, bool fallback) =>
+        Load().GetValue(FoldsSection, id, fallback).AsBool();
+
+    /// <summary>Remembers whether a panel's folding section is open.</summary>
+    public static void SetSectionOpen(string id, bool open)
+    {
+        ConfigFile file = Load();
+        file.SetValue(FoldsSection, id, open);
+        Write(file);
     }
 
     /// <summary>Whether relief is shaded map-style (View ▸ Relief Shading).</summary>

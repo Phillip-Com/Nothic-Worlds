@@ -89,6 +89,11 @@ public partial class SystemPanel : CanvasLayer
     private CalendarSection? _calendar;
     private EclipseSection? _eclipses;
     private OrbitGuideSection? _orbitGuide;
+
+    // The folding parts of the panel (VISION.md UI-07): the selected body's, then the system's.
+    private FoldingSection _bodySection = null!;
+    private FoldingSection _lookSection = null!;
+    private FoldingSection _orbitSection = null!;
     private PhysicsSection? _physics;
     private MeteorShowerSection? _showers;
     private RingsSection? _rings;
@@ -157,8 +162,13 @@ public partial class SystemPanel : CanvasLayer
         panel.AddChild(scroll);
         var layout = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         scroll.AddChild(layout);
+        PanelStyle.FitHeight(panel, layout, TopOffset, BottomOffset);
 
-        layout.AddChild(new Label { Text = "Star System" });
+        layout.AddChild(new Label
+        {
+            Text = "Star System",
+            ThemeTypeVariation = AppTheme.SectionHeader,
+        });
         _tree = new Tree
         {
             HideRoot = true,
@@ -182,28 +192,34 @@ public partial class SystemPanel : CanvasLayer
             return;
         }
 
-        layout.AddChild(new HSeparator());
         _orbitGuide = new OrbitGuideSection { Session = Session, ReportProblem = ReportProblem };
-        layout.AddChild(_orbitGuide);
+        _orbitSection.Content.AddChild(_orbitGuide);
         _physics = new PhysicsSection { Session = Session, Time = Time, Toolbar = Toolbar };
-        layout.AddChild(_physics);
-        layout.AddChild(new HSeparator());
+        _orbitSection.Content.AddChild(_physics);
+
+        var calendar = new FoldingSection("system.calendar", "Calendar & Seasons", true);
         _calendar = new CalendarSection { Session = Session, Time = Time };
-        layout.AddChild(_calendar);
-        layout.AddChild(new HSeparator());
+        calendar.Content.AddChild(_calendar);
+        layout.AddChild(calendar);
+
+        var events = new FoldingSection("system.events", "Eclipses & Showers", false);
         _eclipses = new EclipseSection { Session = Session, Time = Time };
-        layout.AddChild(_eclipses);
+        events.Content.AddChild(_eclipses);
         _showers = new MeteorShowerSection { Session = Session, Time = Time };
-        layout.AddChild(_showers);
+        events.Content.AddChild(_showers);
         _asteroids = new AsteroidEventsSection { Session = Session, Time = Time };
-        layout.AddChild(_asteroids);
+        events.Content.AddChild(_asteroids);
+        layout.AddChild(events);
+
+        // The system's own sky, the same whichever body is selected.
         layout.AddChild(new HSeparator());
-        layout.AddChild(new Label { Text = "Night Sky" });
-        layout.AddChild(CreateButton("Design Night Sky…", () => Sky?.Open(),
+        var sky = new FoldingSection("system.sky", "Night Sky & Nebulas", false);
+        sky.Content.AddChild(CreateButton("Design Night Sky…", () => Sky?.Open(),
             "The world's own stars, the same from every planet: draw and name constellations, " +
             "or scatter new stars"));
         _nebulas = new NebulasSection { Session = Session };
-        layout.AddChild(_nebulas);
+        sky.Content.AddChild(_nebulas);
+        layout.AddChild(sky);
 
         Session.Changed += SyncWithWorld;
         Session.SelectionChanged += SyncWithWorld;
@@ -234,14 +250,21 @@ public partial class SystemPanel : CanvasLayer
         return buttons;
     }
 
+    // The selected body's parts: its name, then what it is, how it looks, and its orbit.
     private Control BuildProperties()
     {
         var layout = new VBoxContainer();
-        _name = new LineEdit { PlaceholderText = "Body name" };
+        _name = new LineEdit
+        {
+            PlaceholderText = "Body name",
+            TooltipText = "The selected body's name",
+        };
         _name.TextSubmitted += _ => CommitName();
         _name.FocusExited += CommitName;
         layout.AddChild(_name);
 
+        _bodySection = new FoldingSection("system.body", "Body", true);
+        layout.AddChild(_bodySection);
         var grid = new GridContainer { Columns = 2 };
         grid.AddChild(new Label { Text = "Kind" });
         var kindRow = new HBoxContainer();
@@ -294,27 +317,33 @@ public partial class SystemPanel : CanvasLayer
         grid.AddChild(_atmosphere);
         AddWaterFields(grid);
         AddDensityFields(grid);
-        AddAppearanceFields(grid);
-        layout.AddChild(grid);
+        _bodySection.Content.AddChild(grid);
+
+        _lookSection = new FoldingSection("system.look", "Appearance", false);
+        layout.AddChild(_lookSection);
+        var look = new GridContainer { Columns = 2 };
+        AddAppearanceFields(look);
+        _lookSection.Content.AddChild(look);
         if (Session is not null)
         {
             _rings = new RingsSection { Session = Session };
-            layout.AddChild(_rings);
+            _lookSection.Content.AddChild(_rings);
             _belts = new BeltsSection { Session = Session };
-            layout.AddChild(_belts);
+            _lookSection.Content.AddChild(_belts);
             _treeLook = new WorldTreeSection { Session = Session };
-            layout.AddChild(_treeLook);
+            _lookSection.Content.AddChild(_treeLook);
         }
 
-        layout.AddChild(new Label { Text = "Orbit" });
+        _orbitSection = new FoldingSection("system.orbit", "Orbit", true);
+        layout.AddChild(_orbitSection);
         _noOrbit = new Label
         {
             Text = "At the center of the system.",
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
         };
-        layout.AddChild(_noOrbit);
+        _orbitSection.Content.AddChild(_noOrbit);
         _orbitFields = BuildOrbitFields();
-        layout.AddChild(_orbitFields);
+        _orbitSection.Content.AddChild(_orbitFields);
         return layout;
     }
 
@@ -450,7 +479,11 @@ public partial class SystemPanel : CanvasLayer
             BodyKind.WorldTree => "world tree",
             _ => "planet",
         };
-        item.SetText(0, $"{body.Name}  ({kind})");
+        // The kind after the name, unless the name already says it ("Planet", not
+        // "Planet (planet)").
+        item.SetText(0, body.Name.Trim().Equals(kind, StringComparison.OrdinalIgnoreCase)
+            ? body.Name
+            : $"{body.Name}  ({kind})");
         item.SetMetadata(0, body.Id.ToString());
         foreach (Body child in SystemHierarchy.ChildrenOf(bodies, body.Id))
         {

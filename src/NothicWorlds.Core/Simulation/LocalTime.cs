@@ -9,5 +9,12 @@ namespace NothicWorlds.Core.Simulation;
 public readonly record struct LocalTime(long Day, int Hour, int Minute)
 {
     /// <summary>For example "Day 1,204, 14:30".</summary>
-    public override string ToString() => $"Day {Day:N0}, {Hour}:{Minute:00}";
+    public override string ToString() => $"{DayName(Day)}, {Hour}:{Minute:00}";
+
+    /// <summary>
+    /// How a day number reads (VISION.md UI-07): "Day 1" for the world's first day, and before
+    /// it, counted back as years are, with no day 0: the day before Day 1 is "Day -1".
+    /// </summary>
+    /// <param name="day">The day number, as <see cref="Day"/>.</param>
+    public static string DayName(long day) => $"Day {(day > 0 ? day : day - 1):N0}";
 }
