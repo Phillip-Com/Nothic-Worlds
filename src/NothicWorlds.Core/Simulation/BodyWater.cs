@@ -54,8 +54,12 @@ public sealed class BodyWater
         }
 
         var lake = new bool[WaterCells.Count];
-        var levels = new short[WaterCells.Count];
-        Array.Fill(levels, HeightGrid.MinHeightMeters);
+        // Only the cells under lakes and around them hold a level (a few, on most worlds).
+        var levels = new Dictionary<int, short>();
+        void Raise(int cell, short surface) =>
+            levels[cell] = levels.TryGetValue(cell, out short level)
+                ? Math.Max(level, surface)
+                : surface;
         var shapes = new Dictionary<Guid, LakeShape>();
         Span<int> around = stackalloc int[WaterCells.MaxNeighbors];
         foreach (Lake each in lakes.Where(l => l.BodyId == body.Id))
@@ -67,12 +71,12 @@ public sealed class BodyWater
             foreach (int cell in shape.Cells)
             {
                 lake[cell] = true;
-                levels[cell] = Math.Max(levels[cell], surface);
+                Raise(cell, surface);
                 foreach (int next in around[..WaterCells.Neighbors(cell, around)])
                 {
                     if (!sea[next])
                     {
-                        levels[next] = Math.Max(levels[next], surface);
+                        Raise(next, surface);
                     }
                 }
             }
@@ -94,15 +98,23 @@ public sealed class BodyWater
         {
             if (shapes[each.Id] is { Outflow: int outflow, Cells: var cells })
             {
+                // Its own lake's cells, in an array: checked for every cell searched.
+                var own = new bool[WaterCells.Count];
+                foreach (int cell in cells)
+                {
+                    own[cell] = true;
+                }
+
                 courses.Add(Natural(null, each.Id, OutflowWidthKm,
                     RiverCourse.Trace(ground, WaterCells.Center(outflow), IsWater,
-                        cells.Contains)));
+                        cell => own[cell])));
             }
         }
 
         HeightGrid lakeLevels = shapes.Count == 0
             ? HeightGrid.Empty
-            : HeightGrid.FromCells(levels);
+            : HeightGrid.Sparse(HeightGrid.MinHeightMeters,
+                levels.Select(pair => (WaterCells.CellOf(pair.Key), pair.Value)));
         return new BodyWater(sea, lake, shapes, lakeLevels, courses);
     }
 

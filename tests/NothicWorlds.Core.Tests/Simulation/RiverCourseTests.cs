@@ -51,6 +51,27 @@ public sealed class RiverCourseTests
     }
 
     [Fact]
+    public void OverRoughGround_TheCourse_IsTheSameAsTheSimpleSearchFinds()
+    {
+        // Bumpy, nearly level ground (a gentle tilt toward the sea), so rivers wander from
+        // hollow to hollow and later searches spread back over earlier ones; and now and then
+        // no water to find, so a search runs to its limit.
+        HeightGrid ground = WaterGround.Make(at => Slope(at) * 0.05
+            + TerrainNoise.Offset(at, 6371, 300, 80, 20, seed: 7));
+        var random = new Random(3);
+
+        for (int river = 0; river < 12; river++)
+        {
+            Vector3D source = WaterGround.At(random.NextDouble() * 10 - 5,
+                random.NextDouble() * 10 - 5);
+            Func<int, bool> water = river % 4 == 3 ? _ => false : IsSea;
+            int[] cells = [.. RiverCourse.Trace(ground, source, water).Points
+                .Select(WaterCells.IndexAt)];
+            Assert.Equal(SimpleRiverCourse.Trace(ground, source, water), cells);
+        }
+    }
+
+    [Fact]
     public void ARiver_NeverCrossesBlockedCells()
     {
         // A wall 1° across straight between the source and the sea.

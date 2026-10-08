@@ -232,9 +232,9 @@ public partial class WorldSession
     }
 
     // Shows a stroke's painting straight away. When the terrain shapes the ground, the ground
-    // goes to the globe at most every ReshapeSeconds during the stroke, and when it ends:
-    // sending heights redraws a whole face of the globe (about a tenth of a second), which
-    // on every brush move made painting stall.
+    // is reshaped in the background (see StartPreparing) at most every ReshapeSeconds during
+    // the stroke, and when it ends: reshaping and sending heights took a tenth of a second
+    // or more, which on every brush move, and then every half second, made painting stall.
     private void ShowPainting(Body body)
     {
         if (!World.TerrainShapesGround || _gesture is null
@@ -249,15 +249,7 @@ public partial class WorldSession
         _reshapedAt.TryGetValue(body.Id, out ulong last);
         if (now - last >= ReshapeSeconds * 1000)
         {
-            if (ShownGroundAtOnce(body) is HeightGrid shown)
-            {
-                surface.SetHeights(shown);
-            }
-            else
-            {
-                ShowTerrain(body);  // Too much changed: reshaped in the background
-            }
-
+            StartPreparing(body, surface);
             _reshapedAt[body.Id] = now;
             _reshapeWaiting.Remove(body.Id);
         }
@@ -267,14 +259,15 @@ public partial class WorldSession
         }
     }
 
-    // Sends the ground of bodies painted since it was last sent, as a stroke ends.
+    // Reshapes the ground of bodies painted since it was last reshaped, as a stroke ends (in
+    // the background; the terrain itself is shown already).
     private void ShowWaitingGround()
     {
         foreach (Guid id in _reshapeWaiting.ToList())
         {
-            if (FindBody(id) is Body body)
+            if (FindBody(id) is Body body && System?.SurfaceFor(id) is PlanetSurface surface)
             {
-                ShowTerrain(body);
+                StartPreparing(body, surface);
             }
         }
 

@@ -187,4 +187,21 @@ public sealed class HeightGridTests
             SphericalCoordinates.ToDirection(new GeoCoordinate(latitude, longitude));
         return new Vector3D(direction.X, direction.Y, direction.Z);
     }
+
+    [Fact]
+    public void ASparseGrid_HoldsItsCells_AndTheFillEverywhereElse()
+    {
+        var lake = new CubeCell(2, 100, 200);
+        var shore = new CubeCell(2, 101, 200);
+
+        HeightGrid grid = HeightGrid.Sparse(HeightGrid.MinHeightMeters,
+            [(lake, (short)420), (shore, (short)420)]);
+
+        Assert.Equal(420, grid.HeightAt(lake));
+        Assert.Equal(420, grid.HeightAt(shore));
+        Assert.Equal(HeightGrid.MinHeightMeters, grid.HeightAt(new CubeCell(2, 900, 900)));
+        Assert.Equal(HeightGrid.MinHeightMeters, grid.HeightAt(new CubeCell(5, 0, 0)));
+        Assert.False(grid.IsEmpty);
+        Assert.True(HeightGrid.Sparse(0, []).IsEmpty);
+    }
 }

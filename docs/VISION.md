@@ -766,6 +766,12 @@ per-user data folder (`user://settings.cfg`); a missing or damaged file gives th
   first, after 3–4 s). The standard benchmark is unchanged (152/154 fps).
 - **Load benchmark:** `-- --open=<world> --benchmark` first reports how long the world took to
   open, until every body was prepared, and the slowest frame meanwhile.
+- **Painting without hitches (PR #102):** while painting, the ground terrain shapes is reworked
+  in the background every moment (the same preparation as above) instead of on the main
+  thread, and once more when the stroke ends. Measured run from source on the large world: the
+  hitches of 130–340 ms every few moments of a stroke went (the slowest frame now about 60 ms),
+  and ending a stroke went from about 110 ms to 5 ms. Each brush move still takes about 24 ms,
+  mostly remaking the painted face's image for the globe.
 - `godot/Diagnostics/PerformanceOverlay.cs`: F3 shows FPS, video memory, app memory, and draw calls.
 - `godot/Diagnostics/Benchmark.cs`: run with `-- --benchmark`. It orbits and zooms for 10 s
   with VSync off, then prints the results. Use it to catch performance regressions.
@@ -2546,6 +2552,15 @@ world's water looks natural or exactly as designed (owner's request, 2026-10-08)
   quicker too: carving segments at least 10 m long, steps sized by their own distance from
   the eye, and the points worked out in parallel, so a rebuild of the ground near a river
   takes tens of milliseconds rather than hundreds.
+- **Faster, same water (PR #102):** the searches mark cells in arrays over every cell, lent
+  out one at a time (`Simulation/WaterScratch.cs`), instead of sets and dictionaries, and a
+  river's way out of a hollow takes cells from a queue per meter of height
+  (`Simulation/HeightQueue.cs`), as the heights are whole meters. The lake-level grid shares
+  one tile between all the dry ones (`HeightGrid.Sparse`), and its images for the globe are
+  made in the background with the rest of the water. The courses are exactly those the plain
+  search finds (a test compares them over rough ground). Measured on the large world (exported
+  build speed): working out a body's water went from about 0.6 s to 0.3 s, and the 0.4 s
+  freeze when the water appeared is gone.
 - **Limits:** courses are a height cell apart (about 10 km on an Earth-sized world). On
   perfectly level ground (unpainted land) a river's way out runs in straight lines. On a flat
   world, rivers away from the north pole are stretched east–west as the disc's map is.

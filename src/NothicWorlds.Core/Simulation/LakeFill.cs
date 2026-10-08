@@ -35,18 +35,36 @@ public static class LakeFill
                 "choose lower ground");
         }
 
+        WaterScratch scratch = WaterScratch.Borrow();
+        try
+        {
+            return Fill(ground, start, levelMeters, isSea, scratch);
+        }
+        finally
+        {
+            WaterScratch.Return(scratch);
+        }
+    }
+
+    private static LakeShape Fill(HeightGrid ground, int start, int levelMeters,
+        Func<int, bool> isSea, WaterScratch scratch)
+    {
+        // The cells filled, in the order they were reached (and taken from in that order, as a
+        // queue), and which are in the lake, by their stamp: a set was slow for a lake that
+        // spreads over much of a world before it's refused.
         Span<int> around = stackalloc int[WaterCells.MaxNeighbors];
-        var inLake = new HashSet<int> { start };
-        var queue = new Queue<int>();
-        queue.Enqueue(start);
+        int[] filled = scratch.Stamps;
+        int stamp = scratch.NewStamp();
+        var cells = new List<int> { start };
+        filled[start] = stamp;
         int? spill = null;
         short spillHeight = short.MaxValue;
-        while (queue.Count > 0)
+        for (int taken = 0; taken < cells.Count; taken++)
         {
-            int cell = queue.Dequeue();
+            int cell = cells[taken];
             foreach (int next in around[..WaterCells.Neighbors(cell, around)])
             {
-                if (inLake.Contains(next) || isSea(next))
+                if (filled[next] == stamp || isSea(next))
                 {
                     continue;
                 }
@@ -63,18 +81,18 @@ public static class LakeFill
                     continue;
                 }
 
-                if (inLake.Count >= MaxCells)
+                if (cells.Count >= MaxCells)
                 {
                     return new LakeShape(new HashSet<int>(), null,
                         "the lake would cover too much of the world: lower its surface");
                 }
 
-                inLake.Add(next);
-                queue.Enqueue(next);
+                filled[next] = stamp;
+                cells.Add(next);
             }
         }
 
-        return new LakeShape(inLake, spill, null);
+        return new LakeShape(new HashSet<int>(cells), spill, null);
     }
 
     /// <summary>

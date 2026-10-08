@@ -28,10 +28,29 @@ public static class RiverCourse
     public static RiverPath Trace(HeightGrid ground, Vector3D source, Func<int, bool> isWater,
         Func<int, bool>? isBlocked = null)
     {
-        isBlocked ??= _ => false;
+        WaterScratch scratch = WaterScratch.Borrow();
+        try
+        {
+            return Trace(ground, source, isWater, isBlocked ?? (_ => false), scratch);
+        }
+        finally
+        {
+            WaterScratch.Return(scratch);
+        }
+    }
+
+    private static RiverPath Trace(HeightGrid ground, Vector3D source, Func<int, bool> isWater,
+        Func<int, bool> isBlocked, WaterScratch scratch)
+    {
         int current = WaterCells.IndexAt(source);
         var course = new List<int> { current };
-        var visited = new HashSet<int> { current };
+
+        // The cells the course has crossed carry this trace's stamp (checked for every
+        // neighbor of every cell searched: a set was slow).
+        int[] stamps = scratch.Stamps;
+        int traceStamp = scratch.NewStamp();
+        stamps[current] = traceStamp;
+        bool Crossed(int cell) => stamps[cell] == traceStamp;
         Span<int> around = stackalloc int[WaterCells.MaxNeighbors];
         double Height(int cell) => ground.HeightAt(WaterCells.CellOf(cell));
 
@@ -41,7 +60,7 @@ public static class RiverCourse
             double lowestHeight = Height(current);
             foreach (int next in around[..WaterCells.Neighbors(current, around)])
             {
-                if (isBlocked(next) || visited.Contains(next))
+                if (isBlocked(next) || Crossed(next))
                 {
                     continue;
                 }
@@ -55,7 +74,7 @@ public static class RiverCourse
 
             List<int>? steps = lowest >= 0
                 ? [lowest]
-                : WayOut(current, Height, isWater, isBlocked, visited);
+                : WayOut(current, Height, isWater, isBlocked, Crossed, scratch);
             if (steps is null)
             {
                 return new RiverPath(Directions(course), ReachesWater: false);
@@ -64,7 +83,7 @@ public static class RiverCourse
             foreach (int step in steps)
             {
                 course.Add(step);
-                visited.Add(step);
+                stamps[step] = traceStamp;
             }
 
             current = course[^1];
@@ -77,15 +96,23 @@ public static class RiverCourse
     // highest point on the way to them) until one is lower than the hollow, or water; then
     // the path to it. Null if none is found within the search's reach.
     private static List<int>? WayOut(int hollow, Func<int, double> height,
-        Func<int, bool> isWater, Func<int, bool> isBlocked, HashSet<int> used)
+        Func<int, bool> isWater, Func<int, bool> isBlocked, Func<int, bool> used,
+        WaterScratch scratch)
     {
         double bottom = height(hollow);
-        var cameFrom = new Dictionary<int, int> { [hollow] = hollow };
-        var open = new PriorityQueue<int, (double Highest, int Order)>();
+
+        // Where each cell was reached from; it counts only for cells with this search's stamp
+        // (crossed cells keep the trace's, and are never searched).
+        int[] cameFrom = scratch.CameFrom;
+        int[] stamps = scratch.Stamps;
+        int stamp = scratch.NewStamp();
+        int searched = 0;
+        HeightQueue open = scratch.Queue;
+        open.Clear();
+        cameFrom[hollow] = hollow;  // Not stamped: it keeps the trace's, as part of the course
         Span<int> around = stackalloc int[WaterCells.MaxNeighbors];
-        int order = 0;
-        open.Enqueue(hollow, (bottom, order++));
-        while (open.TryDequeue(out int cell, out (double Highest, int Order) cost))
+        open.Enqueue(hollow, (int)bottom);
+        while (open.TryDequeue(out int cell, out int highestSoFar))
         {
             if (cell != hollow && (isWater(cell) || height(cell) < bottom))
             {
@@ -99,22 +126,24 @@ public static class RiverCourse
                 return path;
             }
 
-            if (cameFrom.Count > MaxSearch)
+            if (searched + 1 > MaxSearch)
             {
                 return null;
             }
 
             foreach (int next in around[..WaterCells.Neighbors(cell, around)])
             {
-                if (cameFrom.ContainsKey(next) || isBlocked(next) || used.Contains(next))
+                if (stamps[next] == stamp || isBlocked(next) || used(next))
                 {
                     continue;
                 }
 
-                cameFrom[next] = cell;
-                double highest = isWater(next) ? cost.Highest : Math.Max(cost.Highest,
-                    height(next));
-                open.Enqueue(next, (highest, order++));
+                (cameFrom[next], stamps[next]) = (cell, stamp);
+                searched++;
+                int highest = isWater(next)
+                    ? highestSoFar
+                    : Math.Max(highestSoFar, (int)height(next));
+                open.Enqueue(next, highest);
             }
         }
 

@@ -134,7 +134,15 @@ public partial class WorldSession
 
         if (world == World && FindBody(bodyId) is Body now)
         {
-            ShowTerrain(now);  // Shows the rest, or catches up with edits made meanwhile.
+            if (_gesture is not null)
+            {
+                // Mid-stroke: the stroke reshapes again soon, and when it ends.
+                _reshapeWaiting.Add(bodyId);
+            }
+            else
+            {
+                ShowTerrain(now);  // Shows the rest, or catches up with edits made meanwhile.
+            }
         }
 
         if (world == World && _preparing.Count == 0)
