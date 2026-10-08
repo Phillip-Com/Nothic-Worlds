@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 30** (see **Version history** at the end)
+**Current format version: 31** (see **Version history** at the end)
 
 ## Container
 
@@ -32,7 +32,7 @@ list them all.
 
 ```json
 {
-  "formatVersion": 30,
+  "formatVersion": 31,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -138,6 +138,17 @@ list them all.
   "weatherPins": [
     { "id": "3c3c3c3c-3c3c-3c3c-3c3c-3c3c3c3c3c3c", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       "name": "Aster Bay", "latitude": 42.5, "longitude": -71.25 }
+  ],
+  "rivers": [
+    { "id": "a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "name": "Silverrun", "kind": "drawn", "points": [[10.5, -20.25], [12, -18]],
+      "width": 2.5 },
+    { "id": "a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "name": "Mossbrook", "kind": "natural", "points": [[30, 40]] }
+  ],
+  "lakes": [
+    { "id": "a3a3a3a3-a3a3-a3a3-a3a3-a3a3a3a3a3a3", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "name": "Still Mere", "latitude": 35, "longitude": 45.5, "level": 640, "flowsOut": true }
   ],
   "regions": [
     {
@@ -300,6 +311,18 @@ list them all.
 | `…weatherPins[].id`, `name` | yes | GUID, unique among weather pins; name not empty, up to 100 characters |
 | `…weatherPins[].body` | yes | The `id` of the planet or moon it's on (not a star) |
 | `…weatherPins[].latitude`, `longitude` | yes | The spot: −90 to 90, −180 to 180 |
+| `rivers` | no | Rivers on planets and moons (`BOD-11`), in the order added. Omitted when there are none. Up to 2,000. See **Rivers and lakes** below. |
+| `…rivers[].id`, `name` | yes | GUID, unique among rivers; name not empty, up to 100 characters |
+| `…rivers[].body` | yes | The `id` of the planet or moon it's on (not a star or comet) |
+| `…rivers[].kind` | yes | `"drawn"` (its points are its course) or `"natural"` (its one point is its source, and its course runs downhill) |
+| `…rivers[].points` | yes | `[latitude, longitude]` pairs (−90 to 90, −180 to 180), source first: 2 to 2,000 for a drawn river, exactly 1 for a natural one |
+| `…rivers[].width` | no | km, 0.01 to 100: how wide it is at its mouth (a fifth of that at its source). Omitted for 1. |
+| `lakes` | no | Lakes on planets and moons (`BOD-11`), in the order added. Omitted when there are none. Up to 1,000. |
+| `…lakes[].id`, `name` | yes | GUID, unique among lakes; name not empty, up to 100 characters |
+| `…lakes[].body` | yes | The `id` of the planet or moon it's on (not a star or comet) |
+| `…lakes[].latitude`, `longitude` | yes | A spot in the lake: −90 to 90, −180 to 180 |
+| `…lakes[].level` | yes | The height of its surface in meters from the body's radius, a whole number from −12,000 to 12,000 |
+| `…lakes[].flowsOut` | no | `true` if a river flows out of it. Omitted when it doesn't. |
 | `regions` | no | Areas outlined on planets and moons (`LORE-01`), in drawing order (later on top). Omitted when there are none. Up to 5,000. They may overlap. |
 | `…regions[].id` | yes | GUID, unique among regions |
 | `…regions[].body` | yes | The `id` of the planet or moon it's on (not a star) |
@@ -462,6 +485,30 @@ point's height is the ground's height at the latitude and longitude it stands fo
 rim stands for the south pole, so where the water there is above the ground, it pours over the
 edge all the way round (drawn only; nothing more is saved).
 
+## Rivers and lakes (`rivers`, `lakes`)
+
+Only what's listed above is saved; where the water lies is worked out again from the ground
+(terrain-shaped and sculpted) whenever it's drawn, so it follows the ground as it changes. The
+ground is the height grid's cells (6 faces of 1,024 × 1,024; see `heights`), each joined to the
+up to 8 around it (sides and corners, across face edges too).
+
+- **The sea** is every cell lower than the body's `waterLevel`, and every cell painted with a
+  terrain type whose `climate` is `"water"`.
+- **A lake** fills, from the cell its spot is in, every cell lower than its `level` that's
+  joined to it through such cells, and no cell of the sea. A lake whose spot is in the sea, on
+  ground at or above its level, or that would cover more than a sixth of the cells, has no
+  water.
+- **A natural river** runs from its source's cell to the lowest cell around it while that's
+  lower (the sea and lakes count as lowest of all), and stops at the first cell of the sea or a
+  lake. In a hollow, it leaves by the way that climbs least: cells are taken in order of the
+  highest point on the way to them (ties in the order found, neighbors in the order rows −1, 0,
+  1, each with columns −1, 0, 1) until one is lower than the hollow or water, and the river
+  follows that way. It never steps on a cell it has already crossed. It gives up after 20,000
+  cells, or 300,000 searched for one hollow, and ends where it got to.
+- **A lake that flows out** sends a natural river from the lowest cell around it (the first
+  found, if several are equally low), which never crosses the lake itself, 1 km wide at its
+  mouth.
+
 ## The star field (`starSeed`)
 
 Constellations name stars by id, so every reader must make exactly the same stars from a seed
@@ -590,6 +637,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 31 | Rivers and lakes (M42): optional `rivers` and `lakes` | Nothing to change: version 30 worlds have none |
 | 30 | Peaks and water (M36): terrain types gain optional `variation` and `featureSize`; planets and moons gain an optional `waterLevel` | No water. Types named like the defaults (as for version 29) get their variation and feature size (Ocean 800 m/200 km, Shallow Water 40/60, Plains 40/80, Fields 30/80, Forest 80/50, Jungle 100/40, Hills 350/30, Mountains 1,500/40, Desert 120/30, Swamp 5/40, Tundra 60/60, Ice 300/60); others stay level |
 | 29 | Terrain shapes the ground (M35): terrain types gain optional `height` and `edge`; optional `terrainShapesGround` | Off for older worlds. Types named like the defaults (Ocean, Shallow Water, Plains, Fields, Forest, Jungle, Hills, Mountains, Desert, Swamp, Tundra, Ice; any case) get the default heights and edges (−3,000/0.3, −150, 150, 150, 300, 200, 800/0.15, 2,500/0.5, 400, 20, 300, 1,000/0.3); others 0 and gentle |
 | 28 | Designed night skies (M34): `starSeed`; optional `constellations` | Each world gets the seed made from its `id` (its first four bytes, as a little-endian whole number, without the sign bit), so it keeps one fixed sky; no constellations |

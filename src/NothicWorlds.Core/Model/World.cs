@@ -50,6 +50,18 @@ public sealed class World
     public List<WeatherPin> WeatherPins { get; } = [];
 
     /// <summary>
+    /// The rivers on the world's planets and moons (VISION.md BOD-11), in the order they were
+    /// added.
+    /// </summary>
+    public List<River> Rivers { get; } = [];
+
+    /// <summary>
+    /// The lakes on the world's planets and moons (VISION.md BOD-11), in the order they were
+    /// added.
+    /// </summary>
+    public List<Lake> Lakes { get; } = [];
+
+    /// <summary>
     /// The kinds of terrain that can be painted onto the world's bodies (VISION.md BOD-05), in
     /// the order they're listed. New worlds start with <see cref="TerrainType.Defaults"/>.
     /// </summary>
@@ -123,11 +135,14 @@ public sealed class World
         };
         copy.Bodies.AddRange(Bodies.Select(body => body.Clone()));
 
-        // Terrain types, regions, weather pins, entries, timelines, events, relationships,
-        // diagrams, nebulas, and constellations are immutable records, safe to share.
+        // Terrain types, regions, weather pins, rivers, lakes, entries, timelines, events,
+        // relationships, diagrams, nebulas, and constellations are immutable records, safe to
+        // share.
         copy.TerrainTypes.AddRange(TerrainTypes);
         copy.Regions.AddRange(Regions);
         copy.WeatherPins.AddRange(WeatherPins);
+        copy.Rivers.AddRange(Rivers);
+        copy.Lakes.AddRange(Lakes);
         copy.Journal.AddRange(Journal);
         copy.Timelines.AddRange(Timelines);
         copy.Events.AddRange(Events);
