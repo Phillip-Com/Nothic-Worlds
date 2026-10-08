@@ -5,6 +5,7 @@ systems down to local regions on a planet. Built for Dungeon Masters and world b
 
 - What we're building: [docs/VISION.md](docs/VISION.md)
 - How the code is written: [CLAUDE.md](CLAUDE.md)
+- Commands, checks, and repo layout: [docs/development.md](docs/development.md)
 - Key decisions: [docs/DECISIONS.md](docs/DECISIONS.md)
 
 ## Requirements
