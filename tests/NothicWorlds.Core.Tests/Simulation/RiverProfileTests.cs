@@ -132,6 +132,58 @@ public sealed class RiverProfileTests
         Assert.Null(RiverProfile.For(course, RadiusKm, _ => 0));
     }
 
+    [Fact]
+    public void ASetDepth_LowersOnlyTheBed_ShallowerTowardTheSource()
+    {
+        // 100 m wide at its mouth: Auto is 5 m deep there and 1 m at its source.
+        RiverCourseShown auto = Drawn(0.1, WaterGround.At(0, 0), WaterGround.At(0, 0.2));
+        RiverProfile shallow = RiverProfile.For(auto, RadiusKm, _ => 100)!;
+        RiverProfile deep = RiverProfile.For(
+            auto with { Depth = new RiverDepth(MouthMeters: 30) }, RadiusKm, _ => 100)!;
+
+        Assert.Equal(100 - 30, deep.BedMeters[^1], 6);
+        Assert.Equal(100 - 6, deep.BedMeters[0], 6);  // A fifth of it at the source
+        Assert.Equal(shallow.WaterMeters, deep.WaterMeters);
+        Assert.Equal(shallow.WaterHalfWidthMeters, deep.WaterHalfWidthMeters);
+    }
+
+    [Fact]
+    public void ADepthSetShallowerThanAuto_RaisesTheWaterToo()
+    {
+        RiverCourseShown course = Drawn(0.1, WaterGround.At(0, 0), WaterGround.At(0, 0.2))
+            with
+        { Depth = new RiverDepth(MouthMeters: 2) };
+
+        RiverProfile river = RiverProfile.For(course, RadiusKm, _ => 100)!;
+
+        Assert.Equal(100 - RiverProfile.WaterBelowGround * 2, river.WaterMeters[^1], 6);
+        Assert.Equal(100 - 2, river.BedMeters[^1], 6);
+    }
+
+    [Fact]
+    public void AVaryingBed_RisesAndFallsUnderStillWater_NeverAboveIt()
+    {
+        RiverCourseShown even = Drawn(0.1, WaterGround.At(0, 0), WaterGround.At(0, 0.5));
+        RiverCourseShown varied = even with
+        {
+            Depth = new RiverDepth(VariationMeters: 8, SpacingKm: 0.8),
+        };
+        RiverProfile flat = RiverProfile.For(even, RadiusKm, _ => 100)!;
+        RiverProfile river = RiverProfile.For(varied, RadiusKm, _ => 100)!;
+
+        // Finer steps (an eighth of its spacing) so the rises and falls show.
+        Assert.True(river.Points.Count >= 2 * flat.Points.Count - 2);
+        double[] beds = [.. river.BedMeters];
+        Assert.True(beds.Max() - beds.Min() > 8);
+        for (int i = 0; i < river.Points.Count; i++)
+        {
+            Assert.True(river.BedMeters[i]
+                <= river.WaterMeters[i] - RiverProfile.MinWaterDepthMeters + 1e-9);
+        }
+
+        Assert.Equal(flat.WaterMeters[^1], river.WaterMeters[^1], 6);
+    }
+
     internal static RiverCourseShown Drawn(double widthKm, params Vector3D[] points) =>
         new(Guid.NewGuid(), null, RiverKind.Drawn, widthKm, points, true);
 

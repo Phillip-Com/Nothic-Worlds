@@ -1,4 +1,5 @@
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 
 namespace NothicWorlds.Core.Tests.Simulation;
@@ -15,6 +16,15 @@ public sealed class RiverCarvingTests
         _ => 100)!;
 
     private static readonly RiverCarving _carving = RiverCarving.For([_river], RadiusKm);
+
+    // The same river, set 40 m deep at its mouth.
+    private static RiverProfile DeepRiver()
+    {
+        RiverCourseShown course = RiverProfileTests.Drawn(0.1, WaterGround.At(0, -1),
+            WaterGround.At(0, 1));
+        var depth = new RiverDepth(MouthMeters: 40);
+        return RiverProfile.For(course with { Depth = depth }, RadiusKm, _ => 100)!;
+    }
 
     // A spot `north` meters north of the river, at longitude `east` degrees.
     private static Vector3D Beside(double north, double east = 0.01) =>
@@ -33,6 +43,45 @@ public sealed class RiverCarvingTests
         Assert.InRange(bank - bed, 4 * RiverCarving.BankSlope - 0.25,
             4 * RiverCarving.BankSlope + 0.25);
         Assert.Equal(100, _carving.Carve(Beside(halfWidth + 500), 100));
+    }
+
+    [Fact]
+    public void ADeeperBed_KeepsTheBanksAboveTheWater_SteeperBelowIt()
+    {
+        RiverProfile deep = DeepRiver();
+        RiverCarving carving = RiverCarving.For([deep], RadiusKm);
+        int middle = deep.Points.Count / 2;
+        double halfWidth = deep.HalfWidthMeters[middle];
+        double edge = deep.WaterHalfWidthMeters[middle];
+        double east = RiverProfileTests.Longitude(deep.Points[middle]);
+        double Carve(RiverCarving each, double north) => each.Carve(Beside(north, east), 100);
+
+        Assert.Equal(deep.BedMeters[middle], Carve(carving, 0), 0);
+        Assert.Equal(deep.WaterMeters[middle], Carve(carving, edge), 0);
+        // Above the water it's carved just as at Auto's depth.
+        Assert.Equal(Carve(_carving, edge + 3), Carve(carving, edge + 3), 1);
+        // Below it the bank drops more steeply than BankSlope.
+        double underwater = Carve(carving, (halfWidth + edge) / 2);
+        Assert.True(underwater < deep.WaterMeters[middle]
+            - (edge - halfWidth) / 2 * RiverCarving.BankSlope - 5);
+    }
+
+    [Fact]
+    public void UnderTheStrip_CoarserGroundSinksFurther_UnderSteeperBanks()
+    {
+        // Its squares' flat faces would otherwise poke through the steep banks under the water.
+        RiverProfile deep = DeepRiver();
+        RiverCarving carving = RiverCarving.For([deep], RadiusKm);
+        int middle = deep.Points.Count / 2;
+        Vector3D bed = Beside(0, RiverProfileTests.Longitude(deep.Points[middle]));
+        double steeper = deep.WaterMeters[middle] - deep.BedMeters[middle]
+            - (deep.WaterHalfWidthMeters[middle] - deep.HalfWidthMeters[middle])
+            * RiverCarving.BankSlope;
+
+        double sunk = carving.UnderStripNear(bed, 1e-5, 2)!(bed, 100);
+
+        Assert.True(steeper > 10);
+        Assert.Equal(carving.Carve(bed, 100) - 0.5 - 0.4 * 2 - steeper, sunk, 6);
     }
 
     [Fact]

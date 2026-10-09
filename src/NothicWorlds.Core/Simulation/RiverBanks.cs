@@ -17,7 +17,8 @@ public static class RiverBanks
     // bed's middle, halfway out, and its edge, as shares of the half-width...
     private static readonly double[] _bed = [0, 0.5, 1];
 
-    // ...the bank, as shares of its width past the bed...
+    // ...the bank, as shares of its width past the bed (with a point where it reaches the
+    // water, where its slope changes)...
     private static readonly double[] _bank = [1 / 6.0, 2 / 6.0, 3 / 6.0, 4 / 6.0, 5 / 6.0, 1];
 
     // ...and the skirt, as shares of its width past the bank.
@@ -110,6 +111,8 @@ public static class RiverBanks
         List<(double Across, double Skirt)> offsets = [];
         offsets.AddRange(_bed.Select(share => (share * halfWidth, 0.0)));
         offsets.AddRange(_bank.Select(share => (halfWidth + share * (bankTop - halfWidth), 0.0)));
+        offsets.Add((Math.Clamp(point.WaterHalfWidthMeters, halfWidth, bankTop), 0.0));
+        offsets.Sort((a, b) => a.Across.CompareTo(b.Across));
         offsets.AddRange(_skirt.Select(share => (bankTop + share * skirt, share)));
         List<(double Across, double Skirt)> row =
             [.. offsets.Skip(1).Reverse().Select(o => (-o.Across, o.Skirt)), .. offsets];

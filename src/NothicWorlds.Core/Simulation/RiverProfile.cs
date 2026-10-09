@@ -1,4 +1,5 @@
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Model;
 
 namespace NothicWorlds.Core.Simulation;
 
@@ -10,6 +11,9 @@ namespace NothicWorlds.Core.Simulation;
 /// bed, how fast it flows, and how white with rapids it is. The water lies a set share of its
 /// depth below the ground it runs over (the lowest of its middle and its two edges, so it
 /// doesn't hang above a bank on a side slope), wherever the ground takes it, even uphill.
+/// A river set deeper than Auto (<see cref="RiverDepth"/>), or with a bed that rises and
+/// falls, keeps the water and banks of Auto: only its bed is lower, with steeper banks under
+/// the water down to it.
 /// </summary>
 public sealed class RiverProfile
 {
@@ -32,15 +36,23 @@ public sealed class RiverProfile
     /// <summary>The longest step between the profile's points, in meters.</summary>
     public const double SampleMeters = 200;
 
+    /// <summary>
+    /// The shortest step between the points of a river whose bed rises and falls, in meters.
+    /// </summary>
+    public const double FinestSampleMeters = 50;
+
+    /// <summary>The least depth of water over a bed that rises toward it, in meters.</summary>
+    public const double MinWaterDepthMeters = 0.2;
+
     // Slopes are measured over at least this far either side of a point, in meters.
     private const double SlopeSpanMeters = 400;
 
     private RiverProfile(Vector3D[] points, double[] along, double[] halfWidth,
-        double[] water, double[] bed, double[] flow, double[] rapids)
+        double[] waterHalfWidth, double[] water, double[] bed, double[] flow, double[] rapids)
     {
-        (Points, AlongMeters, HalfWidthMeters, WaterMeters, BedMeters) =
-            (points, along, halfWidth, water, bed);
-        (FlowMetersPerSecond, Rapids) = (flow, rapids);
+        (Points, AlongMeters, HalfWidthMeters, WaterHalfWidthMeters) =
+            (points, along, halfWidth, waterHalfWidth);
+        (WaterMeters, BedMeters, FlowMetersPerSecond, Rapids) = (water, bed, flow, rapids);
     }
 
     /// <summary>
@@ -51,8 +63,14 @@ public sealed class RiverProfile
     /// <summary>How far each point is from the source, in meters.</summary>
     public IReadOnlyList<double> AlongMeters { get; }
 
-    /// <summary>Half the river's width at each point, in meters.</summary>
+    /// <summary>Half the river's width at each point (its bed's), in meters.</summary>
     public IReadOnlyList<double> HalfWidthMeters { get; }
+
+    /// <summary>
+    /// Half the width of its water's surface at each point, where the banks reach it, in
+    /// meters.
+    /// </summary>
+    public IReadOnlyList<double> WaterHalfWidthMeters { get; }
 
     /// <summary>The height of the water's surface at each point, in meters.</summary>
     public IReadOnlyList<double> WaterMeters { get; }
@@ -78,7 +96,11 @@ public sealed class RiverProfile
     public static RiverProfile? For(RiverCourseShown course, double radiusKm,
         Func<Vector3D, double> groundMeters)
     {
-        Vector3D[] points = Sampled(RiverLine.PathOf(course), radiusKm * 1000);
+        RiverDepth settings = course.Depth ?? RiverDepth.Auto;
+        double step = settings.VariationMeters > 0
+            ? Math.Clamp(settings.SpacingKm * 1000 / 8, FinestSampleMeters, SampleMeters)
+            : SampleMeters;
+        Vector3D[] points = Sampled(RiverLine.PathOf(course), radiusKm * 1000, step);
         int count = points.Length;
         if (count < 2)
         {
@@ -94,23 +116,33 @@ public sealed class RiverProfile
         }
 
         double length = Math.Max(along[^1], 1e-9);
+        int seed = course.RiverId is Guid id ? RiverBedNoise.SeedFor(id) : 0;
         var halfWidth = new double[count];
+        var waterHalfWidth = new double[count];
         var water = new double[count];
         var bed = new double[count];
         for (int i = 0; i < count; i++)
         {
-            // From a fifth of its width at the source to all of it at the mouth.
-            double width = course.WidthKm * 1000 * (0.2 + 0.8 * along[i] / length);
-            double depth = DepthFor(width);
+            // From a fifth of its width (and a set depth) at the source to all of it at the
+            // mouth.
+            double share = 0.2 + 0.8 * along[i] / length;
+            double width = course.WidthKm * 1000 * share;
+            double auto = DepthFor(width);
+            double depth = settings.MouthMeters is double mouth ? mouth * share : auto;
+            // The water and its banks are as deep as Auto's at most; a deeper bed lies below.
+            double banks = Math.Min(depth, auto);
             halfWidth[i] = width / 2;
-            // The water's edges, where the banks rising from the bed's edges reach it.
-            double edge = halfWidth[i]
-                + (1 - WaterBelowGround) * depth / RiverCarving.BankSlope;
-            Vector3D side = Side(points, i) * (edge / radiusMeters);
+            // The water's edges, where banks rising from the bed's edges at Auto's slope
+            // would reach it.
+            waterHalfWidth[i] = halfWidth[i]
+                + (1 - WaterBelowGround) * banks / RiverCarving.BankSlope;
+            Vector3D side = Side(points, i) * (waterHalfWidth[i] / radiusMeters);
             double lowest = Math.Min(groundMeters(points[i]), Math.Min(
                 groundMeters(Unit(points[i] + side)), groundMeters(Unit(points[i] - side))));
-            water[i] = lowest - WaterBelowGround * depth;
-            bed[i] = water[i] - (1 - WaterBelowGround) * depth;
+            water[i] = lowest - WaterBelowGround * banks;
+            double variation = RiverBedNoise.Offset(along[i], settings.VariationMeters,
+                settings.SpacingKm, settings.Smoothness, seed);
+            bed[i] = Math.Min(lowest - depth - variation, water[i] - MinWaterDepthMeters);
         }
 
         var flow = new double[count];
@@ -122,7 +154,8 @@ public sealed class RiverProfile
             rapids[i] = SmoothStep(RapidsStart, RapidsFull, slope);
         }
 
-        return new RiverProfile(points, along, halfWidth, water, bed, flow, rapids);
+        return new RiverProfile(points, along, halfWidth, waterHalfWidth, water, bed, flow,
+            rapids);
     }
 
     // How steeply the water falls around a point: the drop over the points at least
@@ -144,9 +177,10 @@ public sealed class RiverProfile
         return span > 0 ? Math.Max(0, (water[before] - water[after]) / span) : 0;
     }
 
-    // A path with points added along its long legs, so none is more than SampleMeters long
+    // A path with points added along its long legs, so none is more than `step` meters long
     // on a body radiusMeters in radius.
-    private static Vector3D[] Sampled(List<Vector3D> path, double radiusMeters)
+    private static Vector3D[] Sampled(List<Vector3D> path, double radiusMeters,
+        double stepMeters)
     {
         var sampled = new List<Vector3D>(path.Count);
         for (int i = 0; i < path.Count; i++)
@@ -155,7 +189,7 @@ public sealed class RiverProfile
             {
                 double meters = radiusMeters
                     * Math.Acos(Math.Clamp(path[i - 1].Dot(path[i]), -1, 1));
-                int steps = (int)Math.Ceiling(meters / SampleMeters);
+                int steps = (int)Math.Ceiling(meters / stepMeters);
                 for (int step = 1; step < steps; step++)
                 {
                     double t = (double)step / steps;
