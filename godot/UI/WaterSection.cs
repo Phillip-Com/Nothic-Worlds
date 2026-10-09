@@ -13,8 +13,9 @@ namespace NothicWorlds.UI;
 /// The Terrain panel's Water mode (VISION.md BOD-11; owner's choices: rivers as lines, drawn or
 /// natural, and lakes filled from a click to their own height): buttons to add a lake, a
 /// natural river (from a clicked source, running downhill), or a drawn river (clicked points),
-/// the selected body's rivers and lakes, and the selected one's name, width or surface,
-/// whether a lake flows out, and what its water does, with Delete.
+/// the selected body's rivers and lakes, and the selected one's name, width and depth (with
+/// how its bed rises and falls) or surface, whether a lake flows out, and what its water does,
+/// with Delete.
 /// </summary>
 public partial class WaterSection : VBoxContainer
 {
@@ -26,6 +27,14 @@ public partial class WaterSection : VBoxContainer
     private CheckBox _flowsOut = null!;
     private Control _widthRow = null!;
     private SpinBox _width = null!;
+    private Control _depthRows = null!;
+    private CheckButton _autoDepth = null!;
+    private SpinBox _depth = null!;
+    private SpinBox _bedVariation = null!;
+    private SpinBox _bedSpacing = null!;
+    private HSlider _smoothness = null!;
+    private Label _smoothnessName = null!;
+    private bool _smoothnessDragging;
     private Label _status = null!;
     private Button _delete = null!;
     private Guid? _selectedId;
@@ -135,6 +144,7 @@ public partial class WaterSection : VBoxContainer
         _width.WithLiveTyping(Refresh).ValueChanged += _ => Commit();
         _widthRow.AddChild(_width);
         _editor.AddChild(_widthRow);
+        _editor.AddChild(BuildDepthRows());
 
         _status = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         _editor.AddChild(_status);
@@ -142,6 +152,86 @@ public partial class WaterSection : VBoxContainer
         _editor.AddChild(_delete);
         return _editor;
     }
+
+    // A river's depth: Auto or set, and how its bed rises and falls along it.
+    private Control BuildDepthRows()
+    {
+        _depthRows = new VBoxContainer();
+        var depthRow = new HBoxContainer();
+        depthRow.AddChild(new Label { Text = "Depth" });
+        _autoDepth = new CheckButton
+        {
+            Text = "Auto",
+            FocusMode = Control.FocusModeEnum.None,
+            TooltipText = "Deep for its width: a twentieth of it, 1 to 20 m. Untick to set " +
+                "a depth",
+        };
+        _autoDepth.Toggled += _ => Commit();
+        depthRow.AddChild(_autoDepth);
+        _depth = new SpinBox { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }
+            .WithUnit(Quantity.Length, RiverDepth.MinMouthMeters, RiverDepth.MaxMouthMeters,
+                0.5, 1);
+        _depth.WithLiveTyping(Refresh).ValueChanged += _ => Commit();
+        depthRow.AddChild(_depth);
+        _depthRows.AddChild(depthRow);
+
+        var bedRow = new HBoxContainer();
+        bedRow.AddChild(new Label { Text = "Bed ±" });
+        _bedVariation = new SpinBox
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "How far the river's bed rises and falls along it, deeper and " +
+                "shallower; its water stays where it is (0: an even bed)",
+        }.WithUnit(Quantity.Length, 0, RiverDepth.MaxVariationMeters, 0.5, 1);
+        _bedVariation.WithLiveTyping(Refresh).ValueChanged += _ => Commit();
+        bedRow.AddChild(_bedVariation);
+        bedRow.AddChild(new Label { Text = "every" });
+        _bedSpacing = new SpinBox { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }
+            .WithUnit(Quantity.Distance, RiverDepth.MinSpacingKm, RiverDepth.MaxSpacingKm, 0.1);
+        _bedSpacing.WithLiveTyping(Refresh).ValueChanged += _ => Commit();
+        bedRow.AddChild(_bedSpacing);
+        _depthRows.AddChild(bedRow);
+
+        var smoothRow = new HBoxContainer();
+        smoothRow.AddChild(new Label { Text = "Smoothness" });
+        _smoothness = new HSlider
+        {
+            MinValue = 0,
+            MaxValue = 1,
+            Step = 0.05,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+        };
+        // Re-working out the water can take a moment, so a drag applies when it's let go.
+        _smoothness.DragStarted += () => _smoothnessDragging = true;
+        _smoothness.DragEnded += _ =>
+        {
+            _smoothnessDragging = false;
+            Commit();
+        };
+        _smoothness.ValueChanged += value =>
+        {
+            _smoothnessName.Text = SmoothnessName(value);
+            if (!_smoothnessDragging)
+            {
+                Commit();
+            }
+        };
+        smoothRow.AddChild(_smoothness);
+        _smoothnessName = new Label { CustomMinimumSize = new Vector2(70, 0) };
+        smoothRow.AddChild(_smoothnessName);
+        _depthRows.AddChild(smoothRow);
+        return _depthRows;
+    }
+
+    // What a smoothness setting is called: from steps like weirs to worn smooth.
+    private static string SmoothnessName(double smoothness) => smoothness switch
+    {
+        < 0.15 => "Stepped",
+        < 0.45 => "Sharp",
+        < 0.8 => "Uneven",
+        _ => "Smooth",
+    };
 
     private Body Body => Session.SelectedBody;
 
@@ -238,6 +328,11 @@ public partial class WaterSection : VBoxContainer
             {
                 Name = _name.Text,
                 WidthKm = Math.Round(_width.MetricValue(), 2),
+                Depth = new RiverDepth(
+                    _autoDepth.ButtonPressed ? null : Math.Round(_depth.MetricValue(), 1),
+                    Math.Round(_bedVariation.MetricValue(), 1),
+                    Math.Round(_bedSpacing.MetricValue(), 1),
+                    Math.Round(_smoothness.Value, 2)),
             });
         }
         else if (SelectedLake is Lake lake)
@@ -322,6 +417,7 @@ public partial class WaterSection : VBoxContainer
         _levelRow.Visible = lake is not null;
         _flowsOut.Visible = lake is not null;
         _widthRow.Visible = river is not null;
+        _depthRows.Visible = river is not null;
         if (lake is not null)
         {
             _level.ShowMetric(lake.LevelMeters);
@@ -330,12 +426,44 @@ public partial class WaterSection : VBoxContainer
         else
         {
             _width.ShowMetric(river!.WidthKm);
+            ShowDepth(river);
         }
 
         _status.Text = Session.IsWorkingOutWater(Body.Id)
             ? "Working out where the water goes…"
             : lake is not null ? LakeStatus(lake) : RiverStatus(river!);
         _showing = false;
+    }
+
+    // A river's depth settings; Auto's depth is shown but can't be typed over.
+    private void ShowDepth(River river)
+    {
+        RiverDepth depth = river.Depth;
+        bool auto = depth.MouthMeters is null;
+        _autoDepth.SetPressedNoSignal(auto);
+        _depth.ShowMetric(depth.MouthMeters
+            ?? Math.Round(RiverProfile.DepthFor(river.WidthKm * 1000), 1));
+        _depth.Editable = !auto;
+        _depth.TooltipText = auto
+            ? "Auto: deep for its width. Untick Auto to set a depth"
+            : "How deep the river is at its mouth, from its banks' tops to its bed; it's a " +
+                "fifth as deep at its source. Deeper than Auto lowers only its bed";
+        _bedVariation.ShowMetric(depth.VariationMeters);
+        _bedSpacing.ShowMetric(depth.SpacingKm);
+        _smoothness.SetValueNoSignal(depth.Smoothness);
+        _smoothnessName.Text = SmoothnessName(depth.Smoothness);
+
+        // Spacing and smoothness shape the rises and falls, so they need some.
+        bool even = depth.VariationMeters == 0;
+        _bedSpacing.Editable = !even;
+        _smoothness.Editable = !even;
+        _bedSpacing.TooltipText = even
+            ? "Set how far the bed rises and falls (Bed ±) first"
+            : "How far apart the bed's rises and falls are along the river";
+        _smoothness.TooltipText = even
+            ? "Set how far the bed rises and falls (Bed ±) first"
+            : "How smoothly the bed rises and falls: worn smooth by the water, or (lower) " +
+                "in sharp steps like weirs";
     }
 
     // What a lake's water does: how much ground it covers, or why it has none.
