@@ -81,6 +81,39 @@ public sealed class GroundTileSelectionTests
     }
 
     [Fact]
+    public void FarTileNotBuilt_IsLeftOutAndItsNeighborsStayDrawn()
+    {
+        // Rising, the reach grows and tiles come into it at its edge before they're built:
+        // their parent standing in for them, and its for it, dropped the whole ground to a
+        // coarse tile for a frame and the view jumped.
+        (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
+        ITileSurface surface = selection.Surface;
+        GroundTileChoice all = selection.Choose(eye, spot, Reach, Guess(selection),
+            _ => TileNeed.None);
+        GroundTile far = all.Drawn.First(tile => NearestOf(surface, tile, spot) > Reach * 0.6);
+
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
+            tile => tile == far ? TileNeed.Missing : TileNeed.None);
+
+        Assert.Equal(all.Drawn.Where(tile => tile != far).ToHashSet(), choice.Drawn.ToHashSet());
+        Assert.Contains(far, choice.Wanted);
+    }
+
+    [Fact]
+    public void NearTileNotBuilt_ItsParentStandsIn()
+    {
+        (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
+        GroundTileChoice all = selection.Choose(eye, spot, Reach, Guess(selection),
+            _ => TileNeed.None);
+        GroundTile underfoot = TileOver(selection.Surface, all, spot);
+
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
+            tile => tile == underfoot ? TileNeed.Missing : TileNeed.None);
+
+        Assert.Equal(underfoot.Parent(), TileOver(selection.Surface, choice, spot));
+    }
+
+    [Fact]
     public void StaleTiles_AreWantedAfterMissingOnes()
     {
         (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
@@ -201,6 +234,23 @@ public sealed class GroundTileSelectionTests
     {
         (int root, double u, double v) = surface.Locate(point)!.Value;
         return choice.Drawn.First(tile => Holds(tile, root, u, v));
+    }
+
+    // The nearest a tile comes to a base point along the surface (checked on a grid over it).
+    private static double NearestOf(ITileSurface surface, GroundTile tile, Vector3D from)
+    {
+        double nearest = double.MaxValue;
+        for (int i = 0; i <= 8; i++)
+        {
+            for (int j = 0; j <= 8; j++)
+            {
+                (double u, double v) = tile.OnRoot(i / 8.0, j / 8.0);
+                nearest = Math.Min(nearest, surface.Across(from, surface.BasePoint(tile.Root,
+                    u, v)));
+            }
+        }
+
+        return nearest;
     }
 
     private static bool Holds(GroundTile tile, int root, double u, double v)

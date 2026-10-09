@@ -244,7 +244,8 @@ as you move, on globes and flat worlds alike, the water's surface built with it,
   near the eye) are rebuilt at most ten times a second as it moves.
 - **Ground tiles** (owner's plan, 2026-10-08): Core `Geometry/GroundTile.cs`,
   `GroundTileGrid` (layout, skirt, morph pairs), `GroundTileSelection` (which tiles, finer near
-  the eye, a parent standing in until all four quarters are built), `GlobeTileSurface` (the six
+  the eye, a parent standing in until all four quarters are built, but a tile just come into
+  the far half of the reach left out until it's built: PR #111), `GlobeTileSurface` (the six
   cube faces) and `FlatTopTileSurface` (a flat world's top face). `Rendering/GroundTiles.cs`
   builds tiles on worker threads from a `GroundTileRecipe` (heights, and the water's over
   them), keeps 600 for reuse, and joins the drawn ones into one ground mesh and one water mesh

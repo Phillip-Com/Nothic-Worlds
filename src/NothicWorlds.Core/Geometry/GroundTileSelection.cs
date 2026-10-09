@@ -6,7 +6,8 @@ namespace NothicWorlds.Core.Geometry;
 /// <c>splitFactor</c> times its width, down to tiles <c>finestWidth</c> across, and only tiles
 /// within reach of the eye are kept. Tiles are built a while after they're asked for, so until
 /// a tile's quarters are all built it's drawn whole, and until it's built its parent stands in:
-/// there's never a hole, and never two tiles drawn over each other.
+/// there's never a hole (but in the far part of the reach, past the horizon, where a tile just
+/// come into reach is left out until it's built), and never two tiles drawn over each other.
 /// </summary>
 /// <param name="surface">The surface tiled.</param>
 /// <param name="splitFactor">How many tile widths away from the eye a tile is split.</param>
@@ -14,6 +15,9 @@ namespace NothicWorlds.Core.Geometry;
 public sealed class GroundTileSelection(ITileSurface surface, double splitFactor,
     double finestWidth)
 {
+    // The share of the reach beyond which a tile not built yet is left out, not stood in for.
+    private const double FarShare = 0.5;
+
     /// <summary>The surface tiled.</summary>
     public ITileSurface Surface => surface;
 
@@ -97,6 +101,12 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
             }
 
             bool built = need != TileNeed.Missing;
+
+            // A tile not built yet in the far half of the reach (one just come into it, as the
+            // eye rises and the reach grows) is left out until it is, rather than its parent
+            // standing in for all its built neighbors too: out there, well past the horizon, a
+            // gap goes unseen, but the whole ground dropping to a coarse tile would not.
+            bool leftOut = !built && AllBeyond(tile, reachCenter, reach * FarShare);
             GroundTile[] quarters = ShouldSplit(tile, away)
                 ? [.. tile.Children().Where(child => surface.Covers(child)
                     && InReach(child, reachCenter, reach))]
@@ -122,7 +132,7 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
                     drawn.Add(tile);
                 }
 
-                return built;
+                return built || leftOut;
             }
 
             if (built)
@@ -134,7 +144,7 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
                 }
             }
 
-            return built;
+            return built || leftOut;
         }
     }
 
@@ -145,6 +155,21 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
     // Whether any of a tile is within reach of a base point (a little more, as it's measured
     // from the tile's middle out to its farthest corner).
     private bool InReach(GroundTile tile, Vector3D reachCenter, double reach)
+    {
+        (double away, double spread) = Span(tile, reachCenter);
+        return away - spread <= reach;
+    }
+
+    // Whether all of a tile is farther than `distance` from a base point.
+    private bool AllBeyond(GroundTile tile, Vector3D from, double distance)
+    {
+        (double away, double spread) = Span(tile, from);
+        return away - spread > distance;
+    }
+
+    // How far a tile's middle is from a base point along the surface, and from its middle out
+    // to its farthest corner.
+    private (double Away, double Spread) Span(GroundTile tile, Vector3D from)
     {
         (double u, double v) = tile.OnRoot(0.5, 0.5);
         Vector3D middle = surface.BasePoint(tile.Root, u, v);
@@ -157,6 +182,6 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
                 surface.BasePoint(tile.Root, cu, cv)));
         }
 
-        return surface.Across(reachCenter, middle) - spread <= reach;
+        return (surface.Across(from, middle), spread);
     }
 }
