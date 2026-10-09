@@ -60,6 +60,7 @@ internal sealed class TerrainTypeDocument
     public double? Edge { get; init; }  // Added in format version 29; omitted for 0
     public int? Variation { get; init; }  // Added in format version 30; omitted for 0
     public double? FeatureSize { get; init; }  // Added in version 30, km; omitted for 50
+    public double? Roughness { get; init; }  // Added in format version 33; omitted for 0
 }
 
 internal sealed class JournalEntryDocument

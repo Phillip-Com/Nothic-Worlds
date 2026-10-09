@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §7). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 32** (see **Version history** at the end)
+**Current format version: 33** (see **Version history** at the end)
 
 ## Container
 
@@ -32,7 +32,7 @@ list them all.
 
 ```json
 {
-  "formatVersion": 32,
+  "formatVersion": 33,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -132,7 +132,7 @@ list them all.
     { "code": 5, "name": "Forest", "color": "#2F6B35", "climate": "forest", "height": 300,
       "variation": 80 },
     { "code": 13, "name": "Crystal Wastes", "color": "#B0E0E6", "climate": "desert",
-      "height": 1200, "edge": 0.8, "variation": 900, "featureSize": 25 }
+      "height": 1200, "edge": 0.8, "variation": 900, "featureSize": 25, "roughness": 0.6 }
   ],
   "terrainShapesGround": true,
   "weatherPins": [
@@ -307,6 +307,7 @@ list them all.
 | `…terrainTypes[].edge` | no | 0 (gentle) to 1 (a cliff): how it meets other terrain; the steeper of two wins. Omitted for 0. See **Terrain-shaped ground** below. |
 | `…terrainTypes[].variation` | no | Meters, a whole number from 0 to 8,000: how far the ground rises and falls within the type, around its `height` (`BOD-08`). Omitted for 0 (level). See **Variation within terrain** below. |
 | `…terrainTypes[].featureSize` | no | km, 1 to 5,000: how far apart the type's biggest features are. Omitted for 50. |
+| `…terrainTypes[].roughness` | no | 0 (smooth) to 1 (craggy): how rough the type's ground is up close, its `variation` carried on into features too small for the height grid (`BOD-12`). Omitted for 0. See **Roughness up close** below. |
 | `…terrainTypes[].climate` | yes | How it affects weather pins (`WTH-03`): `"open-land"`, `"water"`, `"forest"`, `"desert"`, `"wetland"`, `"mountains"`, or `"ice"` |
 | `weatherPins` | no | Named spots whose weather is shown (`WTH-01`), in the order added. Omitted when there are none. Up to 1,000. |
 | `…weatherPins[].id`, `name` | yes | GUID, unique among weather pins; name not empty, up to 100 characters |
@@ -661,6 +662,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 33 | Terrain roughness (BOD-12): terrain types gain optional `roughness` | Nothing to change: older types are smooth (0), as they always looked; only new worlds' default types start rough |
 | 32 | River depth (BOD-11): rivers gain optional `depth`, `depthVariation`, `depthSpacing` and `depthSmoothness` | Nothing to change: older rivers are Auto with an even bed |
 | 31 | Rivers and lakes (M42): optional `rivers` and `lakes` | Nothing to change: version 30 worlds have none |
 | 30 | Peaks and water (M36): terrain types gain optional `variation` and `featureSize`; planets and moons gain an optional `waterLevel` | No water. Types named like the defaults (as for version 29) get their variation and feature size (Ocean 800 m/200 km, Shallow Water 40/60, Plains 40/80, Fields 30/80, Forest 80/50, Jungle 100/40, Hills 350/30, Mountains 1,500/40, Desert 120/30, Swamp 5/40, Tundra 60/60, Ice 300/60); others stay level |
