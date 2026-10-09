@@ -895,15 +895,15 @@ public partial class PlanetSurface : MeshInstance3D
     /// How far out the drawn ground is, in the globe's radii, as seen up close (first person):
     /// as <see cref="SurfaceRadiusAt"/>, but with cliffs kept steep (see
     /// <see cref="HeightGrid.SampleSteepAt"/>) on a body <paramref name="radiusKm"/> in radius.
+    /// In full precision: single precision holds the radius only to the nearest meter or so,
+    /// which shows as steps on the ground up close.
     /// </summary>
-    public float GroundRadiusAt(Vector3D direction, double radiusKm) => 1.0f + Lifted(
-        _shownHeights.IsEmpty ? 0 : _reliefScale * (float)_shownHeights.SampleSteepAt(
-            direction, radiusKm * 1000 * Math.PI / 2 / HeightGrid.FaceSize));
+    public double GroundRadiusAt(Vector3D direction, double radiusKm) =>
+        1 + GroundLiftAt(direction, radiusKm);
 
     /// <summary>
-    /// How far the drawn ground is lifted, in the globe's radii, as
-    /// <see cref="GroundRadiusAt"/> has it but in full precision (single precision holds the
-    /// radius only to the nearest meter or so, which shows as steps on fine ground).
+    /// How far the drawn ground is lifted, in the globe's radii (<see cref="GroundRadiusAt"/>
+    /// less one, without losing precision to the one).
     /// </summary>
     public double GroundLiftAt(Vector3D direction, double radiusKm)
     {

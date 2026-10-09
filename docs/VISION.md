@@ -702,7 +702,8 @@ deep as the river, even uphill, and it's **carved at every distance** (2026-10-0
   background); `Rendering/RiverRenderer.cs` (from orbit), `RiverWater.cs` +
   `river_water.gdshader`, `RiverBankStrip.cs` (both worked out on workers:
   `FirstPersonMode.StartChannels`, `StartBanks`; the strip meets `GroundTiles.ShownHeights`);
-  `PlanetSurface.SetLakeLevels`, `WaterRadiusAt`, `GroundLiftAt` (full precision);
+  `PlanetSurface.SetLakeLevels`, `WaterRadiusAt`, `GroundRadiusAt` and `GroundLiftAt` (the
+  ground up close, in full precision);
   `UI/WaterSection.cs` (the Terrain panel's Water mode).
 **Limits:** courses are a height cell apart (about 10 km on an Earth-sized world); on perfectly
 level ground a river's way out runs in straight lines; on a flat world, rivers away from the
