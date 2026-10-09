@@ -51,10 +51,6 @@ public partial class GroundTiles : Node3D
     // set changes nearly every frame, and each joining sends the whole mesh to the GPU.
     private const double MinJoinSeconds = 0.2;
 
-    private static readonly Mesh.ArrayFormat _format = (Mesh.ArrayFormat)(
-        ((int)Mesh.ArrayCustomFormat.RgbaFloat << (int)Mesh.ArrayFormat.FormatCustom0Shift)
-        | ((int)Mesh.ArrayCustomFormat.RgbaFloat << (int)Mesh.ArrayFormat.FormatCustom1Shift));
-
     private readonly ITileSurface _surface;
     private readonly GroundTileSelection _selection;
     private readonly int _cells;
@@ -85,15 +81,15 @@ public partial class GroundTiles : Node3D
     /// world's top face, heights above it) of a body <paramref name="radiusMeters"/> in
     /// radius, as finely as <paramref name="detail"/> says.
     /// </summary>
-    public GroundTiles(ITileSurface surface, double radiusMeters, GroundDetail detail)
+    public GroundTiles(ITileSurface surface, double radiusMeters, StandingGroundDetail detail)
     {
         Name = "GroundTiles";
         _surface = surface;
         _rebaseRadii = RebaseMeters / radiusMeters;
         _cells = detail switch
         {
-            GroundDetail.Low => 8,
-            GroundDetail.High => 32,
+            StandingGroundDetail.Low => 8,
+            StandingGroundDetail.High => 32,
             _ => 16,
         };
         _triangles = GroundTileGrid.Triangles(_cells);
@@ -105,7 +101,7 @@ public partial class GroundTiles : Node3D
 
     /// <summary>Required by Godot; the tiles are made with the other constructor.</summary>
     public GroundTiles()
-        : this(new GlobeTileSurface(), 6371000, GroundDetail.Standard)
+        : this(new GlobeTileSurface(), 6371000, StandingGroundDetail.Standard)
     {
     }
 
@@ -451,6 +447,7 @@ public partial class GroundTiles : Node3D
 
         _joining = true;
         _sinceJoined.Restart();
+        bool pack = PackedSurface.Works;
         CancellationToken stop = _stop.Token;
         Task.Run(() =>
         {
@@ -465,8 +462,8 @@ public partial class GroundTiles : Node3D
                     .OrderBy(meshes => meshes.Extent.DistanceFrom(origin))
                     .Select(meshes => (meshes, (float)_selection.MorphRange(meshes.Tile).End))];
                 _joined.Enqueue(new Joined(origin, drawn,
-                    JoinMeshes(tiles, origin, water: false),
-                    JoinMeshes(tiles, origin, water: true), null));
+                    JoinMeshes(tiles, origin, water: false, pack),
+                    JoinMeshes(tiles, origin, water: true, pack), null));
             }
             catch (Exception error)
             {
@@ -514,22 +511,32 @@ public partial class GroundTiles : Node3D
             return;
         }
 
-        var arrays = new Godot.Collections.Array();
-        arrays.Resize((int)Mesh.ArrayType.Max);
-        arrays[(int)Mesh.ArrayType.Vertex] = joined.Positions;
-        arrays[(int)Mesh.ArrayType.Custom0] = joined.Directions;
-        arrays[(int)Mesh.ArrayType.Custom1] = joined.Morphs;
-        arrays[(int)Mesh.ArrayType.Index] = joined.Indices;
-        var mesh = new ArrayMesh();
-        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays, flags: _format);
-        instance.Mesh = mesh;
+        if (joined.Packed is PackedSurface packed)
+        {
+            instance.Mesh = packed.ToMesh();
+        }
+        else
+        {
+            var arrays = new Godot.Collections.Array();
+            arrays.Resize((int)Mesh.ArrayType.Max);
+            arrays[(int)Mesh.ArrayType.Vertex] = joined.Positions!;
+            arrays[(int)Mesh.ArrayType.Custom0] = joined.Directions!;
+            arrays[(int)Mesh.ArrayType.Custom1] = joined.Morphs!;
+            arrays[(int)Mesh.ArrayType.Index] = joined.Indices!;
+            var mesh = new ArrayMesh();
+            mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays,
+                flags: PackedSurface.Format);
+            instance.Mesh = mesh;
+        }
+
         prepare?.Invoke(instance, origin);
     }
 
     // The tiles' ground (or water) as one mesh around `origin` (on a worker thread): each
-    // point's morph distance (where it has fully taken its parent's shape) in CUSTOM1's w.
+    // point's morph distance (where it has fully taken its parent's shape) in CUSTOM1's w;
+    // packed as the engine keeps it, if `pack`.
     private JoinedMesh? JoinMeshes(List<(TileMeshes Meshes, float MorphEnd)> tiles,
-        Vector3D origin, bool water)
+        Vector3D origin, bool water, bool pack)
     {
         List<(TileMeshes Meshes, float MorphEnd)> parts = [.. tiles.Where(tile =>
             !water || tile.Meshes.WaterPositions is not null)];
@@ -571,7 +578,10 @@ public partial class GroundTiles : Node3D
             }
         }
 
-        return new JoinedMesh(positions, directions, morphs, indices);
+        return pack
+            ? new JoinedMesh(null, null, null, null,
+                PackedSurface.Pack(positions, directions, morphs, indices))
+            : new JoinedMesh(positions, directions, morphs, indices, null);
     }
 
     // Lets go of the tiles kept longest out of use, once there are more than the cache holds.
@@ -758,8 +768,9 @@ public partial class GroundTiles : Node3D
     private sealed record Finished(GroundTile Tile, long Stamp, TileMeshes? Meshes,
         Exception? Error);
 
-    private sealed record JoinedMesh(Vector3[] Positions, float[] Directions, float[] Morphs,
-        int[] Indices);
+    // A joined mesh, packed, or as arrays where the engine packs differently.
+    private sealed record JoinedMesh(Vector3[]? Positions, float[]? Directions, float[]? Morphs,
+        int[]? Indices, PackedSurface? Packed);
 
     // The tiles drawn, joined around a point: the ground and the water's surface.
     private sealed record Joined(Vector3D Origin, Dictionary<GroundTile, TileMeshes> Tiles,
