@@ -1012,11 +1012,18 @@ public partial class FirstPersonMode : Node
         }
 
         double radiusMeters = body.RadiusKm * 1000;
-        double height = _heightMeters / radiusMeters;
+        double ground = globe.GroundRadiusAt(_spot, body.RadiusKm);
+
+        // Flying, the tiles are chosen for the height flown at, not the height kept above the
+        // drawn ground: that is measured on the tiles chosen, so it would choose them in turn,
+        // and rising, the view would flick between coarse tiles and fine ones every frame.
+        double heightMeters = _flying
+            ? Math.Max(EyeHeightMeters, _altitudeMeters - (ground - 1) * radiusMeters)
+            : _heightMeters;
+        double height = heightMeters / radiusMeters;
 
         // The ground reaches well past the horizon, which moves out as the eye rises.
         double outer = Math.Clamp(Math.Acos(1 / (1 + height)) * 4, 0.003, 0.6);
-        double ground = globe.GroundRadiusAt(_spot, body.RadiusKm);
         Vector3D middle = _spot * ground;
         Vector3D Lifted(Vector3D direction, double meters) =>
             direction * (1 + meters / radiusMeters);
