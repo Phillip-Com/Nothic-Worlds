@@ -229,7 +229,8 @@ Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
 worlds the same sky across the disc and walking over the rim onto the underside; clouds seen
 from above; a ground-detail texture near the feet (Base tier); choosing where to stand by
-clicking; true heights while standing.
+clicking; true heights while standing; switches for fog, clouds, and night vision (owner's
+request, 2026-10-08; night vision as brightened true colors, not green).
 **Built:**
 - Core: `BodyOrientation.ToSystem` / `ShapeToSystem`; `Simulation/SkyView.cs` (`From`,
   `FromFlat`, `SolarTimeHours`, `BodyAt`); `Geometry/FlatWalk.cs` and `GlobeWalk` for moving
@@ -244,7 +245,11 @@ clicking; true heights while standing.
   sky gradient, bodies as lit discs, clouds from the live weather via
   `PlanetSurface.CopyCloudsTo` and `cloud_layer.gdshaderinc`, haze as fog), `cloud_deck.gdshader`
   (clouds seen from above), `falling_weather.gdshader` (rain and snow over the view).
-- `UI/FirstPersonHud.cs`, `UI/CompassStrip.cs`.
+- `UI/FirstPersonHud.cs`, `UI/CompassStrip.cs`. Fog (G), Clouds (K), and Night Vision (N)
+  switches under the Calendar button: `SurfaceSky.ShowFog`, `SurfaceSky.ShowNightVision` (more
+  ambient light and exposure, scaled by how dark it is); Clouds is the same switch as View ▸
+  Clouds (`WeatherDisplay.ShowClouds`). The view's visibility of hidden UI is noted before any is
+  hidden, so the terrain brush still works after leaving.
 - **Ground detail** (`eye_level_ground` in `planet_surface.gdshaderinc`): three layers of noise
   matched to the ground **by its color** (grass, sand, snow, water, rock), placed in double
   precision by `FirstPersonMode.SetGroundDetail`; bumps shade the color rather than tilt the
@@ -564,7 +569,8 @@ the app (~0.17 s on the desktop); fully removing it needs carving code of our ow
 **Owner's choices:** an editable list of types per world (12 defaults); without a map the terrain
 is the surface, over a map a see-through overlay (View ▸ Terrain); its own Terrain panel; a grid
 of 1,024 × 1,024 cells a face (about 10 km on an Earth-sized planet); unpainted ground drawn
-grey once a planet without a map has any terrain.
+grey once a planet without a map has any terrain; a Tool On/Off switch (P) for painting,
+sculpting, and shapes, so drags can turn the view (owner's request, 2026-10-08).
 **Built:** Core `Geometry/CubeSphere.cs` (equal-angle cube faces; the shader repeats its math,
 spelled out in docs/world-format.md); `Model/TerrainGrid.cs` (immutable 64 × 64 tiles shared
 between versions; `Paint`, `PaintStroke`, `Replace`, `FacesChangedFrom`, `TilesChangedFrom`);
@@ -572,6 +578,8 @@ between versions; `Paint`, `PaintStroke`, `Replace`, `FacesChangedFrom`, `TilesC
 `Storage/TerrainImage.cs` (format v10, `terrain/<id>.png`). Drawn as a six-layer byte texture
 plus a palette, with smooth edges up close (`terrain_near`) and an averaged far copy so it never
 flickers (kept per face in `PlanetSurface`, so a stroke averages only the tiles it touched); `Session/WorldSession.Terrain.cs`; `Controls/TerrainBrush.cs`; `UI/TerrainPanel.cs`.
+The tool switch is `TerrainPanel`'s `_toolSwitch` (Water mode has its own buttons, so it's off
+there with a tooltip saying so).
 **Reuse:** `TerrainGrid`'s shared-tile pattern for any per-cell data (heights use it).
 
 **BOD-06 — Custom surface appearance** · Implemented (M16: PR #42) · Base
