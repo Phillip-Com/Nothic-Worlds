@@ -144,7 +144,7 @@ public static class CubeSphere
     }
 
     // The face whose outward direction is closest: the largest component wins.
-    private static int FaceOf(Vector3D direction)
+    internal static int FaceOf(Vector3D direction)
     {
         double x = Math.Abs(direction.X);
         double y = Math.Abs(direction.Y);
