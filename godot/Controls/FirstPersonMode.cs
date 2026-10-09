@@ -53,6 +53,14 @@ public partial class FirstPersonMode : Node
     // globe's own water just inside the edge of what's built (past the horizon on a globe).
     private const double NearEyeShare = 0.95;
 
+    // The camera's near distance, as a share of the eye's clearance, and how many times that
+    // its far distance is: the most the engine's depth range allows (see SystemView.FitCamera).
+    private const double NearShare = 0.1;
+    private const double DepthRange = 1e6;
+
+    // The farthest the ground tiles reach to show distant peaks, in meters (VISION.md REN-06).
+    private const double MaxPeakReachMeters = 250_000;
+
     // How far the water's waves repeat: WAVE_REPEAT_METERS in water_surface.gdshader.
     private const double WaveRepeatMeters = 1000;
 
@@ -784,9 +792,9 @@ public partial class FirstPersonMode : Node
         // engine can build (see SystemView.FitCamera).
         // A tenth of it (about 17 cm standing), so ground or a cliff right in front isn't
         // cut away; the view still reaches 170 km, past the horizon from the ground.
-        float near = (float)Math.Max(eyeHeight * 0.1, 1e-9);
+        float near = (float)Math.Max(eyeHeight * NearShare, 1e-9);
         _camera.Near = near;
-        _camera.Far = near * 1e6f;
+        _camera.Far = near * (float)DepthRange;
     }
 
     // Makes the ground tiles for the body stood on, in place of any there were: over a globe,
@@ -1043,26 +1051,30 @@ public partial class FirstPersonMode : Node
 
     // The smallest features of rough terrain (VISION.md BOD-12) worth building into a tile,
     // and into its parent (twice as coarse), in meters (see SmallestFeature). `toDirection`
-    // gives the direction a base point stands for.
+    // gives the direction a base point stands for; `farThinning`, whether they thin out far off.
     private static (double Own, double Parent) SmallestFeatures(GroundTiles tiles,
-        GroundTile tile, double radiusKm, Func<Vector3D, Vector3D> toDirection)
+        GroundTile tile, double radiusKm, Func<Vector3D, Vector3D> toDirection,
+        bool farThinning)
     {
         Vector3D corner = tiles.BasePoint(tile, 0, 0), across = tiles.BasePoint(tile, 1, 0);
         double flat = (across - corner).Length;
         double round = (toDirection(across) - toDirection(corner)).Length;
         double cellMeters = tiles.CellWidth(tile) * radiusKm * 1000 * round
             / Math.Max(flat, 1e-15);
-        return (SmallestFeature(cellMeters), SmallestFeature(2 * cellMeters));
+        return (SmallestFeature(cellMeters, farThinning),
+            SmallestFeature(2 * cellMeters, farThinning));
     }
 
     // The smallest rough features built into ground with squares this wide: at least two
-    // squares across, as finer ones would only shimmer; and far fewer on the widest squares,
-    // far off, so the tiles' outer edge (squares over a kilometer wide) meets the globe's own
-    // ground beyond it, which has none, without a ledge. About 30 m features 200 m away, 4 km
-    // ones 5 km away, and none past 15 km or so.
-    private static double SmallestFeature(double cellMeters) =>
-        Math.Max(TerrainRoughness.FinestMeters,
-            Math.Max(2 * cellMeters, cellMeters * cellMeters / FarRoughMeters));
+    // squares across, as finer ones would only shimmer (that's always more than a few pixels
+    // on screen). With `farThinning`, far fewer on the widest squares, far off, so tiles whose
+    // outer edge is in sight (squares over a kilometer wide) meet the globe's own ground beyond
+    // it, which has none, without a ledge: about 30 m features 200 m away, 4 km ones 5 km away,
+    // and none past 15 km or so. Tiles reaching the farthest peak end out of sight past the
+    // horizon, so they keep every feature to the edge.
+    private static double SmallestFeature(double cellMeters, bool farThinning) =>
+        Math.Max(TerrainRoughness.FinestMeters, Math.Max(2 * cellMeters,
+            farThinning ? cellMeters * cellMeters / FarRoughMeters : 0));
 
     // How far out the drawn ground is at a direction, in radii, with the rivers' channels
     // cut into it.
@@ -1086,10 +1098,10 @@ public partial class FirstPersonMode : Node
     // across. The drawn ground is never above the ground, so where the water is below it,
     // the ground isn't needed.
     private static double WaterOrUnder(double? water, Func<double, double> ground, double under,
-        double cell, double radiusMeters)
+        double cell, double radiusMeters, bool farThinning)
     {
         if (water is double level && level > under
-            && level > ground(SmallestFeature(cell * radiusMeters)))
+            && level > ground(SmallestFeature(cell * radiusMeters, farThinning)))
         {
             return level;
         }
@@ -1194,6 +1206,7 @@ public partial class FirstPersonMode : Node
 
         // The ground reaches well past the horizon, which moves out as the eye rises.
         double outer = Math.Clamp(Math.Acos(1 / (1 + height)) * 4, 0.003, 0.6);
+        double reach = TileReach(globe, outer, ground - 1 + height, heightMeters, radiusMeters);
         Vector3D middle = _spot * ground;
         Vector3D Lifted(Vector3D direction, double meters) =>
             direction * (1 + meters / radiusMeters);
@@ -1208,6 +1221,9 @@ public partial class FirstPersonMode : Node
 
         tiles.GroundMaterial = globe.MaterialOverride;
         SetGroundRadius(globe.MaterialOverride, radiusMeters);
+
+        // At Low detail the tiles' edge can be in sight, so rough features thin out toward it.
+        bool farThinning = _standingGroundDetail == StandingGroundDetail.Low;
         Func<GroundTile, TileExtent, GroundTileRecipe> recipes = Recipes(globe,
             (_, smallest) => direction =>
                 globe.GroundRadiusAt(direction, body.RadiusKm, smallest),
@@ -1215,16 +1231,17 @@ public partial class FirstPersonMode : Node
                 direction => direction, smallest) is { } carved
                 ? direction => 1 + carved(direction) / radiusMeters
                 : null,
-            tile => SmallestFeatures(tiles, tile, body.RadiusKm, direction => direction),
+            tile => SmallestFeatures(tiles, tile, body.RadiusKm, direction => direction,
+                farThinning),
             (direction, under, cell) => WaterOrUnder(globe.WaterRadiusAt(direction) - 1,
                 smallest => globe.GroundLiftAt(direction, body.RadiusKm, smallest), under - 1,
-                cell, radiusMeters) + 1);
-        tiles.Update(_spot * (ground + height), _spot, outer, RecipesVersion(globe), recipes);
+                cell, radiusMeters, farThinning) + 1);
+        tiles.Update(_spot * (ground + height), _spot, reach, RecipesVersion(globe), recipes);
         if (_nearEyeDue && tiles.HasGround)
         {
             // The globe's own water steps aside for the water drawn on the tiles.
             _nearEyeDue = false;
-            globe.SetNearEye(_channelsAround, outer * NearEyeShare);
+            globe.SetNearEye(_channelsAround, reach * NearEyeShare);
         }
 
         TakeInBanks(globe, body);
@@ -1242,6 +1259,26 @@ public partial class FirstPersonMode : Node
             double layer = ground + SurfaceSky.CloudHeightKm / body.RadiusKm;
             _deck!.Build(_ => layer, _spot, 2e-7, outer);
         }
+    }
+
+    // How far the ground tiles reach over a globe, in radians: at Low detail, `outer` (a
+    // little past the horizon); otherwise out to the farthest peak that can show over the
+    // horizon from an eye `eyeLift` radii above the base (`heightMeters` above the ground):
+    // the eye's horizon and the highest point's, together. Never past the camera's far
+    // distance (where nothing's drawn) or MaxPeakReachMeters; flat ground stays at `outer`.
+    private double TileReach(PlanetSurface globe, double outer, double eyeLift,
+        double heightMeters, double radiusMeters)
+    {
+        if (_standingGroundDetail == StandingGroundDetail.Low)
+        {
+            return outer;
+        }
+
+        double peak = Math.Acos(1 / (1 + Math.Max(eyeLift, 0)))
+            + Math.Acos(1 / (1 + Math.Max(globe.HighestRelief, 0)));
+        double farthest = Math.Min(MaxPeakReachMeters,
+            heightMeters * NearShare * DepthRange) / radiusMeters;
+        return Math.Max(outer, Math.Min(peak, farthest));
     }
 
     // Whether the rivers' channels (and with them the cloud deck, and a flat world's rim) are
@@ -1453,11 +1490,11 @@ public partial class FirstPersonMode : Node
                     ? point => FlatGroundLift + Math.Max(carved(point) / radiusMeters,
                         PlanetSurface.FlatDeepestLift)
                     : null,
-                tile => SmallestFeatures(tiles, tile, radiusKm, FlatDisc.DirectionFor),
+                tile => SmallestFeatures(tiles, tile, radiusKm, FlatDisc.DirectionFor, true),
                 (point, under, cell) => FlatGroundLift + Math.Max(WaterOrUnder(
                         globe.WaterRadiusAt(FlatDisc.DirectionFor(point)) - 1,
                         smallest => FlatGroundAt(globe, point, radiusKm, smallest),
-                        under - FlatGroundLift, cell, radiusMeters),
+                        under - FlatGroundLift, cell, radiusMeters, true),
                     PlanetSurface.FlatDeepestLift));
             tiles.Update(eye, FlatWalk.Point(flat), outer, RecipesVersion(globe), recipes);
             if (_nearEyeDue && tiles.HasGround)
