@@ -553,8 +553,11 @@ feature on a star (its rocks drawn, not saved); nebulas are a backdrop around th
 - Shapes: `Model/ShapeEdit.cs` (`FrameOn`; v24 `surface.shapes`, up to 64);
   `Rendering/ShapedGlobe.cs` (a hidden `CsgCombiner3D`, copied to a plain mesh once carved;
   `RayHit` so clicks reach into holes); `Controls/ShapeHandles.cs`, `UI/ShapesSection.cs`,
-  `Session/WorldSession.Shapes.cs`.
-**Limits:** carving re-does the whole globe on the main thread (~0.25 s a change).
+  `Session/WorldSession.Shapes.cs`. Lifting the globe before carving and the hit meshes after
+  it run on a worker thread; the toolbar says "Carving shapes…" meanwhile
+  (`ShapedGlobe.CarvingChanged`).
+**Limits:** Godot only carves in the scene, on the main thread, so each change still pauses
+the app (~0.17 s on the desktop); fully removing it needs carving code of our own.
 
 **BOD-05 — Terrain/biome painting** · Implemented (M11: PRs #33–#35) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.

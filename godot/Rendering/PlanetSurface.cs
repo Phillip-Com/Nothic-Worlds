@@ -1167,27 +1167,34 @@ public partial class PlanetSurface : MeshInstance3D
     }
 
     // A flat world's disc, a carved globe (drawn by its own child node), a sculpted globe's
-    // cube-sphere, or the plain sphere, lighter when the globe is small on screen.
+    // cube-sphere, or the plain sphere, lighter when the globe is small on screen. Until a
+    // globe's first carving is drawn, it's drawn as it was, so it never vanishes meanwhile.
     private void ChooseMesh()
     {
         _sphereMesh ??= Mesh;
         bool carved = _shapes.Count > 0;
+        bool carvingDrawn = carved && _carved is { HasDrawn: true };
         Mesh? sphere = _detailLevel == DetailLevel.Plain ? _coarseSphere : _sphereMesh;
         ReliefDetail relief = _detailLevel == DetailLevel.Light
             ? (ReliefDetail)Math.Min((int)_reliefDetail, (int)ReliefDetail.Low)
             : _reliefDetail;
         bool lifted = !_shownHeights.IsEmpty || _waterLevelMeters is not null;
-        Mesh = carved ? null
+        Mesh = carvingDrawn ? null
             : Shape == BodyShape.FlatDisc
                 ? lifted && _detailLevel != DetailLevel.Plain
                     ? FlatDiscMeshes.TopRelief(relief)
                     : FlatDiscMeshes.Top
             : _shownHeights.IsEmpty || _detailLevel == DetailLevel.Plain ? sphere
             : CubeSphereMesh.For(relief);
-        SurfaceMaterial.SetShaderParameter("lifted_on_cpu", carved);
+        SurfaceMaterial.SetShaderParameter("lifted_on_cpu", carvingDrawn);
         if (carved)
         {
-            _carved ??= new ShapedGlobe { Name = "Shaped" };
+            if (_carved is null)
+            {
+                _carved = new ShapedGlobe { Name = "Shaped" };
+                _carved.FirstDrawn += ChooseMesh;
+            }
+
             if (_carved.GetParent() is null)
             {
                 AddChild(_carved);
