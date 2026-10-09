@@ -44,7 +44,7 @@ public partial class GroundTiles : Node3D
     private const double FinestTileMeters = 64;
 
     // How many built tiles are kept for reuse: enough for the eye to turn round and come back.
-    private const int CacheTiles = 600;
+    private const int CacheTiles = 850;
 
     // The least time between joinings of the tiles drawn, in seconds: moving fast, the drawn
     // set changes nearly every frame, and each joining sends the whole mesh to the GPU.

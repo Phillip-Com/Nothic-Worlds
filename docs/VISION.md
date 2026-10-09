@@ -224,7 +224,7 @@ screen filter; stored per world (format v25); Painterly the default for every wo
 Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 (`WorldSession.SetStyle`, one undo step).
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Owner's choices:** walk or fly; the sky at true size and place with a magnify switch; day and
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
@@ -248,14 +248,18 @@ as you move, on globes and flat worlds alike, the water's surface built with it,
   the far half of the reach left out until it's built: PR #111), `GlobeTileSurface` (the six
   cube faces) and `FlatTopTileSurface` (a flat world's top face). `Rendering/GroundTiles.cs`
   builds tiles on worker threads from a `GroundTileRecipe` (heights, and the water's over
-  them), keeps 600 for reuse, and joins the drawn ones into one ground mesh and one water mesh
+  them), keeps 850 for reuse, and joins the drawn ones into one ground mesh and one water mesh
   (nearest first, also on a worker; 2 draw calls instead of a few hundred). Points morph onto
   the coarser tile's shape before it takes over (`ground_morph` in `planet_surface.gdshaderinc`,
   the distance in `CUSTOM1.w`); skirts hide any crack. The tiles are the same at every detail
   (finest 64 m); `StandingGroundDetail` sets 8, 16, or 32 squares a tile, in the presets too.
   The joined meshes are packed on the worker the way the engine keeps them
   (`Rendering/PackedSurface.cs`, checked against the engine's own packing at start), so the
-  main thread only uploads them. The rim and underside of a flat world are still a
+  main thread only uploads them. Over a globe at Standard and High detail the tiles reach the
+farthest peak that can show over the horizon (the eye's horizon plus the highest point's;
+`FirstPersonMode.TileReach`, at most the camera's far distance, ~170 km standing, or 250 km),
+so distant mountains keep their shape and rough features; at Low and on flat worlds they reach
+a little past the eye's horizon (~19 km). The rim and underside of a flat world are still a
   `Rendering/FlatPatch.cs` of bare rock.
 - `Rendering/SurfaceSky.cs` + `surface_sky.gdshader` (a copy of the environment while standing;
   sky gradient, bodies as lit discs, clouds from the live weather via
@@ -735,13 +739,13 @@ change**, recipe in docs/world-format.md) and `Model/RoughGround.cs` (blended be
 types like heights; only where the terrain shapes the ground); `RiverCarving.BeyondBanksMeters`
 (each feature fades within its own size of a river). `PlanetSurface.GroundLiftAt` adds it, so
 tiles, walking, water and flat worlds follow it; `SmoothGroundLiftAt` for river profiles.
-Each ground tile shows features down to two of its squares, fewer far off
-(`FirstPersonMode.SmallestFeature`), and morphs toward its parent's ground as the parent
+Each ground tile shows features down to two of its squares (`FirstPersonMode.SmallestFeature`;
+at Low ground detail fewer far off, as the tiles' edge is in sight), and morphs toward its parent's ground as the parent
 builds it (`GroundTileRecipe.MorphHeight`). The session keeps each body's (`RoughFor`).
 `UI/TerrainPanel.cs`: the Roughness slider, off with a reason for a level type.
-**Limits:** from orbit nothing changes (the features are smaller than the globe draws), and
-far off (from about 5 km, none past 15 km) the features thin out so the tiles meet the globe's
-own ground. A type with no variation can't be rough.
+**Limits:** from orbit nothing changes (the features are smaller than the globe draws). At
+Low ground detail they thin out far off (from about 5 km, none past 15 km) so the tiles meet
+the globe's own ground; at Standard and High they reach the farthest peak (see `REN-06`). A type with no variation can't be rough.
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
