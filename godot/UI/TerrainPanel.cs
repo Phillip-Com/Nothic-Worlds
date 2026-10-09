@@ -39,7 +39,7 @@ public partial class TerrainPanel : CanvasLayer
     private Label _heading = null!;
     private Label _note = null!;
     private Control _tools = null!;
-    private Button _toolSwitch = null!;
+    private ToolSwitch _toolSwitch = null!;
     private Button _paintButton = null!;
     private Button _eraseButton = null!;
     private Button _sculptButton = null!;
@@ -193,12 +193,7 @@ public partial class TerrainPanel : CanvasLayer
     private Control BuildTools()
     {
         var tools = new VBoxContainer();
-        _toolSwitch = new Button
-        {
-            ToggleMode = true,
-            ButtonPressed = true,
-            FocusMode = Control.FocusModeEnum.None,
-        };
+        _toolSwitch = new ToolSwitch();
         _toolSwitch.Toggled += _ => Refresh();
         tools.AddChild(_toolSwitch);
         var modes = new HBoxContainer();
@@ -614,8 +609,7 @@ public partial class TerrainPanel : CanvasLayer
 
         if (!_toolSwitch.ButtonPressed)
         {
-            return "The tool is off: drag the planet to turn the view. Press P or click " +
-                "Tool Off to turn it back on.";
+            return ToolSwitch.OffHint;
         }
 
         if (_shapesButton.ButtonPressed)
@@ -818,27 +812,12 @@ public partial class TerrainPanel : CanvasLayer
         return swatch;
     }
 
-    // P turns the tool on or off while the panel is open (not while typing: a text field takes
-    // the key first).
-    public override void _UnhandledKeyInput(InputEvent @event)
-    {
-        if (Visible && @event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.P }
-            && !_toolSwitch.Disabled && Session is { SelectedBodyHasSurface: true })
-        {
-            _toolSwitch.ButtonPressed = !_toolSwitch.ButtonPressed;
-            GetViewport().SetInputAsHandled();
-        }
-    }
-
-    // The switch says whether the tool is on; Water mode has its own Place and Draw buttons.
+    // Water mode has its own Place and Draw buttons, so the switch is off there.
     private void ShowToolSwitch()
     {
-        _toolSwitch.Text = _toolSwitch.ButtonPressed ? "Tool On (P)" : "Tool Off (P)";
-        DisabledTip.Apply(_toolSwitch,
-            "Turn the tool off to drag the planet freely, and on again to use it (P)",
-            _waterButton.ButtonPressed
-                ? "Water has its own buttons for placing lakes and drawing rivers"
-                : null);
+        _toolSwitch.SetUnavailable(_waterButton.ButtonPressed
+            ? "Water has its own buttons for placing lakes and drawing rivers"
+            : null);
     }
 
     private static Button CreateButton(string text, Action pressed, string tooltip)

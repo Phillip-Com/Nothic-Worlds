@@ -349,8 +349,12 @@ to work).
 **Built:** `MapToolbar.SetHint(tool, text)` (the hint bar; the last tool given a hint shows);
 `UI/DisabledTip.cs` (`Apply(button, tip, whyNot)`, shared reasons `Busy`, `NoMap`,
 `NoSurface`); `MapToolbar.ShowBusyWarning()` for edits that must wait;
-`TerrainBrush.ShowDone` ("Done: Paint Ocean. Ctrl+Z takes it back.").
-**Reuse:** these three for every new tool (CLAUDE.md §4, Usability).
+`TerrainBrush.ShowDone` ("Done: Paint Ocean. Ctrl+Z takes it back."). `UI/ToolSwitch.cs`: the
+Tool On/Off switch (P) atop the Terrain, Regions, and Map panels (owner's request,
+2026-10-08); while off, drags on the globe turn the view (`TerrainBrush.IsActive`,
+`RegionEditor.ToolOn`, `MapPanel.IsToolOn` for `PieceHandles`), and `ToolSwitch.OffHint` says so.
+**Reuse:** these for every new tool (CLAUDE.md §4, Usability); a `ToolSwitch` for any panel
+whose tool takes drags on the globe.
 
 **UI-06 — Start screen and standalone app** · Implemented (M34: PR #89) · Base
 **Intent:** The app opens to a start screen (New World, Open World, Recent Worlds, Settings,
@@ -579,8 +583,8 @@ between versions; `Paint`, `PaintStroke`, `Replace`, `FacesChangedFrom`, `TilesC
 `Storage/TerrainImage.cs` (format v10, `terrain/<id>.png`). Drawn as a six-layer byte texture
 plus a palette, with smooth edges up close (`terrain_near`) and an averaged far copy so it never
 flickers (kept per face in `PlanetSurface`, so a stroke averages only the tiles it touched); `Session/WorldSession.Terrain.cs`; `Controls/TerrainBrush.cs`; `UI/TerrainPanel.cs`.
-The tool switch is `TerrainPanel`'s `_toolSwitch` (Water mode has its own buttons, so it's off
-there with a tooltip saying so).
+The tool switch is a `ToolSwitch` (UI-05); Water mode has its own buttons, so it's off there
+with a tooltip saying so.
 **Reuse:** `TerrainGrid`'s shared-tile pattern for any per-cell data (heights use it).
 
 **BOD-06 — Custom surface appearance** · Implemented (M16: PR #42) · Base
