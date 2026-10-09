@@ -39,6 +39,37 @@ public static class GroundTileGrid
     }
 
     /// <summary>
+    /// How many edge points either way a skirt point looks for the lowest ground: a neighbor up
+    /// to three levels coarser joins the points this many apart with straight lines.
+    /// </summary>
+    public const int SkirtReach = 8;
+
+    /// <summary>
+    /// How far the skirt hangs under each edge point (heights in <see cref="Edge"/>'s order):
+    /// <paramref name="least"/> more than the drop to the lowest edge point within
+    /// <see cref="SkirtReach"/> either way (going round). Where the edge runs up a cliff, a
+    /// coarser neighbor's straight edge leaves a crack as tall as the cliff, which a skirt of a
+    /// set depth wouldn't reach (seen as slits of sky through a cliff face).
+    /// </summary>
+    public static double[] SkirtDepths(IReadOnlyList<double> edgeHeights, double least)
+    {
+        int count = edgeHeights.Count;
+        var depths = new double[count];
+        for (int i = 0; i < count; i++)
+        {
+            double lowest = edgeHeights[i];
+            for (int step = -SkirtReach; step <= SkirtReach; step++)
+            {
+                lowest = Math.Min(lowest, edgeHeights[((i + step) % count + count) % count]);
+            }
+
+            depths[i] = least + edgeHeights[i] - lowest;
+        }
+
+        return depths;
+    }
+
+    /// <summary>
     /// The two grid points whose middle a point moves to as the tile morphs onto its parent's
     /// shape (the point itself twice, for one the parent has too).
     /// </summary>

@@ -175,4 +175,43 @@ public sealed class GroundTileGridTests
         a.Y * b.Z - a.Z * b.Y,
         a.Z * b.X - a.X * b.Z,
         a.X * b.Y - a.Y * b.X);
+
+    [Fact]
+    public void SkirtDepths_OnLevelGround_AreTheLeast()
+    {
+        double[] depths = GroundTileGrid.SkirtDepths(new double[4 * Cells], 5);
+
+        Assert.All(depths, depth => Assert.Equal(5, depth));
+    }
+
+    [Fact]
+    public void SkirtDepths_UpACliff_ReachTheFoot()
+    {
+        // The bug: an edge running up a 2 km cliff, the step between points 3 and 4. A coarser
+        // neighbor joins points 0 and 8 straight, leaving a crack the old 5 m skirt left open.
+        double[] heights = new double[4 * Cells];
+        for (int i = 4; i < 4 * Cells - 4; i++)
+        {
+            heights[i] = 2000;
+        }
+
+        double[] depths = GroundTileGrid.SkirtDepths(heights, 5);
+
+        Assert.Equal(2005, depths[4]);       // At the top of the step
+        Assert.Equal(2005, depths[11]);      // Eight points past the foot, still in reach
+        Assert.Equal(5, depths[12]);         // Nine past, the foot is out of reach
+        Assert.Equal(5, depths[3]);          // At the foot
+    }
+
+    [Fact]
+    public void SkirtDepths_LookAcrossTheCornerWhereTheEdgeCloses()
+    {
+        double[] heights = new double[4 * Cells];
+        heights[0] = 100;
+
+        double[] depths = GroundTileGrid.SkirtDepths(heights, 1);
+
+        Assert.Equal(101, depths[0]);
+        Assert.Equal(1, depths[^1]);
+    }
 }

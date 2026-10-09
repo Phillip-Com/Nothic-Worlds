@@ -278,6 +278,9 @@ a little past the eye's horizon (~19 km). The rim and underside of a flat world 
   below), not just the ground below, so a hillside beside a low flight isn't cut away; walking
   looks half a meter past each step and stops at slopes over 50°, saying so in the help line.
   On carved globes (ground found only to ~0.5 m) both use the ground below, as before.
+  Each tile's skirt hangs at least to the lowest of its edge points within eight either way
+  (`GroundTileGrid.SkirtDepths`), so where a tile's edge runs up a cliff the crack against a
+  coarser neighbor (seen as slits of sky through the cliff face) stays closed.
 - **Ground detail** (`eye_level_ground` in `planet_surface.gdshaderinc`): three layers of noise
   matched to the ground **by its color** (grass, sand, snow, water, rock), placed in double
   precision by `FirstPersonMode.SetGroundDetail`; bumps shade the color rather than tilt the
