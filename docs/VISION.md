@@ -240,8 +240,8 @@ as you move, on globes and flat worlds alike, the water's surface built with it,
   over flat worlds and globes.
 - `Controls/FirstPersonMode.cs`: View ▸ Stand Here… (a click picks the spot, through
   `PinPlacer`), its own camera, Esc back. While standing `SystemView` puts the origin at the eye
-  (`StandingOn`, `StandingEye`) and hides other bodies. Rivers' channels (they're carved only
-  near the eye) are rebuilt at most ten times a second as it moves.
+  (`StandingOn`, `StandingEye`) and hides other bodies. The rivers' water, beds, and banks
+  around the eye are worked out again on workers as it moves (`BOD-11`).
 - **Ground tiles** (owner's plan, 2026-10-08): Core `Geometry/GroundTile.cs`,
   `GroundTileGrid` (layout, skirt, morph pairs), `GroundTileSelection` (which tiles, finer near
   the eye, a parent standing in until all four quarters are built, but a tile just come into
@@ -275,9 +275,7 @@ as you move, on globes and flat worlds alike, the water's surface built with it,
 drawn at the ground's height around the eye (give it a recipe); `FirstPersonGround.Build` for a
 shell at a set height (the cloud deck).
 **Limits:** the ground from eye level is only as sharp as the map (an 8k map is about 5 km a
-pixel on an Earth-sized planet). Rivers' channels still depend on where the eye is, so tiles
-within about 6 km of a river are rebuilt as it walks (PR 3 of the standing-view plan changes
-that). On arriving, or after a big climb, the ground sharpens over about 1–2 s, coarser
+pixel on an Earth-sized planet). On arriving, or after a big climb, the ground sharpens over about 1–2 s, coarser
 ground standing in meanwhile; handing over the joined tiles takes the main thread about 5–12
 ms on Standard and 15–30 ms on High (up to ~100 ms at worst), at most five times a second
 while moving fast.
@@ -674,7 +672,8 @@ never below `PlanetSurface.FlatDeepestLift`; `PlanetSurface.UpdateRim` and
 `rim_waterfall.gdshader`; `ShapeEdit.FrameOn(radiusKm, BodyShape.FlatDisc)`.
 **Limits:** the disc's map is stretched toward the rim.
 
-**BOD-11 — Rivers and lakes** · Implemented (M42: PRs #98–#100; faster: PRs #102–#103) · Base
+**BOD-11 — Rivers and lakes** · Implemented (M42: PRs #98–#100; faster: PRs #102–#103;
+following the ground: PR #112) · Base
 **Intent:** Rivers you can draw, or that find their own way downhill from a source until they
 reach water, and lakes standing at a height of their own that can flow out into rivers, so a
 world's water looks natural or exactly as designed (owner's request, 2026-10-08).
@@ -683,7 +682,8 @@ keep their clicked course, **natural** ones run downhill by the path of least re
 re-trace when the ground changes; lakes fill from a click to their own surface height; **Flows
 Out** feeds a natural river from a lake's lowest shore. Up close: banks carved into the ground,
 depth from width (a twentieth, 1–20 m), ripples flowing downstream with rapids, lakes you can
-swim in, and smooth banks.
+swim in, and smooth banks. The water **follows the ground** it's drawn on, its channel only as
+deep as the river, even uphill, and it's **carved at every distance** (2026-10-08).
 **Built:**
 - Data (format v31): `Model/River.cs`, `Model/Lake.cs`, `Model/WaterRules.cs`. Only these are
   saved; the water is worked out from the ground each time (rules in docs/world-format.md).
@@ -692,16 +692,23 @@ swim in, and smooth banks.
   climbs least), `BodyWater.For` (one body's sea, lakes, lake levels, and rivers). They borrow
   `WaterScratch` (marking arrays) and use `HeightQueue`; their results are fixed by the docs, so
   any speed-up must give identical courses (`SimpleRiverCourse` in the tests checks this).
-- Up close: `RiverLine`, `RiverProfile` (width, depth, heights, speed, rapids),
-  `RiverChannels` (stretches near the eye and `Carve`), `RiverBanks` (a fine strip for the
-  banks).
+- Up close: `RiverLine`; `RiverProfile` (width, depth, heights, speed, rapids, every 200 m;
+  the water a share of its depth below the lowest of the ground at its middle and its
+  edges); `RiverCarving` (the channels along whole courses, the same wherever the eye is, found
+  through a tree of balls around each river's segments; ground tiles sunk under the strip by
+  their squares' width, but not for rivers narrower than 2% of a square); `RiverChannels`
+  (the stretches near the eye); `RiverBanks` (a fine strip for the beds and banks).
 - `Session/WorldSession.Water.cs` (edits with undo; works out water and lake images in the
   background); `Rendering/RiverRenderer.cs` (from orbit), `RiverWater.cs` +
-  `river_water.gdshader`, `RiverBankStrip.cs`; `PlanetSurface.SetLakeLevels`, `WaterRadiusAt`;
+  `river_water.gdshader`, `RiverBankStrip.cs` (both worked out on workers:
+  `FirstPersonMode.StartChannels`, `StartBanks`; the strip meets `GroundTiles.ShownHeights`);
+  `PlanetSurface.SetLakeLevels`, `WaterRadiusAt`, `GroundLiftAt` (full precision);
   `UI/WaterSection.cs` (the Terrain panel's Water mode).
 **Limits:** courses are a height cell apart (about 10 km on an Earth-sized world); on perfectly
 level ground a river's way out runs in straight lines; on a flat world, rivers away from the
-north pole are stretched east–west as the disc's map is.
+north pole are stretched east–west as the disc's map is. Up close, a river runs uphill where
+the ground rises along its course (owner's choice). Far off, a river narrower than about 2% of
+the ground's squares there isn't cut into them (it's thinner than a pixel by then).
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
