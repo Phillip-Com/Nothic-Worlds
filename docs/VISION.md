@@ -673,7 +673,7 @@ never below `PlanetSurface.FlatDeepestLift`; `PlanetSurface.UpdateRim` and
 **Limits:** the disc's map is stretched toward the rim.
 
 **BOD-11 — Rivers and lakes** · Implemented (M42: PRs #98–#100; faster: PRs #102–#103;
-following the ground: PR #112) · Base
+following the ground: PR #112; depth: PR #113) · Base
 **Intent:** Rivers you can draw, or that find their own way downhill from a source until they
 reach water, and lakes standing at a height of their own that can flow out into rivers, so a
 world's water looks natural or exactly as designed (owner's request, 2026-10-08).
@@ -683,10 +683,16 @@ re-trace when the ground changes; lakes fill from a click to their own surface h
 Out** feeds a natural river from a lake's lowest shore. Up close: banks carved into the ground,
 depth from width (a twentieth, 1–20 m), ripples flowing downstream with rapids, lakes you can
 swim in, and smooth banks. The water **follows the ground** it's drawn on, its channel only as
-deep as the river, even uphill, and it's **carved at every distance** (2026-10-08).
+deep as the river, even uphill, and it's **carved at every distance** (2026-10-08). Each
+river's **depth** is Auto or set (at its mouth, shallower toward its source like its width), and
+its bed can rise and fall by ± meters every so many km, worn smooth unless made sharp (steps
+like weirs); only the bed changes, so the water, its width, and the banks above it stay as
+Auto's, with steeper banks below the water (2026-10-09).
 **Built:**
 - Data (format v31): `Model/River.cs`, `Model/Lake.cs`, `Model/WaterRules.cs`. Only these are
   saved; the water is worked out from the ground each time (rules in docs/world-format.md).
+  Depth (v32): `Model/RiverDepth.cs`; the bed's rises and falls are `RiverBedNoise` (seeded by
+  the river's id; **its output must never change**, recipe in docs/world-format.md).
 - Core `Simulation/`: `WaterCells` (the height grid's cells and neighbors), `LakeFill` (`Fill`,
   `HollowBelow`), `RiverCourse.Trace` (steepest descent, and out of hollows by the way that
   climbs least), `BodyWater.For` (one body's sea, lakes, lake levels, and rivers). They borrow
@@ -694,9 +700,11 @@ deep as the river, even uphill, and it's **carved at every distance** (2026-10-0
   any speed-up must give identical courses (`SimpleRiverCourse` in the tests checks this).
 - Up close: `RiverLine`; `RiverProfile` (width, depth, heights, speed, rapids, every 200 m;
   the water a share of its depth below the lowest of the ground at its middle and its
-  edges); `RiverCarving` (the channels along whole courses, the same wherever the eye is, found
+  edges; finer steps, down to 50 m, where its bed varies; the water's half-width, which a deeper
+bed doesn't change); `RiverCarving` (the channels along whole courses, the same wherever the eye is, found
   through a tree of balls around each river's segments; ground tiles sunk under the strip by
-  their squares' width, but not for rivers narrower than 2% of a square); `RiverChannels`
+  their squares' width, and further under banks steeper than Auto's, but not for rivers
+  narrower than 2% of a square); `RiverChannels`
   (the stretches near the eye); `RiverBanks` (a fine strip for the beds and banks).
 - `Session/WorldSession.Water.cs` (edits with undo; works out water and lake images in the
   background); `Rendering/RiverRenderer.cs` (from orbit), `RiverWater.cs` +
@@ -704,12 +712,14 @@ deep as the river, even uphill, and it's **carved at every distance** (2026-10-0
   `FirstPersonMode.StartChannels`, `StartBanks`; the strip meets `GroundTiles.ShownHeights`);
   `PlanetSurface.SetLakeLevels`, `WaterRadiusAt`, `GroundRadiusAt` and `GroundLiftAt` (the
   ground up close, in full precision);
-  `UI/WaterSection.cs` (the Terrain panel's Water mode).
+  `UI/WaterSection.cs` (the Terrain panel's Water mode, with a river's depth settings).
 **Limits:** courses are a height cell apart (about 10 km on an Earth-sized world); on perfectly
 level ground a river's way out runs in straight lines; on a flat world, rivers away from the
 north pole are stretched east–west as the disc's map is. Up close, a river runs uphill where
 the ground rises along its course (owner's choice). Far off, a river narrower than about 2% of
-the ground's squares there isn't cut into them (it's thinner than a pixel by then).
+the ground's squares there isn't cut into them (it's thinner than a pixel by then). A step in a
+bed is spread over one of the profile's steps (an eighth of its spacing, at least 50 m), so the
+sharpest "weirs" are short ramps.
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
