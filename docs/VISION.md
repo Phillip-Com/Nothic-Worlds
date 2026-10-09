@@ -619,7 +619,9 @@ lifted to the water in `planet_surface.gdshaderinc` (colors in `water_tint.gdsha
 `PlanetSurface.SetTerrainColors`); from the ground a `FirstPersonGround` at the water's radius
 with `water_surface.gdshader`. Underwater: murk (`SurfaceSky.ShowUnderwater`), a wavering tint
 (`UnderwaterView`, `underwater.gdshader`), and light ripples (`caustics`).
-**Limits:** a globe carved by shapes isn't raised to the water (it's still colored as water).
+A globe or disc carved by shapes (`ShapedGlobe`) is raised to the water before carving, so a
+shape cut below the water is a dry pit (owner's choice, 2026-10-08); first person stands on the
+ground under it (`ShapedGlobe.GroundHit`).
 
 **BOD-10 — Flat worlds in relief** · Implemented (M37: PR #93) · Base
 **Intent:** A flat world can have everything a globe has on its surface: sculpted and
@@ -631,8 +633,7 @@ the way round or not at all) fading to mist below the disc; shapes too.
 never below `PlanetSurface.FlatDeepestLift`; `PlanetSurface.UpdateRim` and
 `FlatDiscMeshes.RockLifted` keep the rim meeting the face; `RimWaterfall`,
 `rim_waterfall.gdshader`; `ShapeEdit.FrameOn(radiusKm, BodyShape.FlatDisc)`.
-**Limits:** as on globes, a carved disc isn't raised to the water; the disc's map is stretched
-toward the rim.
+**Limits:** the disc's map is stretched toward the rim.
 
 **BOD-11 — Rivers and lakes** · Implemented (M42: PRs #98–#100; faster: PRs #102–#103) · Base
 **Intent:** Rivers you can draw, or that find their own way downhill from a source until they

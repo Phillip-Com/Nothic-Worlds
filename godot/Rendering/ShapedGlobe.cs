@@ -11,7 +11,8 @@ namespace NothicWorlds.Rendering;
 /// the planet material (its map, terrain, and relief shading); every face a shape makes is bare
 /// rock. Lives under the body's <see cref="PlanetSurface"/>, which hides its own mesh meanwhile.
 /// A flat world (BOD-10) is carved the same way, as a closed disc whose rim and underside the
-/// planet material draws as bare rock.
+/// planet material draws as bare rock. As on the plain globe, the ground is raised to the sea
+/// or a lake wherever that's higher (BOD-09), so a shape cut below the water is a dry pit.
 /// </summary>
 /// <remarks>
 /// <para>Godot re-carves the whole globe whenever anything changes, on the main thread, so the
@@ -66,9 +67,11 @@ public partial class ShapedGlobe : Node3D
     private MeshInstance3D? _preview;
     private MeshInstance3D? _drawn;
     private TriangleMesh? _triangles;  // The drawn carving, for finding where clicks land
+    private TriangleMesh? _groundTriangles;  // ... and with the water taken off, for standing
     private bool _waitingForCarving;
+    private Material? _globeMaterial;
     private (IReadOnlyList<ShapeEdit> Shapes, HeightGrid Heights, double RadiusKm, float Relief,
-        BodyShape Shape)? _built;
+        BodyShape Shape, int? WaterLevel, HeightGrid LakeLevels)? _built;
 
     /// <summary>
     /// The highest an added shape reaches above the body's radius, in radii (0 if none does),
@@ -85,25 +88,34 @@ public partial class ShapedGlobe : Node3D
     /// <param name="reliefScale">How far a meter lifts the drawn surface, in radii.</param>
     /// <param name="globeMaterial">The planet material the globe's own faces keep.</param>
     /// <param name="bodyShape">A globe, or a flat world's disc.</param>
+    /// <param name="waterLevel">The sea's level in meters, or null for none.</param>
+    /// <param name="lakeLevels">
+    /// The lakes' surfaces (see <see cref="PlanetSurface.SetLakeLevels"/>), empty for none.
+    /// </param>
     public void Show(IReadOnlyList<ShapeEdit> shapes, HeightGrid heights, double radiusKm,
-        float reliefScale, Material globeMaterial, BodyShape bodyShape)
+        float reliefScale, Material globeMaterial, BodyShape bodyShape, int? waterLevel,
+        HeightGrid lakeLevels)
     {
         if (_built is { } built && built.Shapes.SequenceEqual(shapes)
             && ReferenceEquals(built.Heights, heights) && built.RadiusKm == radiusKm
-            && built.Relief == reliefScale && built.Shape == bodyShape)
+            && built.Relief == reliefScale && built.Shape == bodyShape
+            && built.WaterLevel == waterLevel && ReferenceEquals(built.LakeLevels, lakeLevels))
         {
             return;
         }
 
-        _built = ([.. shapes], heights, radiusKm, reliefScale, bodyShape);
+        _built = ([.. shapes], heights, radiusKm, reliefScale, bodyShape, waterLevel,
+            lakeLevels);
+        _globeMaterial = globeMaterial;
+        var surface = new CarvedSurface(heights, waterLevel, lakeLevels, reliefScale);
         _combiner?.QueueFree();
         _combiner = new CsgCombiner3D { Name = "Carved", Visible = false };
         _combiner.AddChild(new CsgMesh3D
         {
             Name = "Globe",
             Mesh = bodyShape == BodyShape.FlatDisc
-                ? LiftedDisc(heights, reliefScale, globeMaterial)
-                : LiftedGlobe(heights, reliefScale, globeMaterial),
+                ? LiftedDisc(surface, globeMaterial)
+                : LiftedGlobe(surface, globeMaterial),
         });
 
         HighestTop = 0;
@@ -128,6 +140,7 @@ public partial class ShapedGlobe : Node3D
         _drawn ??= NewDrawnMesh();
         _drawn.Mesh = carved;
         _triangles = carved.GenerateTriangleMesh();
+        _groundTriangles = WaterTakenOff(carved)?.GenerateTriangleMesh() ?? _triangles;
     }
 
     /// <summary>
@@ -136,13 +149,60 @@ public partial class ShapedGlobe : Node3D
     /// </summary>
     public Vector3? RayHit(Vector3 origin, Vector3 direction)
     {
-        if (_triangles is null)
+        return Hit(_triangles, origin, direction);
+    }
+
+    /// <summary>
+    /// As <see cref="RayHit"/>, but with the water taken off: where a ray meets the carved
+    /// ground itself, under any sea or lake, for standing on it.
+    /// </summary>
+    public Vector3? GroundHit(Vector3 origin, Vector3 direction) =>
+        Hit(_groundTriangles, origin, direction);
+
+    private static Vector3? Hit(TriangleMesh? triangles, Vector3 origin, Vector3 direction)
+    {
+        if (triangles is null)
         {
             return null;
         }
 
-        Godot.Collections.Dictionary hit = _triangles.IntersectRay(origin, direction);
+        Godot.Collections.Dictionary hit = triangles.IntersectRay(origin, direction);
         return hit.Count > 0 ? (Vector3)hit["position"] : null;
+    }
+
+    // The carving with each of the globe's own points lowered by how far it was raised to the
+    // water (kept in its first texture coordinate, which carving carries along), or null if
+    // nothing was raised. The shapes' faces are left as they are.
+    private ArrayMesh? WaterTakenOff(ArrayMesh carved)
+    {
+        if (_built is not { } built || (built.WaterLevel is null && built.LakeLevels.IsEmpty))
+        {
+            return null;
+        }
+
+        bool flat = built.Shape == BodyShape.FlatDisc;
+        var ground = new ArrayMesh();
+        for (int index = 0; index < carved.GetSurfaceCount(); index++)
+        {
+            Godot.Collections.Array arrays = carved.SurfaceGetArrays(index);
+            if (carved.SurfaceGetMaterial(index) == _globeMaterial
+                && arrays[(int)Mesh.ArrayType.TexUV].VariantType != Variant.Type.Nil)
+            {
+                Vector3[] points = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+                Vector2[] raised = arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
+                for (int point = 0; point < points.Length; point++)
+                {
+                    Vector3 up = flat ? Vector3.Up : points[point].Normalized();
+                    points[point] -= up * raised[point].X;
+                }
+
+                arrays[(int)Mesh.ArrayType.Vertex] = points;
+            }
+
+            ground.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+        }
+
+        return ground;
     }
 
     private MeshInstance3D NewDrawnMesh()
@@ -153,20 +213,25 @@ public partial class ShapedGlobe : Node3D
     }
 
 
-    // The sculpted globe as a mesh, each vertex lifted by its height (as the shader lifts the
-    // plain one), wearing the planet material.
-    private static ArrayMesh LiftedGlobe(HeightGrid heights, float reliefScale, Material material)
+    // The sculpted globe as a mesh, each vertex lifted by its height or to the water over it
+    // (as the shader lifts the plain one), wearing the planet material. How far the water
+    // raised each vertex is kept in its first texture coordinate (see WaterTakenOff).
+    private static ArrayMesh LiftedGlobe(CarvedSurface surface, Material material)
     {
         Godot.Collections.Array arrays = CubeSphereMesh.For(CarvedDetail).SurfaceGetArrays(0);
         Vector3[] points = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+        var raised = new Vector2[points.Length];
         for (int index = 0; index < points.Length; index++)
         {
             Vector3 point = points[index];
-            double height = heights.SampleAt(new Vector3D(point.X, point.Y, point.Z));
-            points[index] = point * (1.0f + reliefScale * (float)height);
+            (float ground, float water) = surface.LiftAt(new Vector3D(point.X, point.Y, point.Z));
+            float lift = Math.Max(ground, water);
+            points[index] = point * (1.0f + lift);
+            raised[index] = new Vector2(lift - ground, 0);
         }
 
         arrays[(int)Mesh.ArrayType.Vertex] = points;
+        arrays[(int)Mesh.ArrayType.TexUV] = raised;
         var mesh = new ArrayMesh();
         mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
         mesh.SurfaceSetMaterial(0, material);
@@ -178,22 +243,31 @@ public partial class ShapedGlobe : Node3D
     // ground at the south pole, which it all stands for), its rim, and its underside, sharing
     // their edges so CSG can carve it. One surface with the planet material, which draws the
     // rim and underside as bare rock.
-    private static ArrayMesh LiftedDisc(HeightGrid heights, float reliefScale, Material material)
+    private static ArrayMesh LiftedDisc(CarvedSurface surface, Material material)
     {
         float half = (float)FlatDisc.HalfThickness;
         var points = new List<Vector3>();
         var normals = new List<Vector3>();
-        float Lift(Vector3 top) => heights.IsEmpty ? 0 : Math.Max(reliefScale * (float)
-            heights.SampleAt(FlatDisc.DirectionFor(new Vector3D(top.X, 0, top.Z))),
-            PlanetSurface.FlatDeepestLift);
-        int Add(Vector3 point, Vector3 normal)
+        var raised = new List<Vector2>();
+        int Add(Vector3 point, Vector3 normal, float raisedBy = 0)
         {
             points.Add(point);
             normals.Add(normal);
+            raised.Add(new Vector2(raisedBy, 0));
             return points.Count - 1;
         }
 
-        int topMiddle = Add(new Vector3(0, half + Lift(Vector3.Zero), 0), Vector3.Up);
+        // A point of the top face, lifted to the ground or to the water over it.
+        int AddTop(Vector3 top)
+        {
+            (float ground, float water) =
+                surface.LiftAt(FlatDisc.DirectionFor(new Vector3D(top.X, 0, top.Z)));
+            ground = Math.Max(ground, PlanetSurface.FlatDeepestLift);
+            float lift = Math.Max(ground, water);
+            return Add(top + Vector3.Up * (half + lift), Vector3.Up, lift - ground);
+        }
+
+        int topMiddle = AddTop(Vector3.Zero);
         var rings = new int[CarvedRings, CarvedSegments];
         for (int ring = 0; ring < CarvedRings; ring++)
         {
@@ -202,7 +276,7 @@ public partial class ShapedGlobe : Node3D
             {
                 float angle = Mathf.Tau * segment / CarvedSegments;
                 var top = new Vector3(Mathf.Sin(angle) * across, 0, Mathf.Cos(angle) * across);
-                rings[ring, segment] = Add(top + Vector3.Up * (half + Lift(top)), Vector3.Up);
+                rings[ring, segment] = AddTop(top);
             }
         }
 
@@ -238,6 +312,7 @@ public partial class ShapedGlobe : Node3D
         arrays.Resize((int)Mesh.ArrayType.Max);
         arrays[(int)Mesh.ArrayType.Vertex] = points.ToArray();
         arrays[(int)Mesh.ArrayType.Normal] = normals.ToArray();
+        arrays[(int)Mesh.ArrayType.TexUV] = raised.ToArray();
         arrays[(int)Mesh.ArrayType.Index] = indices.ToArray();
         var mesh = new ArrayMesh();
         mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
@@ -353,4 +428,27 @@ public partial class ShapedGlobe : Node3D
 
     private static Vector3 ToGodot(Vector3D vector) =>
         new((float)vector.X, (float)vector.Y, (float)vector.Z);
+
+    // The ground and the water over it, which the carved globe's own faces are lifted to.
+    private readonly record struct CarvedSurface(HeightGrid Heights, int? WaterLevel,
+        HeightGrid LakeLevels, float ReliefScale)
+    {
+        // How far the ground and the water's surface (the sea's or a lake's, whichever is
+        // higher, as in the shader) lift the point at a direction, in radii. The water's lift
+        // is negative infinity where there's none.
+        public (float Ground, float Water) LiftAt(Vector3D direction)
+        {
+            float ground = ReliefScale * (float)Heights.SampleAt(direction);
+            double water = WaterLevel ?? double.NegativeInfinity;
+            if (!LakeLevels.IsEmpty && LakeLevels.HeightAt(direction) is short lake
+                && lake > HeightGrid.MinHeightMeters)
+            {
+                water = Math.Max(water, lake);
+            }
+
+            return (ground, double.IsNegativeInfinity(water)
+                ? float.NegativeInfinity
+                : ReliefScale * (float)water);
+        }
+    }
 }

@@ -685,7 +685,7 @@ public partial class FirstPersonMode : Node
         if (globe.IsCarved)
         {
             var above = new Vector3((float)_spot.X, (float)_spot.Y, (float)_spot.Z);
-            if (globe.CarvedHit(above * 1.5f, -above) is Vector3 hit)
+            if (globe.CarvedGroundHit(above * 1.5f, -above) is Vector3 hit)
             {
                 return hit.Length();
             }
@@ -1150,7 +1150,7 @@ public partial class FirstPersonMode : Node
         if (globe.IsCarved)
         {
             var above = new Vector3((float)topPoint.X, 1, (float)topPoint.Z);
-            return globe.CarvedHit(above, Vector3.Down) is Vector3 hit
+            return globe.CarvedGroundHit(above, Vector3.Down) is Vector3 hit
                 ? hit.Y - FlatDisc.HalfThickness
                 : 0;
         }

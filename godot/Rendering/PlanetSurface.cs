@@ -530,6 +530,11 @@ public partial class PlanetSurface : MeshInstance3D
         }
 
         _shownLakes = levels;
+        if (_carved is not null)
+        {
+            ChooseMesh();  // The carving is raised to the lakes
+        }
+
         UpdateBounds();
     }
 
@@ -851,6 +856,13 @@ public partial class PlanetSurface : MeshInstance3D
         _carved?.RayHit(origin, direction);
 
     /// <summary>
+    /// As <see cref="CarvedHit"/>, but where the ray meets the carved ground itself, under any
+    /// water the globe is drawn raised to: for standing on it.
+    /// </summary>
+    public Vector3? CarvedGroundHit(Vector3 origin, Vector3 direction) =>
+        _carved?.GroundHit(origin, direction);
+
+    /// <summary>
     /// How far a drawn point (in the globe's own space) is above the body's radius, in true km.
     /// The ground under it is drawn with its relief exaggerated and shapes aren't, so the
     /// exaggeration there is taken back out.
@@ -1155,7 +1167,7 @@ public partial class PlanetSurface : MeshInstance3D
             }
 
             _carved.Show(_shapes, _shownHeights, _radiusKm, _reliefScale, SurfaceMaterial,
-                Shape);
+                Shape, _waterLevelMeters, _shownLakes);
         }
         else if (_carved is not null)
         {
