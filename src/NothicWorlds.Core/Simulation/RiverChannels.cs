@@ -94,6 +94,14 @@ public sealed class RiverChannels
         (halfWidthMeters + BankWidthMeters(halfWidthMeters)) * CarveReachPerMeter,
         MinCarveReachMeters, MaxCarveReachMeters);
 
+    /// <summary>
+    /// The farthest from the eye the ground is carved or sunk at all, in meters: a carved
+    /// river's farthest reach, its banks, and the strip's skirt there. Ground farther out is
+    /// the same whichever way the eye has moved.
+    /// </summary>
+    public static double MaxShapedMeters =>
+        (MaxCarveReachMeters * (1 + 1 / CarveReachPerMeter) + MinSkirtMeters) / (1 - SkirtShare);
+
     /// <summary>How far a river's banks may reach out from its water, in meters.</summary>
     public static double BankWidthMeters(double halfWidthMeters) =>
         Math.Min(MaxBankMeters, 20 + halfWidthMeters);

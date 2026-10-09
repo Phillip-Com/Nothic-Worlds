@@ -9,7 +9,7 @@ namespace NothicWorlds.Rendering;
 /// carved up close, ripples and rapids): a strip along each stretch of river in reach (see
 /// <see cref="RiverChannels"/>), as wide as the water between its banks, drawn with
 /// river_water.gdshader, whose ripples flow downstream at the river's speed there and turn
-/// white over rapids. As with <see cref="FirstPersonGround"/>, its positions are kept relative
+/// white over rapids. As with <see cref="GroundTiles"/>, its positions are kept relative
 /// to a point near the eye, so they hold their precision. On a flat world it lies over the top
 /// face, each direction at the point of the face that stands for it.
 /// </summary>

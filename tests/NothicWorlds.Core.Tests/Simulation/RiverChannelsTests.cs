@@ -48,6 +48,20 @@ public sealed class RiverChannelsTests
     }
 
     [Fact]
+    public void BeyondMaxShapedMeters_TheGroundIsNeitherCarvedNorSunk()
+    {
+        RiverChannels channels = Around(Beside(10), reachMeters: 100_000);
+        double Along(double meters) => 0.01 + meters / MetersPerDegree;
+
+        Assert.NotEqual(100, channels.UnderStripMeters(Beside(0, Along(1000)), 100));
+        for (double meters = RiverChannels.MaxShapedMeters; meters < 30_000; meters += 250)
+        {
+            Assert.Equal(100, channels.UnderStripMeters(Beside(0, Along(meters)), 100));
+            Assert.Equal(100, channels.UnderStripMeters(Beside(150, Along(meters)), 100));
+        }
+    }
+
+    [Fact]
     public void FarFromTheEye_TheRiverLiesOnTheGround_Uncarved()
     {
         RiverChannels channels = Around(Beside(10), reachMeters: 100_000);

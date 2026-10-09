@@ -175,8 +175,9 @@ enough on screen).
 **Built:**
 - `Session/AppSettings.cs`: settings that belong to the computer, in `user://settings.cfg`
   (a missing or damaged file gives the defaults).
-- `UI/SettingsWindow.cs`, `Rendering/GraphicsOptions.cs` (the options and presets),
-  `Rendering/GraphicsSettings.cs` (puts them into effect).
+- `UI/SettingsWindow.cs`, `Rendering/GraphicsOptions.cs` (the options and presets, Standing
+  ground detail among them, `REN-06`), `Rendering/GraphicsSettings.cs` (puts
+  them into effect).
 - **Level of detail** (`PlanetSurface.ScreenRadius`, always on): under 200 px a sculpted globe
   uses the Low relief mesh; under 60 px every globe uses a coarse sphere; 15% hysteresis.
 - **High-quality maps** (`Maps/MapQuality`): skips S3TC compression; switching reloads maps
@@ -223,24 +224,38 @@ screen filter; stored per world (format v25); Painterly the default for every wo
 Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 (`WorldSession.SetStyle`, one undo step).
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Owner's choices:** walk or fly; the sky at true size and place with a magnify switch; day and
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
 worlds the same sky across the disc and walking over the rim onto the underside; clouds seen
 from above; a ground-detail texture near the feet (Base tier); choosing where to stand by
 clicking; true heights while standing; switches for fog, clouds, and night vision (owner's
-request, 2026-10-08; night vision as brightened true colors, not green).
+request, 2026-10-08; night vision as brightened true colors, not green); ground that stays put
+as you move, on globes and flat worlds alike, the water's surface built with it, and a
+**Standing ground detail** setting (Low, Standard, High; named so by the owner, 2026-10-09).
 **Built:**
 - Core: `BodyOrientation.ToSystem` / `ShapeToSystem`; `Simulation/SkyView.cs` (`From`,
   `FromFlat`, `SolarTimeHours`, `BodyAt`); `Geometry/FlatWalk.cs` and `GlobeWalk` for moving
   over flat worlds and globes.
 - `Controls/FirstPersonMode.cs`: View ▸ Stand Here… (a click picks the spot, through
   `PinPlacer`), its own camera, Esc back. While standing `SystemView` puts the origin at the eye
-  (`StandingOn`, `StandingEye`) and hides other bodies. The ground is rebuilt at most ten times
-  a second.
-- `Rendering/FirstPersonGround.cs` (rings of mesh around the spot, directions in `CUSTOM0`,
-  drawn with the globe's material) and `Rendering/FlatPatch.cs` (the same on a flat world).
+  (`StandingOn`, `StandingEye`) and hides other bodies. Rivers' channels (they're carved only
+  near the eye) are rebuilt at most ten times a second as it moves.
+- **Ground tiles** (owner's plan, 2026-10-08): Core `Geometry/GroundTile.cs`,
+  `GroundTileGrid` (layout, skirt, morph pairs), `GroundTileSelection` (which tiles, finer near
+  the eye, a parent standing in until all four quarters are built), `GlobeTileSurface` (the six
+  cube faces) and `FlatTopTileSurface` (a flat world's top face). `Rendering/GroundTiles.cs`
+  builds tiles on worker threads from a `GroundTileRecipe` (heights, and the water's over
+  them), keeps 600 for reuse, and joins the drawn ones into one ground mesh and one water mesh
+  (nearest first, also on a worker; 2 draw calls instead of a few hundred). Points morph onto
+  the coarser tile's shape before it takes over (`ground_morph` in `planet_surface.gdshaderinc`,
+  the distance in `CUSTOM1.w`); skirts hide any crack. The tiles are the same at every detail
+  (finest 64 m); `StandingGroundDetail` sets 8, 16, or 32 squares a tile, in the presets too.
+  The joined meshes are packed on the worker the way the engine keeps them
+  (`Rendering/PackedSurface.cs`, checked against the engine's own packing at start), so the
+  main thread only uploads them. The rim and underside of a flat world are still a
+  `Rendering/FlatPatch.cs` of bare rock.
 - `Rendering/SurfaceSky.cs` + `surface_sky.gdshader` (a copy of the environment while standing;
   sky gradient, bodies as lit discs, clouds from the live weather via
   `PlanetSurface.CopyCloudsTo` and `cloud_layer.gdshaderinc`, haze as fog), `cloud_deck.gdshader`
@@ -255,10 +270,16 @@ request, 2026-10-08; night vision as brightened true colors, not green).
   matched to the ground **by its color** (grass, sand, snow, water, rock), placed in double
   precision by `FirstPersonMode.SetGroundDetail`; bumps shade the color rather than tilt the
   normal.
-**Reuse:** `SkyView` for anything about what's in a world's sky; `FirstPersonGround.Build` for
-any shell around the eye (the cloud deck and water use it).
+**Reuse:** `SkyView` for anything about what's in a world's sky; `GroundTiles` for anything
+drawn at the ground's height around the eye (give it a recipe); `FirstPersonGround.Build` for a
+shell at a set height (the cloud deck).
 **Limits:** the ground from eye level is only as sharp as the map (an 8k map is about 5 km a
-pixel on an Earth-sized planet).
+pixel on an Earth-sized planet). Rivers' channels still depend on where the eye is, so tiles
+within about 6 km of a river are rebuilt as it walks (PR 3 of the standing-view plan changes
+that). On arriving, or after a big climb, the ground sharpens over about 1–2 s, coarser
+ground standing in meanwhile; handing over the joined tiles takes the main thread about 5–12
+ms on Standard and 15–30 ms on High (up to ~100 ms at worst), at most five times a second
+while moving fast.
 
 **REN-07 — Designed night skies** · Implemented (M34: PR #90) · Base
 **Intent:** Each world has its own fixed night sky that the user designs: the stars stay put
@@ -633,8 +654,8 @@ beneath it in first person looks like being underwater (owner's request, 2026-10
 with depth; over land it's a standard blue-green.
 **Built:** `Body.WaterLevelMeters` (format v30), `WorldSession.SetWater`. From orbit the globe is
 lifted to the water in `planet_surface.gdshaderinc` (colors in `water_tint.gdshaderinc`,
-`PlanetSurface.SetTerrainColors`); from the ground a `FirstPersonGround` at the water's radius
-with `water_surface.gdshader`. Underwater: murk (`SurfaceSky.ShowUnderwater`), a wavering tint
+`PlanetSurface.SetTerrainColors`); from the ground the water's surface on the ground tiles
+(`GroundTiles`) with `water_surface.gdshader`. Underwater: murk (`SurfaceSky.ShowUnderwater`), a wavering tint
 (`UnderwaterView`, `underwater.gdshader`), and light ripples (`caustics`).
 A globe or disc carved by shapes (`ShapedGlobe`) is raised to the water before carving, so a
 shape cut below the water is a dry pit (owner's choice, 2026-10-08); first person stands on the
