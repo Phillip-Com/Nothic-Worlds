@@ -77,8 +77,7 @@ public partial class RiverWater : MeshInstance3D
                 Vector3 normal = ToGodot(up).Normalized();
 
                 // Between the banks: wider than the bed, as they slope out.
-                double half = point.HalfWidthMeters + TuckMeters
-                    + Math.Max(0, point.SurfaceMeters - point.BedMeters) / RiverCarving.BankSlope;
+                double half = point.WaterHalfWidthMeters + TuckMeters;
                 float u = (float)(origin + point.AlongMeters - start);
                 var color = new Color((float)(point.FlowMetersPerSecond
                     / RiverProfile.MaxFlow), (float)point.Rapids, 0, 1);

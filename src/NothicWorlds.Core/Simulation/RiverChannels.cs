@@ -110,6 +110,7 @@ public sealed class RiverChannels
             direction,
             Lerp(river.AlongMeters[i - 1], river.AlongMeters[i], t),
             Lerp(river.HalfWidthMeters[i - 1], river.HalfWidthMeters[i], t),
+            Lerp(river.WaterHalfWidthMeters[i - 1], river.WaterHalfWidthMeters[i], t),
             Lerp(river.WaterMeters[i - 1], river.WaterMeters[i], t),
             Lerp(river.BedMeters[i - 1], river.BedMeters[i], t),
             Lerp(river.FlowMetersPerSecond[i - 1], river.FlowMetersPerSecond[i], t),

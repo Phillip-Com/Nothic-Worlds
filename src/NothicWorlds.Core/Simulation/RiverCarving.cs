@@ -4,8 +4,9 @@ namespace NothicWorlds.Core.Simulation;
 
 /// <summary>
 /// The channels rivers cut into the ground (VISION.md BOD-11; owner's choices: carved at every
-/// distance, following the ground): a bed as wide as each river, with banks rising at
-/// <see cref="BankSlope"/> to meet the ground. It depends only on the rivers, not on where an
+/// distance, following the ground): a bed as wide as each river, with banks rising to its
+/// water's edges (more steeply where its bed is set deeper) and on at <see cref="BankSlope"/>
+/// to meet the ground. It depends only on the rivers, not on where an
 /// eye is, so ground built with it stays right however the eye moves. The channels are drawn
 /// finely by a strip along each river (<see cref="RiverBanks"/>); the coarser ground under it
 /// is also sunk out of sight (<see cref="UnderStripNear"/>), by more where its cells are wider,
@@ -95,12 +96,13 @@ public sealed class RiverCarving
     }
 
     // The ground carved by the segments given, and sunk (with cells `cellMeters` wide) under
-    // the strip.
+    // the strip: by more under banks steeper than BankSlope below the water, which its cells'
+    // flat faces would otherwise poke through.
     private double Shape(List<(int River, int Segment)> near, Vector3D direction,
         double groundMeters, double? cellMeters)
     {
         double fade = cellMeters is double cell ? SinkReachMeters(cell) : 0;
-        double carved = groundMeters, cover = 0;
+        double carved = groundMeters, cover = 0, steeper = 0;
         foreach ((int r, int s) in near)
         {
             RiverProfile river = _rivers[r];
@@ -109,7 +111,9 @@ public sealed class RiverCarving
             double beyond = away - halfWidth - BankWidthMeters(halfWidth);
             if (fade > 0)
             {
-                cover = Math.Max(cover, Math.Clamp(1 - beyond / fade, 0, 1));
+                double covered = Math.Clamp(1 - beyond / fade, 0, 1);
+                cover = Math.Max(cover, covered);
+                steeper = Math.Max(steeper, covered * DeeperThanSlope(river, s, t, halfWidth));
             }
 
             if (beyond > 0)
@@ -117,14 +121,40 @@ public sealed class RiverCarving
                 continue;
             }
 
-            double bank = Lerp(river.BedMeters[s], river.BedMeters[s + 1], t)
-                + Math.Max(0, away - halfWidth) * BankSlope;
-            carved = Math.Min(carved, bank);
+            carved = Math.Min(carved, Across(river, s, t, away, halfWidth));
         }
 
         return cellMeters is double width
-            ? carved - cover * (MinSinkMeters + SinkPerCell * width)
+            ? carved - cover * (MinSinkMeters + SinkPerCell * width) - steeper
             : carved;
+    }
+
+    // How much deeper a river's bed is, `t` of the way along segment s, than banks rising at
+    // BankSlope from it to its water's edges would make it, in meters (0 for Auto's depth).
+    private static double DeeperThanSlope(RiverProfile river, int s, double t, double halfWidth)
+    {
+        double bed = Lerp(river.BedMeters[s], river.BedMeters[s + 1], t);
+        double water = Lerp(river.WaterMeters[s], river.WaterMeters[s + 1], t);
+        double edge = Lerp(river.WaterHalfWidthMeters[s], river.WaterHalfWidthMeters[s + 1], t);
+        return Math.Max(0, water - bed - (edge - halfWidth) * BankSlope);
+    }
+
+    // The height of a river's channel `away` meters from its middle, `t` of the way along
+    // segment s: its bed, then a bank rising to its water's edge and on at BankSlope.
+    private static double Across(RiverProfile river, int s, double t, double away,
+        double halfWidth)
+    {
+        double bed = Lerp(river.BedMeters[s], river.BedMeters[s + 1], t);
+        if (away <= halfWidth)
+        {
+            return bed;
+        }
+
+        double water = Lerp(river.WaterMeters[s], river.WaterMeters[s + 1], t);
+        double edge = Lerp(river.WaterHalfWidthMeters[s], river.WaterHalfWidthMeters[s + 1], t);
+        return away >= edge || edge <= halfWidth
+            ? water + (away - edge) * BankSlope
+            : bed + (water - bed) * (away - halfWidth) / (edge - halfWidth);
     }
 
     // How far a unit direction is from the segment between two others, in meters, and how far

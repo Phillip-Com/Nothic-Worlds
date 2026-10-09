@@ -88,10 +88,12 @@ public sealed class BodyWater
         {
             courses.Add(river.Kind == RiverKind.Drawn
                 ? new RiverCourseShown(river.Id, null, RiverKind.Drawn, river.WidthKm,
-                    [.. river.Points.Select(SphericalPolygon.ToUnit)], ReachesWater: true)
+                    [.. river.Points.Select(SphericalPolygon.ToUnit)], ReachesWater: true,
+                    river.Depth)
                 : Natural(river.Id, null, river.WidthKm,
                     RiverCourse.Trace(ground, SphericalPolygon.ToUnit(river.Points[0]),
-                        IsWater)));
+                        IsWater)) with
+                { Depth = river.Depth });
         }
 
         foreach (Lake each in lakes.Where(l => l.BodyId == body.Id && l.FlowsOut))

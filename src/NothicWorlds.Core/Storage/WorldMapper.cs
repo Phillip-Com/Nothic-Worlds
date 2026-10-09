@@ -193,6 +193,11 @@ internal static class WorldMapper
             Points = [.. river.Points
                 .Select(p => (double[]?)[p.LatitudeDegrees, p.LongitudeDegrees])],
             Width = river.WidthKm == 1 ? null : river.WidthKm,
+            Depth = river.Depth.MouthMeters,
+            DepthVariation = river.Depth.VariationMeters == 0 ? null
+                : river.Depth.VariationMeters,
+            DepthSpacing = river.Depth.SpacingKm == 1 ? null : river.Depth.SpacingKm,
+            DepthSmoothness = river.Depth.Smoothness == 1 ? null : river.Depth.Smoothness,
         };
     }
 
@@ -210,6 +215,8 @@ internal static class WorldMapper
             Kind = WorldFormat.ParseRiverKind(document.Kind),
             Points = [.. document.Points.Select(p => new GeoCoordinate(p![0], p[1]))],
             WidthKm = document.Width ?? 1,
+            Depth = new RiverDepth(document.Depth, document.DepthVariation ?? 0,
+                document.DepthSpacing ?? 1, document.DepthSmoothness ?? 1),
         };
     }
 

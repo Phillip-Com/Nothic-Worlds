@@ -98,6 +98,10 @@ internal sealed class RiverDocument
     public required string Kind { get; init; }
     public required List<double[]?> Points { get; init; }  // [latitude, longitude] each
     public double? Width { get; init; }  // Omitted when 1 km
+    public double? Depth { get; init; }  // Added in format version 32; omitted for Auto
+    public double? DepthVariation { get; init; }  // Version 32; omitted for 0
+    public double? DepthSpacing { get; init; }  // Version 32; omitted when 1 km
+    public double? DepthSmoothness { get; init; }  // Version 32; omitted when 1
 }
 
 internal sealed class LakeDocument

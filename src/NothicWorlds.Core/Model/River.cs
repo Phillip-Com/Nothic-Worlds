@@ -42,6 +42,9 @@ public sealed record River
     /// <summary>How wide it is at its mouth, in km.</summary>
     public double WidthKm { get; init; } = 1;
 
+    /// <summary>How deep it is, and how its bed rises and falls.</summary>
+    public RiverDepth Depth { get; init; } = RiverDepth.Auto;
+
     /// <summary>What's wrong with this river on its own, or null if nothing.</summary>
     public string? Problem()
     {
@@ -63,15 +66,19 @@ public sealed record River
                 : "a natural river needs exactly one source";
         }
 
-        return double.IsFinite(WidthKm) && WidthKm is >= MinWidthKm and <= MaxWidthKm
-            ? null
-            : $"a river is {MinWidthKm} to {MaxWidthKm} km wide";
+        if (!(double.IsFinite(WidthKm) && WidthKm is >= MinWidthKm and <= MaxWidthKm))
+        {
+            return $"a river is {MinWidthKm} to {MaxWidthKm} km wide";
+        }
+
+        return Depth is null ? "a river needs a depth" : Depth.Problem();
     }
 
     /// <inheritdoc />
     public bool Equals(River? other) =>
         other is not null && Id == other.Id && BodyId == other.BodyId && Name == other.Name
-        && Kind == other.Kind && WidthKm == other.WidthKm && Points.SequenceEqual(other.Points);
+        && Kind == other.Kind && WidthKm == other.WidthKm && Depth == other.Depth
+        && Points.SequenceEqual(other.Points);
 
     /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(Id, Name, Kind, WidthKm, Points.Count);
