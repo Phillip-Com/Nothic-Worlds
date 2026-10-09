@@ -721,6 +721,28 @@ the ground's squares there isn't cut into them (it's thinner than a pixel by the
 bed is spread over one of the profile's steps (an eighth of its spacing, at least 50 m), so the
 sharpest "weirs" are short ramps.
 
+**BOD-12 — Rough terrain up close** · Implemented (PR #114) · Base
+**Intent:** Each terrain type can be rough up close: jagged rock, crags, and uneven ground
+below the 10 km grid, set per type and made when the ground is drawn, so standing on a
+mountain looks like a mountain (owner's request, 2026-10-08).
+**Owner's choices:** a Roughness of 0–100% of the type's own Variation (0 is the smooth look
+from before); new worlds' default types start rough (Mountains 70%, Hills and Ice 50%, Desert
+and Tundra 40%, Plains, Fields, Forest, Jungle and Ocean 30%, Swamp and Shallow Water 15%),
+existing worlds' stay at 0; it fades out near rivers, which run in smooth valleys.
+**Built:** `TerrainType.Roughness` (format v33). Core `Model/TerrainRoughness.cs` (the type's
+`TerrainNoise` layers carried on below the grid, down to 20 m; **its output must never
+change**, recipe in docs/world-format.md) and `Model/RoughGround.cs` (blended between cells'
+types like heights; only where the terrain shapes the ground); `RiverCarving.BeyondBanksMeters`
+(each feature fades within its own size of a river). `PlanetSurface.GroundLiftAt` adds it, so
+tiles, walking, water and flat worlds follow it; `SmoothGroundLiftAt` for river profiles.
+Each ground tile shows features down to two of its squares, fewer far off
+(`FirstPersonMode.SmallestFeature`), and morphs toward its parent's ground as the parent
+builds it (`GroundTileRecipe.MorphHeight`). The session keeps each body's (`RoughFor`).
+`UI/TerrainPanel.cs`: the Roughness slider, off with a reason for a level type.
+**Limits:** from orbit nothing changes (the features are smaller than the globe draws), and
+far off (from about 5 km, none past 15 km) the features thin out so the tiles meet the globe's
+own ground. A type with no variation can't be rough.
+
 ### 4.5 Orbits & Simulation (`SIM`)
 
 **SIM-01 — Designed ("on-rails") orbits** · Implemented (M4; edited in the System panel) · Base
