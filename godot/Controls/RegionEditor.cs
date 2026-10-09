@@ -66,6 +66,12 @@ public partial class RegionEditor : CanvasLayer
     /// <summary>The region whose points are being edited, or null.</summary>
     public Guid? EditingRegionId => _editingRegionId;
 
+    /// <summary>
+    /// Whether clicks and drags on the globe draw and edit (the Regions panel's Tool switch);
+    /// while off they turn the view, and drawing or editing waits where it was.
+    /// </summary>
+    public bool ToolOn { get; set; } = true;
+
     /// <summary>True while a new outline is being drawn.</summary>
     public bool IsDrawing => _drawingBodyId is not null;
 
@@ -177,7 +183,8 @@ public partial class RegionEditor : CanvasLayer
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (!Visible || (!IsDrawing && _editingRegionId is null))
+        if (!Visible || (!IsDrawing && _editingRegionId is null)
+            || (!ToolOn && @event is InputEventMouse))
         {
             return;
         }

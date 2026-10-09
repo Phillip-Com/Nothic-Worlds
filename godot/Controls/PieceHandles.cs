@@ -67,8 +67,10 @@ public partial class PieceHandles : CanvasLayer
         Point,
     }
 
-    // Handles work only while the Map panel shows (it hides during calibration and cutting).
-    private bool IsActive => Panel is { Visible: true } && Session is { IsBusy: false };
+    // Handles work only while the Map panel shows (it hides during calibration and cutting)
+    // with its Tool switch on.
+    private bool IsActive => Panel is { Visible: true, IsToolOn: true }
+        && Session is { IsBusy: false };
 
     public override void _Ready()
     {

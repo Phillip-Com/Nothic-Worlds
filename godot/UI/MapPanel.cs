@@ -35,6 +35,7 @@ public partial class MapPanel : CanvasLayer
     private OptionButton _gridStep = null!;
 
     private Label _heading = null!;
+    private ToolSwitch? _toolSwitch;
     private Button _cutMapButton = null!;
     private Button _cutImageButton = null!;
     private ItemList _list = null!;
@@ -84,6 +85,12 @@ public partial class MapPanel : CanvasLayer
 
     /// <summary>Whether dragged pieces snap to the grid (VISION.md MAP-02).</summary>
     public bool IsSnapping => _snap.ButtonPressed;
+
+    /// <summary>
+    /// Whether the pieces' handles take drags on the globe (the Tool switch); while off, drags
+    /// turn the view.
+    /// </summary>
+    public bool IsToolOn => _toolSwitch?.IsOn ?? true;
 
     /// <summary>
     /// True while the selected piece shows a handle on every point of its cut (Edit Points),
@@ -145,6 +152,9 @@ public partial class MapPanel : CanvasLayer
         scroll.AddChild(layout);
         PanelStyle.FitHeight(panel, layout, TopOffset, BottomOffset);
 
+        _toolSwitch = new ToolSwitch();
+        _toolSwitch.Toggled += _ => ShowHint();
+        layout.AddChild(_toolSwitch);
         _mapImage = new MapImageSection
         {
             Session = Session,
@@ -384,6 +394,10 @@ public partial class MapPanel : CanvasLayer
         }
 
         _heading.Text = $"Map Pieces ({_listed.Count} of {SurfaceSettings.MaxPieces})";
+        _toolSwitch?.SetUnavailable(!Session.SelectedBodyHasSurface ? DisabledTip.NoSurface
+            : _listed.Count == 0
+                ? "There are no pieces to drag yet: Cut from Map… or Cut from Image… makes one"
+                : null);
         bool full = _listed.Count >= SurfaceSettings.MaxPieces;
         string? cantCut = !Session.SelectedBodyHasSurface ? DisabledTip.NoSurface
             : Session.IsBusy ? DisabledTip.Busy
@@ -536,6 +550,11 @@ public partial class MapPanel : CanvasLayer
         {
             return "Import Map… wraps your map image around the planet. Cut from Image… " +
                 "places a piece of another picture on it.";
+        }
+
+        if (_listed.Count > 0 && _toolSwitch is { ButtonPressed: false })
+        {
+            return ToolSwitch.OffHint;
         }
 
         return _listed.Count == 0

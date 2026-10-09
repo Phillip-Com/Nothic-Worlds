@@ -23,6 +23,7 @@ public partial class RegionsPanel : CanvasLayer
     private const float PanelWidth = 340.0f;
 
     private Label _heading = null!;
+    private ToolSwitch _toolSwitch = null!;
     private Label _noRegions = null!;
     private ItemList _list = null!;
     private Button _newButton = null!;
@@ -110,6 +111,17 @@ public partial class RegionsPanel : CanvasLayer
         scroll.AddChild(layout);
         _heading = new Label();
         layout.AddChild(_heading);
+        _toolSwitch = new ToolSwitch();
+        _toolSwitch.Toggled += on =>
+        {
+            if (Editor is not null)
+            {
+                Editor.ToolOn = on;
+            }
+
+            ShowHint();
+        };
+        layout.AddChild(_toolSwitch);
         _noRegions = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         layout.AddChild(_noRegions);
         // A fixed height, so New Region sits right under it rather than at the bottom.
@@ -305,6 +317,7 @@ public partial class RegionsPanel : CanvasLayer
         _noRegions.Text = !canHaveRegions ? "Stars and comets have no regions."
             : regions.Count == 0 ? "No regions yet: New Region draws one." : "";
         _noRegions.Visible = _noRegions.Text != "";
+        _toolSwitch.SetUnavailable(canHaveRegions ? null : DisabledTip.NoSurface);
         _newButton.Disabled = !canHaveRegions;
         _newButton.TooltipText = canHaveRegions
             ? NewRegionTip
@@ -435,6 +448,7 @@ public partial class RegionsPanel : CanvasLayer
             : !Session!.SelectedBodyHasSurface
                 ? "Select a planet or moon to outline regions on it: click it, or choose it in " +
                     "the System panel."
+                : _toolSwitch is { ButtonPressed: false } ? ToolSwitch.OffHint
                 : "New Region, then click corners around it on the globe. Choose a region in " +
                     "the list to rename, recolor, or reshape it.");
     }
