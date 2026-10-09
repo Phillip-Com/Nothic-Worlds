@@ -46,6 +46,19 @@ public sealed class RiverCarvingTests
     }
 
     [Fact]
+    public void BeyondBanks_MeasuresFromTheBanksOut()
+    {
+        int middle = _river.Points.Count / 2;
+        double halfWidth = _river.HalfWidthMeters[middle];
+        double reach = halfWidth + RiverCarving.BankWidthMeters(halfWidth);
+
+        Assert.Equal(0, _carving.BeyondBanksMeters(Beside(0), 10_000));
+        Assert.Equal(0, _carving.BeyondBanksMeters(Beside(reach - 1), 10_000));
+        Assert.Equal(500, _carving.BeyondBanksMeters(Beside(reach + 500), 10_000), 0);
+        Assert.Equal(2_000, _carving.BeyondBanksMeters(Beside(reach + 5_000), 2_000));
+    }
+
+    [Fact]
     public void ADeeperBed_KeepsTheBanksAboveTheWater_SteeperBelowIt()
     {
         RiverProfile deep = DeepRiver();

@@ -42,6 +42,10 @@ public partial class FirstPersonMode : Node
     // GROUND_DETAIL_METERS and PATTERN_NOISE_SIZE in planet_surface.gdshaderinc.
     private const double GroundDetailMeters = 4;
     private const double GroundNoiseRepeat = 32;
+
+    // How quickly rough terrain's features thin out on wider squares, farther off (see
+    // SmallestFeature), in meters.
+    private const double FarRoughMeters = 40;
     private const float FieldOfViewDegrees = 70;
 
     // How much of the ground built around the eye the globe's own mesh leaves unraised by
@@ -962,6 +966,7 @@ public partial class FirstPersonMode : Node
         if (courses.Count == 0)
         {
             _profiles = null;
+            FadeRoughness(globe, null, body.RadiusKm);
             return null;
         }
 
@@ -972,13 +977,32 @@ public partial class FirstPersonMode : Node
             var profiles = new RiverProfile?[courses.Count];
             Parallel.For(0, courses.Count, i => profiles[i] = RiverProfile.For(courses[i],
                 body.RadiusKm,
-                direction => globe.GroundLiftAt(direction, body.RadiusKm) * radiusMeters));
+                direction => globe.SmoothGroundLiftAt(direction, body.RadiusKm) * radiusMeters));
             List<RiverProfile> rivers = [.. profiles.OfType<RiverProfile>()];
-            _profiles = (courses, globe.ReliefVersion, rivers,
-                RiverCarving.For(rivers, body.RadiusKm));
+            var carving = RiverCarving.For(rivers, body.RadiusKm);
+            _profiles = (courses, globe.ReliefVersion, rivers, carving);
+            FadeRoughness(globe, carving, body.RadiusKm);
         }
 
         return _profiles.Value.Rivers;
+    }
+
+    // Fades rough terrain's fine relief out toward the rivers carved (none: kept everywhere;
+    // VISION.md BOD-12), so they run in smooth valleys. Rough ground near them changes with
+    // them, so then every tile's built again.
+    private void FadeRoughness(PlanetSurface globe, RiverCarving? carving, double radiusKm)
+    {
+        Func<Vector3D, double>? riverMeters = null;
+        if (carving is { IsEmpty: false })
+        {
+            double reach = TerrainRoughness.RiverReachMeters(radiusKm);
+            riverMeters = direction => carving.BeyondBanksMeters(direction, reach);
+        }
+
+        if (globe.SetRiverDistance(riverMeters) && globe.IsRough)
+        {
+            _tileHeights++;
+        }
     }
 
     // How high the coarser ground around the eye is built on a tile (see Recipes), in meters
@@ -988,7 +1012,7 @@ public partial class FirstPersonMode : Node
     // direction a base point stands for. Safe off the main thread (tiles are built on workers).
     private static Func<Vector3D, double>? CarvedTile(RiverCarving carving, GroundTiles tiles,
         PlanetSurface globe, GroundTile tile, double radiusKm,
-        Func<Vector3D, Vector3D> toDirection)
+        Func<Vector3D, Vector3D> toDirection, double smallestMeters)
     {
         // The ball around the tile's directions (a little more, as the edges between its
         // corners and middles bulge), and the width of its squares there, in meters.
@@ -1012,10 +1036,33 @@ public partial class FirstPersonMode : Node
             {
                 Vector3D direction = toDirection(point);
                 return under(direction,
-                    (globe.GroundRadiusAt(direction, radiusKm) - 1) * radiusMeters);
+                    globe.GroundLiftAt(direction, radiusKm, smallestMeters) * radiusMeters);
             }
         : null;
     }
+
+    // The smallest features of rough terrain (VISION.md BOD-12) worth building into a tile,
+    // and into its parent (twice as coarse), in meters (see SmallestFeature). `toDirection`
+    // gives the direction a base point stands for.
+    private static (double Own, double Parent) SmallestFeatures(GroundTiles tiles,
+        GroundTile tile, double radiusKm, Func<Vector3D, Vector3D> toDirection)
+    {
+        Vector3D corner = tiles.BasePoint(tile, 0, 0), across = tiles.BasePoint(tile, 1, 0);
+        double flat = (across - corner).Length;
+        double round = (toDirection(across) - toDirection(corner)).Length;
+        double cellMeters = tiles.CellWidth(tile) * radiusKm * 1000 * round
+            / Math.Max(flat, 1e-15);
+        return (SmallestFeature(cellMeters), SmallestFeature(2 * cellMeters));
+    }
+
+    // The smallest rough features built into ground with squares this wide: at least two
+    // squares across, as finer ones would only shimmer; and far fewer on the widest squares,
+    // far off, so the tiles' outer edge (squares over a kilometer wide) meets the globe's own
+    // ground beyond it, which has none, without a ledge. About 30 m features 200 m away, 4 km
+    // ones 5 km away, and none past 15 km or so.
+    private static double SmallestFeature(double cellMeters) =>
+        Math.Max(TerrainRoughness.FinestMeters,
+            Math.Max(2 * cellMeters, cellMeters * cellMeters / FarRoughMeters));
 
     // How far out the drawn ground is at a direction, in radii, with the rivers' channels
     // cut into it.
@@ -1032,13 +1079,17 @@ public partial class FirstPersonMode : Node
     }
 
     // The height the water's surface is built at, in radii above the base: the water's,
-    // where it stands above the ground (before rivers' channels are cut: those hold the
-    // river's water, not the sea's), else out of sight just under the drawn ground (`under`:
-    // carved, and sunk under rivers' banks) on a tile with squares `cell` radii across.
-    private static double WaterOrUnder(double? water, double ground, double under,
+    // where it stands above the `ground` (before rivers' channels are cut: those hold the
+    // river's water, not the sea's; given the smallest rough features the tile shows, and
+    // worked out only where there's water), else out of sight just under the drawn ground
+    // (`under`: carved, and sunk under rivers' banks) on a tile with squares `cell` radii
+    // across. The drawn ground is never above the ground, so where the water is below it,
+    // the ground isn't needed.
+    private static double WaterOrUnder(double? water, Func<double, double> ground, double under,
         double cell, double radiusMeters)
     {
-        if (water is double level && level > ground)
+        if (water is double level && level > under
+            && level > ground(SmallestFeature(cell * radiusMeters)))
         {
             return level;
         }
@@ -1158,14 +1209,16 @@ public partial class FirstPersonMode : Node
         tiles.GroundMaterial = globe.MaterialOverride;
         SetGroundRadius(globe.MaterialOverride, radiusMeters);
         Func<GroundTile, TileExtent, GroundTileRecipe> recipes = Recipes(globe,
-            direction => globe.GroundRadiusAt(direction, body.RadiusKm),
-            (carving, tile) => CarvedTile(carving, tiles, globe, tile, body.RadiusKm,
-                direction => direction) is { } carved
+            (_, smallest) => direction =>
+                globe.GroundRadiusAt(direction, body.RadiusKm, smallest),
+            (carving, tile, smallest) => CarvedTile(carving, tiles, globe, tile, body.RadiusKm,
+                direction => direction, smallest) is { } carved
                 ? direction => 1 + carved(direction) / radiusMeters
                 : null,
+            tile => SmallestFeatures(tiles, tile, body.RadiusKm, direction => direction),
             (direction, under, cell) => WaterOrUnder(globe.WaterRadiusAt(direction) - 1,
-                globe.GroundRadiusAt(direction, body.RadiusKm) - 1, under - 1, cell,
-                radiusMeters) + 1);
+                smallest => globe.GroundLiftAt(direction, body.RadiusKm, smallest), under - 1,
+                cell, radiusMeters) + 1);
         tiles.Update(_spot * (ground + height), _spot, outer, RecipesVersion(globe), recipes);
         if (_nearEyeDue && tiles.HasGround)
         {
@@ -1261,25 +1314,37 @@ public partial class FirstPersonMode : Node
     // with water. The channels don't depend on where the eye is, so these tiles are kept like
     // any other, and built again only when the ground or the rivers change.
     private Func<GroundTile, TileExtent, GroundTileRecipe> Recipes(PlanetSurface globe,
-        Func<Vector3D, double> plain,
-        Func<RiverCarving, GroundTile, Func<Vector3D, double>?> carved,
+        Func<GroundTile, double, Func<Vector3D, double>> plain,
+        Func<RiverCarving, GroundTile, double, Func<Vector3D, double>?> carved,
+        Func<GroundTile, (double Own, double Parent)> smallest,
         Func<Vector3D, double, double, double> water)
     {
         Func<Vector3D, double, double, double>? waterOver =
             globe.WaterRadius is not null || globe.HasLakes ? water : null;
         long stamp = _tileHeights << 32;
-        var plainRecipe = new GroundTileRecipe(stamp, plain, waterOver);
-        if (_profiles is not { Carving: { IsEmpty: false } carving })
-        {
-            return (_, _) => plainRecipe;
-        }
+        RiverCarving? carving = _profiles is { Carving: { IsEmpty: false } some } ? some : null;
+        bool rough = globe.IsRough;
 
-        // Which rivers come near a tile is found when it's built, on a worker.
+        // Rough terrain shows finer detail on finer tiles (BOD-12), so each tile morphs toward
+        // its parent's ground as the parent builds it. Which rivers come near a tile is found
+        // when it's built, on a worker.
         return (tile, _) =>
         {
-            Func<Vector3D, double>? height = null;
-            return new GroundTileRecipe(stamp,
-                point => (height ??= carved(carving, tile) ?? plain)(point), waterOver);
+            (double own, double parent) = rough ? smallest(tile) : (0, 0);
+            Func<Vector3D, double> HeightWith(double finest)
+            {
+                if (carving is null)
+                {
+                    return plain(tile, finest);
+                }
+
+                Func<Vector3D, double>? height = null;
+                return point =>
+                    (height ??= carved(carving, tile, finest) ?? plain(tile, finest))(point);
+            }
+
+            return new GroundTileRecipe(stamp, HeightWith(own), waterOver,
+                rough && parent != own ? HeightWith(parent) : null);
         };
     }
 
@@ -1381,16 +1446,18 @@ public partial class FirstPersonMode : Node
             SetGroundRadius(globe.MaterialOverride, radiusMeters);
             double radiusKm = body.RadiusKm;
             Func<GroundTile, TileExtent, GroundTileRecipe> recipes = Recipes(globe,
-                point => FlatGroundLift + FlatGroundAt(globe, point, radiusKm),
-                (carving, tile) => CarvedTile(carving, tiles, globe, tile, radiusKm,
-                    FlatDisc.DirectionFor) is { } carved
+                (_, smallest) => point =>
+                    FlatGroundLift + FlatGroundAt(globe, point, radiusKm, smallest),
+                (carving, tile, smallest) => CarvedTile(carving, tiles, globe, tile, radiusKm,
+                    FlatDisc.DirectionFor, smallest) is { } carved
                     ? point => FlatGroundLift + Math.Max(carved(point) / radiusMeters,
                         PlanetSurface.FlatDeepestLift)
                     : null,
+                tile => SmallestFeatures(tiles, tile, radiusKm, FlatDisc.DirectionFor),
                 (point, under, cell) => FlatGroundLift + Math.Max(WaterOrUnder(
                         globe.WaterRadiusAt(FlatDisc.DirectionFor(point)) - 1,
-                        FlatGroundAt(globe, point, radiusKm), under - FlatGroundLift, cell,
-                        radiusMeters),
+                        smallest => FlatGroundAt(globe, point, radiusKm, smallest),
+                        under - FlatGroundLift, cell, radiusMeters),
                     PlanetSurface.FlatDeepestLift));
             tiles.Update(eye, FlatWalk.Point(flat), outer, RecipesVersion(globe), recipes);
             if (_nearEyeDue && tiles.HasGround)
@@ -1433,7 +1500,8 @@ public partial class FirstPersonMode : Node
     // How far the drawn ground is lifted at a point of a flat world's top face, in radii: on
     // a disc carved by shapes (VISION.md BOD-10), the carving straight below (the face's own
     // height where a hole goes right through).
-    private static double FlatGroundAt(PlanetSurface globe, Vector3D topPoint, double radiusKm)
+    private static double FlatGroundAt(PlanetSurface globe, Vector3D topPoint, double radiusKm,
+        double smallestMeters = TerrainRoughness.FinestMeters)
     {
         if (globe.IsCarved)
         {
@@ -1443,7 +1511,7 @@ public partial class FirstPersonMode : Node
                 : 0;
         }
 
-        return globe.GroundRadiusAt(FlatDisc.DirectionFor(topPoint), radiusKm) - 1;
+        return globe.GroundLiftAt(FlatDisc.DirectionFor(topPoint), radiusKm, smallestMeters);
     }
 
     // How far the drawn ground is lifted at a point of a flat world's top face, in radii,

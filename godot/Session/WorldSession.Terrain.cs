@@ -23,6 +23,10 @@ public partial class WorldSession
     private readonly Dictionary<Guid, (HeightGrid Base, HeightGrid Sculpted, HeightGrid Shaped)>
         _shownGround = [];
 
+    // Each body's rough terrain's fine relief (see RoughFor), kept with what it came from.
+    private readonly Dictionary<Guid, (TerrainGrid Terrain, TerrainType[] Types,
+        double RadiusKm, bool Shaping, RoughGround? Rough)> _roughGround = [];
+
     // While a stroke paints, when each body's ground last went to its globe, and the bodies
     // whose newest ground hasn't yet (see ShowPainting).
     private const double ReshapeSeconds = 0.5;
@@ -306,6 +310,8 @@ public partial class WorldSession
         _detailWaiting.Remove(body.Id);
         surface.SetTerrain(terrain);
         surface.SetHeights(shown);
+        surface.SetRoughness(RoughFor(body.Id, terrain, [.. World.TerrainTypes], body.RadiusKm,
+            World.TerrainShapesGround));
         _reshapeWaiting.Remove(body.Id);
         ShowWater(body);  // The ground under the rivers and lakes may have changed.
     }
@@ -390,6 +396,30 @@ public partial class WorldSession
         _shownGround[body.Id] = (under, sculpted, shown);
         return shown;
     }
+
+    // A body's rough terrain's fine relief up close (VISION.md BOD-12), where its terrain shapes
+    // the ground: the same as last time unless the terrain, or how rough the types make it,
+    // has changed, so its globe's ground isn't rebuilt for nothing.
+    private RoughGround? RoughFor(Guid bodyId, TerrainGrid terrain, TerrainType[] types,
+        double radiusKm, bool shaping)
+    {
+        if (_roughGround.TryGetValue(bodyId, out var known)
+            && ReferenceEquals(known.Terrain, terrain) && known.RadiusKm == radiusKm
+            && known.Shaping == shaping && known.Types.Select(Roughening)
+                .SequenceEqual(types.Select(Roughening)))
+        {
+            return known.Rough;
+        }
+
+        RoughGround? rough = shaping
+            ? RoughGround.For(terrain, types, radiusKm, TerrainRelief.SeedFor(bodyId))
+            : null;
+        _roughGround[bodyId] = (terrain, types, radiusKm, shaping, rough);
+        return rough;
+    }
+
+    private static (byte, int, double, double) Roughening(TerrainType type) =>
+        (type.Code, type.VariationMeters, type.FeatureSizeKm, type.Roughness);
 
     // Whether two lists of types shape the ground the same (names and colors don't matter).
     private static bool SameShaping(TerrainType[] a, TerrainType[] b) =>

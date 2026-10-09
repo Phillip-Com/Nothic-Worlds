@@ -62,9 +62,9 @@ public static class TerrainNoise
         return variationMeters * (smooth + (sharp - smooth) * ridged) / weight;
     }
 
-    // Smooth noise from 0 to 1, varying over about one unit: a random value at each point of a
-    // whole-number lattice, blended with a gentle curve.
-    private static double Value(Vector3D p, int seed)
+    // Smooth noise from 0 to 1, varying over about one unit (TerrainRoughness uses it too): a
+    // random value at each point of a whole-number lattice, blended with a gentle curve.
+    internal static double Value(Vector3D p, int seed)
     {
         double fx = Math.Floor(p.X), fy = Math.Floor(p.Y), fz = Math.Floor(p.Z);
         int x = (int)fx, y = (int)fy, z = (int)fz;
@@ -79,7 +79,7 @@ public static class TerrainNoise
 
     private static double Fade(double t) => t * t * t * (t * (t * 6 - 15) + 10);
 
-    private static double SmoothStep(double x)
+    internal static double SmoothStep(double x)
     {
         double t = Math.Clamp(x, 0, 1);
         return t * t * (3 - 2 * t);

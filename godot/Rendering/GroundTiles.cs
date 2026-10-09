@@ -669,6 +669,23 @@ public partial class GroundTiles : Node3D
 
         double width = _selection.Width(tile);
         Surface ground = Lay(bases, heights, width);
+
+        // Each point morphs toward the parent's shape, at the heights the parent builds: only
+        // its points (every other row and column) are needed.
+        double[] parentHeights = heights;
+        if (recipe.MorphHeight is { } parentHeight)
+        {
+            parentHeights = new double[gridCount];
+            for (int row = 0; row <= _cells; row += 2)
+            {
+                for (int column = 0; column <= _cells; column += 2)
+                {
+                    int index = GroundTileGrid.Index(column, row, _cells);
+                    parentHeights[index] = parentHeight(bases[index]);
+                }
+            }
+        }
+
         var morphHeights = new double[gridCount];
         for (int row = 0; row <= _cells; row++)
         {
@@ -676,7 +693,7 @@ public partial class GroundTiles : Node3D
             {
                 (int a, int b) = GroundTileGrid.MorphPair(column, row, _cells);
                 morphHeights[GroundTileGrid.Index(column, row, _cells)] =
-                    (heights[a] + heights[b]) / 2;
+                    (parentHeights[a] + parentHeights[b]) / 2;
             }
         }
 

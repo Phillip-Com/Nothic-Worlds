@@ -30,6 +30,14 @@ public partial class TerrainPanel : CanvasLayer
     private const double MinRadiusDegrees = 0.05;
     private const double MaxRadiusDegrees = 45;
 
+    // The Roughness row's tooltip, and why it's off for a level type (VISION.md BOD-12).
+    private const string RoughnessTip = "How rough this terrain is up close, standing on it: " +
+        "its variation carried on into crags, ridges, and bumps too small for the terrain " +
+        "grid (0%: smooth, 50%: natural, 100%: craggy). Seen only up close";
+
+    private const string RoughnessNeedsVariation = "Give this terrain some Variation first: " +
+        "roughness carries its rises and falls on into smaller ones up close";
+
     // How much Raise and Lower move the ground per stroke, in meters, and how far Smooth and
     // Flatten go, in percent.
     private const double MinHeightMeters = 10;
@@ -69,6 +77,10 @@ public partial class TerrainPanel : CanvasLayer
     private Label _edgeName = null!;
     private SpinBox _variation = null!;
     private SpinBox _featureSize = null!;
+    private HBoxContainer _roughnessRow = null!;
+    private HSlider _roughness = null!;
+    private Label _roughnessName = null!;
+    private bool _roughnessDragging;
     private Label _shapingNote = null!;
     private bool _edgeDragging;
     private Label _problem = null!;
@@ -482,6 +494,7 @@ public partial class TerrainPanel : CanvasLayer
         edgeRow.AddChild(_edgeName);
         box.AddChild(edgeRow);
         box.AddChild(BuildVariationRow());
+        box.AddChild(BuildRoughnessRow());
 
         _shapingNote = new Label
         {
@@ -521,6 +534,47 @@ public partial class TerrainPanel : CanvasLayer
         return row;
     }
 
+    // How rough the type's ground is up close (VISION.md BOD-12): its variation carried on
+    // into crags and bumps too small for the terrain grid.
+    private HBoxContainer BuildRoughnessRow()
+    {
+        _roughnessRow = new HBoxContainer { TooltipText = RoughnessTip };
+        _roughnessRow.AddChild(new Label { Text = "Roughness" });
+        _roughness = new HSlider
+        {
+            MinValue = 0,
+            MaxValue = 1,
+            Step = 0.05,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            FocusMode = Control.FocusModeEnum.None,
+        };
+
+        // As with the edge, a drag applies when it's let go.
+        _roughness.DragStarted += () => _roughnessDragging = true;
+        _roughness.DragEnded += _ =>
+        {
+            _roughnessDragging = false;
+            Commit();
+        };
+        _roughness.ValueChanged += value =>
+        {
+            _roughnessName.Text = RoughnessName(value);
+            if (!_roughnessDragging)
+            {
+                Commit();
+            }
+        };
+        _roughnessRow.AddChild(_roughness);
+        _roughnessName = new Label { CustomMinimumSize = new Vector2(70, 0) };
+        _roughnessRow.AddChild(_roughnessName);
+        return _roughnessRow;
+    }
+
+    // What a roughness setting is called: smooth, or how rough in percent.
+    private static string RoughnessName(double roughness) =>
+        roughness <= 0 ? "Smooth" : $"{roughness:P0}";
+
     // What an edge setting is called: from gentle slopes to a cliff.
     private static string EdgeName(double edge) => edge switch
     {
@@ -547,6 +601,7 @@ public partial class TerrainPanel : CanvasLayer
             Edge = Math.Round(_edge.Value, 2),
             VariationMeters = (int)Math.Round(_variation.MetricValue()),
             FeatureSizeKm = Math.Round(_featureSize.MetricValue(), 1),
+            Roughness = Math.Round(_roughness.Value, 2),
         });
         _problem.Text = problem is null ? "" : $"Not saved yet: {problem}.";
     }
@@ -675,6 +730,14 @@ public partial class TerrainPanel : CanvasLayer
         _edge.Editable = type is not null;
         _variation.Editable = type is not null;
         _featureSize.Editable = type is not null;
+
+        // Roughness carries the variation on, so a level type has none to set.
+        bool roughens = type is { VariationMeters: > 0 };
+        _roughness.Editable = roughens;
+        _roughnessRow.TooltipText = type is null || roughens
+            ? RoughnessTip
+            : RoughnessNeedsVariation;
+        _roughnessRow.Modulate = new Color(1, 1, 1, roughens ? 1 : 0.5f);
         if (type is null)
         {
             return;
@@ -697,6 +760,12 @@ public partial class TerrainPanel : CanvasLayer
         _edgeName.Text = EdgeName(_edge.Value);
         _variation.ShowMetric(type.VariationMeters);
         _featureSize.ShowMetric(type.FeatureSizeKm);
+        if (!_roughnessDragging)
+        {
+            _roughness.SetValueNoSignal(type.Roughness);
+        }
+
+        _roughnessName.Text = RoughnessName(_roughness.Value);
         _syncing = false;
     }
 
