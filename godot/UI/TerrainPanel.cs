@@ -16,7 +16,8 @@ namespace NothicWorlds.UI;
 /// which can be added, renamed, recolored, and deleted. While
 /// it's open, dragging on the selected planet or moon paints with the selected type or sculpts
 /// it (<see cref="TerrainBrush"/>), or, in Shapes mode, clicking places a shape and its handles
-/// shape it (<see cref="ShapeHandles"/>).
+/// shape it (<see cref="ShapeHandles"/>). The tool switch (or P) turns that off, so drags turn the
+/// view instead.
 /// </summary>
 public partial class TerrainPanel : CanvasLayer
 {
@@ -38,6 +39,7 @@ public partial class TerrainPanel : CanvasLayer
     private Label _heading = null!;
     private Label _note = null!;
     private Control _tools = null!;
+    private Button _toolSwitch = null!;
     private Button _paintButton = null!;
     private Button _eraseButton = null!;
     private Button _sculptButton = null!;
@@ -191,6 +193,14 @@ public partial class TerrainPanel : CanvasLayer
     private Control BuildTools()
     {
         var tools = new VBoxContainer();
+        _toolSwitch = new Button
+        {
+            ToggleMode = true,
+            ButtonPressed = true,
+            FocusMode = Control.FocusModeEnum.None,
+        };
+        _toolSwitch.Toggled += _ => Refresh();
+        tools.AddChild(_toolSwitch);
         var modes = new HBoxContainer();
         var group = new ButtonGroup();
         _paintButton = CreateButton("Paint", Refresh, "Paint with the selected type");
@@ -567,6 +577,7 @@ public partial class TerrainPanel : CanvasLayer
         _tools.Visible = canPaint;
         _sculptTools.Visible = _sculptButton.ButtonPressed;
         _brushSize.Visible = !_shapesButton.ButtonPressed && !_waterButton.ButtonPressed;
+        ShowToolSwitch();
         if (_shapes is not null)
         {
             _shapes.Visible = _shapesButton.ButtonPressed && canPaint;
@@ -599,6 +610,12 @@ public partial class TerrainPanel : CanvasLayer
         if (_waterButton.ButtonPressed && _water is not null)
         {
             return _water.Hint();
+        }
+
+        if (!_toolSwitch.ButtonPressed)
+        {
+            return "The tool is off: drag the planet to turn the view. Press P or click " +
+                "Tool Off to turn it back on.";
         }
 
         if (_shapesButton.ButtonPressed)
@@ -747,12 +764,14 @@ public partial class TerrainPanel : CanvasLayer
         Brush.Code = _eraseButton.ButtonPressed ? (byte)0 : _selectedCode ?? 0;
         Brush.RadiusDegrees = _sizeSlider.Value;
         bool shaping = _shapesButton.ButtonPressed;
-        Brush.IsActive = Visible && !shaping && !_waterButton.ButtonPressed
+        Brush.IsActive = Visible && _toolSwitch.ButtonPressed && !shaping
+            && !_waterButton.ButtonPressed
             && Session is { SelectedBodyHasSurface: true }
             && (sculpting || _eraseButton.ButtonPressed || _selectedCode is not null);
         if (Shapes is not null)
         {
-            Shapes.IsActive = Visible && shaping && Session is { SelectedBodyHasSurface: true };
+            Shapes.IsActive = Visible && _toolSwitch.ButtonPressed && shaping
+                && Session is { SelectedBodyHasSurface: true };
         }
     }
 
@@ -797,6 +816,29 @@ public partial class TerrainPanel : CanvasLayer
         }
 
         return swatch;
+    }
+
+    // P turns the tool on or off while the panel is open (not while typing: a text field takes
+    // the key first).
+    public override void _UnhandledKeyInput(InputEvent @event)
+    {
+        if (Visible && @event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.P }
+            && !_toolSwitch.Disabled && Session is { SelectedBodyHasSurface: true })
+        {
+            _toolSwitch.ButtonPressed = !_toolSwitch.ButtonPressed;
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    // The switch says whether the tool is on; Water mode has its own Place and Draw buttons.
+    private void ShowToolSwitch()
+    {
+        _toolSwitch.Text = _toolSwitch.ButtonPressed ? "Tool On (P)" : "Tool Off (P)";
+        DisabledTip.Apply(_toolSwitch,
+            "Turn the tool off to drag the planet freely, and on again to use it (P)",
+            _waterButton.ButtonPressed
+                ? "Water has its own buttons for placing lakes and drawing rivers"
+                : null);
     }
 
     private static Button CreateButton(string text, Action pressed, string tooltip)
