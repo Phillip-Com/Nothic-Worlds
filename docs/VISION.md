@@ -175,8 +175,8 @@ enough on screen).
 **Built:**
 - `Session/AppSettings.cs`: settings that belong to the computer, in `user://settings.cfg`
   (a missing or damaged file gives the defaults).
-- `UI/SettingsWindow.cs`, `Rendering/GraphicsOptions.cs` (the options and presets, Ground
-  detail for the standing view among them, `REN-06`), `Rendering/GraphicsSettings.cs` (puts
+- `UI/SettingsWindow.cs`, `Rendering/GraphicsOptions.cs` (the options and presets, Standing
+  ground detail among them, `REN-06`), `Rendering/GraphicsSettings.cs` (puts
   them into effect).
 - **Level of detail** (`PlanetSurface.ScreenRadius`, always on): under 200 px a sculpted globe
   uses the Low relief mesh; under 60 px every globe uses a coarse sphere; 15% hysteresis.
@@ -233,7 +233,7 @@ from above; a ground-detail texture near the feet (Base tier); choosing where to
 clicking; true heights while standing; switches for fog, clouds, and night vision (owner's
 request, 2026-10-08; night vision as brightened true colors, not green); ground that stays put
 as you move, on globes and flat worlds alike, the water's surface built with it, and a
-**Ground detail** setting (Low, Standard, High; 2026-10-08).
+**Standing ground detail** setting (Low, Standard, High; named so by the owner, 2026-10-09).
 **Built:**
 - Core: `BodyOrientation.ToSystem` / `ShapeToSystem`; `Simulation/SkyView.cs` (`From`,
   `FromFlat`, `SolarTimeHours`, `BodyAt`); `Geometry/FlatWalk.cs` and `GlobeWalk` for moving
@@ -251,8 +251,11 @@ as you move, on globes and flat worlds alike, the water's surface built with it,
   (nearest first, also on a worker; 2 draw calls instead of a few hundred). Points morph onto
   the coarser tile's shape before it takes over (`ground_morph` in `planet_surface.gdshaderinc`,
   the distance in `CUSTOM1.w`); skirts hide any crack. The tiles are the same at every detail
-  (finest 64 m); `GroundDetail` sets 8, 16, or 32 squares a tile, in the presets too. The rim
-  and underside of a flat world are still a `Rendering/FlatPatch.cs` of bare rock.
+  (finest 64 m); `StandingGroundDetail` sets 8, 16, or 32 squares a tile, in the presets too.
+  The joined meshes are packed on the worker the way the engine keeps them
+  (`Rendering/PackedSurface.cs`, checked against the engine's own packing at start), so the
+  main thread only uploads them. The rim and underside of a flat world are still a
+  `Rendering/FlatPatch.cs` of bare rock.
 - `Rendering/SurfaceSky.cs` + `surface_sky.gdshader` (a copy of the environment while standing;
   sky gradient, bodies as lit discs, clouds from the live weather via
   `PlanetSurface.CopyCloudsTo` and `cloud_layer.gdshaderinc`, haze as fog), `cloud_deck.gdshader`
@@ -274,8 +277,9 @@ shell at a set height (the cloud deck).
 pixel on an Earth-sized planet). Rivers' channels still depend on where the eye is, so tiles
 within about 6 km of a river are rebuilt as it walks (PR 3 of the standing-view plan changes
 that). On arriving, or after a big climb, the ground sharpens over about 1–2 s, coarser
-ground standing in meanwhile; joining the tiles takes the main thread about 5–10 ms
-(Standard), at most five times a second while moving fast.
+ground standing in meanwhile; handing over the joined tiles takes the main thread about 5–12
+ms on Standard and 15–30 ms on High (up to ~100 ms at worst), at most five times a second
+while moving fast.
 
 **REN-07 — Designed night skies** · Implemented (M34: PR #90) · Base
 **Intent:** Each world has its own fixed night sky that the user designs: the stars stay put

@@ -8,14 +8,14 @@ namespace NothicWorlds.Rendering;
 /// </summary>
 /// <param name="ReliefDetail">How finely sculpted globes' shapes are drawn.</param>
 /// <param name="CloudDetail">How finely live weather's clouds are drawn.</param>
-/// <param name="GroundDetail">How finely the ground is drawn while standing.</param>
+/// <param name="StandingGroundDetail">How finely the ground is drawn while standing.</param>
 /// <param name="AntiAliasing">How edges are smoothed.</param>
 /// <param name="RenderScale">The 3D view's resolution.</param>
 /// <param name="FrameRateLimit">The most frames a second.</param>
 public sealed record GraphicsOptions(
     ReliefDetail ReliefDetail,
     CloudDetail CloudDetail,
-    GroundDetail GroundDetail,
+    StandingGroundDetail StandingGroundDetail,
     AntiAliasing AntiAliasing,
     RenderScale RenderScale,
     FrameRateLimit FrameRateLimit)
@@ -23,11 +23,11 @@ public sealed record GraphicsOptions(
     /// <summary>The options a preset sets (Custom has none of its own: Standard's).</summary>
     public static GraphicsOptions For(GraphicsQuality quality) => quality switch
     {
-        GraphicsQuality.Low => new(ReliefDetail.Low, CloudDetail.Low, GroundDetail.Low,
+        GraphicsQuality.Low => new(ReliefDetail.Low, CloudDetail.Low, StandingGroundDetail.Low,
             AntiAliasing.Off, RenderScale.ThreeQuarters, FrameRateLimit.Thirty),
-        GraphicsQuality.High => new(ReliefDetail.High, CloudDetail.High, GroundDetail.High,
+        GraphicsQuality.High => new(ReliefDetail.High, CloudDetail.High, StandingGroundDetail.High,
             AntiAliasing.Msaa4X, RenderScale.Full, FrameRateLimit.MatchScreen),
-        _ => new(ReliefDetail.Standard, CloudDetail.High, GroundDetail.Standard,
+        _ => new(ReliefDetail.Standard, CloudDetail.High, StandingGroundDetail.Standard,
             AntiAliasing.Fxaa, RenderScale.Full, FrameRateLimit.Sixty),
     };
 

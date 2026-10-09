@@ -104,7 +104,7 @@ public partial class GraphicsSettings : Node
 
         if (Standing is not null)
         {
-            Standing.GroundDetail = Options.GroundDetail;
+            Standing.StandingGroundDetail = Options.StandingGroundDetail;
         }
     }
 }

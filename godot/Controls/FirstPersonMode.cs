@@ -85,7 +85,7 @@ public partial class FirstPersonMode : Node
         new() { Shader = GD.Load<Shader>("res://Rendering/water_surface.gdshader") };
     private Camera3D? _camera;
     private GroundTiles? _tiles;       // The ground and the water's surface around the eye
-    private GroundDetail _groundDetail = GroundDetail.Standard;
+    private StandingGroundDetail _standingGroundDetail = StandingGroundDetail.Standard;
     private FirstPersonGround? _deck;  // The clouds below, when flying above them
     private RiverWater? _rivers;       // The rivers' water around the eye
     private RiverBankStrip? _banks;    // ... and their beds and banks, drawn finely
@@ -314,20 +314,20 @@ public partial class FirstPersonMode : Node
     }
 
     /// <summary>
-    /// How finely the ground is drawn around the eye (File ▸ Settings, Ground detail): changed
-    /// while standing, the ground is built again.
+    /// How finely the ground is drawn around the eye (File ▸ Settings, Standing ground
+    /// detail): changed while standing, the ground is built again.
     /// </summary>
-    public GroundDetail GroundDetail
+    public StandingGroundDetail StandingGroundDetail
     {
-        get => _groundDetail;
+        get => _standingGroundDetail;
         set
         {
-            if (value == _groundDetail)
+            if (value == _standingGroundDetail)
             {
                 return;
             }
 
-            _groundDetail = value;
+            _standingGroundDetail = value;
             if (_tiles is not null)
             {
                 MakeTiles();
@@ -786,7 +786,7 @@ public partial class FirstPersonMode : Node
         _tiles?.QueueFree();
         double radiusKm = body.RadiusKm;
         ITileSurface surface = _flat is null ? new GlobeTileSurface() : new FlatTopTileSurface();
-        _tiles = new GroundTiles(surface, radiusKm * 1000, _groundDetail)
+        _tiles = new GroundTiles(surface, radiusKm * 1000, _standingGroundDetail)
         {
             WaterMaterial = _waterMaterial,
             Visible = false,

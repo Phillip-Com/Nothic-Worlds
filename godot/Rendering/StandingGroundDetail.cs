@@ -5,7 +5,7 @@ namespace NothicWorlds.Rendering;
 /// REN-06, owner's choice): how many squares across each ground tile (GroundTiles). The tiles
 /// are laid out the same at every detail, so it sets the triangles drawn, not the draw calls.
 /// </summary>
-public enum GroundDetail
+public enum StandingGroundDetail
 {
     /// <summary>Tiles 8 squares across (8 m underfoot): the lightest.</summary>
     Low,
