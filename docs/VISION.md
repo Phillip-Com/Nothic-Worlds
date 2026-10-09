@@ -586,7 +586,8 @@ feature on a star (its rocks drawn, not saved); nebulas are a backdrop around th
   `WorldSession.SculptHeights` (a stroke is redone whole from its start, one undo step).
 - Shapes: `Model/ShapeEdit.cs` (`FrameOn`; v24 `surface.shapes`, up to 64);
   `Rendering/ShapedGlobe.cs` (a hidden `CsgCombiner3D`, copied to a plain mesh once carved;
-  `RayHit` so clicks reach into holes); `Controls/ShapeHandles.cs`, `UI/ShapesSection.cs`,
+  `RayHit` so clicks reach into holes, built `HitScale` times bigger so Godot doesn't skip a
+  carved sphere's small faces); `Controls/ShapeHandles.cs`, `UI/ShapesSection.cs`,
   `Session/WorldSession.Shapes.cs`. Lifting the globe before carving and the hit meshes after
   it run on a worker thread; the toolbar says "Carving shapes…" meanwhile
   (`ShapedGlobe.CarvingChanged`).
