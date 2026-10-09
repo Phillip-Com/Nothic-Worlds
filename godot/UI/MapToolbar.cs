@@ -1,4 +1,5 @@
 using Godot;
+using NothicWorlds.Rendering;
 using NothicWorlds.Session;
 
 namespace NothicWorlds.UI;
@@ -43,6 +44,7 @@ public partial class MapToolbar : CanvasLayer
     // Increases with every message, so an old auto-hide timer doesn't hide a newer message.
     private int _messageVersion;
     private int _preparingMessage = -1;  // The message saying a body is being prepared
+    private int _carvingMessage = -1;  // The message saying shapes are being carved
 
     /// <summary>The System panel, shown and hidden by the System button.</summary>
     [Export] public SystemPanel? SystemPanel { get; set; }
@@ -206,6 +208,28 @@ public partial class MapToolbar : CanvasLayer
         if (Session is not null)
         {
             Session.Preparing += SayPreparing;
+        }
+
+        ShapedGlobe.CarvingChanged += SayCarving;
+    }
+
+    public override void _ExitTree()
+    {
+        ShapedGlobe.CarvingChanged -= SayCarving;
+    }
+
+    // While shapes are being carved (VISION.md BOD-04), says so, since carving briefly pauses
+    // the app; takes it away when done.
+    private void SayCarving(bool underway)
+    {
+        if (underway)
+        {
+            ShowInfo("Carving shapes…", autoHide: false);
+            _carvingMessage = _messageVersion;
+        }
+        else if (_carvingMessage == _messageVersion)
+        {
+            _message.Visible = false;
         }
     }
 

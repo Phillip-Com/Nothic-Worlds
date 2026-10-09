@@ -22,6 +22,11 @@ namespace NothicWorlds.Rendering;
 /// <para>The CSG nodes stay hidden: once they've carved (Godot does it the next frame), the
 /// result is copied into a plain mesh and drawn, so the last carving stays on show meanwhile
 /// and nothing flickers.</para>
+/// <para>Godot only carves nodes in the scene, on the main thread, so the carving itself
+/// still pauses the app (most of the time a change takes). Everything around it runs on a
+/// worker thread: lifting the globe before, and building the meshes clicks and standing use
+/// after. <see cref="CarvingChanged"/> lets the toolbar say "Carving…" meanwhile, and the
+/// carving waits a drawn frame so that message is on screen before the pause.</para>
 /// </remarks>
 public partial class ShapedGlobe : Node3D
 {
@@ -63,12 +68,26 @@ public partial class ShapedGlobe : Node3D
         CullMode = BaseMaterial3D.CullModeEnum.Disabled,
     };
 
+    // How many shaped globes are carving, for CarvingChanged.
+    private static int _carvingCount;
+
+    /// <summary>
+    /// Raised with true when a shaped globe starts carving while none was, and with false
+    /// when the last one is done, so the toolbar can say so.
+    /// </summary>
+    public static event Action<bool>? CarvingChanged;
+
     private CsgCombiner3D? _combiner;
     private MeshInstance3D? _preview;
     private MeshInstance3D? _drawn;
     private TriangleMesh? _triangles;  // The drawn carving, for finding where clicks land
     private TriangleMesh? _groundTriangles;  // ... and with the water taken off, for standing
     private bool _waitingForCarving;
+    private bool _carving;
+    private Task<Lifted>? _lifting;
+    private ulong _liftingFrame;  // The frame lifting began, to carve no sooner than the next
+    private Godot.Collections.Array? _globeArrays;  // The cube sphere a globe is lifted from
+    private Task<(TriangleMesh All, TriangleMesh Ground)>? _hitMeshes;
     private Material? _globeMaterial;
     private (IReadOnlyList<ShapeEdit> Shapes, HeightGrid Heights, double RadiusKm, float Relief,
         BodyShape Shape, int? WaterLevel, HeightGrid LakeLevels)? _built;
@@ -78,6 +97,14 @@ public partial class ShapedGlobe : Node3D
     /// so the camera can keep above it.
     /// </summary>
     public float HighestTop { get; private set; }
+
+    /// <summary>Whether a carving is drawn yet (the first one takes a few frames).</summary>
+    public bool HasDrawn => _drawn is not null;
+
+    /// <summary>
+    /// Raised when the first carving is drawn, so the body's own mesh can stop drawing.
+    /// </summary>
+    public event Action? FirstDrawn;
 
     /// <summary>
     /// Builds (or rebuilds, if anything changed) the carved globe.
@@ -107,40 +134,130 @@ public partial class ShapedGlobe : Node3D
         _built = ([.. shapes], heights, radiusKm, reliefScale, bodyShape, waterLevel,
             lakeLevels);
         _globeMaterial = globeMaterial;
+        _waitingForCarving = false;
+        _hitMeshes = null;
         var surface = new CarvedSurface(heights, waterLevel, lakeLevels, reliefScale);
+        if (bodyShape == BodyShape.FlatDisc)
+        {
+            _lifting = Task.Run(() => LiftedDisc(surface));
+        }
+        else
+        {
+            _globeArrays = CubeSphereMesh.For(CarvedDetail).SurfaceGetArrays(0);
+            Vector3[] unit = _globeArrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+            _lifting = Task.Run(() => LiftedGlobe(surface, unit));
+        }
+
+        _liftingFrame = Engine.GetProcessFrames();
+        HighestTop = 0;
+        foreach (ShapeEdit shape in shapes.Where(shape => shape.Operation == ShapeOperation.Add))
+        {
+            Transform3D placement = Placement(shape, heights, radiusKm, reliefScale, bodyShape);
+
+            // Above the radius on a globe; above the face on a flat world.
+            float middle = bodyShape == BodyShape.FlatDisc
+                ? placement.Origin.Y - (float)FlatDisc.HalfThickness
+                : placement.Origin.Length() - 1;
+            HighestTop = Math.Max(HighestTop, middle + placement.Basis.Y.Length() / 2);
+        }
+
+        SetCarving(true);
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_lifting is { IsCompleted: true } lifting
+            && Engine.GetProcessFrames() > _liftingFrame)
+        {
+            _lifting = null;
+            SetCarving(lifting.IsCompletedSuccessfully);  // A failure is reported just below
+            StartCarving(Finished(lifting));
+        }
+        else if (_waitingForCarving && _combiner?.BakeStaticMesh() is ArrayMesh carved)
+        {
+            _waitingForCarving = false;
+            if (carved.GetSurfaceCount() == 0)
+            {
+                // Everything was cut away (shapes can't be that big, but just in case): the
+                // last carving stays on show.
+                SetCarving(false);
+                return;
+            }
+
+            bool first = _drawn is null;
+            _drawn ??= NewDrawnMesh();
+            _drawn.Mesh = carved;
+            if (first)
+            {
+                FirstDrawn?.Invoke();
+            }
+
+            HitSurface[] hitSurfaces = HitSurfaces(carved);
+            bool flat = _built?.Shape == BodyShape.FlatDisc;
+            _hitMeshes = Task.Run(() => HitMeshes(hitSurfaces, flat));
+        }
+        else if (_hitMeshes is { IsCompleted: true } hitMeshes)
+        {
+            _hitMeshes = null;
+            SetCarving(false);
+            (_triangles, _groundTriangles) = Finished(hitMeshes);
+        }
+    }
+
+    public override void _EnterTree()
+    {
+        SetCarving(_lifting is not null || _waitingForCarving || _hitMeshes is not null);
+    }
+
+    public override void _ExitTree()
+    {
+        SetCarving(false);  // A globe taken away mid-carving isn't carving while it's away
+    }
+
+    // The result of work done on a worker thread; anything it threw is a bug, so it's thrown
+    // again here, on the main thread, where Godot reports it.
+    private static T Finished<T>(Task<T> task) => task.GetAwaiter().GetResult();
+
+    // Puts the lifted globe and the shapes into a fresh CSG tree for Godot to carve, which it
+    // does at the end of this frame.
+    private void StartCarving(Lifted lifted)
+    {
+        if (_built is not { } built || _globeMaterial is null)
+        {
+            return;
+        }
+
         _combiner?.QueueFree();
         _combiner = new CsgCombiner3D { Name = "Carved", Visible = false };
         _combiner.AddChild(new CsgMesh3D
         {
             Name = "Globe",
-            Mesh = bodyShape == BodyShape.FlatDisc
-                ? LiftedDisc(surface, globeMaterial)
-                : LiftedGlobe(surface, globeMaterial),
+            Mesh = LiftedMesh(lifted, _globeMaterial),
         });
 
-        HighestTop = 0;
-        foreach (ShapeEdit shape in shapes)
+        foreach (ShapeEdit shape in built.Shapes)
         {
-            _combiner.AddChild(ShapeNode(shape, heights, radiusKm, reliefScale, bodyShape));
+            _combiner.AddChild(ShapeNode(shape, built.Heights, built.RadiusKm, built.Relief,
+                built.Shape));
         }
 
         AddChild(_combiner);
         _waitingForCarving = true;
     }
 
-    public override void _Process(double delta)
+    private void SetCarving(bool carving)
     {
-        if (!_waitingForCarving || _combiner is null
-            || _combiner.BakeStaticMesh() is not ArrayMesh carved || carved.GetSurfaceCount() == 0)
+        if (carving == _carving)
         {
             return;
         }
 
-        _waitingForCarving = false;
-        _drawn ??= NewDrawnMesh();
-        _drawn.Mesh = carved;
-        _triangles = carved.GenerateTriangleMesh();
-        _groundTriangles = WaterTakenOff(carved)?.GenerateTriangleMesh() ?? _triangles;
+        _carving = carving;
+        _carvingCount += carving ? 1 : -1;
+        if (_carvingCount == (carving ? 1 : 0))
+        {
+            CarvingChanged?.Invoke(carving);
+        }
     }
 
     /// <summary>
@@ -170,39 +287,74 @@ public partial class ShapedGlobe : Node3D
         return hit.Count > 0 ? (Vector3)hit["position"] : null;
     }
 
-    // The carving with each of the globe's own points lowered by how far it was raised to the
-    // water (kept in its first texture coordinate, which carving carries along), or null if
-    // nothing was raised. The shapes' faces are left as they are.
-    private ArrayMesh? WaterTakenOff(ArrayMesh carved)
-    {
-        if (_built is not { } built || (built.WaterLevel is null && built.LakeLevels.IsEmpty))
-        {
-            return null;
-        }
+    // One surface of the carving as plain arrays, for building the hit meshes off the main
+    // thread: its points, its triangles' corners (null if every three points make one), and
+    // for the globe's own faces, how far the water raised each point (null for a shape's).
+    private readonly record struct HitSurface(Vector3[] Points, int[]? Corners,
+        Vector2[]? Raised);
 
-        bool flat = built.Shape == BodyShape.FlatDisc;
-        var ground = new ArrayMesh();
-        for (int index = 0; index < carved.GetSurfaceCount(); index++)
+    private HitSurface[] HitSurfaces(ArrayMesh carved)
+    {
+        var surfaces = new HitSurface[carved.GetSurfaceCount()];
+        for (int index = 0; index < surfaces.Length; index++)
         {
             Godot.Collections.Array arrays = carved.SurfaceGetArrays(index);
-            if (carved.SurfaceGetMaterial(index) == _globeMaterial
-                && arrays[(int)Mesh.ArrayType.TexUV].VariantType != Variant.Type.Nil)
-            {
-                Vector3[] points = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
-                Vector2[] raised = arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
-                for (int point = 0; point < points.Length; point++)
-                {
-                    Vector3 up = flat ? Vector3.Up : points[point].Normalized();
-                    points[point] -= up * raised[point].X;
-                }
-
-                arrays[(int)Mesh.ArrayType.Vertex] = points;
-            }
-
-            ground.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
+            Variant corners = arrays[(int)Mesh.ArrayType.Index];
+            Variant raised = arrays[(int)Mesh.ArrayType.TexUV];
+            surfaces[index] = new HitSurface(arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array(),
+                corners.VariantType == Variant.Type.Nil ? null : corners.AsInt32Array(),
+                carved.SurfaceGetMaterial(index) == _globeMaterial
+                    && raised.VariantType != Variant.Type.Nil
+                    ? raised.AsVector2Array()
+                    : null);
         }
 
-        return ground;
+        return surfaces;
+    }
+
+    // The meshes rays are tested against (on a worker thread): the whole carving, and the
+    // carving with each of the globe's own points lowered by how far it was raised to the
+    // water (kept in its first texture coordinate, which carving carries along), for standing
+    // on the ground. The shapes' faces are left as they are.
+    private static (TriangleMesh All, TriangleMesh Ground) HitMeshes(HitSurface[] surfaces,
+        bool flat)
+    {
+        var all = new List<Vector3>();
+        var ground = new List<Vector3>();
+        bool anyRaised = false;
+        foreach (HitSurface surface in surfaces)
+        {
+            Vector3[] lowered = surface.Points;
+            if (surface.Raised is { } raised)
+            {
+                lowered = new Vector3[surface.Points.Length];
+                for (int point = 0; point < lowered.Length; point++)
+                {
+                    Vector3 up = flat ? Vector3.Up : surface.Points[point].Normalized();
+                    lowered[point] = surface.Points[point] - up * raised[point].X;
+                    anyRaised |= raised[point].X != 0;
+                }
+            }
+
+            int count = surface.Corners?.Length ?? surface.Points.Length;
+            for (int corner = 0; corner < count; corner++)
+            {
+                int point = surface.Corners?[corner] ?? corner;
+                all.Add(surface.Points[point]);
+                ground.Add(lowered[point]);
+            }
+        }
+
+        var allMesh = new TriangleMesh();
+        allMesh.CreateFromFaces(all.ToArray());
+        if (!anyRaised)
+        {
+            return (allMesh, allMesh);
+        }
+
+        var groundMesh = new TriangleMesh();
+        groundMesh.CreateFromFaces(ground.ToArray());
+        return (allMesh, groundMesh);
     }
 
     private MeshInstance3D NewDrawnMesh()
@@ -213,37 +365,60 @@ public partial class ShapedGlobe : Node3D
     }
 
 
-    // The sculpted globe as a mesh, each vertex lifted by its height or to the water over it
-    // (as the shader lifts the plain one), wearing the planet material. How far the water
-    // raised each vertex is kept in its first texture coordinate (see WaterTakenOff).
-    private static ArrayMesh LiftedGlobe(CarvedSurface surface, Material material)
+    // The lifted globe's or disc's points and how far the water raised each (kept in its
+    // first texture coordinate, which carving carries along; see HitMeshes); for a disc, also
+    // its normals and triangles' corners (a globe takes those from its cube sphere).
+    private sealed record Lifted(Vector3[] Points, Vector2[] Raised, Vector3[]? Normals = null,
+        int[]? Corners = null);
+
+    // The lifted globe or disc as a mesh wearing the planet material (on the main thread).
+    private ArrayMesh LiftedMesh(Lifted lifted, Material material)
     {
-        Godot.Collections.Array arrays = CubeSphereMesh.For(CarvedDetail).SurfaceGetArrays(0);
-        Vector3[] points = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
-        var raised = new Vector2[points.Length];
-        for (int index = 0; index < points.Length; index++)
+        Godot.Collections.Array arrays;
+        if (lifted.Normals is null)
         {
-            Vector3 point = points[index];
-            (float ground, float water) = surface.LiftAt(new Vector3D(point.X, point.Y, point.Z));
-            float lift = Math.Max(ground, water);
-            points[index] = point * (1.0f + lift);
-            raised[index] = new Vector2(lift - ground, 0);
+            arrays = _globeArrays!;
+        }
+        else
+        {
+            arrays = new Godot.Collections.Array();
+            arrays.Resize((int)Mesh.ArrayType.Max);
+            arrays[(int)Mesh.ArrayType.Normal] = lifted.Normals;
+            arrays[(int)Mesh.ArrayType.Index] = lifted.Corners!;
         }
 
-        arrays[(int)Mesh.ArrayType.Vertex] = points;
-        arrays[(int)Mesh.ArrayType.TexUV] = raised;
+        arrays[(int)Mesh.ArrayType.Vertex] = lifted.Points;
+        arrays[(int)Mesh.ArrayType.TexUV] = lifted.Raised;
         var mesh = new ArrayMesh();
         mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
         mesh.SurfaceSetMaterial(0, material);
         return mesh;
     }
 
+    // The sculpted globe (on a worker thread): each of the cube sphere's points lifted by its
+    // height or to the water over it, as the shader lifts the plain one.
+    private static Lifted LiftedGlobe(CarvedSurface surface, Vector3[] unit)
+    {
+        var points = new Vector3[unit.Length];
+        var raised = new Vector2[unit.Length];
+        for (int index = 0; index < unit.Length; index++)
+        {
+            Vector3 point = unit[index];
+            (float ground, float water) = surface.LiftAt(new Vector3D(point.X, point.Y, point.Z));
+            float lift = Math.Max(ground, water);
+            points[index] = point * (1.0f + lift);
+            raised[index] = new Vector2(lift - ground, 0);
+        }
+
+        return new Lifted(points, raised);
+    }
+
     // A flat world as a closed disc (VISION.md BOD-10): its top face lifted by its heights,
     // as the shader lifts the plain one (never through the underside, and the rim ring by the
     // ground at the south pole, which it all stands for), its rim, and its underside, sharing
     // their edges so CSG can carve it. One surface with the planet material, which draws the
-    // rim and underside as bare rock.
-    private static ArrayMesh LiftedDisc(CarvedSurface surface, Material material)
+    // rim and underside as bare rock. Built on a worker thread.
+    private static Lifted LiftedDisc(CarvedSurface surface)
     {
         float half = (float)FlatDisc.HalfThickness;
         var points = new List<Vector3>();
@@ -308,20 +483,12 @@ public partial class ShapedGlobe : Node3D
             indices.AddRange([bottomMiddle, bottom[segment], bottom[next]]);
         }
 
-        var arrays = new Godot.Collections.Array();
-        arrays.Resize((int)Mesh.ArrayType.Max);
-        arrays[(int)Mesh.ArrayType.Vertex] = points.ToArray();
-        arrays[(int)Mesh.ArrayType.Normal] = normals.ToArray();
-        arrays[(int)Mesh.ArrayType.TexUV] = raised.ToArray();
-        arrays[(int)Mesh.ArrayType.Index] = indices.ToArray();
-        var mesh = new ArrayMesh();
-        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
-        mesh.SurfaceSetMaterial(0, material);
-        return mesh;
+        return new Lifted(points.ToArray(), raised.ToArray(), normals.ToArray(),
+            indices.ToArray());
     }
 
     // A shape as a CSG node of unit size, stretched and placed (see Placement).
-    private CsgPrimitive3D ShapeNode(ShapeEdit shape, HeightGrid heights, double radiusKm,
+    private static CsgPrimitive3D ShapeNode(ShapeEdit shape, HeightGrid heights, double radiusKm,
         float reliefScale, BodyShape bodyShape)
     {
         Transform3D placement = Placement(shape, heights, radiusKm, reliefScale, bodyShape);
@@ -351,15 +518,6 @@ public partial class ShapedGlobe : Node3D
             ? CsgShape3D.OperationEnum.Union
             : CsgShape3D.OperationEnum.Subtraction;
         node.Transform = placement;
-        if (shape.Operation == ShapeOperation.Add)
-        {
-            // Above the radius on a globe; above the face on a flat world.
-            float top = bodyShape == BodyShape.FlatDisc
-                ? placement.Origin.Y - (float)FlatDisc.HalfThickness
-                : placement.Origin.Length() - 1;
-            HighestTop = Math.Max(HighestTop, top + placement.Basis.Y.Length() / 2);
-        }
-
         return node;
     }
 
