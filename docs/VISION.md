@@ -258,7 +258,8 @@ as you move, on globes and flat worlds alike, the water's surface built with it,
   main thread only uploads them. Over a globe at Standard and High detail the tiles reach the
 farthest peak that can show over the horizon (the eye's horizon plus the highest point's;
 `FirstPersonMode.TileReach`, at most the camera's far distance, ~170 km standing, or 250 km),
-so distant mountains keep their shape and rough features; at Low and on flat worlds they reach
+so distant mountains keep their shape and rough features; tiles past the Low reach are built
+after all nearer ones (`GroundTileSelection.Choose`'s `nearReach`); at Low and on flat worlds they reach
 a little past the eye's horizon (~19 km). The rim and underside of a flat world are still a
   `Rendering/FlatPatch.cs` of bare rock.
 - `Rendering/SurfaceSky.cs` + `surface_sky.gdshader` (a copy of the environment while standing;
