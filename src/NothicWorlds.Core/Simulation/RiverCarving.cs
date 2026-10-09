@@ -39,11 +39,13 @@ public sealed class RiverCarving
     private readonly double _radiusMeters;
     private readonly IReadOnlyList<RiverProfile> _rivers;
     private readonly Level[][] _trees;  // Each river's search tree, its segments first
+    private readonly double _widestReach;  // The farthest any channel and banks reach out, m
 
     private RiverCarving(IReadOnlyList<RiverProfile> rivers, double radiusMeters)
     {
         (_rivers, _radiusMeters) = (rivers, radiusMeters);
         _trees = [.. rivers.Select(Tree)];
+        _widestReach = _trees.Select(tree => tree[^1].ReachMeters[0]).DefaultIfEmpty(0).Max();
     }
 
     /// <summary>Whether there are no rivers to carve.</summary>
@@ -93,6 +95,28 @@ public sealed class RiverCarving
 
         return (direction, groundMeters) => Shape(Gather(direction, margin, leastReach),
             direction, groundMeters, cellMeters);
+    }
+
+    /// <summary>
+    /// How much of the ground's fine relief (VISION.md BOD-12) is kept at a unit direction,
+    /// from 0 within a river's banks to 1 once as far again past them as the river and its
+    /// banks reach out from its middle: rivers run in smooth valleys, so their water lies
+    /// evenly. Safe to call from several threads at once.
+    /// </summary>
+    public double RoughnessKept(Vector3D direction)
+    {
+        double kept = 1;
+        foreach ((int r, int s) in Gather(direction, _widestReach / _radiusMeters, 0))
+        {
+            RiverProfile river = _rivers[r];
+            (double away, double t) = Nearest(direction, river.Points[s], river.Points[s + 1]);
+            double halfWidth = Lerp(river.HalfWidthMeters[s], river.HalfWidthMeters[s + 1], t);
+            double reach = halfWidth + BankWidthMeters(halfWidth);
+            double x = Math.Clamp((away - reach) / reach, 0, 1);
+            kept = Math.Min(kept, x * x * (3 - 2 * x));
+        }
+
+        return kept;
     }
 
     // The ground carved by the segments given, and sunk (with cells `cellMeters` wide) under

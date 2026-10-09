@@ -479,6 +479,25 @@ center) as follows (`Model/TerrainNoise.cs` does it; this never changes):
   offset is `V × (smooth + (sharp − smooth) × m) / weight`: rolling ground for small
   variations, ridged peaks for big ones.
 
+## Roughness up close (`roughness`)
+
+Where the terrain shapes the ground, a type with a `roughness` `r` above 0 and a `variation`
+`V` above 0 has fine relief up close: its features carried on below the smallest the height
+grid holds. It's made only when the ground is drawn, never saved (`Model/TerrainRoughness.cs`
+does it; this never changes):
+
+- **Layers.** With `R`, `c`, `S`, the seed, `value` and the layer steps as for the variation
+  above, go through layers `k = 0, 1, …` (at most 40) while the wavelength `λ` (starting at `S`,
+  in meters, halving each layer) is at least `F`, the finest drawn (20 m, or more where the
+  ground is drawn coarsely). Only layers with `λ` under `3c` add relief; the first of those
+  has wavelength `λ₀`. Each adds `A × f × (smooth + (sharp − smooth) × m)`, with `n`,
+  `smooth = 2n − 1`, `sharp = 2(1 − |2n − 1|)² − 1` and `m` as for the variation, where
+  `A = r × V × (λ₀ / S) × (λ / λ₀)^(1 − 0.6r)` and `f = min(λ / F − 1, 1)`.
+- **Between types.** At a place, the four cells whose middles surround it (as heights are
+  blended) each give their type's relief, weighted by how near the place is to each.
+- **Rivers.** It fades out toward rivers: none within a river's banks, all of it once a place
+  is as far again past them as the river and its banks reach out from its middle (smoothstep).
+
 ## Water (`waterLevel`)
 
 A planet or moon with a `waterLevel` is under water wherever its ground (terrain-shaped and
