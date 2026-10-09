@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using Godot;
 using NothicWorlds.Core.Geometry;
 
@@ -115,8 +114,10 @@ public partial class GroundTiles : Node3D
     /// <summary>As <see cref="PrepareGround"/>, for the water's surface (its waves).</summary>
     public Action<GeometryInstance3D, Vector3D>? PrepareWater { get; set; }
 
-    /// <summary>Goes up each time the tiles drawn change.</summary>
-    public int DrawnVersion { get; private set; }
+    /// <summary>
+    /// Goes up each time the ground shown changes (see <see cref="ShownHeights"/>).
+    /// </summary>
+    public int ShownVersion { get; private set; }
 
     /// <summary>Whether any ground is drawn yet (none until the first tiles are built).</summary>
     public bool HasGround => _ground.Mesh is not null;
@@ -184,25 +185,6 @@ public partial class GroundTiles : Node3D
     }
 
     /// <summary>
-    /// Names the drawn tiles within <paramref name="reach"/> of a point (in the body's own
-    /// space), as built: it changes only when one of them does, or one is drawn or taken away.
-    /// </summary>
-    public int DrawnNear(Vector3D point, double reach)
-    {
-        int name = 17;
-        foreach (GroundTile tile in _drawn)
-        {
-            TileMeshes meshes = _built[tile].Meshes;
-            if (meshes.Extent.DistanceFrom(point) < reach)
-            {
-                name ^= HashCode.Combine(tile, meshes.Stamp, RuntimeHelpers.GetHashCode(meshes));
-            }
-        }
-
-        return name;
-    }
-
-    /// <summary>
     /// The highest the drawn ground reaches around a point on or over the surface (as the
     /// surface measures height): the highest corner of the square of mesh it's over, morphed or
     /// not. The mesh is flat between its points, so where the ground curves or steps it can
@@ -211,7 +193,9 @@ public partial class GroundTiles : Node3D
     /// </summary>
     public double? HighestAround(Vector3D point)
     {
-        if (Square(point) is not var (meshes, column, row, _, _))
+        if (Square(point, _deepest,
+            tile => _drawn.Contains(tile) ? _built[tile].Meshes : null)
+            is not var (meshes, column, row, _, _))
         {
             return null;
         }
@@ -229,26 +213,54 @@ public partial class GroundTiles : Node3D
     }
 
     /// <summary>
-    /// The drawn ground's height at a point on or over the surface, as the mesh's flat
-    /// triangles lie there (unmorphed); null if no drawn tile is under it.
+    /// The base point <paramref name="across"/> and <paramref name="down"/> a tile (0 to 1
+    /// each), as its heights are asked for.
     /// </summary>
-    public double? HeightAt(Vector3D point)
+    public Vector3D BasePoint(GroundTile tile, double across, double down)
     {
-        if (Square(point) is not var (meshes, column, row, x, y))
+        (double u, double v) = tile.OnRoot(across, down);
+        return _surface.BasePoint(tile.Root, u, v);
+    }
+
+    /// <summary>The width of a tile's squares, in the surface's units.</summary>
+    public double CellWidth(GroundTile tile) => _selection.Width(tile) / _cells;
+
+    /// <summary>
+    /// The widest squares drawn <paramref name="away"/> from the eye (in the surface's units):
+    /// a tile is split until it's SplitFactor of its widths away (or as narrow as tiles get),
+    /// and its parent may stand in for it until it's built.
+    /// </summary>
+    public double WidestCellAt(double away) =>
+        2 * Math.Max(away / SplitFactor, 2 * _selection.FinestWidth) / _cells;
+
+    /// <summary>
+    /// The height of the ground shown now (the tiles last joined) at a point on or over the
+    /// surface, as the mesh's flat triangles lie there (unmorphed); null if no tile shown is
+    /// under it. It stays as it is when other ground is shown, so it can be read on any thread.
+    /// </summary>
+    public Func<Vector3D, double?> ShownHeights()
+    {
+        Dictionary<GroundTile, TileMeshes> shown = _joinedTiles;
+        int deepest = shown.Count == 0 ? 0 : shown.Keys.Max(tile => tile.Level);
+        return point =>
         {
-            return null;
-        }
+            if (Square(point, deepest, tile => shown.GetValueOrDefault(tile)) is not var
+                (meshes, column, row, x, y))
+            {
+                return null;
+            }
 
-        double[] heights = meshes.Heights;
-        double topLeft = heights[GroundTileGrid.Index(column, row, _cells)];
-        double topRight = heights[GroundTileGrid.Index(column + 1, row, _cells)];
-        double bottomLeft = heights[GroundTileGrid.Index(column, row + 1, _cells)];
-        double bottomRight = heights[GroundTileGrid.Index(column + 1, row + 1, _cells)];
+            double[] heights = meshes.Heights;
+            double topLeft = heights[GroundTileGrid.Index(column, row, _cells)];
+            double topRight = heights[GroundTileGrid.Index(column + 1, row, _cells)];
+            double bottomLeft = heights[GroundTileGrid.Index(column, row + 1, _cells)];
+            double bottomRight = heights[GroundTileGrid.Index(column + 1, row + 1, _cells)];
 
-        // The square's two triangles meet along its diagonal from top left to bottom right.
-        return x >= y
-            ? topLeft + (topRight - topLeft) * x + (bottomRight - topRight) * y
-            : topLeft + (bottomLeft - topLeft) * y + (bottomRight - bottomLeft) * x;
+            // The square's two triangles meet along its diagonal from top left to bottom right.
+            return x >= y
+                ? topLeft + (topRight - topLeft) * x + (bottomRight - topRight) * y
+                : topLeft + (bottomLeft - topLeft) * y + (bottomRight - bottomLeft) * x;
+        };
     }
 
     public override void _ExitTree() => _stop.Cancel();
@@ -271,7 +283,6 @@ public partial class GroundTiles : Node3D
             _drawn = drawn;
             _deepest = drawn.Count == 0 ? 0 : drawn.Max(tile => tile.Level);
             _joinDue = true;
-            DrawnVersion++;
         }
 
         foreach (GroundTile tile in choice.Kept)
@@ -423,7 +434,6 @@ public partial class GroundTiles : Node3D
             if (_drawn.Contains(meshes.Tile))
             {
                 _joinDue = true;  // A drawn tile's shape changed
-                DrawnVersion++;
             }
         }
 
@@ -491,6 +501,7 @@ public partial class GroundTiles : Node3D
         Show(_water, joined.Water, joined.Origin, PrepareWater);
         _joinedOrigin = joined.Origin;
         _joinedTiles = joined.Tiles;
+        ShownVersion++;
     }
 
     // A mesh instance for the ground or water, placed by Place.
@@ -603,23 +614,25 @@ public partial class GroundTiles : Node3D
         }
     }
 
-    // The drawn tile a point is over, the square of its grid, and where in the square (0 to 1
-    // across and down); null if no drawn tile is under it.
-    private (TileMeshes Meshes, int Column, int Row, double X, double Y)? Square(Vector3D point)
+    // The tile a point is over, of those `meshesOf` gives meshes for (none at levels below
+    // `deepest`), the square of its grid, and where in the square (0 to 1 across and down);
+    // null if none is under it.
+    private (TileMeshes Meshes, int Column, int Row, double X, double Y)? Square(Vector3D point,
+        int deepest, Func<GroundTile, TileMeshes?> meshesOf)
     {
         if (_surface.Locate(point) is not var (root, u, v))
         {
             return null;
         }
 
-        // The drawn tile there, if any, from the finest it could be up.
-        for (int level = _deepest; level >= 0; level--)
+        // The tile there, if any, from the finest it could be up.
+        for (int level = deepest; level >= 0; level--)
         {
             double across = 1L << level;
             var tile = new GroundTile(root, level,
                 (int)Math.Min(Math.Floor(u * across), across - 1),
                 (int)Math.Min(Math.Floor(v * across), across - 1));
-            if (!_drawn.Contains(tile))
+            if (meshesOf(tile) is not TileMeshes meshes)
             {
                 continue;
             }
@@ -628,7 +641,7 @@ public partial class GroundTiles : Node3D
             x *= _cells;
             y *= _cells;
             int column = Math.Min((int)x, _cells - 1), row = Math.Min((int)y, _cells - 1);
-            return (_built[tile].Meshes, column, row, x - column, y - row);
+            return (meshes, column, row, x - column, y - row);
         }
 
         return null;

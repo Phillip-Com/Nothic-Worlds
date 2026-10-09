@@ -901,6 +901,18 @@ public partial class PlanetSurface : MeshInstance3D
             direction, radiusKm * 1000 * Math.PI / 2 / HeightGrid.FaceSize));
 
     /// <summary>
+    /// How far the drawn ground is lifted, in the globe's radii, as
+    /// <see cref="GroundRadiusAt"/> has it but in full precision (single precision holds the
+    /// radius only to the nearest meter or so, which shows as steps on fine ground).
+    /// </summary>
+    public double GroundLiftAt(Vector3D direction, double radiusKm)
+    {
+        double lift = _shownHeights.IsEmpty ? 0 : _reliefScale * _shownHeights.SampleSteepAt(
+            direction, radiusKm * 1000 * Math.PI / 2 / HeightGrid.FaceSize);
+        return Shape == BodyShape.FlatDisc ? Math.Max(lift, FlatDeepestLift) : lift;
+    }
+
+    /// <summary>
     /// How far out the drawn surface is at a direction, in the globe's radii: 1 on an unsculpted
     /// globe, more on a sculpted hill or over water, less in a basin. Overlays sit on it. On a
     /// flat world it's 1 plus how far the face is lifted there (VISION.md BOD-10), so

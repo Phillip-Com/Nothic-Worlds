@@ -24,6 +24,10 @@ public readonly record struct Vector3D(double X, double Y, double Z)
     /// <summary>The dot product.</summary>
     public double Dot(Vector3D other) => X * other.X + Y * other.Y + Z * other.Z;
 
+    /// <summary>The cross product (right-handed).</summary>
+    public Vector3D Cross(Vector3D other) =>
+        new(Y * other.Z - Z * other.Y, Z * other.X - X * other.Z, X * other.Y - Y * other.X);
+
     /// <summary>
     /// Turns the vector around the +X axis by <paramref name="degrees"/> (right-handed: +Y
     /// toward +Z).

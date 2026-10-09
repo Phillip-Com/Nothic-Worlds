@@ -12,19 +12,21 @@ public sealed class RiverBanksTests
     // up, an eye beside it, and the coarser ground drawn a meter lower.
     private static readonly Vector3D _eye = WaterGround.At(10 / MetersPerDegree, 0.01);
 
-    private static List<List<BankPoint[]>> Strips()
-    {
-        RiverProfile river = RiverProfile.For(
-            RiverProfileTests.Drawn(0.1, WaterGround.At(0, -1), WaterGround.At(0, 1)),
-            RadiusKm, _ => 100)!;
-        RiverChannels channels = RiverChannels.Near([river], _eye, RadiusKm, 20_000, _ => 100);
-        return RiverBanks.Strips(channels, _eye, RadiusKm, _ => 100, _ => 99);
-    }
+    private static readonly RiverProfile _river = RiverProfile.For(
+        RiverProfileTests.Drawn(0.1, WaterGround.At(0, -1), WaterGround.At(0, 1)), RadiusKm,
+        _ => 100)!;
+
+    private static readonly RiverChannels _channels =
+        RiverChannels.Near([_river], _eye, RadiusKm, 20_000);
+
+    private static List<List<BankPoint[]>> Strips() =>
+        RiverBanks.Strips(_channels, RiverCarving.For([_river], RadiusKm), _eye, RadiusKm,
+            _ => 100, _ => 99, _ => 5);
 
     [Fact]
     public void EachRow_RunsFromBedUpTheBanks_ToTheCoarserGroundAtItsEdges()
     {
-        // The row nearest the eye, where the channel's fully carved.
+        // The row nearest the eye.
         BankPoint[] row = Assert.Single(Strips())
             .MinBy(r => Angle(_eye, r[r.Length / 2].Direction))!;
 
@@ -41,13 +43,16 @@ public sealed class RiverBanksTests
     }
 
     [Fact]
-    public void TheStrip_CoversOnlyTheCarvedStretch()
+    public void TheStrip_CoversTheWholeStretchInReach_ItsSkirtsAsWideAsAsked()
     {
         List<BankPoint[]> strip = Assert.Single(Strips());
-        double reach = RiverChannels.CarveReachMeters(50) + 500;
-
-        Assert.All(strip, row => Assert.True(
-            Angle(_eye, row[row.Length / 2].Direction) * MetersPerDegree < reach));
+        double farthest = strip.Max(row => Angle(_eye, row[row.Length / 2].Direction))
+            * MetersPerDegree;
+        Assert.InRange(farthest, 19_000, 20_000);
+        BankPoint[] first = strip[0];
+        double halfWidth = _channels.Stretches[0][0].HalfWidthMeters;
+        double across = Angle(first[0].Direction, first[^1].Direction) * MetersPerDegree / 2;
+        Assert.InRange(across - halfWidth - RiverCarving.BankWidthMeters(halfWidth), 4, 6);
     }
 
     private static double Angle(Vector3D a, Vector3D b) =>

@@ -4,10 +4,12 @@ namespace NothicWorlds.Core.Simulation;
 
 /// <summary>
 /// The fine strip of ground along the rivers near a first-person eye (VISION.md BOD-11): the
-/// bed and banks of each carved stretch (<see cref="RiverChannels"/>), drawn more finely than
+/// bed and banks of each stretch in reach (<see cref="RiverChannels"/>), as
+/// <see cref="RiverCarving"/> cuts them, drawn more finely than
 /// the coarser ground around the eye could, with a skirt beyond each bank that blends into
 /// that coarser ground, so its cells' flat faces never show along a river. Each row runs
-/// across the river from one skirt's edge to the other.
+/// across the river from one skirt's edge to the other. Worked out on one thread (it's meant
+/// for a worker, where it shouldn't crowd out the drawing).
 /// </summary>
 public static class RiverBanks
 {
@@ -30,54 +32,42 @@ public static class RiverBanks
     private const double LiftShare = 0.005, MinLiftMeters = 0.05;
 
     /// <summary>
-    /// The strips along the carved stretches of <paramref name="channels"/>, around
-    /// <paramref name="eye"/> on a body <paramref name="radiusKm"/> in radius:
-    /// <paramref name="groundMeters"/> gives the ground's height at a direction and
-    /// <paramref name="coarseMeters"/> the coarser drawn ground's (where the skirts end).
+    /// The strips along the stretches of <paramref name="channels"/>, cut by
+    /// <paramref name="carving"/>, around <paramref name="eye"/> on a body
+    /// <paramref name="radiusKm"/> in radius: <paramref name="groundMeters"/> gives the
+    /// ground's height at a direction, <paramref name="coarseMeters"/> the coarser drawn
+    /// ground's (where the skirts end), and <paramref name="skirtMeters"/> how wide the skirt
+    /// beyond each bank must be there (past where the coarser ground is sunk under it).
     /// </summary>
-    public static List<List<BankPoint[]>> Strips(RiverChannels channels, Vector3D eye,
-        double radiusKm, Func<Vector3D, double> groundMeters, Func<Vector3D, double> coarseMeters)
+    public static List<List<BankPoint[]>> Strips(RiverChannels channels, RiverCarving carving,
+        Vector3D eye, double radiusKm, Func<Vector3D, double> groundMeters,
+        Func<Vector3D, double> coarseMeters, Func<Vector3D, double> skirtMeters)
     {
         double radiusMeters = radiusKm * 1000;
 
-        // Which steps get a row, strip by strip; the rows are worked out after, all at once
-        // (each is independent, and there are thousands of points to measure).
+        // Which steps get a row, strip by strip; the rows are worked out after.
         var strips = new List<List<int>>();
         var stretchOf = new List<IReadOnlyList<ChannelPoint>>();
         foreach (IReadOnlyList<ChannelPoint> stretch in channels.Stretches)
         {
-            List<int>? strip = null;
+            var strip = new List<int>();
             double lastRow = double.NegativeInfinity;
             for (int i = 0; i < stretch.Count; i++)
             {
-                // A step is in the strip if it or a step beside it is carved.
-                bool carved = stretch[Math.Max(i - 1, 0)].Carved > 0 || stretch[i].Carved > 0
-                    || stretch[Math.Min(i + 1, stretch.Count - 1)].Carved > 0;
-                if (!carved)
-                {
-                    strip = null;
-                    continue;
-                }
-
                 double fromEye = radiusMeters
                     * Math.Acos(Math.Clamp(stretch[i].Direction.Dot(eye), -1, 1));
-                bool last = i == stretch.Count - 1 || stretch[i + 1].Carved <= 0;
-                if (strip is not null && !last && stretch[i].AlongMeters - lastRow
+                if (i > 0 && i < stretch.Count - 1 && stretch[i].AlongMeters - lastRow
                     < Math.Max(MinRowMeters, RowShare * fromEye))
                 {
                     continue;
                 }
 
-                if (strip is null)
-                {
-                    strip = [];
-                    strips.Add(strip);
-                    stretchOf.Add(stretch);
-                }
-
                 lastRow = stretch[i].AlongMeters;
                 strip.Add(i);
             }
+
+            strips.Add(strip);
+            stretchOf.Add(stretch);
         }
 
         var rows = new List<(int Strip, int Step)>();
@@ -90,27 +80,30 @@ public static class RiverBanks
         }
 
         var built = new BankPoint[rows.Count][];
-        Parallel.For(0, rows.Count, r => built[r] = Row(channels, stretchOf[rows[r].Strip],
-            rows[r].Step, eye, radiusMeters, groundMeters, coarseMeters));
+        for (int r = 0; r < rows.Count; r++)
+        {
+            built[r] = Row(carving, stretchOf[rows[r].Strip], rows[r].Step, eye, radiusMeters,
+                groundMeters, coarseMeters, skirtMeters);
+        }
         return [.. rows.Select((row, r) => (row.Strip, Row: built[r]))
             .GroupBy(row => row.Strip)
             .Select(group => group.Select(row => row.Row).ToList())];
     }
 
     // The row across the river at step i of a stretch.
-    private static BankPoint[] Row(RiverChannels channels, IReadOnlyList<ChannelPoint> stretch,
+    private static BankPoint[] Row(RiverCarving carving, IReadOnlyList<ChannelPoint> stretch,
         int i, Vector3D eye, double radiusMeters, Func<Vector3D, double> groundMeters,
-        Func<Vector3D, double> coarseMeters)
+        Func<Vector3D, double> coarseMeters, Func<Vector3D, double> skirtMeters)
     {
         ChannelPoint point = stretch[i];
         Vector3D along = stretch[Math.Min(i + 1, stretch.Count - 1)].Direction
             - stretch[Math.Max(i - 1, 0)].Direction;
-        Vector3D side = Cross(point.Direction, along);
+        Vector3D side = point.Direction.Cross(along);
         side *= 1 / Math.Max(side.Length, 1e-12);
         double fromEye = radiusMeters * Math.Acos(Math.Clamp(point.Direction.Dot(eye), -1, 1));
         double halfWidth = point.HalfWidthMeters;
-        double bankTop = halfWidth + RiverChannels.BankWidthMeters(halfWidth);
-        double skirt = RiverChannels.SkirtMeters(fromEye);
+        double bankTop = halfWidth + RiverCarving.BankWidthMeters(halfWidth);
+        double skirt = skirtMeters(point.Direction);
         double lift = MinLiftMeters + LiftShare * fromEye;
 
         // The offsets across, from one skirt's edge to the other.
@@ -125,14 +118,11 @@ public static class RiverBanks
         {
             Vector3D direction = point.Direction + side * (offset.Across / radiusMeters);
             direction *= 1 / direction.Length;
-            double carved = channels.Carve(direction, groundMeters(direction));
+            double carved = carving.Carve(direction, groundMeters(direction));
             double meters = offset.Skirt == 0
                 ? carved
                 : carved + (coarseMeters(direction) + lift - carved) * offset.Skirt;
             return new BankPoint(direction, meters, 1 - offset.Skirt);
         })];
     }
-
-    private static Vector3D Cross(Vector3D a, Vector3D b) =>
-        new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
 }
