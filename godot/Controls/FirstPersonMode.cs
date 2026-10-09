@@ -20,8 +20,8 @@ namespace NothicWorlds.Controls;
 /// </summary>
 /// <remarks>
 /// While standing, the scene is centered on the eye (<see cref="SystemView.StandingOn"/>) and
-/// the ground right around it is drawn by a <see cref="FirstPersonGround"/>, both so the
-/// ground near the eye keeps its precision. A <see cref="SurfaceSky"/> takes over the
+/// the ground right around it is drawn by <see cref="GroundTiles"/>, both so the ground near
+/// the eye keeps its precision. A <see cref="SurfaceSky"/> takes over the
 /// background, and a <see cref="FirstPersonHud"/> shows the readouts. Must come last in the
 /// scene: it takes the mouse and keys before the globe's camera and tools.
 /// </remarks>
@@ -30,7 +30,8 @@ public partial class FirstPersonMode : Node
     private const double EyeHeightMeters = 1.7;
     private const float LookDegreesPerPixel = 0.2f;
 
-    // The least time between rebuilds of the ground while it's only drifted a little.
+    // The least time between rebuilds of the rivers' channels (and the cloud deck, and a flat
+    // world's rim) while the eye has only drifted a little.
     private const double MinGroundRebuildSeconds = 0.1;
 
     // The ground detail's coarsest noise size, and how many of those the noise repeats over:
@@ -83,30 +84,38 @@ public partial class FirstPersonMode : Node
     private readonly ShaderMaterial _waterMaterial =
         new() { Shader = GD.Load<Shader>("res://Rendering/water_surface.gdshader") };
     private Camera3D? _camera;
-    private FirstPersonGround? _ground;
+    private GroundTiles? _tiles;       // The ground and the water's surface around the eye
+    private GroundDetail _groundDetail = GroundDetail.Standard;
     private FirstPersonGround? _deck;  // The clouds below, when flying above them
-    private FirstPersonGround? _water; // The water's surface, on a body with water
-    private double? _waterBuiltRadius; // The water level it was built at, in radii
     private RiverWater? _rivers;       // The rivers' water around the eye
     private RiverBankStrip? _banks;    // ... and their beds and banks, drawn finely
     private RiverChannels? _channels;  // ... and the channels they cut, as last built
+    private Vector3D _channelsAround;  // The spot they were built around
+    private Vector3D _channelsMiddle;  // ... on the ground there (in the body's own space)
+    private bool _nearEyeDue = true;   // The globe's water hasn't stepped aside for them yet
+    private int _channelsVersion;      // Goes up each time they're built
+    private int _banksDrawnVersion = -1;  // The tiles drawn when the banks were last checked
+    private int _banksGround;          // ... and those under them when they were built
+    private bool _banksStale = true;   // The banks don't match the channels yet
+
+    // Names the heights the ground tiles are built from (with the rivers' channels near the
+    // eye): goes up when the ground or the water changes, so tiles built before are rebuilt.
+    private long _tileHeights;
+    private double? _tilesWaterRadius;
 
     // Each river's water along its course (VISION.md BOD-11), worked out for the courses and
     // ground they were worked out from (they change rarely; the channels with every rebuild).
     private (IReadOnlyList<RiverCourseShown> Courses, int Relief, List<RiverProfile> Rivers)?
         _profiles;
 
-    // Where there's no water over the ground, the water's surface built around the eye lies
-    // this far under it, so it stays out of sight: this share of the distance from the eye
-    // (the ground drawn farther out is coarser), and at least this, in meters. Near the shore
-    // the water slopes down under the ground over a single step of the mesh.
-    private const double DryShare = 0.002, MinDryMeters = 0.5;
-    private FlatPatch? _flatGround;    // On a flat world, the ground around the eye
-    private FlatPatch? _flatDeck;      // ... and the clouds below
-    private FlatPatch? _flatWater;     // ... and the water's surface
-    private double? _flatWaterBuilt;   // The water level it was built at, in radii
+    // Where there's no water over the ground, the water's surface built with it lies this far
+    // under it, so it stays out of sight: this share of the width of the tile's squares (the
+    // ground farther out is coarser), and at least this, in meters. Near the shore the water
+    // slopes down under the ground over a single square.
+    private const double DryCellShare = 0.1, MinDryMeters = 0.5;
+    private FlatPatch? _flatGround;    // On a flat world's rim or underside, the ground there
+    private FlatPatch? _flatDeck;      // ... and on its top face, the clouds below
     private FlatSpot? _flat;           // Where the eye stands on a flat world (else on a globe)
-    private double _flatBuiltHeightMeters;
 
     // On a flat world the ground patch sits this far off the disc's own face (in globe radii,
     // about 6 m on an Earth-sized world), so the two don't flicker against each other where
@@ -133,10 +142,10 @@ public partial class FirstPersonMode : Node
     private Vector2 _mouse;
     private int _speed;
     private int _groundVersion = -1;
-    private double _groundHeightMeters;  // The eye's height when the ground was built
-    private double _sinceGroundBuilt;     // Seconds since the ground was last built
+    private double _groundHeightMeters;  // The eye's height when the channels were built
+    private double _sinceGroundBuilt;     // Seconds since the channels were last built
+    private double _sinceBanksBuilt;      // ... and the banks
     private bool _deckStale = true;       // The cloud deck doesn't match the ground yet
-    private bool _waterStale = true;      // The water's surface doesn't match the ground yet
     private float _savedRelief = 1;       // View ▸ Relief's exaggeration, back on leaving
     private WeatherSample? _weather;
     private double _weatherAge = double.PositiveInfinity;
@@ -304,6 +313,28 @@ public partial class FirstPersonMode : Node
         Enter(bodyId, direction);
     }
 
+    /// <summary>
+    /// How finely the ground is drawn around the eye (File ▸ Settings, Ground detail): changed
+    /// while standing, the ground is built again.
+    /// </summary>
+    public GroundDetail GroundDetail
+    {
+        get => _groundDetail;
+        set
+        {
+            if (value == _groundDetail)
+            {
+                return;
+            }
+
+            _groundDetail = value;
+            if (_tiles is not null)
+            {
+                MakeTiles();
+            }
+        }
+    }
+
     /// <summary>Goes back to the globe, if standing.</summary>
     public void Leave()
     {
@@ -324,13 +355,10 @@ public partial class FirstPersonMode : Node
             System.ReliefExaggeration = _savedRelief;
         }
 
-        _ground?.QueueFree();
-        _ground = null;
+        _tiles?.QueueFree();
+        _tiles = null;
         _deck?.QueueFree();
         _deck = null;
-        _water?.QueueFree();
-        _water = null;
-        _waterBuiltRadius = null;
         _rivers?.QueueFree();
         _rivers = null;
         _banks?.QueueFree();
@@ -342,9 +370,6 @@ public partial class FirstPersonMode : Node
         _flatGround = null;
         _flatDeck?.QueueFree();
         _flatDeck = null;
-        _flatWater?.QueueFree();
-        _flatWater = null;
-        _flatWaterBuilt = null;
         _camera?.QueueFree();
         _camera = null;
         _overhead?.QueueFree();
@@ -424,8 +449,6 @@ public partial class FirstPersonMode : Node
             GlobeCamera.ProcessMode = ProcessModeEnum.Disabled;
         }
 
-        _ground = new FirstPersonGround();
-        AddChild(_ground);
         _deck = new FirstPersonGround
         {
             Name = "CloudDeck",
@@ -433,13 +456,6 @@ public partial class FirstPersonMode : Node
             Visible = false,
         };
         AddChild(_deck);
-        _water = new FirstPersonGround
-        {
-            Name = "WaterSurface",
-            MaterialOverride = _waterMaterial,
-            Visible = false,
-        };
-        AddChild(_water);
         _rivers = new RiverWater { Visible = flat is null };
         AddChild(_rivers);
         _banks = new RiverBankStrip { Visible = flat is null };
@@ -455,14 +471,9 @@ public partial class FirstPersonMode : Node
                 Visible = false,
             };
             AddChild(_flatDeck);
-            _flatWater = new FlatPatch
-            {
-                Name = "FlatWaterSurface",
-                MaterialOverride = _waterMaterial,
-                Visible = false,
-            };
-            AddChild(_flatWater);
         }
+
+        MakeTiles();
 
         if (Environment is not null)
         {
@@ -575,6 +586,7 @@ public partial class FirstPersonMode : Node
 
         Move(body, delta);
         _sinceGroundBuilt += delta;
+        _sinceBanksBuilt += delta;
         double radiusMeters = body.RadiusKm * 1000;
         if (_flat is null)
         {
@@ -722,9 +734,9 @@ public partial class FirstPersonMode : Node
         }
 
         // Never under the drawn ground, which can stand above the ground's height between its
-        // points (see FirstPersonGround.HighestAround).
+        // points (see GroundTiles.HighestAround).
         double ground = CarvedRadius(globe, body, _spot);
-        return _ground?.HighestAround(_spot) is double drawn ? Math.Max(ground, drawn) : ground;
+        return _tiles?.HighestAround(_spot) is double drawn ? Math.Max(ground, drawn) : ground;
     }
 
     // How far the eye is from the nearest surface it could look at closely, in meters: the
@@ -762,6 +774,31 @@ public partial class FirstPersonMode : Node
         _camera.Far = near * 1e6f;
     }
 
+    // Makes the ground tiles for the body stood on, in place of any there were: over a globe,
+    // or a flat world's top face.
+    private void MakeTiles()
+    {
+        if (Session?.World.Bodies.Find(b => b.Id == _bodyId) is not Body body)
+        {
+            return;
+        }
+
+        _tiles?.QueueFree();
+        double radiusKm = body.RadiusKm;
+        ITileSurface surface = _flat is null ? new GlobeTileSurface() : new FlatTopTileSurface();
+        _tiles = new GroundTiles(surface, radiusKm * 1000, _groundDetail)
+        {
+            WaterMaterial = _waterMaterial,
+            Visible = false,
+            PrepareGround = (tile, anchor) => SetGroundDetail(tile, anchor, radiusKm),
+            PrepareWater = (tile, anchor) => SetWaveOrigin(tile, anchor, radiusKm),
+        };
+        AddChild(_tiles);
+        _waterMaterial.SetShaderParameter("radius_meters", (float)(radiusKm * 1000));
+        _banksStale = true;
+        _nearEyeDue = true;
+    }
+
     // The way the view looks, in the scene's frame.
     private Vector3D Look((Vector3D East, Vector3D North, Vector3D Up) frame)
     {
@@ -769,37 +806,35 @@ public partial class FirstPersonMode : Node
         return level * Math.Cos(_pitch) + frame.Up * Math.Sin(_pitch);
     }
 
-    // The rings of ground around the eye, and the cloud deck's: built again when the eye has
-    // moved a good part of its height away from their middle, risen or sunk by half, or the
-    // ground changed (they reach past the horizon, which moves out as the eye rises); placed
-    // relative to the eye. Moving fast, that would be every frame, which took the frame rate
-    // down to a dozen a second: then they're built at most every MinGroundRebuildSeconds,
-    // unless the eye has gone a good way out across them.
+    // Puts the ground tiles, the cloud deck, and the rivers in the scene, relative to the eye.
     private void PlaceGround(Body body, double time, Vector3D eye, double displayRadius)
     {
-        PlaceRings(_ground!, body, time, eye, displayRadius);
+        _tiles!.Place(point => At(body, time, eye, displayRadius, point));
         PlaceRings(_deck!, body, time, eye, displayRadius);
-        PlaceRings(_water!, body, time, eye, displayRadius);
         PlaceRivers(body, time, eye, displayRadius);
     }
 
     // Puts the rivers' water, beds, and banks in the scene, relative to the eye.
     private void PlaceRivers(Body body, double time, Vector3D eye, double displayRadius)
     {
-        Transform3D At(Vector3D middle) => new(
-            BodyBasis(body, time).Scaled(Vector3.One * (float)displayRadius),
-            ToGodot(ToSystem(body, time, middle - eye) * displayRadius));
         if (_rivers is { Mesh: not null } rivers)
         {
-            rivers.GlobalTransform = At(rivers.Middle);
+            rivers.GlobalTransform = At(body, time, eye, displayRadius, rivers.Middle);
             rivers.SetScale(body.RadiusKm * 1000 / displayRadius);
         }
 
         if (_banks is { Mesh: not null } banks)
         {
-            banks.GlobalTransform = At(banks.Middle);
+            banks.GlobalTransform = At(body, time, eye, displayRadius, banks.Middle);
         }
     }
+
+    // Where a mesh kept relative to `middle` (a point in the body's own space, in radii) goes
+    // in the scene, relative to the eye.
+    private static Transform3D At(Body body, double time, Vector3D eye, double displayRadius,
+        Vector3D middle) => new(
+            BodyBasis(body, time).Scaled(Vector3.One * (float)displayRadius),
+            ToGodot(ToSystem(body, time, middle - eye) * displayRadius));
 
     // The beds and banks of the rivers around the eye, drawn finely over the coarser ground
     // (VISION.md BOD-11): `coarseRadius` gives how far out that ground is drawn at a
@@ -819,6 +854,7 @@ public partial class FirstPersonMode : Node
                     : _channels.Carve(direction, GroundMeters(direction)));
         _banks!.MaterialOverride = globe.MaterialOverride;
         _banks.Build(strips, middle, pointAt, placeAt);
+        SetGroundDetail(_banks, middle, body.RadiusKm);
     }
 
     // The rivers around `eye` (a direction on the globe, or the one a flat world's spot
@@ -853,17 +889,13 @@ public partial class FirstPersonMode : Node
 
     // How far out the coarser ground around the eye is at a direction, in radii: with the
     // rivers' channels cut in, and sunk out of sight under the fine strip that draws their
-    // beds and banks.
-    private double UnderStripRadius(PlanetSurface globe, Body body, Vector3D direction)
+    // beds and banks. Safe off the main thread (the tiles are built on workers).
+    private static double UnderStripRadius(PlanetSurface globe, double radiusKm,
+        RiverChannels channels, Vector3D direction)
     {
-        double ground = globe.GroundRadiusAt(direction, body.RadiusKm);
-        if (_channels is null)
-        {
-            return ground;
-        }
-
-        double radiusMeters = body.RadiusKm * 1000;
-        return 1 + _channels.UnderStripMeters(direction, (ground - 1) * radiusMeters)
+        double radiusMeters = radiusKm * 1000;
+        double ground = globe.GroundRadiusAt(direction, radiusKm);
+        return 1 + channels.UnderStripMeters(direction, (ground - 1) * radiusMeters)
             / radiusMeters;
     }
 
@@ -883,18 +915,18 @@ public partial class FirstPersonMode : Node
 
     // The height the water's surface is built at, in radii above the base: the water's,
     // where it stands above the ground (before rivers' channels are cut: those hold the
-    // river's water, not the sea's), else out of sight just under the coarser drawn ground
-    // (`under`: carved, and sunk under rivers' banks), `away` radii from the eye.
+    // river's water, not the sea's), else out of sight just under the drawn ground (`under`:
+    // carved, and sunk under rivers' banks) on a tile with squares `cell` radii across.
     private static double WaterOrUnder(double? water, double ground, double under,
-        double away, Body body)
+        double cell, double radiusMeters)
     {
         if (water is double level && level > ground)
         {
             return level;
         }
 
-        double radiusMeters = body.RadiusKm * 1000;
-        return under - Math.Max(MinDryMeters, DryShare * away * radiusMeters) / radiusMeters;
+        return under - Math.Max(MinDryMeters, DryCellShare * cell * radiusMeters)
+            / radiusMeters;
     }
 
     // How far out the water's surface is over the eye, in radii: the sea's, or a lake's
@@ -961,87 +993,188 @@ public partial class FirstPersonMode : Node
         return underfoot?.Climate == ClimateKind.Water ? underfoot.Color.ToGodot() : null;
     }
 
-    // Builds the ground (and cloud deck) again when needed (see PlaceGround). Done before the
-    // eye is placed on it, so the eye is always measured against the ground that's drawn:
-    // built after, the eye could be a frame below the new ground and see through it.
+    // Keeps the ground around the eye built (GroundTiles), with the rivers' channels cut in
+    // near it, and the cloud deck over it. Done before the eye is placed on it, so the eye is
+    // always measured against the ground that's drawn. The channels depend on where the eye
+    // is (they're carved only near it), so they're built again when the eye has moved a good
+    // part of its height away, risen or sunk by half, or the ground changed (see ChannelsDue);
+    // the tiles near the eye are rebuilt with them, and the rest stay as they are.
     private void KeepGroundBuilt(PlanetSurface globe, Body body)
     {
-        FirstPersonGround ground = _ground!;
-        ground.Visible = !globe.IsCarved;  // A carved globe draws its own carving
-        _water!.Visible = !globe.IsCarved && (globe.WaterRadius is not null || globe.HasLakes);
-        _rivers!.Visible = !globe.IsCarved;
-        _banks!.Visible = !globe.IsCarved;
-        if (globe.IsCarved)
+        GroundTiles tiles = _tiles!;
+        bool shown = !globe.IsCarved;  // A carved globe draws its own carving
+        tiles.Visible = shown;
+        _rivers!.Visible = shown;
+        _banks!.Visible = shown;
+        if (!shown)
         {
             return;
         }
 
-        double height = _heightMeters / (body.RadiusKm * 1000);
-        double horizon = Math.Acos(1 / (1 + height));
-        double outer = Math.Clamp(horizon * 4, 0.003, 0.6);
-        double moved = Math.Acos(Math.Clamp(ground.Center.Dot(_spot), -1, 1));
-        double risen = _heightMeters / _groundHeightMeters;
-        bool drifted = moved > Math.Max(height * 0.25, 1e-7)
-            && (_sinceGroundBuilt >= MinGroundRebuildSeconds || moved > outer * 0.3);
-        if (ground.Mesh is null || globe.ReliefVersion != _groundVersion
-            || drifted || risen > 1.5 || risen < 1 / 1.5)
+        double radiusMeters = body.RadiusKm * 1000;
+        double height = _heightMeters / radiusMeters;
+
+        // The ground reaches well past the horizon, which moves out as the eye rises.
+        double outer = Math.Clamp(Math.Acos(1 / (1 + height)) * 4, 0.003, 0.6);
+        double ground = globe.GroundRadiusAt(_spot, body.RadiusKm);
+        Vector3D middle = _spot * ground;
+        Vector3D Lifted(Vector3D direction, double meters) =>
+            direction * (1 + meters / radiusMeters);
+        double moved = Math.Acos(Math.Clamp(_channelsAround.Dot(_spot), -1, 1));
+        if (ChannelsDue(globe, moved > Math.Max(height * 0.25, 1e-7), moved > outer * 0.3))
         {
-            _sinceGroundBuilt = 0;
             _channels = ChannelsAround(globe, body, _spot, outer);
-            ground.Build(direction => UnderStripRadius(globe, body, direction), _spot,
-                Math.Max(height * 0.5, 2e-7), outer);
-            double radiusMeters = body.RadiusKm * 1000;
-            Vector3D Lifted(Vector3D direction, double meters) =>
-                direction * (1 + meters / radiusMeters);
-            _rivers!.Build(_channels, ground.Center * ground.CenterRadius, Lifted,
-                radiusMeters);
-            BuildBanks(globe, body, _spot, ground.Center * ground.CenterRadius,
-                ground.SurfaceRadiusAt, Lifted, (direction, _) => direction);
-            ground.MaterialOverride = globe.MaterialOverride;
-            SetGroundDetail(ground.MaterialOverride, ground.Center * ground.CenterRadius,
-                body.RadiusKm);
-            globe.SetNearEye(ground.Center, outer * NearEyeShare);
-            _groundVersion = globe.ReliefVersion;
-            _groundHeightMeters = _heightMeters;
-            _deckStale = true;
-            _waterStale = true;
+            _channelsAround = _spot;
+            _channelsMiddle = middle;
+            _rivers.Build(_channels, middle, Lifted, radiusMeters);
         }
 
-        // The water's surface: the same rings at the sea's level, or a lake's (VISION.md
-        // BOD-11), and out of sight under the ground where there's neither.
-        if (_water.Visible && (_waterStale || globe.WaterRadius != _waterBuiltRadius))
+        tiles.GroundMaterial = globe.MaterialOverride;
+        SetGroundRadius(globe.MaterialOverride, radiusMeters);
+        Func<GroundTile, TileExtent, GroundTileRecipe> recipes = Recipes(globe, body,
+            direction => globe.GroundRadiusAt(direction, body.RadiusKm),
+            channels => direction => UnderStripRadius(globe, body.RadiusKm, channels,
+                direction),
+            (direction, under, cell) => WaterOrUnder(globe.WaterRadiusAt(direction) - 1,
+                globe.GroundRadiusAt(direction, body.RadiusKm) - 1, under - 1, cell,
+                radiusMeters) + 1);
+        tiles.Update(_spot * (ground + height), _spot, outer, RecipesVersion(globe), recipes);
+        if (_nearEyeDue && tiles.HasGround)
         {
-            _waterStale = false;
-            _waterBuiltRadius = globe.WaterRadius;
-            Vector3D center = ground.Center;
-            _water.Build(direction => WaterOrUnder(globe.WaterRadiusAt(direction) - 1,
-                    globe.GroundRadiusAt(direction, body.RadiusKm) - 1,
-                    UnderStripRadius(globe, body, direction) - 1,
-                    Math.Acos(Math.Clamp(direction.Dot(center), -1, 1)), body) + 1,
-                center, Math.Max(height * 0.5, 2e-7), outer);
-            SetWaveOrigin(ground.Center * _water.CenterRadius, body.RadiusKm);
+            // The globe's own water steps aside for the water drawn on the tiles.
+            _nearEyeDue = false;
+            globe.SetNearEye(_channelsAround, outer * NearEyeShare);
         }
 
-        // The cloud deck: the same rings at the cloud layer, over the ground here. It's only
-        // seen from above the clouds, so it's built only then.
+        if (BanksDue(tiles, body))
+        {
+            BuildBanks(globe, body, _spot, middle, direction => tiles.HeightAt(direction),
+                Lifted, (direction, _) => direction);
+        }
+
+        // The cloud deck: rings at the cloud layer, over the ground here. It's only seen from
+        // above the clouds, so it's built only then.
         if (_deckStale && !BelowClouds())
         {
             _deckStale = false;
-            double layer = ground.CenterRadius + SurfaceSky.CloudHeightKm / body.RadiusKm;
-            _deck!.Build(_ => layer, ground.Center, 2e-7, outer);
+            double layer = ground + SurfaceSky.CloudHeightKm / body.RadiusKm;
+            _deck!.Build(_ => layer, _spot, 2e-7, outer);
         }
     }
 
-    // Tells the ground's material where the point its patch is built around falls in the fine
-    // ground detail's noise (planet_surface.gdshaderinc): worked out here in double precision
-    // and wrapped to the noise's repeat, so the detail stays put on the ground as it's rebuilt.
-    private static void SetGroundDetail(Material? material, Vector3D anchor, double radiusKm)
+    // Whether the rivers' channels (and with them the cloud deck, and a flat world's rim) are
+    // due to be built again: when the ground has changed, the eye has risen or sunk by half,
+    // or it has `drifted` a good part of its height away from where they were built. Moving
+    // fast, that would be every frame, so then it's at most every MinGroundRebuildSeconds,
+    // unless it has gone `far`. Notes the ground and height they're built for.
+    private bool ChannelsDue(PlanetSurface globe, bool drifted, bool far)
     {
-        if (material is not ShaderMaterial shader)
+        double risen = _heightMeters / _groundHeightMeters;
+        if (globe.ReliefVersion == _groundVersion && risen <= 1.5 && risen >= 1 / 1.5
+            && !(drifted && (_sinceGroundBuilt >= MinGroundRebuildSeconds || far)))
         {
-            return;
+            return false;
         }
 
+        if (globe.ReliefVersion != _groundVersion)
+        {
+            _tileHeights++;  // The ground (or the water on it) changed: every tile's rebuilt
+        }
+
+        _groundVersion = globe.ReliefVersion;
+        _groundHeightMeters = _heightMeters;
+        _sinceGroundBuilt = 0;
+        _channelsVersion++;
+        _banksStale = true;
+        _deckStale = true;
+        _nearEyeDue = true;
+        return true;
+    }
+
+    // Whether the rivers' beds and banks are due to be built again: after the channels, or
+    // once the ground drawn under them has changed (their edges meet it), at most every
+    // MinGroundRebuildSeconds.
+    private bool BanksDue(GroundTiles tiles, Body body)
+    {
+        if (_sinceBanksBuilt < MinGroundRebuildSeconds)
+        {
+            return false;
+        }
+
+        bool rivers = _channels is { Stretches.Count: > 0 };
+        if (!_banksStale && (!rivers || tiles.DrawnVersion == _banksDrawnVersion))
+        {
+            return false;
+        }
+
+        // Only the ground within the channels' reach matters.
+        _banksDrawnVersion = tiles.DrawnVersion;
+        int under = rivers ? tiles.DrawnNear(_channelsMiddle,
+            RiverChannels.MaxShapedMeters / (body.RadiusKm * 1000)) : 0;
+        if (!_banksStale && under == _banksGround)
+        {
+            return false;
+        }
+
+        _banksStale = false;
+        _banksGround = under;
+        _sinceBanksBuilt = 0;
+        return true;
+    }
+
+    // Names the ground tiles' recipes (see Recipes): it changes when they do. Notes the sea's
+    // level they're built for: when that changes, every tile's built again.
+    private long RecipesVersion(PlanetSurface globe)
+    {
+        if (globe.WaterRadius != _tilesWaterRadius)
+        {
+            _tilesWaterRadius = globe.WaterRadius;
+            _tileHeights++;
+        }
+
+        return (_tileHeights << 32) | (uint)_channelsVersion;
+    }
+
+    // How the ground tiles are built (GroundTileRecipe): at the `plain` ground's height; within
+    // reach of the rivers' channels, at the height `carved` gives with them cut in (those
+    // tiles are built again with each new set of channels); with the water's surface `water`
+    // gives over them, on a body with water.
+    private Func<GroundTile, TileExtent, GroundTileRecipe> Recipes(PlanetSurface globe,
+        Body body, Func<Vector3D, double> plain,
+        Func<RiverChannels, Func<Vector3D, double>> carved,
+        Func<Vector3D, double, double, double> water)
+    {
+        Func<Vector3D, double, double, double>? waterOver =
+            globe.WaterRadius is not null || globe.HasLakes ? water : null;
+        var plainRecipe = new GroundTileRecipe(_tileHeights << 32, plain, waterOver);
+        if (_channels is not { Stretches.Count: > 0 } channels)
+        {
+            return (_, _) => plainRecipe;
+        }
+
+        var carvedRecipe = new GroundTileRecipe((_tileHeights << 32) | (uint)_channelsVersion,
+            carved(channels), waterOver);
+        Vector3D around = _channelsMiddle;
+        double reach = RiverChannels.MaxShapedMeters / (body.RadiusKm * 1000);
+        return (_, extent) => extent.DistanceFrom(around) < reach ? carvedRecipe : plainRecipe;
+    }
+
+    // Tells the ground's material the globe's radius in meters, for the fine ground detail
+    // (planet_surface.gdshaderinc).
+    private static void SetGroundRadius(Material? material, double radiusMeters)
+    {
+        if (material is ShaderMaterial shader)
+        {
+            shader.SetShaderParameter("ground_radius_meters", (float)radiusMeters);
+        }
+    }
+
+    // Tells a mesh of the ground where the point it's built around falls in the fine ground
+    // detail's noise (planet_surface.gdshaderinc): worked out here in double precision and
+    // wrapped to the noise's repeat, so the detail runs on unbroken from one tile to the next.
+    private static void SetGroundDetail(GeometryInstance3D ground, Vector3D anchor,
+        double radiusKm)
+    {
         double radiusMeters = radiusKm * 1000;
         float Wrapped(double radii)
         {
@@ -1049,14 +1182,14 @@ public partial class FirstPersonMode : Node
             return (float)(units - Math.Floor(units / GroundNoiseRepeat) * GroundNoiseRepeat);
         }
 
-        shader.SetShaderParameter("ground_detail_origin",
+        ground.SetInstanceShaderParameter("ground_detail_origin",
             new Vector3(Wrapped(anchor.X), Wrapped(anchor.Y), Wrapped(anchor.Z)));
-        shader.SetShaderParameter("ground_radius_meters", (float)radiusMeters);
     }
 
-    // Tells the water's material where the point its rings are built around falls in the
-    // waves' repeat, worked out in double precision, so the waves stay put as it's rebuilt.
-    private void SetWaveOrigin(Vector3D anchor, double radiusKm)
+    // Tells a tile of the water's surface where the point it's built around falls in the
+    // waves' repeat, worked out in double precision, so the waves run on unbroken.
+    private static void SetWaveOrigin(GeometryInstance3D water, Vector3D anchor,
+        double radiusKm)
     {
         double radiusMeters = radiusKm * 1000;
         float Wrapped(double radii)
@@ -1065,98 +1198,101 @@ public partial class FirstPersonMode : Node
             return (float)(meters - Math.Floor(meters / WaveRepeatMeters) * WaveRepeatMeters);
         }
 
-        _waterMaterial.SetShaderParameter("wave_origin",
+        water.SetInstanceShaderParameter("wave_origin",
             new Vector3(Wrapped(anchor.X), Wrapped(anchor.Y), Wrapped(anchor.Z)));
-        _waterMaterial.SetShaderParameter("radius_meters", (float)radiusMeters);
     }
 
-    // On a flat world, the patch of ground around the eye (the map on top, bare rock on the
-    // rim and underside) and the cloud deck over the top: built again when the eye has moved a
-    // good part of its height away from their middle, onto another face, or risen or sunk by
-    // half; placed relative to the eye.
+    // On a flat world: on the top face, the ground tiles (as on a globe: see
+    // KeepGroundBuilt), the rivers, and the cloud deck over them; on the rim and underside, a
+    // patch of bare rock around the eye. The rock, deck, and channels are built again as
+    // ChannelsDue says, or when the eye has gone onto another face. All placed relative to
+    // the eye.
     private void PlaceFlatGround(PlanetSurface globe, Body body, double time, Vector3D eye,
         double displayRadius, FlatSpot flat)
     {
-        _ground!.Visible = false;
-        FlatPatch ground = _flatGround!;
-        ground.Visible = !globe.IsCarved;  // A carved disc draws its own carving
-        double height = _heightMeters / (body.RadiusKm * 1000);
+        GroundTiles tiles = _tiles!;
+        FlatPatch rock = _flatGround!;
+        bool top = flat.Face == FlatFace.Top;
+        tiles.Visible = top && !globe.IsCarved;  // A carved disc draws its own carving
+        rock.Visible = !top && !globe.IsCarved;
+        _rivers!.Visible = tiles.Visible;
+        _banks!.Visible = tiles.Visible;
+        double radiusMeters = body.RadiusKm * 1000;
+        double height = _heightMeters / radiusMeters;
         Vector3D underfoot = FlatPoint(globe, flat, 0, body);
-        double risen = _heightMeters / _flatBuiltHeightMeters;
+
+        // No horizon on a flat face: the ground reaches well past what the eye sees sharply,
+        // and the disc's own mesh beyond it.
         double outer = Math.Clamp(height * 400, 0.003, 2 * FlatDisc.Radius);
-        if (ground.Mesh is null || flat.Face != _flatBuiltFace
-            || globe.ReliefVersion != _groundVersion
-            || (ground.Middle - underfoot).Length > Math.Max(height * 0.25, 1e-7)
-            || risen > 1.5 || risen < 1 / 1.5)
+        Vector3D OnTop(Vector3D direction, double meters) =>
+            FlatDisc.TopPointFor(direction) + new Vector3D(0, FlatGroundLift
+                + Math.Max(meters / radiusMeters, PlanetSurface.FlatDeepestLift), 0);
+        double moved = (underfoot - _channelsMiddle).Length;
+        bool otherFace = flat.Face != _flatBuiltFace;
+        if (ChannelsDue(globe, moved > Math.Max(height * 0.25, 1e-7), otherFace) || otherFace)
         {
-            // No horizon on a flat face: the patch reaches well past what the eye sees sharply,
-            // and the disc's own mesh beyond it.
-            // (Hidden on a carved disc, so not lifted there: that would cast a ray per point.)
-            _channels = FlatWalk.MapDirection(flat) is Vector3D seen && !globe.IsCarved
+            _flatBuiltFace = flat.Face;
+            _channelsMiddle = underfoot;
+            _channels = top && !globe.IsCarved && FlatWalk.MapDirection(flat) is Vector3D seen
                 ? ChannelsAround(globe, body, seen, outer)
                 : null;
-            ground.Build(flat, outer, FlatGroundLift, ground: globe.IsCarved ? null
-                : point => FlatUnderStripAt(globe, point, body), rimLift: globe.RimLift);
-            double radiusMeters = body.RadiusKm * 1000;
-            Vector3D OnTop(Vector3D direction, double meters) =>
-                FlatDisc.TopPointFor(direction) + new Vector3D(0, FlatGroundLift
-                    + Math.Max(meters / radiusMeters, PlanetSurface.FlatDeepestLift), 0);
-            _rivers!.Build(_channels, ground.Middle, OnTop, radiusMeters);
-            if (_channels is not null && FlatWalk.MapDirection(flat) is Vector3D eyeOnMap)
-            {
-                BuildBanks(globe, body, eyeOnMap, ground.Middle,
-                    direction => ground.TopHeightAt(FlatDisc.TopPointFor(direction))
-                        is double drawn
-                        ? 1 + drawn - FlatDisc.HalfThickness - FlatGroundLift
-                        : null,
-                    OnTop, OnTop);
-            }
-            else
-            {
-                _banks!.Build([], ground.Middle, OnTop, OnTop);
-            }
-            globe.SetNearEye(flat.Face == FlatFace.Top ? ground.Middle : null,
-                outer * NearEyeShare);
-            _groundVersion = globe.ReliefVersion;
-            _flatWaterBuilt = null;
-            ground.MaterialOverride = flat.Face == FlatFace.Top
-                ? globe.MaterialOverride
-                : PlanetSurface.RockMaterial;
-            SetGroundDetail(ground.MaterialOverride, ground.Middle, body.RadiusKm);
-            if (flat.Face == FlatFace.Top)
+            _rivers.Build(_channels, underfoot, OnTop, radiusMeters);
+            if (top)
             {
                 // The deck carries each point's map direction, as the globe's deck does.
                 _flatDeck!.Build(flat, outer, SurfaceSky.CloudHeightKm / body.RadiusKm,
                     point => FlatDisc.DirectionFor(point));
             }
-
-            _flatBuiltHeightMeters = _heightMeters;
-            _flatBuiltFace = flat.Face;
+            else
+            {
+                rock.Build(flat, outer, FlatGroundLift, rimLift: globe.RimLift);
+                rock.MaterialOverride = PlanetSurface.RockMaterial;
+                globe.SetNearEye(null, 0);
+            }
         }
 
-        // The water's surface over the top face, at the sea's level or a lake's (VISION.md
-        // BOD-11), and out of sight under the ground where there's neither.
-        FlatPatch water = _flatWater!;
-        water.Visible = flat.Face == FlatFace.Top && !globe.IsCarved
-            && (globe.WaterRadius is not null || globe.HasLakes);
-        _rivers!.Visible = flat.Face == FlatFace.Top && !globe.IsCarved;
-        _banks!.Visible = _rivers.Visible;
-        double sea = globe.WaterRadius ?? 0;
-        if (water.Visible && sea != _flatWaterBuilt)
+        if (tiles.Visible)
         {
-            _flatWaterBuilt = sea;
-            Vector3D middle = ground.Middle;
-            water.Build(flat, outer, FlatGroundLift, ground: point => Math.Max(WaterOrUnder(
-                    globe.WaterRadiusAt(FlatDisc.DirectionFor(point)) - 1,
-                    FlatGroundAt(globe, point, body.RadiusKm), FlatUnderStripAt(globe, point, body),
-                    new Vector3D(point.X - middle.X, 0, point.Z - middle.Z).Length, body),
-                PlanetSurface.FlatDeepestLift));
-            SetWaveOrigin(water.Middle, body.RadiusKm);
+            tiles.GroundMaterial = globe.MaterialOverride;
+            SetGroundRadius(globe.MaterialOverride, radiusMeters);
+            double radiusKm = body.RadiusKm;
+            Func<GroundTile, TileExtent, GroundTileRecipe> recipes = Recipes(globe, body,
+                point => FlatGroundLift + FlatGroundAt(globe, point, radiusKm),
+                channels => point => FlatGroundLift
+                    + FlatUnderStripAt(globe, point, radiusKm, channels),
+                (point, under, cell) => FlatGroundLift + Math.Max(WaterOrUnder(
+                        globe.WaterRadiusAt(FlatDisc.DirectionFor(point)) - 1,
+                        FlatGroundAt(globe, point, radiusKm), under - FlatGroundLift, cell,
+                        radiusMeters),
+                    PlanetSurface.FlatDeepestLift));
+            tiles.Update(eye, FlatWalk.Point(flat), outer, RecipesVersion(globe), recipes);
+            if (_nearEyeDue && tiles.HasGround)
+            {
+                _nearEyeDue = false;
+                globe.SetNearEye(_channelsMiddle, outer * NearEyeShare);
+            }
+
+            if (BanksDue(tiles, body))
+            {
+                if (_channels is not null && FlatWalk.MapDirection(flat) is Vector3D eyeOnMap)
+                {
+                    BuildBanks(globe, body, eyeOnMap, underfoot,
+                        direction => tiles.HeightAt(FlatDisc.TopPointFor(direction))
+                            is double drawn
+                            ? 1 + drawn - FlatGroundLift
+                            : null,
+                        OnTop, OnTop);
+                }
+                else
+                {
+                    _banks.Build([], underfoot, OnTop, OnTop);
+                }
+            }
         }
 
-        PlacePatch(ground, body, time, eye, displayRadius);
+        tiles.Place(point => At(body, time, eye, displayRadius, point));
+        PlacePatch(rock, body, time, eye, displayRadius);
         PlacePatch(_flatDeck!, body, time, eye, displayRadius);
-        PlacePatch(water, body, time, eye, displayRadius);
         PlaceRivers(body, time, eye, displayRadius);
     }
 
@@ -1190,17 +1326,13 @@ public partial class FirstPersonMode : Node
 
     // How far the coarser ground around the eye is lifted at a point of a flat world's top
     // face, in radii: with the rivers' channels cut in, and sunk out of sight under the fine
-    // strip that draws their beds and banks.
-    private double FlatUnderStripAt(PlanetSurface globe, Vector3D topPoint, Body body)
+    // strip that draws their beds and banks. Safe off the main thread.
+    private static double FlatUnderStripAt(PlanetSurface globe, Vector3D topPoint,
+        double radiusKm, RiverChannels channels)
     {
-        double lift = FlatGroundAt(globe, topPoint, body.RadiusKm);
-        if (_channels is null)
-        {
-            return lift;
-        }
-
-        double radiusMeters = body.RadiusKm * 1000;
-        double under = _channels.UnderStripMeters(FlatDisc.DirectionFor(topPoint),
+        double lift = FlatGroundAt(globe, topPoint, radiusKm);
+        double radiusMeters = radiusKm * 1000;
+        double under = channels.UnderStripMeters(FlatDisc.DirectionFor(topPoint),
             lift * radiusMeters);
         return Math.Max(under / radiusMeters, PlanetSurface.FlatDeepestLift);
     }
@@ -1224,29 +1356,21 @@ public partial class FirstPersonMode : Node
     private static void PlacePatch(FlatPatch patch, Body body, double time, Vector3D eye,
         double displayRadius)
     {
-        if (patch.Mesh is null)
+        if (patch.Mesh is not null)
         {
-            return;
+            patch.GlobalTransform = At(body, time, eye, displayRadius, patch.Middle);
         }
-
-        patch.GlobalTransform = new Transform3D(
-            BodyBasis(body, time).Scaled(Vector3.One * (float)displayRadius),
-            ToGodot(ToSystem(body, time, patch.Middle - eye) * displayRadius));
     }
 
     // Puts rings built around a spot in the scene, relative to the eye.
     private static void PlaceRings(FirstPersonGround rings, Body body, double time, Vector3D eye,
         double displayRadius)
     {
-        if (rings.Mesh is null)
+        if (rings.Mesh is not null)
         {
-            return;
+            rings.GlobalTransform = At(body, time, eye, displayRadius,
+                rings.Center * rings.CenterRadius);
         }
-
-        Vector3D offset = rings.Center * rings.CenterRadius - eye;
-        rings.GlobalTransform = new Transform3D(
-            BodyBasis(body, time).Scaled(Vector3.One * (float)displayRadius),
-            ToGodot(ToSystem(body, time, offset) * displayRadius));
     }
 
     // Looks up the live weather at the spot now and then (it changes slowly).
@@ -1462,12 +1586,12 @@ public partial class FirstPersonMode : Node
         if (_flat is FlatSpot flat)
         {
             _flat = FlatWalk.Walk(flat, bearing, meters / radiusMeters);
-            _flatBuiltHeightMeters = 0;  // Build the ground there straight away
+            _sinceGroundBuilt = MinGroundRebuildSeconds;  // Its channels straight away
             return;
         }
 
         _spot = GlobeWalk.FromOverhead(_spot, bearing, meters / radiusMeters);
-        _groundVersion = -1;  // Build the ground there straight away
+        _sinceGroundBuilt = MinGroundRebuildSeconds;  // Its channels straight away
     }
 
     // Opens or closes the calendar over the view (VISION.md REN-08).

@@ -1,4 +1,5 @@
 using Godot;
+using NothicWorlds.Controls;
 using NothicWorlds.Maps;
 using NothicWorlds.Session;
 
@@ -7,10 +8,10 @@ namespace NothicWorlds.Rendering;
 /// <summary>
 /// Puts the graphics options into effect (VISION.md REN-03): smoothing edges, the 3D view's
 /// resolution, and the frame-rate cap on the window; the relief and cloud detail on the globes
-/// and the weather. On start it takes the options remembered on this computer, or, for any never
-/// chosen, the preset for its graphics (owner's choice: Standard on integrated graphics, High on
-/// a dedicated card). That default isn't written down, so nothing is saved until the user
-/// changes something.
+/// and the weather; the ground detail while standing. On start it takes the options remembered
+/// on this computer, or, for any never chosen, the preset for its graphics (owner's choice:
+/// Standard on integrated graphics, High on a dedicated card). That default isn't written
+/// down, so nothing is saved until the user changes something.
 /// </summary>
 public partial class GraphicsSettings : Node
 {
@@ -19,6 +20,9 @@ public partial class GraphicsSettings : Node
 
     /// <summary>The live weather, for how finely clouds are drawn.</summary>
     [Export] public WeatherDisplay? LiveWeather { get; set; }
+
+    /// <summary>The first-person view, for how finely the ground is drawn while standing.</summary>
+    [Export] public FirstPersonMode? Standing { get; set; }
 
     /// <summary>The open world, whose maps load again when high-quality maps change.</summary>
     [Export] public WorldSession? Session { get; set; }
@@ -96,6 +100,11 @@ public partial class GraphicsSettings : Node
         if (LiveWeather is not null)
         {
             LiveWeather.Detail = Options.CloudDetail;
+        }
+
+        if (Standing is not null)
+        {
+            Standing.GroundDetail = Options.GroundDetail;
         }
     }
 }

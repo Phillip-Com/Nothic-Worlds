@@ -182,11 +182,12 @@ varying vec3 local_direction;
 varying float eye_level_ground;
 
 // Fine detail on that ground near the eye (VISION.md REN-06): its position from the point the
-// ground is built around (in globe radii, precise near the eye), where that point is in the
-// detail's noise (FirstPersonMode works it out in double precision, wrapped to the noise's
-// repeat so the pattern stays put as the ground is rebuilt), and the globe's radius in meters.
+// mesh is built around (in globe radii, precise near the eye), where that point is in the
+// detail's noise (FirstPersonMode works it out in double precision for each mesh, wrapped to
+// the noise's repeat so the pattern stays put as the ground is rebuilt), and the globe's radius
+// in meters.
 varying vec3 ground_offset;
-uniform vec3 ground_detail_origin = vec3(0.0);
+instance uniform vec3 ground_detail_origin = vec3(0.0);
 uniform float ground_radius_meters = 6371000.0;
 
 // The detail's coarsest noise is this many meters across.
@@ -499,6 +500,15 @@ float height_at(vec3 direction, float lod) {
 }
 
 // True for a point (a direction on a globe, a place on a flat world's face) near the eye.
+// How far a point of a ground tile (GroundTiles) moves onto its parent tile's shape: farther
+// out, a tile takes its parent's shape, to meet a coarser neighbor. `morph` is how far it
+// moves (xyz), and how far from the eye (in radii) it has fully moved (w, more than 0); it
+// starts moving at three quarters of that.
+vec3 ground_morph(vec3 point, vec4 morph, mat4 model_view, mat4 model) {
+	float away = length((model_view * vec4(point, 1.0)).xyz) / length(model[0].xyz);
+	return morph.xyz * clamp((away / morph.w - 0.75) * 4.0, 0.0, 1.0);
+}
+
 bool near_eye(vec3 point) {
 	if (near_radius <= 0.0) {
 		return false;
@@ -755,14 +765,19 @@ float map_shade(vec3 normal, vec3 direction) {
 #endif
 
 void vertex() {
-	// The ground around a first-person eye (VISION.md REN-06, FirstPersonGround) is built
-	// around the eye, not the globe's middle, so its positions keep their precision; it brings
-	// each point's direction from the globe's middle along (CUSTOM0, w = 1) and is lifted
-	// already. Other meshes have no CUSTOM0 (it reads as 0).
+	// The ground around a first-person eye (VISION.md REN-06, GroundTiles) is built in tiles,
+	// each around its own middle rather than the globe's, so its positions keep their
+	// precision; it brings each point's direction from the globe's middle along (CUSTOM0,
+	// w = 1) and is lifted already. Other meshes have no CUSTOM0 (it reads as 0).
 	eye_level_ground = CUSTOM0.w > 0.5 ? CUSTOM0.w : 0.0;
 	ground_offset = VERTEX;
 	if (CUSTOM0.w > 0.5) {
 		local_direction = CUSTOM0.xyz;
+		if (CUSTOM1.w > 0.0) {
+			// A ground tile (GroundTiles) brings no normal: it's straight up.
+			NORMAL = flat_disc ? vec3(0.0, 1.0, 0.0) : normalize(CUSTOM0.xyz);
+			VERTEX += ground_morph(VERTEX, CUSTOM1, MODELVIEW_MATRIX, MODEL_MATRIX);
+		}
 	} else {
 		local_direction = VERTEX;
 		if ((has_heights || has_water || has_lakes) && !lifted_on_cpu) {

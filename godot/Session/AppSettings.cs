@@ -20,6 +20,7 @@ public static class AppSettings
     private const string ReliefDetailKey = "relief_detail";
     private const string MapShadingKey = "map_style_shading";
     private const string CloudDetailKey = "cloud_detail";
+    private const string GroundDetailKey = "ground_detail";
     private const string AntiAliasingKey = "anti_aliasing";
     private const string RenderScaleKey = "render_scale";
     private const string FrameRateKey = "frame_rate_limit";
@@ -71,6 +72,7 @@ public static class AppSettings
         return new GraphicsOptions(
             Read(file, ReliefDetailKey, defaults.ReliefDetail),
             Read(file, CloudDetailKey, defaults.CloudDetail),
+            Read(file, GroundDetailKey, defaults.GroundDetail),
             Read(file, AntiAliasingKey, defaults.AntiAliasing),
             Read(file, RenderScaleKey, defaults.RenderScale),
             Read(file, FrameRateKey, defaults.FrameRateLimit));
@@ -82,6 +84,7 @@ public static class AppSettings
         ConfigFile file = Load();
         file.SetValue(DisplaySection, ReliefDetailKey, options.ReliefDetail.ToString());
         file.SetValue(DisplaySection, CloudDetailKey, options.CloudDetail.ToString());
+        file.SetValue(DisplaySection, GroundDetailKey, options.GroundDetail.ToString());
         file.SetValue(DisplaySection, AntiAliasingKey, options.AntiAliasing.ToString());
         file.SetValue(DisplaySection, RenderScaleKey, options.RenderScale.ToString());
         file.SetValue(DisplaySection, FrameRateKey, options.FrameRateLimit.ToString());

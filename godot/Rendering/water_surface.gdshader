@@ -1,5 +1,5 @@
-// The water's surface around a first-person eye (VISION.md BOD-09): rings of mesh at the
-// body's water level around the spot (a FirstPersonGround built at a set radius). From above
+// The water's surface around a first-person eye (VISION.md BOD-09): tiles of mesh at the
+// body's water level, built with the ground's (GroundTiles). From above
 // it's clear in the shallows and darkens with the water's depth below it (read from the depth
 // of what's behind it), shining in the sun; from below it's a bright, see-through ceiling.
 // Small waves move across it.
@@ -22,7 +22,7 @@ uniform float radius_meters = 6371000.0;
 
 // Where the mesh's middle falls in the waves' repeat (WaveRepeatMeters in FirstPersonMode),
 // worked out on the CPU in double precision, so the waves stay put as the mesh is rebuilt.
-uniform vec3 wave_origin = vec3(0.0);
+instance uniform vec3 wave_origin = vec3(0.0);
 
 // How light the day is, from 0 at night to 1 (SurfaceSky.Daylight): the surface seen from
 // below glows with the light coming through it.
@@ -40,6 +40,13 @@ varying vec3 wave_place;
 void vertex() {
 	up = CUSTOM0.xyz;
 	wave_place = VERTEX * radius_meters + wave_origin;
+	if (CUSTOM1.w > 0.0) {
+		// Farther out, a tile takes its parent's shape (GroundTiles; as ground_morph in
+		// planet_surface.gdshaderinc).
+		float away = length((MODELVIEW_MATRIX * vec4(VERTEX, 1.0)).xyz)
+			/ length(MODEL_MATRIX[0].xyz);
+		VERTEX += CUSTOM1.xyz * clamp((away / CUSTOM1.w - 0.75) * 4.0, 0.0, 1.0);
+	}
 }
 
 // The waves' slope here, in meters per meter along the globe's axes: four trains of waves a

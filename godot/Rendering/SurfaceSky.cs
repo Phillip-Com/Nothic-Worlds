@@ -273,7 +273,7 @@ public sealed class SurfaceSky
             return false;
         }
 
-        var east = new Vector3D(mapUp.Z, 0, -mapUp.X);  // As FirstPersonGround's (any at a pole)
+        var east = new Vector3D(mapUp.Z, 0, -mapUp.X);  // As the cloud deck's (any at a pole)
         east = east.Length < 1e-9 ? new Vector3D(1, 0, 0) : east * (1 / east.Length);
         var north = new Vector3D(mapUp.Y * east.Z - mapUp.Z * east.Y,
             mapUp.Z * east.X - mapUp.X * east.Z, mapUp.X * east.Y - mapUp.Y * east.X);
