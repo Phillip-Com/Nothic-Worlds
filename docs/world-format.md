@@ -1,7 +1,7 @@
 # World File Format (`.nworld`)
 
 This is the specification for Nothic Worlds save files. It's engine-independent: anything that
-can read a zip file and JSON can read a world, without Godot (CLAUDE.md §9). Code:
+can read a zip file and JSON can read a world, without Godot (CLAUDE.md §7). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
 **Current format version: 31** (see **Version history** at the end)
