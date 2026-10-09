@@ -24,15 +24,15 @@ public partial class RiverBankStrip : MeshInstance3D
     public Vector3D Middle { get; private set; }
 
     /// <summary>
-    /// Builds the strips around <paramref name="middle"/>, each point where
+    /// Works out the mesh of the strips around <paramref name="middle"/>, each point where
     /// <paramref name="pointAt"/> puts a direction at a height in meters, and
     /// <paramref name="placeAt"/> gives what the shader reads as its place (a direction on a
-    /// globe, the point on a flat world's face). None: nothing is drawn.
+    /// globe, the point on a flat world's face); null with none. Safe off the main thread;
+    /// <see cref="Show"/> draws it.
     /// </summary>
-    public void Build(List<List<BankPoint[]>> strips, Vector3D middle,
+    internal static Surface? Prepare(List<List<BankPoint[]>> strips, Vector3D middle,
         Func<Vector3D, double, Vector3D> pointAt, Func<Vector3D, double, Vector3D> placeAt)
     {
-        Middle = middle;
         var positions = new List<Vector3>();
         var normals = new List<Vector3>();
         var customs = new List<float>();
@@ -72,7 +72,19 @@ public partial class RiverBankStrip : MeshInstance3D
             }
         }
 
-        if (indices.Count == 0)
+        return indices.Count == 0
+            ? null
+            : new Surface(middle, [.. positions], [.. normals], [.. customs], [.. indices]);
+    }
+
+    /// <summary>
+    /// Draws the strips worked out by <see cref="Prepare"/> (none: nothing is drawn) around
+    /// <paramref name="middle"/>.
+    /// </summary>
+    internal void Show(Surface? surface, Vector3D middle)
+    {
+        Middle = surface?.Middle ?? middle;
+        if (surface is null)
         {
             Mesh = null;
             return;
@@ -80,10 +92,10 @@ public partial class RiverBankStrip : MeshInstance3D
 
         var arrays = new Godot.Collections.Array();
         arrays.Resize((int)Mesh.ArrayType.Max);
-        arrays[(int)Mesh.ArrayType.Vertex] = positions.ToArray();
-        arrays[(int)Mesh.ArrayType.Normal] = normals.ToArray();
-        arrays[(int)Mesh.ArrayType.Custom0] = customs.ToArray();
-        arrays[(int)Mesh.ArrayType.Index] = indices.ToArray();
+        arrays[(int)Mesh.ArrayType.Vertex] = surface.Positions;
+        arrays[(int)Mesh.ArrayType.Normal] = surface.Normals;
+        arrays[(int)Mesh.ArrayType.Custom0] = surface.Customs;
+        arrays[(int)Mesh.ArrayType.Index] = surface.Indices;
         var mesh = new ArrayMesh();
         mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays,
             flags: (Mesh.ArrayFormat)((int)Mesh.ArrayCustomFormat.RgbaFloat
@@ -101,7 +113,7 @@ public partial class RiverBankStrip : MeshInstance3D
             - points[row, Math.Max(across - 1, 0)];
         Vector3D along = points[Math.Min(row + 1, rows - 1), across]
             - points[Math.Max(row - 1, 0), across];
-        Vector3D normal = Cross(sideways, along);
+        Vector3D normal = sideways.Cross(along);
         Vector3D up = pointAt(point.Direction, point.Meters + 1)
             - pointAt(point.Direction, point.Meters);
         if (normal.Dot(up) < 0)
@@ -114,6 +126,9 @@ public partial class RiverBankStrip : MeshInstance3D
         return new Vector3((float)normal.X, (float)normal.Y, (float)normal.Z);
     }
 
-    private static Vector3D Cross(Vector3D a, Vector3D b) =>
-        new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
+    /// <summary>
+    /// The strips' mesh as worked out (<see cref="Prepare"/>), around its middle.
+    /// </summary>
+    internal sealed record Surface(Vector3D Middle, Vector3[] Positions, Vector3[] Normals,
+        float[] Customs, int[] Indices);
 }

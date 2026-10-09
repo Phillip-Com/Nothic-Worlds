@@ -35,18 +35,17 @@ public partial class RiverWater : MeshInstance3D
     public Vector3D Middle { get; private set; }
 
     /// <summary>
-    /// Builds the water of <paramref name="channels"/> (none: nothing is drawn) around
+    /// Works out the water of <paramref name="channels"/> (none: null) around
     /// <paramref name="middle"/>, on a body <paramref name="radiusMeters"/> in radius, each
-    /// point where <paramref name="pointAt"/> puts a direction at a height in meters.
+    /// point where <paramref name="pointAt"/> puts a direction at a height in meters. Safe off
+    /// the main thread; <see cref="Show"/> draws it.
     /// </summary>
-    public void Build(RiverChannels? channels, Vector3D middle,
+    internal static Surface? Prepare(RiverChannels? channels, Vector3D middle,
         Func<Vector3D, double, Vector3D> pointAt, double radiusMeters)
     {
-        Middle = middle;
         if (channels is null)
         {
-            Mesh = null;
-            return;
+            return null;
         }
 
         var positions = new List<Vector3>();
@@ -67,7 +66,7 @@ public partial class RiverWater : MeshInstance3D
                 ChannelPoint point = stretch[i];
                 Vector3D along = stretch[Math.Min(i + 1, stretch.Count - 1)].Direction
                     - stretch[Math.Max(i - 1, 0)].Direction;
-                Vector3D side = Cross(point.Direction, along);
+                Vector3D side = point.Direction.Cross(along);
                 side *= 1 / Math.Max(side.Length, 1e-12);
 
                 // Up and downstream where the water's placed (on a flat world, the face's).
@@ -77,10 +76,9 @@ public partial class RiverWater : MeshInstance3D
                 downstream *= 1 / Math.Max(downstream.Length, 1e-12);
                 Vector3 normal = ToGodot(up).Normalized();
 
-                // Between the banks: wider than the bed where it's carved, as they slope out.
-                double half = point.HalfWidthMeters + TuckMeters + point.Carved
-                    * Math.Max(0, point.SurfaceMeters - point.BedMeters)
-                    / RiverChannels.BankSlope;
+                // Between the banks: wider than the bed, as they slope out.
+                double half = point.HalfWidthMeters + TuckMeters
+                    + Math.Max(0, point.SurfaceMeters - point.BedMeters) / RiverCarving.BankSlope;
                 float u = (float)(origin + point.AlongMeters - start);
                 var color = new Color((float)(point.FlowMetersPerSecond
                     / RiverProfile.MaxFlow), (float)point.Rapids, 0, 1);
@@ -88,7 +86,7 @@ public partial class RiverWater : MeshInstance3D
                 {
                     Vector3D direction = point.Direction + side * (across / radiusMeters);
                     direction *= 1 / direction.Length;
-                    Vector3D at = pointAt(direction, point.SurfaceMeters) - Middle;
+                    Vector3D at = pointAt(direction, point.SurfaceMeters) - middle;
                     positions.Add(new Vector3((float)at.X, (float)at.Y, (float)at.Z));
                     normals.Add(normal);
                     tangents.AddRange([(float)downstream.X, (float)downstream.Y,
@@ -105,7 +103,20 @@ public partial class RiverWater : MeshInstance3D
             }
         }
 
-        if (indices.Count == 0)
+        return indices.Count == 0
+            ? null
+            : new Surface(middle, [.. positions], [.. normals], [.. tangents], [.. uvs],
+                [.. colors], [.. indices]);
+    }
+
+    /// <summary>
+    /// Draws the water worked out by <see cref="Prepare"/> (none: nothing is drawn) around
+    /// <paramref name="middle"/>.
+    /// </summary>
+    internal void Show(Surface? surface, Vector3D middle)
+    {
+        Middle = surface?.Middle ?? middle;
+        if (surface is null)
         {
             Mesh = null;
             return;
@@ -113,12 +124,12 @@ public partial class RiverWater : MeshInstance3D
 
         var arrays = new Godot.Collections.Array();
         arrays.Resize((int)Mesh.ArrayType.Max);
-        arrays[(int)Mesh.ArrayType.Vertex] = positions.ToArray();
-        arrays[(int)Mesh.ArrayType.Normal] = normals.ToArray();
-        arrays[(int)Mesh.ArrayType.Tangent] = tangents.ToArray();
-        arrays[(int)Mesh.ArrayType.TexUV] = uvs.ToArray();
-        arrays[(int)Mesh.ArrayType.Color] = colors.ToArray();
-        arrays[(int)Mesh.ArrayType.Index] = indices.ToArray();
+        arrays[(int)Mesh.ArrayType.Vertex] = surface.Positions;
+        arrays[(int)Mesh.ArrayType.Normal] = surface.Normals;
+        arrays[(int)Mesh.ArrayType.Tangent] = surface.Tangents;
+        arrays[(int)Mesh.ArrayType.TexUV] = surface.Uvs;
+        arrays[(int)Mesh.ArrayType.Color] = surface.Colors;
+        arrays[(int)Mesh.ArrayType.Index] = surface.Indices;
         var mesh = new ArrayMesh();
         mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays);
         Mesh = mesh;
@@ -131,6 +142,9 @@ public partial class RiverWater : MeshInstance3D
 
     private static Vector3 ToGodot(Vector3D v) => new((float)v.X, (float)v.Y, (float)v.Z);
 
-    private static Vector3D Cross(Vector3D a, Vector3D b) =>
-        new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
+    /// <summary>
+    /// The water's mesh as worked out (<see cref="Prepare"/>), around its middle.
+    /// </summary>
+    internal sealed record Surface(Vector3D Middle, Vector3[] Positions, Vector3[] Normals,
+        float[] Tangents, Vector2[] Uvs, Color[] Colors, int[] Indices);
 }

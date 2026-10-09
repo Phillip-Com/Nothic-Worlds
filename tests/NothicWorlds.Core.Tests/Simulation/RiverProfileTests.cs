@@ -46,18 +46,55 @@ public sealed class RiverProfileTests
     }
 
     [Fact]
-    public void TheWater_NeverRunsUphill_AndTheBedIsBelowIt()
+    public void TheWater_FollowsTheGround_EvenUphill_InShortSteps()
     {
-        // Ground falling, then rising over a ridge, then falling again.
+        // Ground falling, then rising over a ridge, then falling again: the water rides over
+        // it (the owner's choice) instead of cutting a canyon through it.
+        double Ground(Vector3D at) =>
+            500 - 100 * Longitude(at) + 400 * Math.Exp(-Square(Longitude(at) - 1));
         RiverCourseShown course = Drawn(0.1, WaterGround.At(0, 0), WaterGround.At(0, 2));
-        RiverProfile river = RiverProfile.For(course, RadiusKm,
-            at => 500 - 100 * Longitude(at) + 400 * Math.Exp(-Square(Longitude(at) - 1)))!;
-
-        for (int i = 1; i < river.Points.Count; i++)
+        RiverProfile river = RiverProfile.For(course, RadiusKm, Ground)!;
+        Assert.True(river.Points.Count > 1000);  // About 222 km, at most 200 m apart
+        for (int i = 0; i < river.Points.Count; i++)
         {
-            Assert.True(river.WaterMeters[i] <= river.WaterMeters[i - 1]);
-            Assert.True(river.BedMeters[i] < river.WaterMeters[i]);
+            double depth = RiverProfile.DepthFor(2 * river.HalfWidthMeters[i]);
+            double below = Ground(river.Points[i]) - river.WaterMeters[i];
+            Assert.InRange(below, RiverProfile.WaterBelowGround * depth - 0.01,
+                RiverProfile.WaterBelowGround * depth + 0.5);
+            Assert.Equal(river.WaterMeters[i] - (1 - RiverProfile.WaterBelowGround) * depth,
+                river.BedMeters[i], 9);
         }
+
+        Assert.All(river.Points.Zip(river.Points.Skip(1)), pair => Assert.True(
+            Math.Acos(Math.Clamp(pair.First.Dot(pair.Second), -1, 1)) * RadiusKm * 1000
+                <= RiverProfile.SampleMeters + 1e-6));
+    }
+
+    [Fact]
+    public void OnASideSlope_TheWaterLiesBelowTheGroundOnItsLowerSide()
+    {
+        // A river running east along the equator, over ground falling 1 m for every 10 m
+        // south: the water lies below the ground at its lower edge, not its middle.
+        const double metersPerDegree = RadiusKm * 1000 * Math.PI / 180;
+        double Ground(Vector3D at) =>
+            1000 + 0.1 * SphericalPolygon.FromUnit(at).LatitudeDegrees * metersPerDegree;
+        RiverCourseShown course = Drawn(0.2, WaterGround.At(0, 0), WaterGround.At(0, 0.1));
+        RiverProfile river = RiverProfile.For(course, RadiusKm, Ground)!;
+        int last = river.Points.Count - 1;  // 200 m wide, 10 m deep
+        double edge = 100 + (1 - RiverProfile.WaterBelowGround) * 10 / RiverCarving.BankSlope;
+        Assert.Equal(1000 - 0.1 * edge - RiverProfile.WaterBelowGround * 10,
+            river.WaterMeters[last], 0);
+    }
+
+    [Fact]
+    public void WhereTheGroundRises_TheWaterIsCalm()
+    {
+        RiverCourseShown course = Drawn(0.1, WaterGround.At(0, 0), WaterGround.At(0, 0.1));
+        RiverProfile rising = RiverProfile.For(course, RadiusKm,
+            at => 20_000 * Longitude(at))!;
+        int middle = rising.Points.Count / 2;
+        Assert.Equal(RiverProfile.MinFlow, rising.FlowMetersPerSecond[middle]);
+        Assert.Equal(0, rising.Rapids[middle]);
     }
 
     [Fact]
