@@ -189,6 +189,34 @@ public sealed class TerrainGridTests
     }
 
     [Fact]
+    public void TilesChangedFrom_NamesTheTilesHoldingTheChangedCells()
+    {
+        TerrainGrid before = TerrainGrid.Empty.Paint(At(90, 0), 3, Forest);
+        TerrainGrid after = before.Paint(At(0, 0), 1, Desert);  // Middle of the +Z face
+        var beforeCells = new byte[TerrainGrid.CellsPerFace];
+        var afterCells = new byte[TerrainGrid.CellsPerFace];
+        before.CopyFace(4, beforeCells);
+        after.CopyFace(4, afterCells);
+
+        IReadOnlyList<(int Column, int Row)> tiles = after.TilesChangedFrom(before, 4);
+
+        Assert.NotEmpty(tiles);
+        for (int cell = 0; cell < TerrainGrid.CellsPerFace; cell++)
+        {
+            if (beforeCells[cell] != afterCells[cell])
+            {
+                int column = cell % TerrainGrid.FaceSize / TerrainGrid.TileSize;
+                int row = cell / TerrainGrid.FaceSize / TerrainGrid.TileSize;
+                Assert.Contains((column, row), tiles);
+            }
+        }
+
+        Assert.All(tiles, tile => Assert.InRange(tile.Column, 6, 9));
+        Assert.Empty(after.TilesChangedFrom(before, 0));
+        Assert.Empty(after.TilesChangedFrom(after, 4));
+    }
+
+    [Fact]
     public void CopyFaceAndFromCells_RoundTrip()
     {
         TerrainGrid grid = TerrainGrid.Empty

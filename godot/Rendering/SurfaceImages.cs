@@ -42,13 +42,50 @@ public static class SurfaceImages
     }
 
     /// <summary>As <see cref="FarFace(TerrainGrid, int, byte[])"/>, from a face's cells.</summary>
-    public static Image FarFace(byte[] cells, byte[] palette)
+    public static Image FarFace(byte[] cells, byte[] palette) =>
+        FarImage(FarColors(cells, palette));
+
+    /// <summary>
+    /// A face's cells averaged into colors as <see cref="FarFace(byte[], byte[])"/> does, as
+    /// RGBA bytes (<see cref="FarSize"/> squared pixels), to keep and redo in part with
+    /// <see cref="RedoFarColors"/>.
+    /// </summary>
+    public static byte[] FarColors(byte[] cells, byte[] palette)
     {
         var colors = new byte[FarSize * FarSize * 4];
+        RedoFarColors(colors, cells, palette, 0, 0, FarSize);
+        return colors;
+    }
+
+    /// <summary>
+    /// Redoes the averaged colors of one tile of a face (see
+    /// <see cref="TerrainGrid.TilesChangedFrom"/>) from the face's cells: a brush stroke
+    /// changes a few tiles, and redoing only those is far quicker than the whole face.
+    /// </summary>
+    public static void RedoFarColors(byte[] colors, byte[] cells, byte[] palette,
+        int tileColumn, int tileRow)
+    {
+        const int farPerTile = TerrainGrid.TileSize / FarBlock;
+        RedoFarColors(colors, cells, palette, tileColumn * farPerTile, tileRow * farPerTile,
+            farPerTile);
+    }
+
+    /// <summary>Kept colors (see <see cref="FarColors"/>) as an image with mipmaps.</summary>
+    public static Image FarImage(byte[] colors)
+    {
+        Image image = Image.CreateFromData(FarSize, FarSize, false, Image.Format.Rgba8, colors);
+        image.GenerateMipmaps();
+        return image;
+    }
+
+    // Averages the square of far pixels from (firstColumn, firstRow), size across.
+    private static void RedoFarColors(byte[] colors, byte[] cells, byte[] palette,
+        int firstColumn, int firstRow, int size)
+    {
         bool hasPalette = palette.Length > 0;
-        for (int farRow = 0; farRow < FarSize; farRow++)
+        for (int farRow = firstRow; farRow < firstRow + size; farRow++)
         {
-            for (int farColumn = 0; farColumn < FarSize; farColumn++)
+            for (int farColumn = firstColumn; farColumn < firstColumn + size; farColumn++)
             {
                 int red = 0, green = 0, blue = 0, alpha = 0;
                 for (int row = 0; row < FarBlock && hasPalette; row++)
@@ -74,10 +111,6 @@ public static class SurfaceImages
                 colors[texel + 3] = (byte)(alpha / count);
             }
         }
-
-        Image image = Image.CreateFromData(FarSize, FarSize, false, Image.Format.Rgba8, colors);
-        image.GenerateMipmaps();
-        return image;
     }
 
     /// <summary>
