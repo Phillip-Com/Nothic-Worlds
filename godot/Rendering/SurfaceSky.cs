@@ -76,6 +76,21 @@ public sealed class SurfaceSky
         ? Math.Max(body.AngularDiameterDegrees / 2, MagnifiedRadiusDegrees)
         : body.AngularDiameterDegrees / 2;
 
+    // Night vision at its darkest: the ambient light added, and how much more the view is
+    // exposed (the sky, ground, and water alike).
+    private const float NightVisionAmbient = 0.9f, NightVisionExposure = 2.5f;
+
+    /// <summary>
+    /// Whether the haze is drawn (<see cref="ShowHaze"/>); the murk under water always is.
+    /// </summary>
+    public bool ShowFog { get; set; } = true;
+
+    /// <summary>
+    /// Whether night vision is on: the dark lit up about as at dusk (see
+    /// <see cref="ShowNightVision"/>).
+    /// </summary>
+    public bool NightVision { get; set; }
+
     /// <summary>Puts the sky in place of <paramref name="scene"/>'s background.</summary>
     public void Show(WorldEnvironment scene)
     {
@@ -301,7 +316,7 @@ public sealed class SurfaceSky
             return;
         }
 
-        _standing.FogEnabled = air;
+        _standing.FogEnabled = air && ShowFog;
         _standing.FogDensity = (float)(Math.Log(2) / (halfKm * unitsPerKm));
         _standing.FogSkyAffect = 0;
 
@@ -310,6 +325,25 @@ public sealed class SurfaceSky
         Color clear = new(0.77f, 0.86f, 0.96f), overcast = new(0.72f, 0.74f, 0.77f);
         _standing.FogLightColor = clear.Lerp(overcast, (float)Math.Clamp(cloudCover, 0, 1))
             * light;
+    }
+
+    /// <summary>
+    /// Lights the view for <see cref="NightVision"/>, by how dark it is with the sun this high
+    /// (nothing added by day), or leaves the scene's own light while it's off: more ambient
+    /// light, whiter, and more exposure, so the ground and sky keep their true colors.
+    /// </summary>
+    public void ShowNightVision(double sunAltitudeDegrees)
+    {
+        if (_standing is null || _original is null)
+        {
+            return;
+        }
+
+        float dark = NightVision ? 1 - (float)Daylight(sunAltitudeDegrees) : 0;
+        _standing.AmbientLightEnergy = _original.AmbientLightEnergy + dark * NightVisionAmbient;
+        _standing.AmbientLightColor = _original.AmbientLightColor.Lerp(Colors.White, dark);
+        _standing.TonemapExposure =
+            _original.TonemapExposure * (1 + dark * (NightVisionExposure - 1));
     }
 
     /// <summary>

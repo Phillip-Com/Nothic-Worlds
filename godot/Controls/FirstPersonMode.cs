@@ -195,6 +195,15 @@ public partial class FirstPersonMode : Node
             _mapSpan = Math.Clamp(_mapSpan + step, 0, _mapSpans.Length - 1);
         _hud.Minimap.Clicked += TravelOnMap;
         _hud.CalendarButton.Pressed += ToggleCalendar;
+        _hud.FogSwitch.Toggled += on => _sky.ShowFog = on;
+        _hud.CloudsSwitch.Toggled += on =>
+        {
+            if (Weather is not null)
+            {
+                Weather.ShowClouds = on;  // The same switch as View ▸ Clouds
+            }
+        };
+        _hud.NightVisionSwitch.Toggled += on => _sky.NightVision = on;
         if (Session is not null)
         {
             Session.WorldClosed += _ => Leave();
@@ -456,21 +465,28 @@ public partial class FirstPersonMode : Node
             _sky.Show(Environment);
         }
 
+        // Everything's visibility is noted before any is hidden: hiding the toolbar hides what
+        // follows it (the terrain brush), which would otherwise be noted as hidden and stay
+        // hidden, ignoring clicks, after leaving.
         foreach (Node node in HideWhileStanding)
         {
             if (node is CanvasItem item)
             {
                 _hiddenItems.Add((item, item.Visible));
-                item.Visible = false;
             }
             else if (node is CanvasLayer layer)
             {
                 _hiddenLayers.Add((layer, layer.Visible));
-                layer.Visible = false;
             }
         }
 
+        _hiddenItems.ForEach(hidden => hidden.Item.Visible = false);
+        _hiddenLayers.ForEach(hidden => hidden.Layer.Visible = false);
+
         _hud!.Visible = true;
+        _hud.FogSwitch.SetPressedNoSignal(_sky.ShowFog);
+        _hud.CloudsSwitch.SetPressedNoSignal(Weather?.ShowClouds ?? true);
+        _hud.NightVisionSwitch.SetPressedNoSignal(_sky.NightVision);
         ShowHelp();
     }
 
@@ -519,6 +535,15 @@ public partial class FirstPersonMode : Node
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.M }:
                 _magnify = !_magnify;
                 ShowHelp();
+                break;
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.G }:
+                _hud!.FogSwitch.ButtonPressed = !_hud.FogSwitch.ButtonPressed;
+                break;
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.K }:
+                _hud!.CloudsSwitch.ButtonPressed = !_hud.CloudsSwitch.ButtonPressed;
+                break;
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.N }:
+                _hud!.NightVisionSwitch.ButtonPressed = !_hud.NightVisionSwitch.ButtonPressed;
                 break;
             case InputEventMouse or InputEventKey:
                 break;  // Taken, so the globe's camera and tools stay still
@@ -625,6 +650,7 @@ public partial class FirstPersonMode : Node
         }
         _sky.ShowHaze(body.HasAtmosphere, place.Radius / body.RadiusKm, HazeKm(),
             sky.Star?.AltitudeDegrees ?? -90, _weather?.CloudCover ?? 0);
+        _sky.ShowNightVision(sunAltitude);
         ShowWater(globe, eyeLift, radiusMeters, place.Radius, sunAltitude, unitsPerKm);
         ShowReadouts(body, time, sky, frame);
     }
@@ -1341,7 +1367,7 @@ public partial class FirstPersonMode : Node
             $"{(_magnify ? " · Magnified" : "")}\n" +
             "Drag to look · W A S D move (Shift: faster) · Wheel: speed · F: " +
             $"{(_flying ? "walk" : "fly")}{(_flying ? " · Space / C: up / down" : "")} · " +
-            "M: magnify · T: calendar · Esc: back");
+            "M: magnify · T: calendar · G / K / N: fog, clouds, night vision · Esc: back");
     }
 
     private static string Speed(double metersPerSecond) => metersPerSecond < 1000
