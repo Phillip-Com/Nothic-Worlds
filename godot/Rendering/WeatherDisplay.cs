@@ -29,6 +29,7 @@ public partial class WeatherDisplay : Node
     private readonly Dictionary<Guid, WeatherSnapshots> _snapshots = [];
     private readonly HashSet<Guid> _stale = [];  // Showing weather from before the last change
     private readonly HashSet<string> _editors = [];  // Panels editing the surface, now open
+    private bool _showClouds = AppSettings.ShowClouds;  // Remembered from the last session
     private Task<Dictionary<Guid, LiveWeather>>? _rebuilding;
     private Task<(Image Weather, Image Wind)>? _baking;
     private (Guid Body, double TimeDays, bool Alone, double StartedAt) _bakingFor;
@@ -53,8 +54,21 @@ public partial class WeatherDisplay : Node
     /// </summary>
     public event Action? WeatherRebuilt;
 
-    /// <summary>Whether clouds, rain, and snow show (View ▸ Clouds).</summary>
-    public bool ShowClouds { get; set; } = true;
+    /// <summary>
+    /// Whether clouds, rain, and snow show (View ▸ Clouds), remembered on this computer.
+    /// </summary>
+    public bool ShowClouds
+    {
+        get => _showClouds;
+        set
+        {
+            if (value != _showClouds)
+            {
+                _showClouds = value;
+                AppSettings.ShowClouds = value;
+            }
+        }
+    }
 
     /// <summary>Whether the wind shows (View ▸ Wind).</summary>
     public bool ShowWind { get; set; }

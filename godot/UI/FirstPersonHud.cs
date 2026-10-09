@@ -6,9 +6,9 @@ namespace NothicWorlds.UI;
 /// What's shown over the first-person view (VISION.md REN-06; owner's choice: a compass, readouts
 /// on hover, and a panel for the spot): the controls along the top left, a compass along the
 /// top, the name and place of the body under the mouse, the time and weather at the spot in
-/// the bottom left, the rain or snow falling over everything, and (REN-08) the minimap and a
-/// Calendar button in the top right. It only shows what it's given;
-/// <see cref="Controls.FirstPersonMode"/> works it out.
+/// the bottom left, the rain or snow falling over everything, and (REN-08) the minimap, a
+/// Calendar button, and switches for fog, clouds, and night vision, in the top right. It only
+/// shows what it's given; <see cref="Controls.FirstPersonMode"/> works it out.
 /// </summary>
 public partial class FirstPersonHud : CanvasLayer
 {
@@ -84,8 +84,25 @@ public partial class FirstPersonHud : CanvasLayer
             TooltipText = "Open or close the calendar: click a day to run the clock there",
         };
         corner.AddChild(CalendarButton);
+        FogSwitch = Switch("Fog (G)", "Show or hide the haze that fades the distance");
+        corner.AddChild(FogSwitch);
+        CloudsSwitch = Switch("Clouds (K)",
+            "Show or hide the clouds, here and on the globe (as View ▸ Clouds)");
+        corner.AddChild(CloudsSwitch);
+        NightVisionSwitch = Switch("Night Vision (N)",
+            "Light up the night (and dim places) as if at dusk, to see the ground");
+        corner.AddChild(NightVisionSwitch);
         AddChild(corner);
     }
+
+    /// <summary>Shows or hides the fog (haze) while standing.</summary>
+    public Button FogSwitch { get; }
+
+    /// <summary>Shows or hides the clouds.</summary>
+    public Button CloudsSwitch { get; }
+
+    /// <summary>Turns night vision on or off.</summary>
+    public Button NightVisionSwitch { get; }
 
     /// <summary>The minimap in the top right.</summary>
     public Minimap Minimap { get; }
@@ -137,4 +154,13 @@ public partial class FirstPersonHud : CanvasLayer
         label.AddThemeConstantOverride("outline_size", 4);
         return label;
     }
+
+    // An on/off button for the corner, its pressed look showing it's on.
+    private static Button Switch(string text, string tooltip) => new()
+    {
+        Text = text,
+        ToggleMode = true,
+        FocusMode = Control.FocusModeEnum.None,
+        TooltipText = tooltip,
+    };
 }
