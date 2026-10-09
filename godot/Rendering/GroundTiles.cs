@@ -145,9 +145,10 @@ public partial class GroundTiles : Node3D
     /// a guess at it); a tile built another way is built again. <paramref name="recipes"/>
     /// names the recipes it gives: the tiles are chosen again only when it changes, a tile has
     /// been built, or the eye or the reach has moved, so standing still costs next to nothing.
+    /// Tiles wholly beyond <paramref name="nearReach"/> are built after the nearer ones.
     /// </summary>
-    public void Update(Vector3D eye, Vector3D reachCenter, double reach, long recipes,
-        Func<GroundTile, TileExtent, GroundTileRecipe> recipeFor)
+    public void Update(Vector3D eye, Vector3D reachCenter, double reach, double nearReach,
+        long recipes, Func<GroundTile, TileExtent, GroundTileRecipe> recipeFor)
     {
         TakeInJoined();
         int taken = TakeInFinished();
@@ -158,7 +159,7 @@ public partial class GroundTiles : Node3D
         if (taken > 0 || moved)
         {
             _chosenFor = (eye, reachCenter, reach, recipes);
-            Choose(eye, reachCenter, reach, recipeFor);
+            Choose(eye, reachCenter, reach, nearReach, recipeFor);
         }
 
         if (_origin is not Vector3D origin || (eye - origin).Length > _rebaseRadii)
@@ -267,7 +268,7 @@ public partial class GroundTiles : Node3D
 
     // Chooses the tiles to draw, starts building those wanted, and lets go of the oldest
     // unused ones.
-    private void Choose(Vector3D eye, Vector3D reachCenter, double reach,
+    private void Choose(Vector3D eye, Vector3D reachCenter, double reach, double nearReach,
         Func<GroundTile, TileExtent, GroundTileRecipe> recipeFor)
     {
         _frame++;
@@ -275,7 +276,7 @@ public partial class GroundTiles : Node3D
         var extents = new Dictionary<GroundTile, TileExtent>();
         GroundTileChoice choice = _selection.Choose(eye, reachCenter, reach,
             tile => extents[tile] = ExtentOf(tile),
-            tile => NeedOf(tile, extents[tile], recipes, recipeFor));
+            tile => NeedOf(tile, extents[tile], recipes, recipeFor), nearReach);
         StartBuilding(choice.Wanted, recipes);
         var drawn = new HashSet<GroundTile>(choice.Drawn);
         if (!drawn.SetEquals(_drawn))

@@ -1236,7 +1236,10 @@ public partial class FirstPersonMode : Node
             (direction, under, cell) => WaterOrUnder(globe.WaterRadiusAt(direction) - 1,
                 smallest => globe.GroundLiftAt(direction, body.RadiusKm, smallest), under - 1,
                 cell, radiusMeters, farThinning) + 1);
-        tiles.Update(_spot * (ground + height), _spot, reach, RecipesVersion(globe), recipes);
+        // The ground out past `outer` to the farthest peak is built after the ground within it
+        // (owner's choice, 2026-10-09).
+        tiles.Update(_spot * (ground + height), _spot, reach, outer, RecipesVersion(globe),
+            recipes);
         if (_nearEyeDue && tiles.HasGround)
         {
             // The globe's own water steps aside for the water drawn on the tiles.
@@ -1496,7 +1499,7 @@ public partial class FirstPersonMode : Node
                         smallest => FlatGroundAt(globe, point, radiusKm, smallest),
                         under - FlatGroundLift, cell, radiusMeters, true),
                     PlanetSurface.FlatDeepestLift));
-            tiles.Update(eye, FlatWalk.Point(flat), outer, RecipesVersion(globe), recipes);
+            tiles.Update(eye, FlatWalk.Point(flat), outer, outer, RecipesVersion(globe), recipes);
             if (_nearEyeDue && tiles.HasGround)
             {
                 _nearEyeDue = false;

@@ -64,13 +64,16 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
     /// <paramref name="reach"/> (along the surface) of <paramref name="reachCenter"/> (a base
     /// point); <paramref name="extentOf"/> gives the space a tile takes up (for one not built
     /// yet, a guess: see <see cref="Estimate"/>), and <paramref name="needOf"/> what it needs.
+    /// Tiles wholly beyond <paramref name="nearReach"/> (all within reach, if null) are wanted
+    /// after every nearer one, so the far ground never holds up the ground around the eye.
     /// </summary>
     public GroundTileChoice Choose(Vector3D eye, Vector3D reachCenter, double reach,
-        Func<GroundTile, TileExtent> extentOf, Func<GroundTile, TileNeed> needOf)
+        Func<GroundTile, TileExtent> extentOf, Func<GroundTile, TileNeed> needOf,
+        double? nearReach = null)
     {
         var drawn = new List<GroundTile>();
-        var missing = new List<(GroundTile Tile, double Away)>();
-        var stale = new List<(GroundTile Tile, double Away)>();
+        var missing = new List<(GroundTile Tile, double Away, bool Far)>();
+        var stale = new List<(GroundTile Tile, double Away, bool Far)>();
         var kept = new HashSet<GroundTile>();
         for (int root = 0; root < surface.RootCount; root++)
         {
@@ -81,13 +84,18 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
             }
         }
 
-        List<GroundTile> wanted =
-        [
-            .. missing.OrderBy(entry => entry.Tile.Level).ThenBy(entry => entry.Away)
-                .Select(entry => entry.Tile),
-            .. stale.OrderBy(entry => entry.Away).Select(entry => entry.Tile),
-        ];
+        List<GroundTile> wanted = [.. Wanted(far: false), .. Wanted(far: true)];
         return new GroundTileChoice(drawn, wanted, kept);
+
+        // The near or far tiles wanted: missing ones coarsest first (they stand in for the
+        // rest), then stale ones, each nearest first.
+        IEnumerable<GroundTile> Wanted(bool far) =>
+        [
+            .. missing.Where(entry => entry.Far == far).OrderBy(entry => entry.Tile.Level)
+                .ThenBy(entry => entry.Away).Select(entry => entry.Tile),
+            .. stale.Where(entry => entry.Far == far).OrderBy(entry => entry.Away)
+                .Select(entry => entry.Tile),
+        ];
 
         // Chooses tiles for a tile's area; true if it's all covered by drawn tiles.
         bool Visit(GroundTile tile)
@@ -95,9 +103,11 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
             kept.Add(tile);
             double away = extentOf(tile).DistanceFrom(eye);
             TileNeed need = needOf(tile);
+            bool far = need != TileNeed.None && nearReach is double near
+                && AllBeyond(tile, reachCenter, near);
             if (need == TileNeed.Missing)
             {
-                missing.Add((tile, away));
+                missing.Add((tile, away, far));
             }
 
             bool built = need != TileNeed.Missing;
@@ -140,7 +150,7 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
                 drawn.Add(tile);
                 if (need == TileNeed.Stale)
                 {
-                    stale.Add((tile, away));
+                    stale.Add((tile, away, far));
                 }
             }
 

@@ -131,6 +131,37 @@ public sealed class GroundTileSelectionTests
     }
 
     [Fact]
+    public void NothingBuilt_TilesBeyondTheNearReachAreWantedLast()
+    {
+        // The far ground is coarse, so coarsest first it was built before the fine ground
+        // round the eye, and the view took longer to settle.
+        (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
+        const double nearReach = Reach / 4;
+
+        GroundTileChoice before = selection.Choose(eye, spot, Reach, Guess(selection),
+            _ => TileNeed.Missing);
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
+            _ => TileNeed.Missing, nearReach);
+
+        // Every tile reaching into the near reach comes before every one well beyond it
+        // (among tiles small enough for NearestOf's points to measure them).
+        (int LastNear, int FirstFar) Order(GroundTileChoice wanted)
+        {
+            double[] nearest = [.. wanted.Wanted.Select(tile =>
+                selection.Width(tile) <= nearReach / 2
+                    ? NearestOf(selection.Surface, tile, spot)
+                    : double.NaN)];
+            return (Array.FindLastIndex(nearest, away => away <= nearReach),
+                Array.FindIndex(nearest, away => away > 2 * nearReach));
+        }
+
+        (int lastNear, int firstFar) = Order(choice);
+        Assert.True(firstFar > lastNear, $"far tile {firstFar} before near {lastNear}");
+        Assert.True(Order(before).FirstFar < Order(before).LastNear);
+        Assert.Equal(before.Wanted.ToHashSet(), choice.Wanted.ToHashSet());
+    }
+
+    [Fact]
     public void Kept_HoldsTheDrawnTilesAndEveryOneAboveThem()
     {
         (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
