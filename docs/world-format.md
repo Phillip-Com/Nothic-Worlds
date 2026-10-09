@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §7). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 31** (see **Version history** at the end)
+**Current format version: 32** (see **Version history** at the end)
 
 ## Container
 
@@ -32,7 +32,7 @@ list them all.
 
 ```json
 {
-  "formatVersion": 31,
+  "formatVersion": 32,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -142,7 +142,8 @@ list them all.
   "rivers": [
     { "id": "a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       "name": "Silverrun", "kind": "drawn", "points": [[10.5, -20.25], [12, -18]],
-      "width": 2.5 },
+      "width": 2.5, "depth": 40, "depthVariation": 6, "depthSpacing": 3,
+      "depthSmoothness": 0.25 },
     { "id": "a2a2a2a2-a2a2-a2a2-a2a2-a2a2a2a2a2a2", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       "name": "Mossbrook", "kind": "natural", "points": [[30, 40]] }
   ],
@@ -317,6 +318,10 @@ list them all.
 | `…rivers[].kind` | yes | `"drawn"` (its points are its course) or `"natural"` (its one point is its source, and its course runs downhill) |
 | `…rivers[].points` | yes | `[latitude, longitude]` pairs (−90 to 90, −180 to 180), source first: 2 to 2,000 for a drawn river, exactly 1 for a natural one |
 | `…rivers[].width` | no | km, 0.01 to 100: how wide it is at its mouth (a fifth of that at its source). Omitted for 1. |
+| `…rivers[].depth` | no | Meters, 0.5 to 500: how deep its channel is at its mouth, from the ground to its bed (a fifth of that at its source). Omitted for Auto (from its width). See **A river's depth** below. |
+| `…rivers[].depthVariation` | no | Meters, 0 to 200: how far its bed rises and falls along it. Omitted for 0 (an even bed). |
+| `…rivers[].depthSpacing` | no | km, 0.5 to 100: how far apart its bed's rises and falls are. Omitted for 1. |
+| `…rivers[].depthSmoothness` | no | 0 to 1: from sharp steps (0) to worn smooth (1). Omitted for 1. |
 | `lakes` | no | Lakes on planets and moons (`BOD-11`), in the order added. Omitted when there are none. Up to 1,000. |
 | `…lakes[].id`, `name` | yes | GUID, unique among lakes; name not empty, up to 100 characters |
 | `…lakes[].body` | yes | The `id` of the planet or moon it's on (not a star or comet) |
@@ -509,6 +514,25 @@ up to 8 around it (sides and corners, across face edges too).
   are equally low, the first found spreading out from its spot, a ring at a time, neighbors in
   the order above), which never crosses the lake itself, 1 km wide at its mouth.
 
+### A river's depth (`depth`, `depthVariation`, `depthSpacing`, `depthSmoothness`)
+
+A share `s` of the way from its source (by distance along its course) a river is `W × (0.2 +
+0.8s)` wide, and Auto's depth there is `A` = a twentieth of that width, from 1 to 20 m. Its
+depth `D` is `depth × (0.2 + 0.8s)`, or `A` for Auto. Its water and banks are shaped for the
+smaller of `A` and `D`, as Auto's are (so a deeper river only has a lower bed), and its bed is
+`D + N` below the ground, but at least 0.2 m below the water, where `N` is the variation:
+
+- With `V` = `depthVariation` above 0, `x` = distance from the source / (`depthSpacing` ×
+  1,000 m), and `r = 0.02 + 0.98 × depthSmoothness`: `N = V × (n(x, seed) + 0.5 × n(2.03x +
+  0.37, seed + 101)) / 1.5`, where `n(x, k)` takes `i = floor(x)`, `t = fade(clamp((x − i −
+  0.5) / r + 0.5, 0, 1))` with `fade(t) = t³(t(6t − 15) + 10)`, and gives `2 × (h(i) + (h(i
+  + 1) − h(i)) × t) − 1`.
+- `h(i)` mixes, unsigned 32-bit: `h = k`, `h ^= i × 0x8DA6B343`, `h ^= h >> 16`,
+  `h *= 0x7FEB352D`, `h ^= h >> 15`, `h *= 0x846CA68B`, `h ^= h >> 16`, and gives
+  `h / 4,294,967,295`.
+- The seed is the river's `id` as .NET writes a GUID's 16 bytes (the first three groups
+  little-endian), read as four little-endian signed 32-bit numbers XORed together.
+
 ## The star field (`starSeed`)
 
 Constellations name stars by id, so every reader must make exactly the same stars from a seed
@@ -637,6 +661,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 32 | River depth (BOD-11): rivers gain optional `depth`, `depthVariation`, `depthSpacing` and `depthSmoothness` | Nothing to change: older rivers are Auto with an even bed |
 | 31 | Rivers and lakes (M42): optional `rivers` and `lakes` | Nothing to change: version 30 worlds have none |
 | 30 | Peaks and water (M36): terrain types gain optional `variation` and `featureSize`; planets and moons gain an optional `waterLevel` | No water. Types named like the defaults (as for version 29) get their variation and feature size (Ocean 800 m/200 km, Shallow Water 40/60, Plains 40/80, Fields 30/80, Forest 80/50, Jungle 100/40, Hills 350/30, Mountains 1,500/40, Desert 120/30, Swamp 5/40, Tundra 60/60, Ice 300/60); others stay level |
 | 29 | Terrain shapes the ground (M35): terrain types gain optional `height` and `edge`; optional `terrainShapesGround` | Off for older worlds. Types named like the defaults (Ocean, Shallow Water, Plains, Fields, Forest, Jungle, Hills, Mountains, Desert, Swamp, Tundra, Ice; any case) get the default heights and edges (−3,000/0.3, −150, 150, 150, 300, 200, 800/0.15, 2,500/0.5, 400, 20, 300, 1,000/0.3); others 0 and gentle |

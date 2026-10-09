@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 31;
+    public const int CurrentVersion = 32;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -264,6 +264,10 @@ internal static partial class WorldFormat
 
         // 30 → 31: the world gained optional "rivers" and "lakes" (M42, rivers and lakes).
         // Older worlds have none.
+        document => document,
+
+        // 31 → 32: rivers gained an optional "depth", "depthVariation", "depthSpacing" and
+        // "depthSmoothness" (BOD-11, river depth). Older rivers are Auto with an even bed.
         document => document,
     ];
 

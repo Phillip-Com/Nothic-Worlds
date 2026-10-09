@@ -10,5 +10,7 @@ namespace NothicWorlds.Core.Simulation;
 /// <param name="WidthKm">How wide it is at its mouth (a fifth of that at its source).</param>
 /// <param name="Points">Its course, as unit directions, source first.</param>
 /// <param name="ReachesWater">False if it couldn't find its way to water.</param>
+/// <param name="Depth">How deep it is (a lake's outflow: Auto).</param>
 public sealed record RiverCourseShown(Guid? RiverId, Guid? LakeId, RiverKind Kind,
-    double WidthKm, IReadOnlyList<Vector3D> Points, bool ReachesWater);
+    double WidthKm, IReadOnlyList<Vector3D> Points, bool ReachesWater,
+    RiverDepth? Depth = null);
