@@ -16,7 +16,7 @@ public sealed class GroundTileSelectionTests
     {
         (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup(surfaceName);
 
-        GroundTileChoice choice = selection.Choose(eye, spot, Reach, _ => null,
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
             _ => TileNeed.None);
 
         // Points around the spot, out to the edge of reach.
@@ -42,7 +42,7 @@ public sealed class GroundTileSelectionTests
     {
         (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup(surfaceName);
 
-        GroundTileChoice choice = selection.Choose(eye, spot, Reach, _ => null,
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
             _ => TileNeed.None);
         GroundTile underfoot = TileOver(selection.Surface, choice, spot);
         GroundTile away = TileOver(selection.Surface, choice,
@@ -57,7 +57,7 @@ public sealed class GroundTileSelectionTests
     {
         (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
 
-        GroundTileChoice choice = selection.Choose(eye, spot, Reach, _ => null,
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
             _ => TileNeed.Missing);
 
         Assert.Empty(choice.Drawn);
@@ -72,7 +72,7 @@ public sealed class GroundTileSelectionTests
         (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
 
         // Only the coarsest three levels are built.
-        GroundTileChoice choice = selection.Choose(eye, spot, Reach, _ => null,
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
             tile => tile.Level <= 2 ? TileNeed.None : TileNeed.Missing);
 
         Assert.NotEmpty(choice.Drawn);
@@ -84,10 +84,11 @@ public sealed class GroundTileSelectionTests
     public void StaleTiles_AreWantedAfterMissingOnes()
     {
         (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
-        GroundTileChoice all = selection.Choose(eye, spot, Reach, _ => null, _ => TileNeed.None);
+        GroundTileChoice all = selection.Choose(eye, spot, Reach, Guess(selection),
+            _ => TileNeed.None);
         GroundTile stale = all.Drawn[0], missing = all.Drawn[^1];
 
-        GroundTileChoice choice = selection.Choose(eye, spot, Reach, _ => null,
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
             tile => tile == stale ? TileNeed.Stale
                 : tile == missing ? TileNeed.Missing
                 : TileNeed.None);
@@ -101,7 +102,7 @@ public sealed class GroundTileSelectionTests
     {
         (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
 
-        GroundTileChoice choice = selection.Choose(eye, spot, Reach, _ => null,
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
             _ => TileNeed.None);
 
         Assert.All(choice.Drawn, tile =>
@@ -172,8 +173,15 @@ public sealed class GroundTileSelectionTests
         ITileSurface surface = GroundTileGridTests.SurfaceNamed(surfaceName);
         double baseHeight = surface is GlobeTileSurface ? 1 : 0;
         Vector3D spot = surface.BasePoint(0, 0.43, 0.61);
-        return (new GroundTileSelection(surface, SplitFactor, FinestWidth, baseHeight), spot,
+        return (new GroundTileSelection(surface, SplitFactor, FinestWidth), spot,
             surface.Place(spot, baseHeight + 3e-7));
+    }
+
+    // Each tile's extent guessed with the bare surface's height.
+    private static Func<GroundTile, TileExtent> Guess(GroundTileSelection selection)
+    {
+        double baseHeight = selection.Surface is GlobeTileSurface ? 1 : 0;
+        return tile => selection.Estimate(tile, baseHeight, baseHeight);
     }
 
     // A base point `distance` from another along the surface, toward `bearing`.

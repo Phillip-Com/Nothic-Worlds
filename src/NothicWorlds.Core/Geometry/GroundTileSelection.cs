@@ -11,13 +11,14 @@ namespace NothicWorlds.Core.Geometry;
 /// <param name="surface">The surface tiled.</param>
 /// <param name="splitFactor">How many tile widths away from the eye a tile is split.</param>
 /// <param name="finestWidth">The narrowest a tile gets, in radii.</param>
-/// <param name="baseHeight">The bare surface's height, for guessing an unbuilt tile's extent
-/// when nothing above it is built either.</param>
 public sealed class GroundTileSelection(ITileSurface surface, double splitFactor,
-    double finestWidth, double baseHeight)
+    double finestWidth)
 {
     /// <summary>The surface tiled.</summary>
     public ITileSurface Surface => surface;
+
+    /// <summary>The narrowest a tile gets, in radii.</summary>
+    public double FinestWidth => finestWidth;
 
     /// <summary>A tile's width along the surface, in radii.</summary>
     public double Width(GroundTile tile) => surface.RootWidth * tile.Share;
@@ -57,11 +58,11 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
     /// <summary>
     /// The tiles to draw for an eye at <paramref name="eye"/> (in the body's own space), within
     /// <paramref name="reach"/> (along the surface) of <paramref name="reachCenter"/> (a base
-    /// point); <paramref name="extentOf"/> gives a built tile's extent (null if it isn't built),
-    /// and <paramref name="needOf"/> what it needs.
+    /// point); <paramref name="extentOf"/> gives the space a tile takes up (for one not built
+    /// yet, a guess: see <see cref="Estimate"/>), and <paramref name="needOf"/> what it needs.
     /// </summary>
     public GroundTileChoice Choose(Vector3D eye, Vector3D reachCenter, double reach,
-        Func<GroundTile, TileExtent?> extentOf, Func<GroundTile, TileNeed> needOf)
+        Func<GroundTile, TileExtent> extentOf, Func<GroundTile, TileNeed> needOf)
     {
         var drawn = new List<GroundTile>();
         var missing = new List<(GroundTile Tile, double Away)>();
@@ -72,7 +73,7 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
             var tile = new GroundTile(root, 0, 0, 0);
             if (surface.Covers(tile) && InReach(tile, reachCenter, reach))
             {
-                Visit(tile, baseHeight, baseHeight);
+                Visit(tile);
             }
         }
 
@@ -85,11 +86,10 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
         return new GroundTileChoice(drawn, wanted, kept);
 
         // Chooses tiles for a tile's area; true if it's all covered by drawn tiles.
-        bool Visit(GroundTile tile, double lowest, double highest)
+        bool Visit(GroundTile tile)
         {
             kept.Add(tile);
-            TileExtent extent = extentOf(tile) ?? Estimate(tile, lowest, highest);
-            double away = extent.DistanceFrom(eye);
+            double away = extentOf(tile).DistanceFrom(eye);
             TileNeed need = needOf(tile);
             if (need == TileNeed.Missing)
             {
@@ -108,7 +108,7 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
                 foreach (GroundTile quarter in quarters)
                 {
                     // Every quarter's visited, covered or not, so all that's wanted is asked for.
-                    covered &= Visit(quarter, extent.Lowest, extent.Highest);
+                    covered &= Visit(quarter);
                 }
 
                 if (covered)

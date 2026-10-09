@@ -21,7 +21,7 @@ public sealed class GroundTileGridTests
             {
                 Vector3D a = points[triangles[i]], b = points[triangles[i + 1]];
                 Vector3D c = points[triangles[i + 2]];
-                Vector3D up = surface.Up((a + b + c) * (1.0 / 3));
+                Vector3D up = Up(surface, (a + b + c) * (1.0 / 3));
 
                 // Clockwise seen from above, as the engine's front faces are.
                 Assert.True(Cross(b - a, c - a).Dot(up) < 0, $"{tile}, triangle {i / 3}");
@@ -160,12 +160,16 @@ public sealed class GroundTileGridTests
         {
             int index = GroundTileGrid.Index(edge[i].Column, edge[i].Row, Cells);
             points[GroundTileGrid.GridCount(Cells) + i] =
-                points[index] - surface.Up(bases[index]) * (width * 0.1);
+                points[index] - Up(surface, bases[index]) * (width * 0.1);
         }
 
         middle = points[GroundTileGrid.Index(Cells / 2, Cells / 2, Cells)];
         return points;
     }
+
+    // The way up at a point: out from a globe's middle, or up off a flat world's face.
+    private static Vector3D Up(ITileSurface surface, Vector3D point) =>
+        surface is GlobeTileSurface ? point * (1 / point.Length) : new Vector3D(0, 1, 0);
 
     private static Vector3D Cross(Vector3D a, Vector3D b) => new(
         a.Y * b.Z - a.Z * b.Y,

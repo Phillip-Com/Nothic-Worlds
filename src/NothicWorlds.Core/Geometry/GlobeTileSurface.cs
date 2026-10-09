@@ -17,9 +17,6 @@ public sealed class GlobeTileSurface : ITileSurface
     public Vector3D BasePoint(int root, double u, double v) => CubeSphere.Direction(root, u, v);
 
     /// <inheritdoc/>
-    public Vector3D Up(Vector3D basePoint) => basePoint;
-
-    /// <inheritdoc/>
     public Vector3D Place(Vector3D basePoint, double height) => basePoint * height;
 
     /// <inheritdoc/>

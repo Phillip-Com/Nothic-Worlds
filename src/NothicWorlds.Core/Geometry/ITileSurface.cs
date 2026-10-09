@@ -19,9 +19,6 @@ public interface ITileSurface
     /// </summary>
     Vector3D BasePoint(int root, double u, double v);
 
-    /// <summary>The way up at a base point (unit length).</summary>
-    Vector3D Up(Vector3D basePoint);
-
     /// <summary>A base point lifted to a height (the surface's own measure of height).</summary>
     Vector3D Place(Vector3D basePoint, double height);
 

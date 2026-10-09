@@ -7,8 +7,6 @@ namespace NothicWorlds.Core.Geometry;
 /// </summary>
 public sealed class FlatTopTileSurface : ITileSurface
 {
-    private static readonly Vector3D _up = new(0, 1, 0);
-
     /// <inheritdoc/>
     public int RootCount => 1;
 
@@ -23,9 +21,6 @@ public sealed class FlatTopTileSurface : ITileSurface
         double scale = across > FlatDisc.Radius ? FlatDisc.Radius / across : 1;
         return new Vector3D(x * scale, FlatDisc.HalfThickness, z * scale);
     }
-
-    /// <inheritdoc/>
-    public Vector3D Up(Vector3D basePoint) => _up;
 
     /// <inheritdoc/>
     public Vector3D Place(Vector3D basePoint, double height) =>
