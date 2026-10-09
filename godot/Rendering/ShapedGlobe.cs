@@ -38,6 +38,13 @@ public partial class ShapedGlobe : Node3D
     private const int CarvedRings = 48;
     private const int CarvedSegments = 160;
 
+    // How much bigger the hit meshes are built than the globe (a power of two, so exact). Godot
+    // takes a ray as running alongside a triangle when a product of its sides is under 1e-5,
+    // which missed every face of a carved sphere's small triangles (about 1e-6 at unit size):
+    // rays went through the bowl to the globe's far side. 2^16 keeps a 1 km shape's faces hit
+    // on a world of over 100,000 km.
+    private const float HitScale = 65536;
+
     private static readonly StandardMaterial3D _rockMaterial = new()
     {
         AlbedoColor = new Color(0.36f, 0.33f, 0.30f),
@@ -283,8 +290,8 @@ public partial class ShapedGlobe : Node3D
             return null;
         }
 
-        Godot.Collections.Dictionary hit = triangles.IntersectRay(origin, direction);
-        return hit.Count > 0 ? (Vector3)hit["position"] : null;
+        Godot.Collections.Dictionary hit = triangles.IntersectRay(origin * HitScale, direction);
+        return hit.Count > 0 ? (Vector3)hit["position"] / HitScale : null;
     }
 
     // One surface of the carving as plain arrays, for building the hit meshes off the main
@@ -315,7 +322,8 @@ public partial class ShapedGlobe : Node3D
     // The meshes rays are tested against (on a worker thread): the whole carving, and the
     // carving with each of the globe's own points lowered by how far it was raised to the
     // water (kept in its first texture coordinate, which carving carries along), for standing
-    // on the ground. The shapes' faces are left as they are.
+    // on the ground. The shapes' faces are left as they are. Both are built HitScale times
+    // bigger.
     private static (TriangleMesh All, TriangleMesh Ground) HitMeshes(HitSurface[] surfaces,
         bool flat)
     {
@@ -340,8 +348,8 @@ public partial class ShapedGlobe : Node3D
             for (int corner = 0; corner < count; corner++)
             {
                 int point = surface.Corners?[corner] ?? corner;
-                all.Add(surface.Points[point]);
-                ground.Add(lowered[point]);
+                all.Add(surface.Points[point] * HitScale);
+                ground.Add(lowered[point] * HitScale);
             }
         }
 
