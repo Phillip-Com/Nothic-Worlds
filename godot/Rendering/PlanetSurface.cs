@@ -79,6 +79,12 @@ public partial class PlanetSurface : MeshInstance3D
     private float _reliefScale;
     private ReliefDetail _reliefDetail = ReliefDetail.Standard;
 
+    // The painted terrain's fine relief up close (VISION.md BOD-12; null where none is rough),
+    // and how far a direction is past the nearest river's banks, in meters, for it to fade out
+    // toward them (null: no rivers).
+    private RoughGround? _rough;
+    private Func<Vector3D, double>? _riverMeters;
+
     // The body's water level in meters (VISION.md BOD-09), or null for none.
     private int? _waterLevelMeters;
 
@@ -896,21 +902,79 @@ public partial class PlanetSurface : MeshInstance3D
     /// as <see cref="SurfaceRadiusAt"/>, but with cliffs kept steep (see
     /// <see cref="HeightGrid.SampleSteepAt"/>) on a body <paramref name="radiusKm"/> in radius.
     /// In full precision: single precision holds the radius only to the nearest meter or so,
-    /// which shows as steps on the ground up close.
+    /// which shows as steps on the ground up close. With rough terrain (VISION.md BOD-12), its
+    /// fine relief down to <paramref name="smallestMeters"/>
+    /// (<see cref="TerrainRoughness.FinestMeters"/> by default: underfoot).
     /// </summary>
-    public double GroundRadiusAt(Vector3D direction, double radiusKm) =>
-        1 + GroundLiftAt(direction, radiusKm);
+    public double GroundRadiusAt(Vector3D direction, double radiusKm,
+        double smallestMeters = TerrainRoughness.FinestMeters) =>
+        1 + GroundLiftAt(direction, radiusKm, smallestMeters);
 
     /// <summary>
     /// How far the drawn ground is lifted, in the globe's radii (<see cref="GroundRadiusAt"/>
     /// less one, without losing precision to the one).
     /// </summary>
-    public double GroundLiftAt(Vector3D direction, double radiusKm)
+    public double GroundLiftAt(Vector3D direction, double radiusKm,
+        double smallestMeters = TerrainRoughness.FinestMeters)
     {
-        double lift = _shownHeights.IsEmpty ? 0 : _reliefScale * _shownHeights.SampleSteepAt(
-            direction, radiusKm * 1000 * Math.PI / 2 / HeightGrid.FaceSize);
+        double lift = SteepLift(direction, radiusKm);
+        if (_rough is { } rough && _reliefScale > 0)
+        {
+            lift += _reliefScale * rough.OffsetAt(direction, smallestMeters, _riverMeters);
+        }
+
         return Shape == BodyShape.FlatDisc ? Math.Max(lift, FlatDeepestLift) : lift;
     }
+
+    /// <summary>
+    /// As <see cref="GroundLiftAt"/>, but without the fine relief of rough terrain: the
+    /// ground rivers' water is laid on (it fades out toward them, so this is what they see).
+    /// </summary>
+    public double SmoothGroundLiftAt(Vector3D direction, double radiusKm)
+    {
+        double lift = SteepLift(direction, radiusKm);
+        return Shape == BodyShape.FlatDisc ? Math.Max(lift, FlatDeepestLift) : lift;
+    }
+
+    /// <summary>
+    /// Shows the painted terrain's fine relief up close (VISION.md BOD-12; null for none),
+    /// as the session works it out with the ground (WorldSession.Prepare).
+    /// </summary>
+    public void SetRoughness(RoughGround? rough)
+    {
+        if (ReferenceEquals(rough, _rough))
+        {
+            return;
+        }
+
+        _rough = rough;
+        ReliefVersion++;
+    }
+
+    /// <summary>
+    /// How far a direction is past the nearest river's banks, in meters (null: no rivers), for
+    /// the fine relief to fade out toward them: first person gives it
+    /// (<see cref="Core.Simulation.RiverCarving.BeyondBanksMeters"/>). Must be safe to call
+    /// from worker threads. Returns whether it changed.
+    /// </summary>
+    public bool SetRiverDistance(Func<Vector3D, double>? riverMeters)
+    {
+        if (ReferenceEquals(riverMeters, _riverMeters))
+        {
+            return false;
+        }
+
+        _riverMeters = riverMeters;
+        return true;
+    }
+
+    /// <summary>Whether the ground has fine relief up close (VISION.md BOD-12).</summary>
+    public bool IsRough => _rough is not null;
+
+    // The sculpted and terrain-shaped ground's lift, with cliffs kept steep.
+    private double SteepLift(Vector3D direction, double radiusKm) =>
+        _shownHeights.IsEmpty ? 0 : _reliefScale * _shownHeights.SampleSteepAt(
+            direction, radiusKm * 1000 * Math.PI / 2 / HeightGrid.FaceSize);
 
     /// <summary>
     /// How far out the drawn surface is at a direction, in the globe's radii: 1 on an unsculpted

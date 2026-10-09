@@ -16,6 +16,14 @@ namespace NothicWorlds.Core.Model;
 public static class TerrainRoughness
 {
     /// <summary>
+    /// How far from a river its features can be faded (see <see cref="Offset"/>), in meters,
+    /// on a body <paramref name="radiusKm"/> in radius: the biggest are a little under three
+    /// of the height grid's cells across.
+    /// </summary>
+    public static double RiverReachMeters(double radiusKm) =>
+        3 * radiusKm * 1000 * Math.PI / 2 / TerrainGrid.FaceSize;
+
+    /// <summary>
     /// The finest features made, in meters: finer bumps are the ground's shading
     /// (planet_surface.gdshaderinc), which is cheaper and never shimmers.
     /// </summary>
@@ -44,8 +52,14 @@ public static class TerrainRoughness
     /// coarsely leaves out what it couldn't show, so it doesn't shimmer.
     /// </param>
     /// <param name="seed">The type's seed, as given to <see cref="TerrainNoise.Offset"/>.</param>
+    /// <param name="riverMeters">
+    /// How far the place is past the nearest river's banks (infinite with none near): each
+    /// feature fades out within its own size of a river, so rivers run in smooth valleys as
+    /// wide as the features around them, with fine crags right up to their banks.
+    /// </param>
     public static double Offset(Vector3D direction, double radiusKm, double variationMeters,
-        double sizeKm, double belowKm, double roughness, double smallestMeters, int seed)
+        double sizeKm, double belowKm, double roughness, double smallestMeters, int seed,
+        double riverMeters = double.PositiveInfinity)
     {
         if (variationMeters <= 0 || sizeKm <= 0 || roughness <= 0)
         {
@@ -56,27 +70,26 @@ public static class TerrainRoughness
         double sizeMeters = sizeKm * 1000, belowMeters = belowKm * 1000;
 
         // At half roughness the first layer is as big as the type's own layers would make it,
-        // and finer layers shrink more slowly than they do (craggier as roughness rises).
-        double falloff = 1 - 0.6 * roughness;
+        // and finer layers shrink more slowly than they do (craggier as roughness rises): each
+        // by half to the power of the falloff.
+        double falloff = 1 - 0.25 * roughness;
+        double shrink = Math.Pow(0.5, falloff);
         double ridged = TerrainNoise.SmoothStep((variationMeters - TerrainNoise.RidgedFromMeters)
             / (TerrainNoise.FullyRidgedMeters - TerrainNoise.RidgedFromMeters));
         Vector3D p = direction * (radiusKm / sizeKm);
-        double wavelength = sizeMeters, first = 0, total = 0;
+        double wavelength = sizeMeters, amplitude = 0, total = 0;
         for (int layer = 0; layer < MaxLayers && wavelength >= smallest; layer++)
         {
             if (wavelength < belowMeters)
             {
-                if (first == 0)
-                {
-                    first = wavelength;
-                }
-
-                double amplitude = roughness * variationMeters * (first / sizeMeters)
-                    * Math.Pow(wavelength / first, falloff);
+                amplitude = amplitude == 0
+                    ? roughness * variationMeters * (wavelength / sizeMeters)
+                    : amplitude * shrink;
 
                 // The finest layer fades in, so the ground drawn more coarsely farther off
                 // meets the finer ground nearer without a step.
-                double fade = Math.Min(wavelength / smallest - 1, 1);
+                double fade = Math.Min(wavelength / smallest - 1, 1)
+                    * TerrainNoise.SmoothStep(riverMeters / wavelength);
                 double n = TerrainNoise.Value(p, seed + layer * 101);  // 0 to 1
                 double smooth = 2 * n - 1;
                 double ridge = 1 - Math.Abs(smooth);

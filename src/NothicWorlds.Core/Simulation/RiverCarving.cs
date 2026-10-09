@@ -39,13 +39,11 @@ public sealed class RiverCarving
     private readonly double _radiusMeters;
     private readonly IReadOnlyList<RiverProfile> _rivers;
     private readonly Level[][] _trees;  // Each river's search tree, its segments first
-    private readonly double _widestReach;  // The farthest any channel and banks reach out, m
 
     private RiverCarving(IReadOnlyList<RiverProfile> rivers, double radiusMeters)
     {
         (_rivers, _radiusMeters) = (rivers, radiusMeters);
         _trees = [.. rivers.Select(Tree)];
-        _widestReach = _trees.Select(tree => tree[^1].ReachMeters[0]).DefaultIfEmpty(0).Max();
     }
 
     /// <summary>Whether there are no rivers to carve.</summary>
@@ -98,25 +96,69 @@ public sealed class RiverCarving
     }
 
     /// <summary>
-    /// How much of the ground's fine relief (VISION.md BOD-12) is kept at a unit direction,
-    /// from 0 within a river's banks to 1 once as far again past them as the river and its
-    /// banks reach out from its middle: rivers run in smooth valleys, so their water lies
-    /// evenly. Safe to call from several threads at once.
+    /// How far a unit direction is past the nearest river's banks, in meters (0 on them or in
+    /// the river), looking no farther than <paramref name="withinMeters"/> (which it gives if
+    /// no river is nearer): rough terrain's fine relief fades out toward rivers by it
+    /// (VISION.md BOD-12), so they run in smooth valleys. Safe to call from several threads at
+    /// once.
     /// </summary>
-    public double RoughnessKept(Vector3D direction)
+    public double BeyondBanksMeters(Vector3D direction, double withinMeters)
     {
-        double kept = 1;
-        foreach ((int r, int s) in Gather(direction, _widestReach / _radiusMeters, 0))
+        double nearest = withinMeters;
+        for (int r = 0; r < _trees.Length && nearest > 0; r++)
         {
-            RiverProfile river = _rivers[r];
-            (double away, double t) = Nearest(direction, river.Points[s], river.Points[s + 1]);
-            double halfWidth = Lerp(river.HalfWidthMeters[s], river.HalfWidthMeters[s + 1], t);
-            double reach = halfWidth + BankWidthMeters(halfWidth);
-            double x = Math.Clamp((away - reach) / reach, 0, 1);
-            kept = Math.Min(kept, x * x * (3 - 2 * x));
+            Level[] tree = _trees[r];
+            nearest = NearestBanks(tree, tree.Length - 1, 0, r, direction, nearest);
         }
 
-        return kept;
+        return nearest;
+    }
+
+    // The nearest of `nearest` meters and how far a unit direction is past the banks of the
+    // segments under a node of a river's tree: down the tree, skipping nodes that can't be
+    // nearer (so only a handful of segments are looked at, however far it looks).
+    private double NearestBanks(Level[] tree, int level, int index, int r, Vector3D point,
+        double nearest)
+    {
+        Level nodes = tree[level];
+        double closest = ((point - nodes.Centers[index]).Length - nodes.Radii[index])
+            * _radiusMeters - nodes.ReachMeters[index];
+        if (closest >= nearest)
+        {
+            return nearest;
+        }
+
+        if (level == 0)
+        {
+            RiverProfile river = _rivers[r];
+            (double away, double t) = Nearest(point, river.Points[index],
+                river.Points[index + 1]);
+            double halfWidth = Lerp(river.HalfWidthMeters[index],
+                river.HalfWidthMeters[index + 1], t);
+            return Math.Min(nearest, Math.Max(0, away - halfWidth - BankWidthMeters(halfWidth)));
+        }
+
+        // The children nearest first, so the farther ones are mostly skipped.
+        Level below = tree[level - 1];
+        int first = index * GroupSize, count = Math.Min(first + GroupSize, below.Centers.Length)
+            - first;
+        Span<double> bounds = stackalloc double[GroupSize];
+        Span<int> order = stackalloc int[GroupSize];
+        for (int i = 0; i < count; i++)
+        {
+            int child = first + i;
+            bounds[i] = ((point - below.Centers[child]).Length - below.Radii[child])
+                * _radiusMeters - below.ReachMeters[child];
+            order[i] = child;
+        }
+
+        bounds[..count].Sort(order[..count]);
+        for (int i = 0; i < count && bounds[i] < nearest && nearest > 0; i++)
+        {
+            nearest = NearestBanks(tree, level - 1, order[i], r, point, nearest);
+        }
+
+        return nearest;
     }
 
     // The ground carved by the segments given, and sunk (with cells `cellMeters` wide) under

@@ -48,23 +48,33 @@ public sealed class RoughGround
     /// <summary>
     /// The fine relief of <paramref name="terrain"/> painted with <paramref name="types"/> on
     /// a body <paramref name="radiusKm"/> in radius with seed <paramref name="seed"/>
-    /// (<see cref="TerrainRelief.SeedFor"/>), or null if none of it is rough.
+    /// (<see cref="TerrainRelief.SeedFor"/>), or null if nothing is painted or no type is
+    /// rough. Quick: nothing is worked out until it's asked for.
     /// </summary>
     public static RoughGround? For(TerrainGrid terrain, IReadOnlyList<TerrainType> types,
         double radiusKm, int seed)
     {
-        bool rough = types.Any(type => type.Roughness > 0 && type.VariationMeters > 0
-            && terrain.Uses(type.Code));
+        bool rough = !terrain.IsEmpty
+            && types.Any(type => type.Roughness > 0 && type.VariationMeters > 0);
         return rough ? new RoughGround(terrain, types, radiusKm, seed) : null;
     }
 
     /// <summary>
     /// How far the fine relief lifts (positive) or sinks the ground at a unit direction, in
     /// meters, with no features smaller than <paramref name="smallestMeters"/> (see
-    /// <see cref="TerrainRoughness.Offset"/>).
+    /// <see cref="TerrainRoughness.Offset"/>). <paramref name="riverMeters"/> gives how far a
+    /// place is past the nearest river's banks (null: no rivers), asked only where the ground is
+    /// rough.
     /// </summary>
-    public double OffsetAt(Vector3D direction, double smallestMeters)
+    public double OffsetAt(Vector3D direction, double smallestMeters,
+        Func<Vector3D, double>? riverMeters = null)
     {
+        // Ground drawn too coarsely for any of the features has none (most of it, far off).
+        if (smallestMeters >= _belowKm * 1000)
+        {
+            return 0;
+        }
+
         // The four cells whose middles surround the place, as HeightGrid.SampleSteepAt finds
         // them, each weighted by how near it is.
         CubeCell cell = CubeSphere.CellAt(direction, FaceSize);
@@ -80,8 +90,9 @@ public sealed class RoughGround
         Span<double> weights = [
             (1 - fx) * (1 - fy), fx * (1 - fy), (1 - fx) * fy, fx * fy];
 
-        // Each type's relief is worked out once, however many of the cells it's in.
-        double total = 0;
+        // Each type's relief is worked out once, however many of the cells it's in; the rivers
+        // are looked for only once some is.
+        double total = 0, river = double.NaN;
         for (int i = 0; i < 4; i++)
         {
             byte code = codes[i];
@@ -98,9 +109,14 @@ public sealed class RoughGround
 
             if (weight > 0)
             {
+                if (double.IsNaN(river))
+                {
+                    river = riverMeters?.Invoke(direction) ?? double.PositiveInfinity;
+                }
+
                 total += weight * TerrainRoughness.Offset(direction, _radiusKm,
                     _variation[code], Math.Max(_sizeKm[code], _fewestKm), _belowKm,
-                    _roughness[code], smallestMeters, _seed + code * 7_919);
+                    _roughness[code], smallestMeters, _seed + code * 7_919, river);
             }
         }
 

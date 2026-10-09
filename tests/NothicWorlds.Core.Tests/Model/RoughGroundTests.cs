@@ -45,6 +45,49 @@ public class RoughGroundTests
         Assert.InRange(most, 3, 200);
     }
 
+    [Theory]
+    [InlineData(1_500)]  // Ridged
+    [InlineData(100)]    // Rolling
+    public void OnAverage_RoughGroundIsNeitherRaisedNorLowered(int variation)
+    {
+        // Otherwise rough land would sink or rise around a river's smooth valley, leaving the
+        // river on a causeway or in a trench.
+        double mean = Enumerable.Range(0, 2_000).Average(i =>
+            Relief(0.7, variation, Place(i * 0.013)));
+        double spread = Enumerable.Range(0, 2_000).Average(i =>
+            Math.Abs(Relief(0.7, variation, Place(i * 0.013))));
+
+        Assert.InRange(Math.Abs(mean), 0, 0.15 * spread);
+    }
+
+    [Fact]
+    public void CraggyGround_StaysWalkableAtMostPlaces()
+    {
+        // Steeper than 45° over 20 m at under a tenth of places on craggy mountains: crags, not
+        // a maze of walls.
+        int steep = 0;
+        const int places = 400;
+        for (int i = 0; i < places; i++)
+        {
+            Vector3D here = Place(i * 0.11);
+            Vector3D along = Unit(here + new Vector3D(20 / (EarthKm * 1000), 0, 0));
+            steep += Math.Abs(Relief(0.7, 1_500, here) - Relief(0.7, 1_500, along)) > 20 ? 1 : 0;
+        }
+
+        Assert.InRange(steep, 0, places / 10);
+    }
+
+    [Fact]
+    public void BesideARiver_TheGroundIsSmooth_AndOnlySmallFeaturesComeBackNearIt()
+    {
+        Vector3D here = Place(2.2);
+
+        Assert.Equal(0, Relief(0.7, 1_500, here, riverMeters: 0));
+        double near = Math.Abs(Relief(0.7, 1_500, here, riverMeters: 300));
+        Assert.InRange(near, 0, 0.1 * Spread(0.7));
+        Assert.Equal(Relief(0.7, 1_500, here), Relief(0.7, 1_500, here, riverMeters: 50_000));
+    }
+
     [Fact]
     public void GroundDrawnCoarsely_LeavesOutOnlyTheFinestFeatures()
     {
@@ -57,14 +100,23 @@ public class RoughGroundTests
     }
 
     [Fact]
-    public void For_IsNullWhenNothingPaintedIsRough()
+    public void For_IsNullWhenNothingIsPaintedOrNoTypeIsRough()
+    {
+        TerrainGrid terrain = TerrainGrid.Empty.Paint(_faceMiddle, 5, Meadow);
+        TerrainType[] smooth = [.. Types().Select(type => type with { Roughness = 0 })];
+
+        Assert.Null(RoughGround.For(terrain, smooth, EarthKm, Seed));
+        Assert.Null(RoughGround.For(TerrainGrid.Empty, Types(), EarthKm, Seed));
+        Assert.NotNull(RoughGround.For(terrain, Types(), EarthKm, Seed));
+    }
+
+    [Fact]
+    public void GroundOfASmoothType_HasNoRelief()
     {
         TerrainGrid terrain = TerrainGrid.Empty.Paint(_faceMiddle, 5, Meadow);
 
-        Assert.Null(RoughGround.For(terrain, Types(), EarthKm, Seed));
-        Assert.Null(RoughGround.For(TerrainGrid.Empty, Types(), EarthKm, Seed));
-        Assert.NotNull(RoughGround.For(terrain.Paint(_faceMiddle, 1, Crags), Types(), EarthKm,
-            Seed));
+        Assert.Equal(0, RoughGround.For(terrain, Types(), EarthKm, Seed)!
+            .OffsetAt(_faceMiddle, 20));
     }
 
     [Fact]
@@ -112,11 +164,11 @@ public class RoughGroundTests
         Unit(new Vector3D(Math.Sin(t) * 0.3, Math.Cos(t * 1.7) * 0.3, 1));
 
     private static double Relief(double roughness, int variation, Vector3D? place = null,
-        double smallestMeters = 20)
+        double smallestMeters = 20, double riverMeters = double.PositiveInfinity)
     {
         double cellKm = EarthKm * Math.PI / 2 / TerrainGrid.FaceSize;
         return TerrainRoughness.Offset(place ?? Place(0.5), EarthKm, variation, 40, 3 * cellKm,
-            roughness, smallestMeters, Seed);
+            roughness, smallestMeters, Seed, riverMeters);
     }
 
     // How far the relief strays from level, on average over many places.

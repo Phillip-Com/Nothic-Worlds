@@ -101,15 +101,16 @@ public partial class WorldSession
         Preparing?.Invoke(bodyId, true);
         try
         {
-            (HeightGrid ground, HeightGrid shown, PreparedSurface images) = await Task.Run(() =>
-            {
-                HeightGrid ground = shaping
-                    ? WorkOutGround(known, terrain, types, radiusKm, seed)
-                    : HeightGrid.Empty;
-                HeightGrid shown = TerrainRelief.Shaped(ground, sculpted);
-                return (ground, shown, SurfaceImages.Prepare(terrain, terrainBefore, palette,
-                    shown, heightsBefore));
-            });
+            (HeightGrid ground, HeightGrid shown, PreparedSurface images) =
+                await Task.Run(() =>
+                {
+                    HeightGrid ground = shaping
+                        ? WorkOutGround(known, terrain, types, radiusKm, seed)
+                        : HeightGrid.Empty;
+                    HeightGrid shown = TerrainRelief.Shaped(ground, sculpted);
+                    return (ground, shown, SurfaceImages.Prepare(terrain, terrainBefore,
+                        palette, shown, heightsBefore));
+                });
             if (world == World)
             {
                 if (shaping)
@@ -118,7 +119,9 @@ public partial class WorldSession
                 }
 
                 _shownGround[bodyId] = (ground, sculpted, shown);
-                (System?.SurfaceFor(bodyId))?.ShowPrepared(images);
+                PlanetSurface? globe = System?.SurfaceFor(bodyId);
+                globe?.ShowPrepared(images);
+                globe?.SetRoughness(RoughFor(bodyId, terrain, types, radiusKm, shaping));
             }
         }
         catch (ArgumentException exception)
