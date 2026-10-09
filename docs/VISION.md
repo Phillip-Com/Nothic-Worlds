@@ -224,7 +224,7 @@ screen filter; stored per world (format v25); Painterly the default for every wo
 Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 (`WorldSession.SetStyle`, one undo step).
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Owner's choices:** walk or fly; the sky at true size and place with a magnify switch; day and
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
@@ -233,7 +233,8 @@ from above; a ground-detail texture near the feet (Base tier); choosing where to
 clicking; true heights while standing; switches for fog, clouds, and night vision (owner's
 request, 2026-10-08; night vision as brightened true colors, not green); ground that stays put
 as you move, on globes and flat worlds alike, the water's surface built with it, and a
-**Standing ground detail** setting (Low, Standard, High; named so by the owner, 2026-10-09).
+**Standing ground detail** setting (Low, Standard, High; named so by the owner, 2026-10-09);
+walking stops at slopes over 50°, flying goes anywhere (owner's choice, 2026-10-09).
 **Built:**
 - Core: `BodyOrientation.ToSystem` / `ShapeToSystem`; `Simulation/SkyView.cs` (`From`,
   `FromFlat`, `SolarTimeHours`, `BodyAt`); `Geometry/FlatWalk.cs` and `GlobeWalk` for moving
@@ -272,6 +273,11 @@ a little past the eye's horizon (~19 km). The rim and underside of a flat world 
   Clouds (`WeatherDisplay.ShowClouds`). All three are remembered on this computer
   (`AppSettings.StandingFog`, `ShowClouds`, `NightVision`; owner's choice). The view's visibility of hidden UI is noted before any is
   hidden, so the terrain brush still works after leaving.
+- **Ground clearance** (Core `Geometry/GroundClearance.cs`): the camera's near distance follows
+  the nearest ground in any direction (rings around the eye out to its height above the ground
+  below), not just the ground below, so a hillside beside a low flight isn't cut away; walking
+  looks half a meter past each step and stops at slopes over 50°, saying so in the help line.
+  On carved globes (ground found only to ~0.5 m) both use the ground below, as before.
 - **Ground detail** (`eye_level_ground` in `planet_surface.gdshaderinc`): three layers of noise
   matched to the ground **by its color** (grass, sand, snow, water, rock), placed in double
   precision by `FirstPersonMode.SetGroundDetail`; bumps shade the color rather than tilt the
