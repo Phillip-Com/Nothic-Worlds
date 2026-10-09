@@ -195,7 +195,11 @@ public partial class FirstPersonMode : Node
             _mapSpan = Math.Clamp(_mapSpan + step, 0, _mapSpans.Length - 1);
         _hud.Minimap.Clicked += TravelOnMap;
         _hud.CalendarButton.Pressed += ToggleCalendar;
-        _hud.FogSwitch.Toggled += on => _sky.ShowFog = on;
+        // The fog and night vision switches are remembered on this computer (clouds are too,
+        // by WeatherDisplay).
+        _sky.ShowFog = AppSettings.StandingFog;
+        _sky.NightVision = AppSettings.NightVision;
+        _hud.FogSwitch.Toggled += on => _sky.ShowFog = AppSettings.StandingFog = on;
         _hud.CloudsSwitch.Toggled += on =>
         {
             if (Weather is not null)
@@ -203,7 +207,7 @@ public partial class FirstPersonMode : Node
                 Weather.ShowClouds = on;  // The same switch as View ▸ Clouds
             }
         };
-        _hud.NightVisionSwitch.Toggled += on => _sky.NightVision = on;
+        _hud.NightVisionSwitch.Toggled += on => _sky.NightVision = AppSettings.NightVision = on;
         if (Session is not null)
         {
             Session.WorldClosed += _ => Leave();

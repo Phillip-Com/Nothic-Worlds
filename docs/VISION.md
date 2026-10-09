@@ -248,7 +248,8 @@ request, 2026-10-08; night vision as brightened true colors, not green).
 - `UI/FirstPersonHud.cs`, `UI/CompassStrip.cs`. Fog (G), Clouds (K), and Night Vision (N)
   switches under the Calendar button: `SurfaceSky.ShowFog`, `SurfaceSky.ShowNightVision` (more
   ambient light and exposure, scaled by how dark it is); Clouds is the same switch as View ▸
-  Clouds (`WeatherDisplay.ShowClouds`). The view's visibility of hidden UI is noted before any is
+  Clouds (`WeatherDisplay.ShowClouds`). All three are remembered on this computer
+  (`AppSettings.StandingFog`, `ShowClouds`, `NightVision`; owner's choice). The view's visibility of hidden UI is noted before any is
   hidden, so the terrain brush still works after leaving.
 - **Ground detail** (`eye_level_ground` in `planet_surface.gdshaderinc`): three layers of noise
   matched to the ground **by its color** (grass, sand, snow, water, rock), placed in double

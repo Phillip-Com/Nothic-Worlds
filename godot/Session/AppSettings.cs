@@ -25,6 +25,9 @@ public static class AppSettings
     private const string FrameRateKey = "frame_rate_limit";
     private const string HighQualityMapsKey = "high_quality_maps";
     private const string UnitsKey = "units";
+    private const string CloudsKey = "show_clouds";
+    private const string FogKey = "standing_fog";
+    private const string NightVisionKey = "night_vision";
     private const string FilesSection = "files";
     private const string FoldsSection = "folds";
     private const string RecentWorldsKey = "recent_worlds";
@@ -108,6 +111,27 @@ public static class AppSettings
         ConfigFile file = Load();
         file.SetValue(FoldsSection, id, open);
         Write(file);
+    }
+
+    /// <summary>Whether clouds show, on globes and while standing (View ▸ Clouds).</summary>
+    public static bool ShowClouds
+    {
+        get => Load().GetValue(DisplaySection, CloudsKey, true).AsBool();
+        set => Save(CloudsKey, value);
+    }
+
+    /// <summary>Whether the haze shows while standing (VISION.md REN-06).</summary>
+    public static bool StandingFog
+    {
+        get => Load().GetValue(DisplaySection, FogKey, true).AsBool();
+        set => Save(FogKey, value);
+    }
+
+    /// <summary>Whether night vision is on while standing (VISION.md REN-06).</summary>
+    public static bool NightVision
+    {
+        get => Load().GetValue(DisplaySection, NightVisionKey, false).AsBool();
+        set => Save(NightVisionKey, value);
     }
 
     /// <summary>Whether relief is shaded map-style (View ▸ Relief Shading).</summary>
