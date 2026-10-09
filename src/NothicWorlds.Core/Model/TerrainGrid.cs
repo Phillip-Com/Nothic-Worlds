@@ -35,7 +35,12 @@ public sealed class TerrainGrid
     /// <summary>The largest brush radius, in degrees of arc (a whole hemisphere).</summary>
     public const double MaxBrushRadiusDegrees = CubeGridBrush.MaxRadiusDegrees;
 
-    private const int TileSize = CubeGridBrush.TileSize;
+    /// <summary>
+    /// Cells along each edge of a tile, the part of a face a brush stroke copies and
+    /// <see cref="TilesChangedFrom"/> names.
+    /// </summary>
+    public const int TileSize = CubeGridBrush.TileSize;
+
     private const int TilesPerSide = CubeGridBrush.TilesPerSide;
     private const int TilesPerFace = CubeGridBrush.TilesPerFace;
     private const int TileCount = CubeGridBrush.TileCount;
@@ -191,6 +196,37 @@ public sealed class TerrainGrid
         }
 
         return faces;
+    }
+
+    /// <summary>
+    /// The tiles of one face that may differ from <paramref name="other"/>, as their column
+    /// and row on the face (each <see cref="TileSize"/> cells across, counted
+    /// from the top left as in <see cref="CopyFace"/>), e.g. to redo only those parts of the
+    /// face's image after a brush stroke. Quick, comparing tiles by identity as
+    /// <see cref="FacesChangedFrom"/> does.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The face isn't 0 to 5.</exception>
+    public IReadOnlyList<(int Column, int Row)> TilesChangedFrom(TerrainGrid other, int face)
+    {
+        if (face is < 0 or >= CubeSphere.FaceCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(face));
+        }
+
+        var tiles = new List<(int Column, int Row)>();
+        for (int tileRow = 0; tileRow < TilesPerSide; tileRow++)
+        {
+            for (int tileColumn = 0; tileColumn < TilesPerSide; tileColumn++)
+            {
+                int index = TileIndex(face, tileColumn, tileRow);
+                if (!ReferenceEquals(_tiles[index], other._tiles[index]))
+                {
+                    tiles.Add((tileColumn, tileRow));
+                }
+            }
+        }
+
+        return tiles;
     }
 
     /// <summary>
