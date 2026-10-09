@@ -197,8 +197,8 @@ enough on screen).
 **~150–160 fps** as the realistic baseline for the standard benchmark and compare builds back
 to back (an open Godot editor drops it to ~125–130). Opening a large, heavily painted world:
 slowest frame ~150 ms (it was 6 s before background preparation).
-**Limits:** each brush move while painting still takes ~24 ms, mostly remaking the painted
-face's image for the globe.
+**Limits:** an occasional brush move while painting is still slow (cause not yet pinned
+down).
 
 **REN-04 — Top-down local region view** · Implemented (M13: PRs #37–#38) · Base
 **Intent:** Zoom down to a local region and see it as a top-down terrain view.
@@ -564,10 +564,11 @@ of 1,024 × 1,024 cells a face (about 10 km on an Earth-sized planet); unpainted
 grey once a planet without a map has any terrain.
 **Built:** Core `Geometry/CubeSphere.cs` (equal-angle cube faces; the shader repeats its math,
 spelled out in docs/world-format.md); `Model/TerrainGrid.cs` (immutable 64 × 64 tiles shared
-between versions; `Paint`, `PaintStroke`, `Replace`, `FacesChangedFrom`); `Model/TerrainType.cs`;
+between versions; `Paint`, `PaintStroke`, `Replace`, `FacesChangedFrom`, `TilesChangedFrom`);
+`Model/TerrainType.cs`;
 `Storage/TerrainImage.cs` (format v10, `terrain/<id>.png`). Drawn as a six-layer byte texture
 plus a palette, with smooth edges up close (`terrain_near`) and an averaged far copy so it never
-flickers; `Session/WorldSession.Terrain.cs`; `Controls/TerrainBrush.cs`; `UI/TerrainPanel.cs`.
+flickers (kept per face in `PlanetSurface`, so a stroke averages only the tiles it touched); `Session/WorldSession.Terrain.cs`; `Controls/TerrainBrush.cs`; `UI/TerrainPanel.cs`.
 **Reuse:** `TerrainGrid`'s shared-tile pattern for any per-cell data (heights use it).
 
 **BOD-06 — Custom surface appearance** · Implemented (M16: PR #42) · Base

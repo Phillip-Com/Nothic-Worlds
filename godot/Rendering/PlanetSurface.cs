@@ -57,6 +57,10 @@ public partial class PlanetSurface : MeshInstance3D
     private bool _farColorsStale;
     private double _sinceFarRedone;
     private readonly byte[] _faceCells = new byte[TerrainGrid.CellsPerFace];
+
+    // Each face's averaged terrain colors in the current palette, as last sent (null if not
+    // known), so a brush stroke redoes only the tiles it changed.
+    private readonly byte[]?[] _farColors = new byte[]?[CubeSphere.FaceCount];
     private TerrainGrid _shownTerrain = TerrainGrid.Empty;
     private ImageTexture? _terrainPalette;
     private byte[] _paletteBytes = [];
@@ -417,6 +421,7 @@ public partial class PlanetSurface : MeshInstance3D
             SurfaceMaterial.SetShaderParameter("terrain_far", default);
             _terrainTexture = null;
             _farTexture = null;
+            Array.Clear(_farColors);
         }
         else if (_terrainTexture is null || _farTexture is null)
         {
@@ -425,7 +430,7 @@ public partial class PlanetSurface : MeshInstance3D
             for (int face = 0; face < CubeSphere.FaceCount; face++)
             {
                 faces.Add(FaceImage(terrain, face));
-                farFaces.Add(FarFaceImage());
+                farFaces.Add(FarFaceImage(face));
             }
 
             _terrainTexture = new Texture2DArray();
@@ -440,8 +445,10 @@ public partial class PlanetSurface : MeshInstance3D
         {
             foreach (int face in terrain.FacesChangedFrom(_shownTerrain))
             {
+                // Only the tiles a stroke touched are averaged again (most of the work).
                 _terrainTexture.UpdateLayer(FaceImage(terrain, face), face);
-                _farTexture.UpdateLayer(FarFaceImage(), face);
+                _farTexture.UpdateLayer(
+                    FarFaceImage(face, terrain.TilesChangedFrom(_shownTerrain, face)), face);
             }
         }
 
@@ -743,6 +750,7 @@ public partial class PlanetSurface : MeshInstance3D
                 _terrainTexture.CreateFromImages(new Godot.Collections.Array<Image>(faces!));
                 _farTexture = new Texture2DArray();
                 _farTexture.CreateFromImages(new Godot.Collections.Array<Image>(far!));
+                Array.Clear(_farColors);
                 SurfaceMaterial.SetShaderParameter("terrain_cells", _terrainTexture);
                 SurfaceMaterial.SetShaderParameter("terrain_far", _farTexture);
                 SurfaceMaterial.SetShaderParameter("has_terrain", true);
@@ -758,6 +766,7 @@ public partial class PlanetSurface : MeshInstance3D
                     {
                         _terrainTexture.UpdateLayer(codes, face);
                         _farTexture.UpdateLayer(colors, face);
+                        _farColors[face] = null;
                     }
                 }
 
@@ -946,6 +955,7 @@ public partial class PlanetSurface : MeshInstance3D
         }
 
         _paletteBytes = bytes;
+        Array.Clear(_farColors);
 
         // The averaged copy holds colors, so it's redone in the new ones: soon, not now, as
         // redoing it for every step of a color being picked froze the app (see _Process).
@@ -1029,7 +1039,7 @@ public partial class PlanetSurface : MeshInstance3D
         foreach (int face in _shownTerrain.FacesChangedFrom(TerrainGrid.Empty))
         {
             _shownTerrain.CopyFace(face, _faceCells);
-            _farTexture.UpdateLayer(FarFaceImage(), face);
+            _farTexture.UpdateLayer(FarFaceImage(face), face);
         }
     }
 
@@ -1081,8 +1091,25 @@ public partial class PlanetSurface : MeshInstance3D
             TerrainGrid.FaceSize, TerrainGrid.FaceSize, false, Image.Format.R8, _faceCells);
     }
 
-    // The face in _faceCells, averaged into colors (see SurfaceImages.FarFace).
-    private Image FarFaceImage() => SurfaceImages.FarFace(_faceCells, _paletteBytes);
+    // The face in _faceCells, averaged into colors (see SurfaceImages.FarFace) and kept: only
+    // the changed tiles are redone when given and the face's kept colors are known.
+    private Image FarFaceImage(int face, IReadOnlyList<(int Column, int Row)>? changedTiles = null)
+    {
+        if (changedTiles is null || _farColors[face] is not byte[] colors)
+        {
+            colors = SurfaceImages.FarColors(_faceCells, _paletteBytes);
+            _farColors[face] = colors;
+        }
+        else
+        {
+            foreach ((int column, int row) in changedTiles)
+            {
+                SurfaceImages.RedoFarColors(colors, _faceCells, _paletteBytes, column, row);
+            }
+        }
+
+        return SurfaceImages.FarImage(colors);
+    }
 
     // Copies a lookup into its tile of the atlas, unless that tile already holds it.
     private bool WriteWarpTile(int tile, WarpLookup warp)
