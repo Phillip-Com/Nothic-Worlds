@@ -224,7 +224,7 @@ screen filter; stored per world (format v25); Painterly the default for every wo
 Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 (`WorldSession.SetStyle`, one undo step).
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120; ground materials: PR #121) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120; ground materials: PR #121; plants: PR #122) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Owner's choices:** walk or fly; the sky at true size and place with a magnify switch; day and
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
@@ -243,7 +243,12 @@ drawn as a CC0 photo material tinted partway toward the type's color, with bare 
 slopes and snow above a snow line that falls with latitude; a
 sense of scale: speed in km/h or mph, a rangefinder both at a crosshair in the middle and under
 the mouse, and the journal's and timeline's pins on the compass with their distances (owner's
-choices, 2026-10-09; no markers of one's own, no labels in the 3D view).
+choices, 2026-10-09; no markers of one's own, no labels in the 3D view); **plants**
+(owner's choices, 2026-10-10): each terrain type picks what grows on it (none, grass, meadow,
+woodland, forest, conifer forest, jungle, scrub, marsh, rocky), drawn with CC0 low-poly models
+(Quaternius) and short grass made in code, far trees as flat pictures; a **Standing plants**
+setting (Off, Low, Standard, High; High is the Advanced tier) in the presets, and a remembered
+Plants switch (V) while standing.
 **Built:**
 - Core: `BodyOrientation.ToSystem` / `ShapeToSystem`; `Simulation/SkyView.cs` (`From`,
   `FromFlat`, `SolarTimeHours`, `BodyAt`); `Geometry/FlatWalk.cs` and `GlobeWalk` for moving
@@ -325,6 +330,27 @@ a little past the eye's horizon (~19 km). The rim and underside of a flat world 
   on `CompassStrip`, labeled nearest first where there's room; places out of view wait at the
   strip's ends, with ‹ or ›. Limits: ground narrower than a step can be missed; a river reads
   as its bed (its water isn't sampled); off a flat world's top face neither shows.
+- **Plants** (`Controls/FirstPersonMode.Plants.cs`, `Rendering/StandingPlants.cs`; models
+  in `godot/Assets/Plants/`, 2.3 MB, see its `CREDITS.md`): `TerrainType.Plants`
+  (`Model/PlantCover.cs`, format v35, guessed from climate and ground by
+  `TerrainType.GuessPlants`; a type named Jungle gets jungle). Core `Model/PlantMix.cs` says
+  what each cover grows and how thickly (trees and undergrowth a hectare, grass tufts a square
+  meter); `Geometry/PlantScatter.cs` strews seeded spots over a `GroundTile` (the body's seed,
+  so plants stay put and come back), `Geometry/PlantPatches.cs` finds the tiles around the eye
+  (128 m for trees, 32 m undergrowth, 8 m grass). `StandingPlants` places them on a worker on
+  the drawn ground (`GroundTiles.ShownHeights`), not in water, rivers or their banks, on
+  slopes over about 37° (trees; 40° for the rest, 50° for stones), or above the snow line
+  (trees stop 300 m below it; `GroundMaterials.SnowLineAt`); the near ones again every 4 m,
+  the far every 40 m. Drawn as one batch (MultiMesh) per model shape, each merged into one
+  vertex-colored mesh (`Rendering/PlantModels.cs`), trees past 40 m (Standard) in a simpler
+  shape the engine makes (about 12% of the triangles), past 150 m as flat pictures drawn once
+  on entering (`Rendering/PlantImpostors.cs`), thinning out to 1.5 km; grass tufts to 30 m,
+  undergrowth to 60 m (`plants.gdshaderinc`: dithered fades, a little sway, and a trunk or
+  bush the eye stands in left out). Low, Standard, and High set the reaches and how thick.
+  On flat worlds, on the top face. About 2 ms more GPU in a meadow and 4–5 ms in a thick
+  forest at Standard on the baseline laptop (measured in PR #122). Limits: plants don't follow
+  the seasons; they cast no shadows yet; walking passes through them; ground that isn't
+  painted grows nothing.
 **Reuse:** `SkyView` for anything about what's in a world's sky; `GroundTiles` for anything
 drawn at the ground's height around the eye (give it a recipe); `FirstPersonGround.Build` for a
 shell at a set height (the cloud deck).
@@ -653,7 +679,8 @@ grey once a planet without a map has any terrain; a Tool On/Off switch (P) for p
 sculpting, and shapes, so drags can turn the view (owner's request, 2026-10-08); an eye on each
 type in the list hides it everywhere, drawn as what's under it, until the world closes (never
 saved; owner's choice, 2026-10-09); each type's ground while standing, a Ground choice under
-Climate (`REN-06`; owner's choice, 2026-10-09).
+Climate (`REN-06`; owner's choice, 2026-10-09); what grows on each while standing, a Plants
+choice under Ground (`REN-06`; owner's choice, 2026-10-10).
 **Built:** Core `Geometry/CubeSphere.cs` (equal-angle cube faces; the shader repeats its math,
 spelled out in docs/world-format.md); `Model/TerrainGrid.cs` (immutable 64 × 64 tiles shared
 between versions; `Paint`, `PaintStroke`, `Replace`, `FacesChangedFrom`, `TilesChangedFrom`);
