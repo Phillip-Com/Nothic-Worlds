@@ -224,7 +224,7 @@ screen filter; stored per world (format v25); Painterly the default for every wo
 Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 (`WorldSession.SetStyle`, one undo step).
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Owner's choices:** walk or fly; the sky at true size and place with a magnify switch; day and
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
@@ -236,7 +236,10 @@ as you move, on globes and flat worlds alike, the water's surface built with it,
 **Standing ground detail** setting (Low, Standard, High; named so by the owner, 2026-10-09);
 walking stops at slopes over 50°, flying goes anywhere (owner's choice, 2026-10-09); a
 remembered Terrain switch that hides the painted colors underfoot, apart from View ▸ Terrain,
-so the map keeps them (owner's choice, 2026-10-09; on by default until ground materials).
+so the map keeps them (owner's choice, 2026-10-09; on by default until ground materials); a
+sense of scale: speed in km/h or mph, a rangefinder both at a crosshair in the middle and under
+the mouse, and the journal's and timeline's pins on the compass with their distances (owner's
+choices, 2026-10-09; no markers of one's own, no labels in the 3D view).
 **Built:**
 - Core: `BodyOrientation.ToSystem` / `ShapeToSystem`; `Simulation/SkyView.cs` (`From`,
   `FromFlat`, `SolarTimeHours`, `BodyAt`); `Geometry/FlatWalk.cs` and `GlobeWalk` for moving
@@ -289,6 +292,16 @@ a little past the eye's horizon (~19 km). The rim and underside of a flat world 
   matched to the ground **by its color** (grass, sand, snow, water, rock), placed in double
   precision by `FirstPersonMode.SetGroundDetail`; bumps shade the color rather than tilt the
   normal.
+- **Scale** (`Controls/FirstPersonMode.Scale.cs`): the rangefinder, Core
+  `Geometry/GroundRange.cs`, steps out along a line of sight (steps 2% of the distance, then
+  halving) over the drawn ground's heights, stopping at the water's surface (at the bottom when
+  under water), out to 200 km. It runs on a worker with its own copy of the eye's place, the
+  middle and the mouse taking turns about ten times a second; the reading shows under the
+  crosshair (`FirstPersonHud.SetRange`) and in the hover readout. Pins come from
+  `PinMarkers.PinsOn` (so the Pins switch applies), placed by Core `Geometry/SurfaceBearing.cs`
+  on `CompassStrip`, labeled nearest first where there's room; places out of view wait at the
+  strip's ends, with ‹ or ›. Limits: ground narrower than a step can be missed; a river reads
+  as its bed (its water isn't sampled); off a flat world's top face neither shows.
 **Reuse:** `SkyView` for anything about what's in a world's sky; `GroundTiles` for anything
 drawn at the ground's height around the eye (give it a recipe); `FirstPersonGround.Build` for a
 shell at a set height (the cloud deck).
