@@ -199,6 +199,44 @@ const float GROUND_DETAIL_METERS = 4.0;
 const mat3 DETAIL_TURN_A = mat3(vec3(2.0, -2.0, 1.0), vec3(2.0, 1.0, -2.0), vec3(1.0, 2.0, 2.0));
 const mat3 DETAIL_TURN_B = mat3(vec3(1.0, 2.0, 2.0), vec3(2.0, 1.0, -2.0), vec3(2.0, -2.0, 1.0));
 
+#ifdef GROUND_MATERIALS
+// Photo materials for that ground (VISION.md REN-06; GroundMaterials.cs), only in the standing
+// shaders (planet_standing.gdshader and its styles): a color and a normal
+// map per ground kind, one layer each in GroundKind's order, with each color map's average (in
+// linear light) for where the detail is too small to see. The ground palette holds, per terrain
+// code, its color (to tint toward) and its kind plus 1 in alpha (0: unpainted). Hidden types
+// keep theirs: hiding only hides painted colors.
+uniform sampler2DArray ground_colors : source_color, filter_linear_mipmap_anisotropic,
+	repeat_enable;
+uniform sampler2DArray ground_normals : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform vec3 ground_averages[8];
+uniform sampler2D ground_palette : source_color, filter_nearest, repeat_disable;
+// Snow lies above this height at the equator (meters), lower toward the poles; none without
+// air (GroundMaterials.ShowOn).
+uniform bool has_snow_line = false;
+uniform float snow_line_meters = 5000.0;
+// Where the mesh's middle falls in the materials' broad shading noise, as ground_detail_origin
+// does for the fine detail, but GROUND_BROAD_METERS to a noise unit.
+instance uniform vec3 ground_broad_origin = vec3(0.0);
+const float GROUND_BROAD_METERS = 64.0;
+
+// Some ground kinds (GroundKind), and each one's texture size in meters, which must divide the
+// detail noise's repeat (GROUND_DETAIL_METERS times PATTERN_NOISE_SIZE, 128 m) so the
+// textures stay put as the ground is rebuilt; and how rough each is to the light.
+const int GROUND_GRASS = 0;
+const int GROUND_SAND = 3;
+const int GROUND_ROCK = 5;
+const int GROUND_SNOW = 6;
+const int GROUND_GRAVEL = 7;
+const float GROUND_TILE_METERS[8] = float[8](2.0, 2.0, 2.0, 2.0, 4.0, 4.0, 2.0, 2.0);
+const float GROUND_ROUGHNESS[8] = float[8](0.95, 0.95, 0.95, 0.9, 0.6, 0.85, 0.7, 0.9);
+// How far a material's color is pulled toward its terrain's painted color (owner's choice:
+// partway, so the palette still shows), and how much of the painted color's lightness comes
+// with it (the photo's own lightness is the more realistic).
+const float GROUND_TINT = 0.6;
+const float GROUND_TINT_LIGHTNESS = 0.3;
+#endif
+
 // 1.0 on a line through multiples of `spacing`, fading to 0.0 over `pixels` screen pixels.
 // `width` is how much `value` changes from pixel to pixel.
 float grid_line(float value, float width, float spacing, float pixels) {
@@ -583,8 +621,11 @@ vec4 terrain_code_color(int code) {
 
 // Up close: the four cells around this point, with smooth, softly anti-aliased edges between
 // terrains instead of square cells. Each terrain's share of the four (by distance) decides; the
-// edge runs where the two biggest shares are equal, which gives rounded coastlines.
-vec4 terrain_near(vec3 position, float cells_per_pixel) {
+// edge runs where the two biggest shares are equal, which gives rounded coastlines. Gives the
+// two terrains with the biggest shares and how much the first wins by (1 inside one terrain,
+// 0.5 on the edge).
+void terrain_pair(vec3 position, float cells_per_pixel, out int best, out int second,
+		out float blend) {
 	int face = int(position.z);
 	vec2 cells = position.xy * float(TERRAIN_FACE_SIZE) - 0.5;
 	ivec2 base = ivec2(floor(cells));
@@ -611,15 +652,15 @@ vec4 terrain_near(vec3 position, float cells_per_pixel) {
 	}
 
 	// Inside one terrain (most of the globe), there's no edge to draw.
+	best = codes[0];
+	second = codes[0];
+	blend = 1.0;
 	if (codes[0] == codes[1] && codes[0] == codes[2] && codes[0] == codes[3]) {
-		vec4 color = terrain_code_color(codes[0]);
-		return vec4(color.rgb * color.a, color.a);
+		return;
 	}
 
 	// Each corner's terrain's total share; keep the biggest and the biggest other one.
-	int best = codes[0];
 	float best_share = -1.0;
-	int second = codes[0];
 	float second_share = 0.0;
 	for (int i = 0; i < 4; i++) {
 		float share = 0.0;
@@ -640,7 +681,14 @@ vec4 terrain_near(vec3 position, float cells_per_pixel) {
 	}
 
 	float edge = max(cells_per_pixel, TERRAIN_EDGE_CELLS);
-	float blend = second == best ? 1.0 : smoothstep(-edge, edge, best_share - second_share);
+	blend = second == best ? 1.0 : smoothstep(-edge, edge, best_share - second_share);
+}
+
+// The painted colors up close (see terrain_pair), multiplied by alpha.
+vec4 terrain_near(vec3 position, float cells_per_pixel) {
+	int best, second;
+	float blend;
+	terrain_pair(position, cells_per_pixel, best, second, blend);
 	vec4 best_color = terrain_code_color(best);
 	vec4 second_color = terrain_code_color(second);
 	// Blended with alpha, so an edge against unpainted ground fades rather than darkens.
@@ -913,6 +961,187 @@ vec3 bumped(vec3 normal, float height) {
 	return normalize(abs(det) * normal - slope);
 }
 
+#ifdef GROUND_MATERIALS
+// A terrain code's ground kind (-1 for unpainted) and the color to tint it toward.
+int ground_kind(int code, out vec3 tint) {
+	vec4 entry = texelFetch(ground_palette, ivec2(code, 0), 0);
+	tint = entry.rgb;
+	return int(round(entry.a * 255.0)) - 1;
+}
+
+// The ground kind for ground drawn without painted terrain (a map, or a surface pattern), by
+// its color, as the fine detail guesses it (ground_kinds): bare ground is rock, and the bottom
+// under water sand.
+int ground_kind_by_color(vec3 color) {
+	vec4 kinds = ground_kinds(color);
+	float most = max(max(kinds.x, kinds.y), max(kinds.z, kinds.w));
+	if (most < 0.5) {
+		return GROUND_ROCK;
+	}
+	return most == kinds.x ? GROUND_GRASS : most == kinds.z ? GROUND_SNOW : GROUND_SAND;
+}
+
+// A turn and shrink of a texture's coordinates (about 27 degrees, 2.24 times finer) for its
+// second look: whole numbers, so it repeats where the texture does (see GROUND_TILE_METERS).
+const mat2 GROUND_TURN = mat2(vec2(2.0, 1.0), vec2(-1.0, 2.0));
+
+// The texture's color at `uv` with its broad light and dark (what a 16 by 16 copy of it
+// holds) evened out to `light`: those repeat with the texture and line up into rows, while the
+// broad patches over the ground (ground_material) vary freely.
+vec3 ground_texel(vec2 uv, float layer, float light) {
+	vec3 color = texture(ground_colors, vec3(uv, layer)).rgb;
+	vec3 broad = textureLod(ground_colors, vec3(uv, layer), 6.0).rgb;
+	return color * (light / max(dot(broad, vec3(0.2126, 0.7152, 0.0722)), 1e-3));
+}
+
+// One side's look of the material at `uv`: its color, and the normal map's tilt along the
+// texture's directions; `light` is how light the material is on average. Where `turned` is 1
+// the texture is turned and shrunk (GROUND_TURN), in between both are read and blended, so its
+// repeats don't line up into rows.
+vec3 ground_side(vec2 uv, float layer, float light, float turned, out vec2 tilt) {
+	vec3 color = vec3(0.0);
+	tilt = vec2(0.0);
+	if (turned < 0.99) {
+		color = (1.0 - turned) * ground_texel(uv, layer, light);
+		tilt = (1.0 - turned) * (texture(ground_normals, vec3(uv, layer)).xy * 2.0 - 1.0);
+	}
+	if (turned > 0.01) {
+		vec2 other = GROUND_TURN * uv;
+		color += turned * ground_texel(other, layer, light);
+		// Its tilt is along the turned directions: turned back.
+		vec2 bent = texture(ground_normals, vec3(other, layer)).xy * 2.0 - 1.0;
+		tilt += turned * (transpose(GROUND_TURN) * bent) / sqrt(5.0);
+	}
+	return color;
+}
+
+// The material of `kind` here, sampled from three sides with sharp weights (`normal` is the
+// ground's, in the globe's space), so cliffs aren't stretched and flat ground mostly takes one
+// sample; `size` times its usual size (a whole number dividing 128 m with it), and `turned`
+// says which of its two looks (see ground_side). Gives the color, and the normal tilted by the
+// normal map in `tilted`.
+vec3 ground_sample(int kind, float size, vec3 normal, float turned, out vec3 tilted) {
+	vec3 p = (ground_offset * ground_radius_meters / GROUND_DETAIL_METERS + ground_detail_origin)
+		* (GROUND_DETAIL_METERS / (GROUND_TILE_METERS[kind] * size));
+	vec3 weights = pow(abs(normal), vec3(8.0));
+	weights /= weights.x + weights.y + weights.z;
+	vec3 used = step(vec3(0.02), weights);
+	weights *= used;
+	weights /= max(weights.x + weights.y + weights.z, 1e-4);
+	vec3 color = vec3(0.0);
+	vec3 bent = normal;
+	float layer = float(kind);
+	float light = dot(ground_averages[kind], vec3(0.2126, 0.7152, 0.0722));
+	vec2 tilt;
+	// Each side's normal map tilts the normal along the directions its texture runs.
+	if (used.x > 0.5) {
+		color += weights.x * ground_side(p.zy, layer, light, turned, tilt);
+		bent += weights.x * vec3(0.0, tilt.y, tilt.x);
+	}
+	if (used.y > 0.5) {
+		color += weights.y * ground_side(p.xz, layer, light, turned, tilt);
+		bent += weights.y * vec3(tilt.x, 0.0, tilt.y);
+	}
+	if (used.z > 0.5) {
+		color += weights.z * ground_side(p.xy, layer, light, turned, tilt);
+		bent += weights.z * vec3(tilt.x, tilt.y, 0.0);
+	}
+	tilted = normalize(bent);
+	return color;
+}
+
+// The ground's look up close while standing (VISION.md REN-06): the photo material of the
+// painted terrain's ground kind (by the drawn color where nothing is painted), its color pulled
+// toward the terrain's, with bare rock on slopes too steep to hold soil and snow above the snow
+// line. Edges between kinds are ragged, as on real ground, rather than blended. `normal` is
+// the ground's smooth shape's, as it's lit (the drawn triangles' own facing would show them as
+// blocks and a lattice), and `up` the way up, both in the globe's space; gives the normal
+// tilted by the material, and its roughness.
+vec3 ground_material(vec3 direction, vec3 up, vec3 normal, vec3 drawn, float latitude,
+		float pixel_angle, float meters_per_pixel, out vec3 tilted, out float roughness) {
+	vec3 q = ground_offset * ground_radius_meters / GROUND_DETAIL_METERS + ground_detail_origin;
+	vec3 broad_q = ground_offset * ground_radius_meters / GROUND_BROAD_METERS
+		+ ground_broad_origin;
+	// One filtered read each (value_noise): smooth enough for patches, and far cheaper.
+	float broad = value_noise(broad_q);               // Patches about 64 m across
+	float medium = value_noise(broad_q * 4.0 + 3.1);  // About 16 m
+	float fine = value_noise(q);                      // About 4 m
+	float ragged = 0.6 * medium + 0.4 * fine - 0.5;  // For edges: about -0.5 to 0.5
+
+	vec3 tint = drawn;
+	int kind = ground_kind_by_color(drawn);
+	if (has_terrain) {
+		int best, second;
+		float blend;
+		float cells_per_pixel = pixel_angle / (HALF_PI / float(TERRAIN_FACE_SIZE));
+		terrain_pair(terrain_face_position(direction), cells_per_pixel, best, second, blend);
+		vec3 best_tint, second_tint;
+		int best_kind = ground_kind(best, best_tint);
+		int second_kind = ground_kind(second, second_tint);
+		int painted = blend + 0.8 * ragged > 0.5 ? best_kind : second_kind;
+		kind = painted >= 0 ? painted : GROUND_GRAVEL;
+		tint = mix(second_kind >= 0 ? second_tint : unpainted_color,
+			best_kind >= 0 ? best_tint : unpainted_color, blend);
+	}
+
+	// Bare rock where it's steeper than about 40 degrees; snow above the line, on ground not
+	// too steep to hold it, and never under water. Their own colors, untinted.
+	float level = dot(normal, up);
+	bool own_color = false;
+	if (level + 0.12 * ragged < 0.77) {
+		own_color = kind != GROUND_ROCK;
+		kind = GROUND_ROCK;
+	} else if (has_snow_line) {
+		float height = ground_height(direction, 0.0);
+		float line = snow_line_meters - 5000.0 * pow(abs(latitude) / 75.0, 2.0)
+			+ 400.0 * (broad - 0.5);
+		if (height > water_surface(direction) && height + 300.0 * ragged > line
+				&& level > 0.85) {
+			kind = GROUND_SNOW;
+			own_color = true;
+		}
+	}
+
+	// The tint: the painted color's hue at the photo's lightness, with a little of its own
+	// lightness, taken partway; none where the photo keeps its own color.
+	vec3 average = ground_averages[kind];
+	vec3 luma = vec3(0.2126, 0.7152, 0.0722);
+	float photo_light = max(dot(average, luma), 1e-4);
+	float tint_light = max(dot(tint, luma), 1e-4);
+	vec3 target = tint * (photo_light / tint_light)
+		* pow(tint_light / photo_light, GROUND_TINT_LIGHTNESS);
+	vec3 pull = own_color ? vec3(1.0)
+		: mix(vec3(1.0), clamp(target / max(average, vec3(1e-4)), 0.5, 2.0), GROUND_TINT);
+
+	// The photo up close; further off the same at 8 times the size, whose repeats a pixel
+	// can't pick out the way it would the near one's; past that its average, where a pixel
+	// covers much of a texture (which would only shimmer, and costs the most). Each fades into
+	// the next, so a pixel reads at most two.
+	float texels = meters_per_pixel / GROUND_TILE_METERS[kind];
+	float near_seen = 1.0 - smoothstep(0.03, 0.12, texels);
+	float far_seen = 1.0 - smoothstep(0.1, 0.5, texels / 8.0);
+	float turned = smoothstep(0.4, 0.6, medium);  // Patches about 16 m across
+	vec3 color = average;
+	vec3 bent = normal;
+	if (far_seen > 0.0 && near_seen < 1.0) {
+		vec3 far_bent;
+		color = mix(average, ground_sample(kind, 8.0, normal, turned, far_bent), far_seen);
+		bent = normalize(mix(normal, far_bent, far_seen));
+	}
+	if (near_seen > 0.0) {
+		vec3 near_bent;
+		color = mix(color, ground_sample(kind, 1.0, normal, turned, near_bent), near_seen);
+		bent = normalize(mix(bent, near_bent, near_seen));
+	}
+	tilted = bent;
+
+	// Broad patches of lighter and darker ground, so the texture's repeat doesn't show.
+	color *= 0.8 + 0.25 * broad + 0.15 * medium;
+	roughness = GROUND_ROUGHNESS[kind];
+	return color * pull;
+}
+#endif
+
 void fragment() {
 	vec3 direction = flat_disc
 		? flat_disc_direction(local_direction)
@@ -980,8 +1209,13 @@ void fragment() {
 		color = mix(color, highlight_color, highlight);
 	}
 
-	// The bump underfoot, in meters (first-person ground only).
+	// The bump underfoot, in meters, or the photo material's tilt of the normal and its
+	// roughness (first-person ground only; materials unless the painted colors are shown).
 	float bump_meters = 0.0;
+	vec3 material_tilt = vec3(0.0);
+	float material_roughness = -1.0;
+	vec3 relief = vec3(0.0);
+	bool relief_known = false;
 	if (eye_level_ground > 0.5) {
 		// How much ground a pixel covers: its width at that distance, stretched where the
 		// ground is seen edge-on.
@@ -989,7 +1223,26 @@ void fragment() {
 		float facing = max(abs(dot(normalize(VERTEX), normalize(NORMAL))), 0.1);
 		float pixel_size = 2.0 / (PROJECTION_MATRIX[1][1] * VIEWPORT_SIZE.y);
 		float meters_per_pixel = meters_away * pixel_size / facing;
-		bump_meters = ground_detail(color, meters_per_pixel);
+#ifdef GROUND_MATERIALS
+		if (!terrain_shown) {
+			// The ground's shape as it's lit (kept for the lighting below).
+			vec3 up = flat_disc ? vec3(0.0, 1.0, 0.0) : direction;
+			vec3 shape = up;
+			if (has_heights) {
+				relief = flat_disc ? flat_relief_normal(local_direction.xz, pixel_angle)
+					: relief_normal(direction, pixel_angle);
+				relief_known = true;
+				shape = relief;
+			}
+			vec3 tilted;
+			color = ground_material(direction, up, shape, color, latitude, pixel_angle,
+				meters_per_pixel, tilted, material_roughness);
+			material_tilt = tilted - shape;
+		} else
+#endif
+		{
+			bump_meters = ground_detail(color, meters_per_pixel);
+		}
 		float depth = water_level - ground_height(direction, 0.0);
 		if (has_water && depth > 0.0) {
 			color *= 1.0 + 0.9 * caustics(depth, meters_per_pixel);
@@ -998,7 +1251,9 @@ void fragment() {
 
 	ALBEDO = color;
 	EMISSION = weather_glow;
-	ROUGHNESS = mix(0.9, 0.3, wet);  // Water catches the sun
+	ROUGHNESS = material_roughness >= 0.0
+		? material_roughness
+		: mix(0.9, 0.3, wet);  // Water catches the sun
 	// A carved flat world's disc (ShapedGlobe) comes with its rim and underside, which are
 	// bare rock, as the plain disc's are.
 	bool flat_rock = flat_disc && lifted_on_cpu && eye_level_ground < 0.5
@@ -1013,8 +1268,8 @@ void fragment() {
 	if (has_heights && wet < 0.5 && !flat_rock) {
 		// On a flat world, "up" is the face's, and slopes run across the disc.
 		vec3 up = flat_disc ? vec3(0.0, 1.0, 0.0) : direction;
-		vec3 normal = flat_disc
-			? flat_relief_normal(local_direction.xz, pixel_angle)
+		vec3 normal = relief_known ? relief
+			: flat_disc ? flat_relief_normal(local_direction.xz, pixel_angle)
 			: relief_normal(direction, pixel_angle);
 		float shaped = clamp(eye_level_ground - 1.0, 0.0, 1.0);
 		if (shaped > 0.0) {
@@ -1036,7 +1291,9 @@ void fragment() {
 		// from the view's), where sun_direction is.
 		mat3 to_view = mat3(VIEW_MATRIX) * mat3(MODEL_MATRIX);
 		vec3 normal = normalize(transpose(to_view) * NORMAL);
-		vec3 tilted = bumped(normal, bump_meters);
+		vec3 tilted = material_roughness >= 0.0
+			? normalize(normal + material_tilt)
+			: bumped(normal, bump_meters);
 		float flat_light = max(dot(normal, sun_direction), 0.0) + 0.15;
 		float bump_light = max(dot(tilted, sun_direction), 0.0) + 0.15;
 		ALBEDO *= clamp(bump_light / flat_light, 0.6, 1.45);

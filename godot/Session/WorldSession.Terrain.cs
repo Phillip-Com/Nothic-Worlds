@@ -111,8 +111,9 @@ public partial class WorldSession
             number++;
         }
 
-        var type = new TerrainType(code, $"New Terrain {number}",
-            _newTerrainColors[World.TerrainTypes.Count % _newTerrainColors.Length]);
+        RgbColor color = _newTerrainColors[World.TerrainTypes.Count % _newTerrainColors.Length];
+        var type = new TerrainType(code, $"New Terrain {number}", color,
+            Ground: TerrainType.GuessGround(ClimateKind.OpenLand, color));
         RecordUndo("Add Terrain Type");
         _hiddenTerrain.Remove(code);  // A deleted type's code, reused: the new one shows
         World.TerrainTypes.Add(type);

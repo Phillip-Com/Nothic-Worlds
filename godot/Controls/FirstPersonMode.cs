@@ -42,6 +42,7 @@ public partial class FirstPersonMode : Node
     // GROUND_DETAIL_METERS and PATTERN_NOISE_SIZE in planet_surface.gdshaderinc.
     private const double GroundDetailMeters = 4;
     private const double GroundNoiseRepeat = 32;
+    private const double GroundBroadMeters = 64;  // GROUND_BROAD_METERS in the shader
 
     // How quickly rough terrain's features thin out on wider squares, farther off (see
     // SmallestFeature), in meters.
@@ -107,6 +108,8 @@ public partial class FirstPersonMode : Node
         new() { Shader = GD.Load<Shader>("res://Rendering/water_surface.gdshader") };
     private Camera3D? _camera;
     private GroundTiles? _tiles;       // The ground and the water's surface around the eye
+    private GroundMaterials? _groundMaterials;  // Its photo materials, while standing
+    private bool _groundMaterialsFailed;        // They couldn't be loaded (said once)
     private StandingGroundDetail _standingGroundDetail = StandingGroundDetail.Standard;
     private FirstPersonGround? _deck;  // The clouds below, when flying above them
     private RiverWater? _rivers;       // The rivers' water around the eye
@@ -398,6 +401,8 @@ public partial class FirstPersonMode : Node
 
         _tiles?.QueueFree();
         _tiles = null;
+        _groundMaterials?.Hide();
+        _groundMaterials = null;
         _deck?.QueueFree();
         _deck = null;
         _rivers?.QueueFree();
@@ -1327,6 +1332,7 @@ public partial class FirstPersonMode : Node
 
         tiles.GroundMaterial = globe.MaterialOverride;
         SetGroundRadius(globe.MaterialOverride, radiusMeters);
+        ShowGroundMaterials(globe, body);
 
         // At Low detail the tiles' edge can be in sight, so rough features thin out toward it.
         bool farThinning = _standingGroundDetail == StandingGroundDetail.Low;
@@ -1504,6 +1510,26 @@ public partial class FirstPersonMode : Node
         }
     }
 
+    // Puts the ground's photo materials on its material, loading them the first time. If they
+    // can't be loaded, the ground looks as it did before them, and the log says why.
+    private void ShowGroundMaterials(PlanetSurface globe, Body body)
+    {
+        if (_groundMaterials is null && !_groundMaterialsFailed)
+        {
+            try
+            {
+                _groundMaterials = GroundMaterials.Load();
+            }
+            catch (InvalidOperationException error)
+            {
+                _groundMaterialsFailed = true;
+                GD.PushError($"Ground materials not shown: {error.Message}");
+            }
+        }
+
+        _groundMaterials?.ShowOn(globe, body);
+    }
+
     // Tells a mesh of the ground where the point it's built around falls in the fine ground
     // detail's noise (planet_surface.gdshaderinc): worked out here in double precision and
     // wrapped to the noise's repeat, so the detail runs on unbroken from one tile to the next.
@@ -1519,6 +1545,16 @@ public partial class FirstPersonMode : Node
 
         ground.SetInstanceShaderParameter("ground_detail_origin",
             new Vector3(Wrapped(anchor.X), Wrapped(anchor.Y), Wrapped(anchor.Z)));
+
+        // The same for the ground materials' broad shading, whose noise is much bigger.
+        float WrappedBroad(double radii)
+        {
+            double units = radii * radiusMeters / GroundBroadMeters;
+            return (float)(units - Math.Floor(units / GroundNoiseRepeat) * GroundNoiseRepeat);
+        }
+
+        ground.SetInstanceShaderParameter("ground_broad_origin",
+            new Vector3(WrappedBroad(anchor.X), WrappedBroad(anchor.Y), WrappedBroad(anchor.Z)));
     }
 
     // Tells a tile of the water's surface where the point it's built around falls in the
@@ -1590,6 +1626,7 @@ public partial class FirstPersonMode : Node
         {
             tiles.GroundMaterial = globe.MaterialOverride;
             SetGroundRadius(globe.MaterialOverride, radiusMeters);
+            ShowGroundMaterials(globe, body);
             double radiusKm = body.RadiusKm;
             Func<GroundTile, TileExtent, GroundTileRecipe> recipes = Recipes(globe,
                 (_, smallest) => point =>

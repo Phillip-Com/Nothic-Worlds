@@ -34,8 +34,19 @@ public partial class PlanetSurface : MeshInstance3D
         [VisualStyle.Simple] = GD.Load<Shader>("res://Rendering/planet_simple.gdshader"),
     };
 
+    // The same, with the ground's photo materials, while standing (VISION.md REN-06): kept
+    // apart so the globe views don't carry their code.
+    private static readonly Dictionary<VisualStyle, Shader> _standingShaders = new()
+    {
+        [VisualStyle.Painterly] =
+            GD.Load<Shader>("res://Rendering/planet_painterly_standing.gdshader"),
+        [VisualStyle.Realistic] = GD.Load<Shader>("res://Rendering/planet_standing.gdshader"),
+        [VisualStyle.Simple] = GD.Load<Shader>("res://Rendering/planet_simple_standing.gdshader"),
+    };
+
     private ShaderMaterial? _surfaceMaterial;
     private VisualStyle _style = VisualStyle.Realistic;
+    private bool _groundMaterials;
     private ImageTexture? _latitudeTable;
     private ImageTexture? _longitudeTable;
 
@@ -66,6 +77,8 @@ public partial class PlanetSurface : MeshInstance3D
     private byte[] _paletteBytes = [];
     private ImageTexture? _waterPalette;
     private byte[] _waterPaletteBytes = [];
+    private ImageTexture? _groundPalette;
+    private byte[] _groundPaletteBytes = [];
 
     // Sculpted heights (VISION.md BOD-04): the six faces as layers of one texture of
     // half-precision floats with smaller copies (only while something is sculpted, about 16 MB),
@@ -676,10 +689,32 @@ public partial class PlanetSurface : MeshInstance3D
             if (value != _style)
             {
                 _style = value;
-                SurfaceMaterial.Shader = _styleShaders[value];
+                SurfaceMaterial.Shader = ShaderNow;
             }
         }
     }
+
+    /// <summary>
+    /// Whether the ground around a first-person eye is drawn with its photo materials
+    /// (VISION.md REN-06; set by <see cref="GroundMaterials"/>): its style's standing shader.
+    /// </summary>
+    public bool ShowsGroundMaterials
+    {
+        get => _groundMaterials;
+        set
+        {
+            if (value != _groundMaterials)
+            {
+                _groundMaterials = value;
+                SurfaceMaterial.Shader = ShaderNow;
+            }
+        }
+    }
+
+    /// <summary>The material the surface and the ground around a first-person eye share.</summary>
+    public ShaderMaterial Material => SurfaceMaterial;
+
+    private Shader ShaderNow => (_groundMaterials ? _standingShaders : _styleShaders)[_style];
 
     /// <summary>
     /// How big the globe is drawn on screen, as its radius in pixels (0 if it's behind the
@@ -1016,6 +1051,7 @@ public partial class PlanetSurface : MeshInstance3D
     public void SetTerrainColors(IEnumerable<TerrainType> types, IReadOnlySet<byte> hidden)
     {
         SetWaterColors(types);
+        SetGroundKinds(types);
 
         // One RGBA pixel per code; alpha 0 (the default) draws as unpainted.
         var bytes = new byte[(byte.MaxValue + 1) * 4];
@@ -1038,15 +1074,43 @@ public partial class PlanetSurface : MeshInstance3D
         // redoing it for every step of a color being picked froze the app (see _Process).
         _farColorsStale = true;
 
+        _terrainPalette = ShowPalette(_terrainPalette, bytes, "terrain_palette");
+    }
+
+    // Puts a palette of one RGBA pixel per terrain code in the texture given (made and given
+    // to the shader parameter named the first time), and returns the texture.
+    private ImageTexture ShowPalette(ImageTexture? texture, byte[] bytes, string parameter)
+    {
         Image image = Image.CreateFromData(byte.MaxValue + 1, 1, false, Image.Format.Rgba8, bytes);
-        if (_terrainPalette is null)
+        if (texture is null)
         {
-            _terrainPalette = ImageTexture.CreateFromImage(image);
-            SurfaceMaterial.SetShaderParameter("terrain_palette", _terrainPalette);
+            texture = ImageTexture.CreateFromImage(image);
+            SurfaceMaterial.SetShaderParameter(parameter, texture);
         }
         else
         {
-            _terrainPalette.Update(image);
+            texture.Update(image);
+        }
+
+        return texture;
+    }
+
+    // One RGBA pixel per code for the standing ground's photo materials (VISION.md REN-06):
+    // every type's color and its ground kind plus 1 in alpha, hidden or not; 0 for the rest.
+    private void SetGroundKinds(IEnumerable<TerrainType> types)
+    {
+        var bytes = new byte[(byte.MaxValue + 1) * 4];
+        foreach (TerrainType type in types)
+        {
+            int at = type.Code * 4;
+            (bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]) =
+                (type.Color.R, type.Color.G, type.Color.B, (byte)((int)type.Ground + 1));
+        }
+
+        if (!bytes.AsSpan().SequenceEqual(_groundPaletteBytes))
+        {
+            _groundPaletteBytes = bytes;
+            _groundPalette = ShowPalette(_groundPalette, bytes, "ground_palette");
         }
     }
 
@@ -1081,16 +1145,7 @@ public partial class PlanetSurface : MeshInstance3D
 
         _waterPaletteBytes = bytes;
         UpdateWaterfall();
-        Image image = Image.CreateFromData(byte.MaxValue + 1, 1, false, Image.Format.Rgba8, bytes);
-        if (_waterPalette is null)
-        {
-            _waterPalette = ImageTexture.CreateFromImage(image);
-            SurfaceMaterial.SetShaderParameter("water_palette", _waterPalette);
-        }
-        else
-        {
-            _waterPalette.Update(image);
-        }
+        _waterPalette = ShowPalette(_waterPalette, bytes, "water_palette");
     }
 
     public override void _Process(double delta)

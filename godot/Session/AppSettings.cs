@@ -29,7 +29,8 @@ public static class AppSettings
     private const string CloudsKey = "show_clouds";
     private const string FogKey = "standing_fog";
     private const string NightVisionKey = "night_vision";
-    private const string StandingTerrainKey = "standing_terrain";
+    // Renamed with the ground materials (it used to default to on), so everyone starts on them.
+    private const string StandingTerrainKey = "standing_painted_colors";
     private const string FilesSection = "files";
     private const string FoldsSection = "folds";
     private const string RecentWorldsKey = "recent_worlds";
@@ -133,11 +134,12 @@ public static class AppSettings
     }
 
     /// <summary>
-    /// Whether painted terrain shows on the ground while standing (VISION.md REN-06, BOD-05).
+    /// Whether the ground shows its painted terrain colors while standing, instead of the
+    /// photo materials (VISION.md REN-06, BOD-05). Off by default (owner's choice).
     /// </summary>
     public static bool StandingTerrain
     {
-        get => Load().GetValue(DisplaySection, StandingTerrainKey, true).AsBool();
+        get => Load().GetValue(DisplaySection, StandingTerrainKey, false).AsBool();
         set => Save(StandingTerrainKey, value);
     }
 

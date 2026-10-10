@@ -118,7 +118,8 @@ public partial class FirstPersonHud : CanvasLayer
             "Show or hide the clouds, here and on the globe (as View ▸ Clouds)");
         corner.AddChild(CloudsSwitch);
         TerrainSwitch = Switch("Terrain (R)",
-            "Show or hide the painted terrain colors on the ground here (the map keeps its own)");
+            "Show the painted terrain colors on the ground here, instead of its ground " +
+            "(grass, rock, sand…); the map keeps its own");
         corner.AddChild(TerrainSwitch);
         NightVisionSwitch = Switch("Night Vision (N)",
             "Light up the night (and dim places) as if at dusk, to see the ground");
