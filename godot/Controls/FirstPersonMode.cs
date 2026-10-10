@@ -58,6 +58,12 @@ public partial class FirstPersonMode : Node
     private const double NearShare = 0.1;
     private const double DepthRange = 1e6;
 
+    // The least clearance the near distance follows, in meters: on a slope or by a cliff the
+    // nearest ground can be closer than eye height, but the near distance stays at least a
+    // tenth of this (10 cm, closer than a step lets the eye come), so the far distance
+    // (DepthRange times it) still reaches 100 km.
+    private const double MinClearanceMeters = 1;
+
     // The farthest the ground tiles reach to show distant peaks, in meters (VISION.md REN-06).
     private const double MaxPeakReachMeters = 250_000;
 
@@ -157,6 +163,7 @@ public partial class FirstPersonMode : Node
     private double _altitudeMeters;
     private double _groundMeters;
     private bool _descending;
+    private bool _tooSteep;  // Walking held back by ground too steep to climb
     private bool _flying;
     private bool _magnify;
     private bool _dragging;
@@ -438,6 +445,7 @@ public partial class FirstPersonMode : Node
         _heading = 0;
         _pitch = 0;
         _flying = false;
+        _tooSteep = false;
         _heightMeters = EyeHeightMeters;
         _groundVersion = -1;
         _weather = null;
@@ -607,7 +615,7 @@ public partial class FirstPersonMode : Node
             return;
         }
 
-        Move(body, delta);
+        Move(globe, body, delta);
         _sinceGroundBuilt += delta;
         _sinceBanksBuilt += delta;
         double radiusMeters = body.RadiusKm * 1000;
@@ -650,7 +658,7 @@ public partial class FirstPersonMode : Node
 
         double time = Session.World.TimeDays;
         (Vector3D East, Vector3D North, Vector3D Up) frame = Frame(body, time);
-        double clearance = Clearance(globe, eyeLift, radiusMeters);
+        double clearance = Clearance(globe, body, eyeLift);
         PlaceCamera(frame, clearance / radiusMeters * place.Radius);
         PlaceOverhead(frame, body, place.Radius);
         if (_flat is FlatSpot flat)
@@ -703,7 +711,7 @@ public partial class FirstPersonMode : Node
     }
 
     // Walks or flies by the keys held, over the body's surface along great circles.
-    private void Move(Body body, double delta)
+    private void Move(PlanetSurface globe, Body body, double delta)
     {
         double forward = Held(Key.W) - Held(Key.S), sideways = Held(Key.D) - Held(Key.A);
         double rise = _flying ? Held(Key.Space) - Held(Key.C) : 0;
@@ -724,13 +732,15 @@ public partial class FirstPersonMode : Node
             }
         }
 
-        if (forward == 0 && sideways == 0)
+        double bearing = _heading + Math.Atan2(sideways, forward);
+        double length = Math.Sqrt(forward * forward + sideways * sideways);
+        ShowTooSteep(length > 0 && !_flying && TooSteepAhead(globe, body, bearing,
+            speed * length));
+        if (length == 0 || _tooSteep)
         {
             return;
         }
 
-        double bearing = _heading + Math.Atan2(sideways, forward);
-        double length = Math.Sqrt(forward * forward + sideways * sideways);
         if (_flat is FlatSpot flat)
         {
             // Over the face, the rim, and the underside alike (FlatWalk keeps north toward
@@ -741,6 +751,32 @@ public partial class FirstPersonMode : Node
 
         double angle = speed * length / (body.RadiusKm * 1000 + _heightMeters);
         _spot = GlobeWalk.Walk(_spot, bearing, angle);
+    }
+
+    // Whether a step of `meters` along `bearing` climbs ground too steep to walk up, looked at
+    // a body's half-width past the step (see GroundClearance). A carved globe's ground is only
+    // found to about half a meter, too coarse to tell, so there every step is let through.
+    private bool TooSteepAhead(PlanetSurface globe, Body body, double bearing, double meters)
+    {
+        if (globe.IsCarved || _flat is { Face: not FlatFace.Top })
+        {
+            return false;
+        }
+
+        double run = meters + GroundClearance.BodyRadiusMeters;
+        return GroundClearance.TooSteep(run,
+            GroundMetersToward(globe, body, bearing, run) - GroundMetersToward(globe, body, 0, 0));
+    }
+
+    // Notes in the help line whether walking is held back by ground too steep to climb, so
+    // the keys never just do nothing (CLAUDE.md, Usability).
+    private void ShowTooSteep(bool tooSteep)
+    {
+        if (tooSteep != _tooSteep)
+        {
+            _tooSteep = tooSteep;
+            ShowHelp();
+        }
     }
 
     // How far out the drawn ground is under the eye, in the body's radii: the sculpted ground,
@@ -763,19 +799,67 @@ public partial class FirstPersonMode : Node
     }
 
     // How far the eye is from the nearest surface it could look at closely, in meters: the
-    // ground below, or the water's surface above or below it (never under eye height). The
-    // near clipping distance follows it, so over deep water the surface just below isn't cut
-    // away by a near distance set by the bottom, kilometers down.
-    private double Clearance(PlanetSurface globe, double? eyeLift, double radiusMeters)
+    // nearest ground in any direction, or the water's surface above or below it (never under
+    // eye height). The near clipping distance follows it, so a hillside ahead isn't cut away
+    // by a near distance set by the ground far below, nor the water's surface over deep
+    // water by the bottom, kilometers down.
+    private double Clearance(PlanetSurface globe, Body body, double? eyeLift)
     {
+        double radiusMeters = body.RadiusKm * 1000;
+        double ground = Math.Max(NearestGround(globe, body), MinClearanceMeters);
         if (eyeLift is not double lift || globe.IsCarved
             || WaterRadiusHere(globe, radiusMeters / 1000) is not double water)
+        {
+            return ground;
+        }
+
+        double fromWater = Math.Abs(lift - (water - 1)) * radiusMeters;
+        return Math.Min(ground, Math.Max(fromWater, EyeHeightMeters));
+    }
+
+    // How far the nearest ground is from the eye, in meters, looked at on rings around it out
+    // to its height above the ground below (see GroundClearance). A carved globe's ground is
+    // only found to about half a meter, too coarse for this, so there it's the ground below.
+    private double NearestGround(PlanetSurface globe, Body body)
+    {
+        if (globe.IsCarved || _flat is { Face: not FlatFace.Top })
         {
             return _heightMeters;
         }
 
-        double fromWater = Math.Abs(lift - (water - 1)) * radiusMeters;
-        return Math.Min(_heightMeters, Math.Max(fromWater, EyeHeightMeters));
+        var ground = new List<(double, double)>(
+            GroundClearance.RingShares.Count * GroundClearance.Bearings);
+        foreach (double share in GroundClearance.RingShares)
+        {
+            double across = share * _heightMeters;
+            for (int i = 0; i < GroundClearance.Bearings; i++)
+            {
+                double bearing = Math.Tau * i / GroundClearance.Bearings;
+                ground.Add((across,
+                    GroundMetersToward(globe, body, bearing, across) - _groundMeters));
+            }
+        }
+
+        return GroundClearance.Nearest(_heightMeters, ground);
+    }
+
+    // How high the drawn ground is, in meters above the base, `meters` from the eye along
+    // `bearing` (radians clockwise from north), over a globe or a flat world's top face (a
+    // flat world's rim and underside are bare rock at the base).
+    private double GroundMetersToward(PlanetSurface globe, Body body, double bearing,
+        double meters)
+    {
+        double radiusMeters = body.RadiusKm * 1000;
+        if (_flat is FlatSpot flat)
+        {
+            FlatSpot there = FlatWalk.Walk(flat, bearing, meters / radiusMeters);
+            return there.Face == FlatFace.Top
+                ? FlatCarvedAt(globe, FlatWalk.Point(there), body) * radiusMeters
+                : 0;
+        }
+
+        Vector3D spot = GlobeWalk.Walk(_spot, bearing, meters / radiusMeters);
+        return (CarvedRadius(globe, body, spot) - 1) * radiusMeters;
     }
 
     // The camera at the scene's middle (the eye), looking along the heading and pitch.
@@ -1709,7 +1793,8 @@ public partial class FirstPersonMode : Node
         (double metersPerSecond, string name) = _speeds[_speed];
         _hud?.SetHelp($"Standing on {body?.Name} · {(_flying ? "Flying" : "Walking")} · " +
             $"{Speed(metersPerSecond)} ({name})" +
-            $"{(_magnify ? " · Magnified" : "")}\n" +
+            $"{(_magnify ? " · Magnified" : "")}" +
+            $"{(_tooSteep ? " · Too steep to climb (F: fly)" : "")}\n" +
             "Drag to look · W A S D move (Shift: faster) · Wheel: speed · F: " +
             $"{(_flying ? "walk" : "fly")}{(_flying ? " · Space / C: up / down" : "")} · " +
             "M: magnify · T: calendar · G / K / N: fog, clouds, night vision · Esc: back");

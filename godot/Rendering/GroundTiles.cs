@@ -22,7 +22,8 @@ namespace NothicWorlds.Rendering;
 /// </summary>
 public partial class GroundTiles : Node3D
 {
-    // How far a tile's skirt hangs below its edge, for each unit of the tile's width.
+    // How far a tile's skirt hangs below its edge at least, for each unit of the tile's width
+    // (more up a cliff: GroundTileGrid.SkirtDepths).
     private const double SkirtShare = 0.05;
 
     // The eye counts as standing still while it's moved less than this share of the narrowest
@@ -751,13 +752,22 @@ public partial class GroundTiles : Node3D
             }
         }
 
-        // The skirt hangs under the edge and moves with it.
+        // The skirt hangs under the edge, at least to the lowest ground near along it (so it
+        // closes a crack up a cliff), and moves with it.
         (int Column, int Row)[] edge = GroundTileGrid.Edge(_cells);
-        double depth = width * SkirtShare;
+        var tops = new int[edge.Length];
+        var edgeHeights = new double[edge.Length];
         for (int i = 0; i < edge.Length; i++)
         {
-            int top = GroundTileGrid.Index(edge[i].Column, edge[i].Row, _cells);
-            placed[gridCount + i] = _surface.Place(bases[top], heights[top] - depth);
+            tops[i] = GroundTileGrid.Index(edge[i].Column, edge[i].Row, _cells);
+            edgeHeights[i] = heights[tops[i]];
+        }
+
+        double[] depths = GroundTileGrid.SkirtDepths(edgeHeights, width * SkirtShare);
+        for (int i = 0; i < edge.Length; i++)
+        {
+            int top = tops[i];
+            placed[gridCount + i] = _surface.Place(bases[top], heights[top] - depths[i]);
             moves[gridCount + i] = moves[top];
             basesAll[gridCount + i] = bases[top];
         }
