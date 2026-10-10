@@ -66,7 +66,8 @@ public partial class TerrainPanel : CanvasLayer
     private Label _amountValue = null!;
     private HSlider _sizeSlider = null!;
     private SpinBox _sizeField = null!;
-    private ItemList _list = null!;
+    private Tree _list = null!;
+    private bool _showingList;
     private Button _deleteButton = null!;
     private LineEdit _name = null!;
     private ColorPickerButton _color = null!;
@@ -341,17 +342,29 @@ public partial class TerrainPanel : CanvasLayer
     private Control BuildTypeList()
     {
         var box = new VBoxContainer();
-        _list = new ItemList
+        // A tree rather than a plain list, for the eye on each row (as in layer lists).
+        _list = new Tree
         {
             CustomMinimumSize = new Vector2(0, 200),
             FocusMode = Control.FocusModeEnum.None,
+            HideRoot = true,
+            SelectMode = Tree.SelectModeEnum.Row,
         };
-        _list.ItemSelected += index =>
+        // The tree can't be rebuilt while it handles a click, so the changes wait till after.
+        _list.ButtonClicked += (item, _, _, _) =>
         {
-            _selectedCode = (byte)_list.GetItemMetadata((int)index).AsInt32();
-            _paintButton.ButtonPressed = true;
-            _problem.Text = "";
-            Refresh();
+            byte code = (byte)item.GetMetadata(0).AsInt32();
+            Callable.From(() => ToggleHidden(code)).CallDeferred();
+        };
+        _list.ItemSelected += () =>
+        {
+            if (_showingList || _list.GetSelected() is not TreeItem item)
+            {
+                return;
+            }
+
+            byte code = (byte)item.GetMetadata(0).AsInt32();
+            Callable.From(() => ChooseType(code)).CallDeferred();
         };
         box.AddChild(_list);
 
@@ -686,6 +699,12 @@ public partial class TerrainPanel : CanvasLayer
         }
 
         string name = Selected?.Name ?? "the chosen type";
+        if (Selected is TerrainType selected && Session.IsTerrainHidden(selected.Code))
+        {
+            return $"{name} is hidden: painting it still works but won't show. Click its eye " +
+                "in the list to show it.";
+        }
+
         return Session.TerrainShapesGround
             ? $"Drag across the planet to paint {name}; the ground rises or sinks to its " +
                 "height, merging where types meet. Heights are true to scale: raise View ▸ " +
@@ -697,7 +716,8 @@ public partial class TerrainPanel : CanvasLayer
     private void ShowList()
     {
         IReadOnlyList<TerrainType> types = Session!.TerrainTypes;
-        string signature = string.Join("|", types.Select(t => $"{t.Code}:{t.Name}:{t.Color}"))
+        string signature = string.Join("|", types.Select(t =>
+                $"{t.Code}:{t.Name}:{t.Color}:{Session.IsTerrainHidden(t.Code)}"))
             + $"#{_selectedCode}";
         if (signature == _listSignature)
         {
@@ -705,17 +725,47 @@ public partial class TerrainPanel : CanvasLayer
         }
 
         _listSignature = signature;
+        _showingList = true;  // Selecting a row here isn't the user choosing it
         _list.Clear();
+        TreeItem root = _list.CreateItem();
         foreach (TerrainType type in types)
         {
-            int index = _list.AddItem(type.Name, Swatch(type.Color));
-            _list.SetItemMetadata(index, (int)type.Code);
+            bool hidden = Session.IsTerrainHidden(type.Code);
+            TreeItem item = _list.CreateItem(root);
+            item.SetText(0, type.Name);
+            item.SetIcon(0, Swatch(type.Color));
+            item.SetMetadata(0, (int)type.Code);
+            item.AddButton(0, EyeIcon.Get(open: !hidden), 0, false,
+                hidden ? $"Show {type.Name}" : $"Hide {type.Name} (painting it still works)");
+            if (hidden)
+            {
+                item.SetCustomColor(0, new Color(1, 1, 1, 0.45f));
+            }
+
             if (type.Code == _selectedCode)
             {
-                _list.Select(index);
-                _list.EnsureCurrentIsVisible();
+                item.Select(0);
+                _list.ScrollToItem(item);
             }
         }
+
+        _showingList = false;
+    }
+
+    // A row in the type list was clicked: paint with that type.
+    private void ChooseType(byte code)
+    {
+        _selectedCode = code;
+        _paintButton.ButtonPressed = true;
+        _problem.Text = "";
+        Refresh();
+    }
+
+    // An eye in the type list was clicked: hides or shows that type.
+    private void ToggleHidden(byte code)
+    {
+        Session!.SetTerrainHidden(code, !Session.IsTerrainHidden(code));
+        Refresh();
     }
 
     // Fills the editor from the selected type, leaving the name alone while it's being typed.
