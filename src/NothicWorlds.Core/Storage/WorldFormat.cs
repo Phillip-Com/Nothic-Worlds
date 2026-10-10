@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 34;
+    public const int CurrentVersion = 35;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -76,6 +76,20 @@ internal static partial class WorldFormat
         [GroundKind.Rock] = "rock",
         [GroundKind.Snow] = "snow",
         [GroundKind.Gravel] = "gravel",
+    };
+
+    private static readonly Dictionary<PlantCover, string> _plantNames = new()
+    {
+        [PlantCover.None] = "none",
+        [PlantCover.Grass] = "grass",
+        [PlantCover.Meadow] = "meadow",
+        [PlantCover.Woodland] = "woodland",
+        [PlantCover.Forest] = "forest",
+        [PlantCover.ConiferForest] = "conifer-forest",
+        [PlantCover.Jungle] = "jungle",
+        [PlantCover.Scrub] = "scrub",
+        [PlantCover.Marsh] = "marsh",
+        [PlantCover.Rocky] = "rocky",
     };
 
     private static readonly Dictionary<ShapeKind, string> _shapeKindNames = new()
@@ -289,6 +303,11 @@ internal static partial class WorldFormat
         // 33 → 34: terrain types gained a "ground" (REN-06, ground materials), guessed from
         // each type's climate and color (TerrainType.GuessGround).
         AddTerrainGrounds,
+
+        // 34 → 35: terrain types gained "plants" (REN-06, plants while standing), guessed
+        // from each type's climate and ground (TerrainType.GuessPlants); one named Jungle, as
+        // the default is, gets jungle.
+        AddTerrainPlants,
     ];
 
     // The variations and feature sizes the version 30 upgrade gives types by name. Deliberately
@@ -448,6 +467,31 @@ internal static partial class WorldFormat
         return document;
     }
 
+    private static JsonObject AddTerrainPlants(JsonObject document)
+    {
+        if (document["terrainTypes"] is JsonArray types)
+        {
+            foreach (JsonObject type in types.OfType<JsonObject>())
+            {
+                // As for the ground: a type whose climate or ground can't be read is refused
+                // on loading anyway, so it's left as it is.
+                if (Text(type["climate"]) is string climateName
+                    && _climateNames.ContainsValue(climateName)
+                    && Text(type["ground"]) is string groundName
+                    && _groundNames.ContainsValue(groundName))
+                {
+                    type["plants"] ??= PlantsName(
+                        string.Equals(TypeName(type), "Jungle", StringComparison.OrdinalIgnoreCase)
+                            ? PlantCover.Jungle
+                            : TerrainType.GuessPlants(ParseClimate(climateName),
+                                ParseGround(groundName)));
+                }
+            }
+        }
+
+        return document;
+    }
+
     // A JSON value's text, or null if it isn't text.
     private static string? Text(JsonNode? node) =>
         node?.GetValueKind() == System.Text.Json.JsonValueKind.String
@@ -533,6 +577,8 @@ internal static partial class WorldFormat
 
     public static string GroundName(GroundKind kind) => _groundNames[kind];
 
+    public static string PlantsName(PlantCover cover) => _plantNames[cover];
+
     public static string ShapeName(BodyShape shape) => _shapeNames[shape];
 
     public static BodyShape ParseShape(string? name) => Parse(_shapeNames, name, "body shape");
@@ -581,6 +627,9 @@ internal static partial class WorldFormat
 
     public static GroundKind ParseGround(string? name) =>
         Parse(_groundNames, name, "terrain ground");
+
+    public static PlantCover ParsePlants(string? name) =>
+        Parse(_plantNames, name, "terrain plants");
 
     /// <summary>The name written for a calendar fit, or null for none (left out).</summary>
     public static string? CalendarFitName(CalendarFit fit) =>

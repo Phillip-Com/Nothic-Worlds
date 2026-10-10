@@ -105,6 +105,7 @@ public partial class GraphicsSettings : Node
         if (Standing is not null)
         {
             Standing.StandingGroundDetail = Options.StandingGroundDetail;
+            Standing.StandingPlants = Options.StandingPlants;
         }
     }
 }

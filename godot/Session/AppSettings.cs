@@ -21,6 +21,7 @@ public static class AppSettings
     private const string MapShadingKey = "map_style_shading";
     private const string CloudDetailKey = "cloud_detail";
     private const string StandingGroundDetailKey = "ground_detail";
+    private const string StandingPlantsKey = "standing_plants";
     private const string AntiAliasingKey = "anti_aliasing";
     private const string RenderScaleKey = "render_scale";
     private const string FrameRateKey = "frame_rate_limit";
@@ -29,6 +30,7 @@ public static class AppSettings
     private const string CloudsKey = "show_clouds";
     private const string FogKey = "standing_fog";
     private const string NightVisionKey = "night_vision";
+    private const string ShowPlantsKey = "show_plants";
     // Renamed with the ground materials (it used to default to on), so everyone starts on them.
     private const string StandingTerrainKey = "standing_painted_colors";
     private const string FilesSection = "files";
@@ -75,6 +77,7 @@ public static class AppSettings
             Read(file, ReliefDetailKey, defaults.ReliefDetail),
             Read(file, CloudDetailKey, defaults.CloudDetail),
             Read(file, StandingGroundDetailKey, defaults.StandingGroundDetail),
+            Read(file, StandingPlantsKey, defaults.StandingPlants),
             Read(file, AntiAliasingKey, defaults.AntiAliasing),
             Read(file, RenderScaleKey, defaults.RenderScale),
             Read(file, FrameRateKey, defaults.FrameRateLimit));
@@ -88,6 +91,7 @@ public static class AppSettings
         file.SetValue(DisplaySection, CloudDetailKey, options.CloudDetail.ToString());
         file.SetValue(DisplaySection, StandingGroundDetailKey,
             options.StandingGroundDetail.ToString());
+        file.SetValue(DisplaySection, StandingPlantsKey, options.StandingPlants.ToString());
         file.SetValue(DisplaySection, AntiAliasingKey, options.AntiAliasing.ToString());
         file.SetValue(DisplaySection, RenderScaleKey, options.RenderScale.ToString());
         file.SetValue(DisplaySection, FrameRateKey, options.FrameRateLimit.ToString());
@@ -141,6 +145,16 @@ public static class AppSettings
     {
         get => Load().GetValue(DisplaySection, StandingTerrainKey, false).AsBool();
         set => Save(StandingTerrainKey, value);
+    }
+
+    /// <summary>
+    /// Whether plants show while standing (VISION.md REN-06): the Plants switch, apart from
+    /// the Standing plants setting, which says how many there are.
+    /// </summary>
+    public static bool ShowPlants
+    {
+        get => Load().GetValue(DisplaySection, ShowPlantsKey, true).AsBool();
+        set => Save(ShowPlantsKey, value);
     }
 
     /// <summary>Whether night vision is on while standing (VISION.md REN-06).</summary>

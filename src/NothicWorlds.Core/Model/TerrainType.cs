@@ -39,11 +39,15 @@ namespace NothicWorlds.Core.Model;
 /// What its ground looks like up close while standing (VISION.md REN-06). New types get a
 /// guess (<see cref="GuessGround"/>).
 /// </param>
+/// <param name="Plants">
+/// What grows on it while standing (VISION.md REN-06). New types get a guess
+/// (<see cref="GuessPlants"/>).
+/// </param>
 public sealed record TerrainType(
     byte Code, string Name, RgbColor Color, ClimateKind Climate = ClimateKind.OpenLand,
     int HeightMeters = 0, double Edge = 0, int VariationMeters = 0,
     double FeatureSizeKm = TerrainType.DefaultFeatureSizeKm, double Roughness = 0,
-    GroundKind Ground = GroundKind.Grass)
+    GroundKind Ground = GroundKind.Grass, PlantCover Plants = PlantCover.Meadow)
 {
     /// <summary>The most terrain types a world can have (one per code).</summary>
     public const int MaxCount = byte.MaxValue;
@@ -77,29 +81,29 @@ public sealed record TerrainType(
     public static IReadOnlyList<TerrainType> Defaults { get; } =
     [
         new(1, "Ocean", new RgbColor(0x1F, 0x4E, 0x79), ClimateKind.Water, -3_000, 0.3,
-            800, 200, 0.3, GroundKind.Sand),
+            800, 200, 0.3, GroundKind.Sand, PlantCover.None),
         new(2, "Shallow Water", new RgbColor(0x3A, 0x86, 0xB8), ClimateKind.Water, -150, 0,
-            40, 60, 0.15, GroundKind.Sand),
+            40, 60, 0.15, GroundKind.Sand, PlantCover.None),
         new(3, "Plains", new RgbColor(0xA8, 0xC6, 0x6C), ClimateKind.OpenLand, 150, 0, 40, 80,
-            0.3, GroundKind.Grass),
+            0.3, GroundKind.Grass, PlantCover.Meadow),
         new(4, "Fields", new RgbColor(0xD8, 0xC8, 0x78), ClimateKind.OpenLand, 150, 0, 30, 80,
-            0.3, GroundKind.DryGrass),
+            0.3, GroundKind.DryGrass, PlantCover.Grass),
         new(5, "Forest", new RgbColor(0x2F, 0x6B, 0x35), ClimateKind.Forest, 300, 0, 80, 50,
-            0.3, GroundKind.ForestFloor),
+            0.3, GroundKind.ForestFloor, PlantCover.Forest),
         new(6, "Jungle", new RgbColor(0x1E, 0x56, 0x31), ClimateKind.Forest, 200, 0, 100, 40,
-            0.3, GroundKind.ForestFloor),
+            0.3, GroundKind.ForestFloor, PlantCover.Jungle),
         new(7, "Hills", new RgbColor(0x8C, 0x9A, 0x5B), ClimateKind.OpenLand, 800, 0.15,
-            350, 30, 0.5, GroundKind.Grass),
+            350, 30, 0.5, GroundKind.Grass, PlantCover.Meadow),
         new(8, "Mountains", new RgbColor(0x7D, 0x6E, 0x62), ClimateKind.Mountains, 2_500, 0.5,
-            1_500, 40, 0.7, GroundKind.Rock),
+            1_500, 40, 0.7, GroundKind.Rock, PlantCover.Rocky),
         new(9, "Desert", new RgbColor(0xE3, 0xC7, 0x8F), ClimateKind.Desert, 400, 0, 120, 30,
-            0.4, GroundKind.Sand),
+            0.4, GroundKind.Sand, PlantCover.Scrub),
         new(10, "Swamp", new RgbColor(0x4F, 0x6B, 0x4A), ClimateKind.Wetland, 20, 0, 5, 40,
-            0.15, GroundKind.Mud),
+            0.15, GroundKind.Mud, PlantCover.Marsh),
         new(11, "Tundra", new RgbColor(0xA3, 0xA8, 0x8E), ClimateKind.OpenLand, 300, 0, 60, 60,
-            0.4, GroundKind.DryGrass),
+            0.4, GroundKind.DryGrass, PlantCover.Grass),
         new(12, "Ice", new RgbColor(0xEE, 0xF3, 0xF7), ClimateKind.Ice, 1_000, 0.3, 300, 60,
-            0.5, GroundKind.Snow),
+            0.5, GroundKind.Snow, PlantCover.None),
     ];
 
     /// <summary>
@@ -148,6 +152,34 @@ public sealed record TerrainType(
         }
 
         return red - green > 0.08 ? GroundKind.Sand : GroundKind.DryGrass;
+    }
+
+    /// <summary>
+    /// Likely plants for a type of this climate and ground, for new types and for worlds saved
+    /// before types had them: the climate decides where it can (water and ice grow nothing,
+    /// forest is broadleaf forest, and so on), and open land goes by its ground. A jungle can't
+    /// be told from a forest this way, so it's guessed as one.
+    /// </summary>
+    public static PlantCover GuessPlants(ClimateKind climate, GroundKind ground)
+    {
+        return climate switch
+        {
+            ClimateKind.Water or ClimateKind.Ice => PlantCover.None,
+            ClimateKind.Desert => PlantCover.Scrub,
+            ClimateKind.Forest => PlantCover.Forest,
+            ClimateKind.Wetland => PlantCover.Marsh,
+            ClimateKind.Mountains => PlantCover.Rocky,
+            _ => ground switch
+            {
+                GroundKind.Grass => PlantCover.Meadow,
+                GroundKind.DryGrass => PlantCover.Grass,
+                GroundKind.ForestFloor => PlantCover.Woodland,
+                GroundKind.Sand => PlantCover.Scrub,
+                GroundKind.Mud => PlantCover.Marsh,
+                GroundKind.Rock or GroundKind.Gravel => PlantCover.Rocky,
+                _ => PlantCover.None,
+            },
+        };
     }
 
     /// <summary>
@@ -204,6 +236,11 @@ public sealed record TerrainType(
         if (types.Any(type => !Enum.IsDefined(type.Ground)))
         {
             return "a terrain type's ground isn't a known kind";
+        }
+
+        if (types.Any(type => !Enum.IsDefined(type.Plants)))
+        {
+            return "a terrain type's plants aren't a known kind";
         }
 
         return null;
