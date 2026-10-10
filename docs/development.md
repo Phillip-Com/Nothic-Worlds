@@ -90,6 +90,7 @@ godot/                         The Godot project (references Core)
   Session/                     The open world (all edits go through WorldSession), recovery
   Diagnostics/                 Performance overlay (F3) and benchmark
   Interop/                     Conversions between Core types and Godot types
+  Assets/                      CC0 art (standing view's ground textures), credited in CREDITS.md
 docs/                          VISION.md, DECISIONS.md, world-format.md, this guide
 ```
 
