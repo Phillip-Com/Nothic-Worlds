@@ -75,6 +75,16 @@ public partial class PinMarkers : CanvasLayer
         }
     }
 
+    /// <summary>
+    /// The pins on a body, each with its spot, color, and title, or none while pins are hidden
+    /// (for the first-person compass, VISION.md REN-06).
+    /// </summary>
+    public IEnumerable<(GeoCoordinate Spot, Color Color, string Title)> PinsOn(Guid bodyId) =>
+        _shown
+            ? _pins.Where(pin => pin.BodyId == bodyId)
+                .Select(pin => (pin.Spot, pin.Color, pin.Entry?.Title ?? pin.Event!.Title))
+            : [];
+
     public override void _Ready()
     {
         Layer = 0;  // Over the 3D view, under the toolbar and panels.

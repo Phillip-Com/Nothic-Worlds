@@ -463,6 +463,9 @@ public partial class FirstPersonMode : Node
         _groundVersion = -1;
         _weather = null;
         _weatherAge = double.PositiveInfinity;
+        _sinceRanged = double.PositiveInfinity;
+        _mouseRange = null;
+        _pendingRange = null;
 
         // Standing, the ground is always at its true height (owner's choice): View ▸ Relief's
         // exaggeration comes back on leaving.
@@ -716,6 +719,8 @@ public partial class FirstPersonMode : Node
             sky.Star?.AltitudeDegrees ?? -90, _weather?.CloudCover ?? 0);
         _sky.ShowNightVision(sunAltitude);
         ShowWater(globe, eyeLift, radiusMeters, place.Radius, sunAltitude, unitsPerKm);
+        UpdateRanges(globe, body, frame, delta);
+        ShowPins(body);
         ShowReadouts(body, time, sky, frame);
     }
 
@@ -1733,7 +1738,7 @@ public partial class FirstPersonMode : Node
     {
         FirstPersonHud hud = _hud!;
         hud.SetHeading(double.RadiansToDegrees(_heading));
-        hud.SetHover(_dragging ? null : HoverText(sky, frame), _mouse);
+        hud.SetHover(_dragging ? null : HoverText(sky, frame) ?? _mouseRange, _mouse);
         hud.SetInfo(InfoText(body, time, sky));
 
         double light = sky.Star is SkyBody star

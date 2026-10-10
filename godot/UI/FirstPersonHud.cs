@@ -5,7 +5,9 @@ namespace NothicWorlds.UI;
 /// <summary>
 /// What's shown over the first-person view (VISION.md REN-06; owner's choice: a compass, readouts
 /// on hover, and a panel for the spot): the controls along the top left, a compass along the
-/// top, the name and place of the body under the mouse, the time and weather at the spot in
+/// top with pinned places on it, a rangefinder (a crosshair in the middle with the distance to
+/// the ground there under it; the distance under the mouse goes in the hover readout), the
+/// name and place of the body under the mouse, the time and weather at the spot in
 /// the bottom left, the rain or snow falling over everything, and (REN-08) the minimap, a
 /// Calendar button, and switches for fog, clouds, and night vision, in the top right. It only
 /// shows what it's given; <see cref="Controls.FirstPersonMode"/> works it out.
@@ -20,6 +22,7 @@ public partial class FirstPersonHud : CanvasLayer
     private readonly Label _help;
     private readonly CompassStrip _compass;
     private readonly Label _hover;
+    private readonly Label _range;
     private readonly Label _info;
 
     /// <summary>Makes the overlay, hidden until shown.</summary>
@@ -48,9 +51,34 @@ public partial class FirstPersonHud : CanvasLayer
             OffsetLeft = -280,
             OffsetRight = 280,
             OffsetTop = 64,
-            OffsetBottom = 104,
+            OffsetBottom = 134,
         };
         AddChild(_compass);
+
+        // The rangefinder's crosshair, and what it reads under it.
+        var crosshair = new Control
+        {
+            AnchorLeft = 0.5f,
+            AnchorRight = 0.5f,
+            AnchorTop = 0.5f,
+            AnchorBottom = 0.5f,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        crosshair.Draw += () => DrawCrosshair(crosshair);
+        AddChild(crosshair);
+        _range = Outlined(new Label
+        {
+            AnchorLeft = 0.5f,
+            AnchorRight = 0.5f,
+            AnchorTop = 0.5f,
+            AnchorBottom = 0.5f,
+            OffsetLeft = -150,
+            OffsetRight = 150,
+            OffsetTop = 12,
+            HorizontalAlignment = HorizontalAlignment.Center,
+        });
+        _range.Modulate = new Color(1, 1, 1, 0.85f);
+        AddChild(_range);
 
         _hover = Outlined(new Label { Visible = false });
         AddChild(_hover);
@@ -123,6 +151,16 @@ public partial class FirstPersonHud : CanvasLayer
     public void SetHeading(double degrees) => _compass.HeadingDegrees = (float)degrees;
 
     /// <summary>
+    /// The pinned places to mark on the compass, nearest first: each one's bearing in degrees
+    /// clockwise from north, color, and label.
+    /// </summary>
+    public void SetPins(IEnumerable<(double BearingDegrees, Color Color, string Label)> pins) =>
+        _compass.SetPins(pins);
+
+    /// <summary>What the rangefinder reads at the view's middle, under the crosshair.</summary>
+    public void SetRange(string text) => _range.Text = text;
+
+    /// <summary>
     /// The readout for the body under the mouse at <paramref name="mouse"/>, or none.
     /// </summary>
     public void SetHover(string? text, Vector2 mouse)
@@ -150,6 +188,19 @@ public partial class FirstPersonHud : CanvasLayer
         _fallingMaterial.SetShaderParameter("snow", (float)snow);
         _fallingMaterial.SetShaderParameter("slant", (float)slant);
         _fallingMaterial.SetShaderParameter("light", (float)light);
+    }
+
+    // A small cross at the middle of the view, in white outlined in black, open in the
+    // middle so the spot it measures isn't hidden.
+    private static void DrawCrosshair(Control at)
+    {
+        foreach ((Color color, float width) in new[] { (Colors.Black, 3f), (Colors.White, 1f) })
+        {
+            foreach (Vector2 way in new[] { Vector2.Up, Vector2.Down, Vector2.Left, Vector2.Right })
+            {
+                at.DrawLine(way * 3, way * 9, color, width);
+            }
+        }
     }
 
     // White text outlined in black, which reads against any sky or ground.
