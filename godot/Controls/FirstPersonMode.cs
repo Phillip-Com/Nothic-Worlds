@@ -232,8 +232,13 @@ public partial class FirstPersonMode : Node
             _mapSpan = Math.Clamp(_mapSpan + step, 0, _mapSpans.Length - 1);
         _hud.Minimap.Clicked += TravelOnMap;
         _hud.CalendarButton.Pressed += ToggleCalendar;
-        // The fog and night vision switches are remembered on this computer (clouds are too,
-        // by WeatherDisplay).
+        // The fog, terrain, and night vision switches are remembered on this computer (clouds
+        // are too, by WeatherDisplay).
+        if (System is not null)
+        {
+            System.StandingTerrain = AppSettings.StandingTerrain;
+        }
+
         _sky.ShowFog = AppSettings.StandingFog;
         _sky.NightVision = AppSettings.NightVision;
         _hud.FogSwitch.Toggled += on => _sky.ShowFog = AppSettings.StandingFog = on;
@@ -245,6 +250,14 @@ public partial class FirstPersonMode : Node
             }
         };
         _hud.NightVisionSwitch.Toggled += on => _sky.NightVision = AppSettings.NightVision = on;
+        _hud.TerrainSwitch.Toggled += on =>
+        {
+            AppSettings.StandingTerrain = on;
+            if (System is not null)
+            {
+                System.StandingTerrain = on;
+            }
+        };
         if (Session is not null)
         {
             Session.WorldClosed += _ => Leave();
@@ -532,6 +545,7 @@ public partial class FirstPersonMode : Node
         _hud!.Visible = true;
         _hud.FogSwitch.SetPressedNoSignal(_sky.ShowFog);
         _hud.CloudsSwitch.SetPressedNoSignal(Weather?.ShowClouds ?? true);
+        _hud.TerrainSwitch.SetPressedNoSignal(System?.StandingTerrain ?? true);
         _hud.NightVisionSwitch.SetPressedNoSignal(_sky.NightVision);
         ShowHelp();
     }
@@ -587,6 +601,9 @@ public partial class FirstPersonMode : Node
                 break;
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.K }:
                 _hud!.CloudsSwitch.ButtonPressed = !_hud.CloudsSwitch.ButtonPressed;
+                break;
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.R }:
+                _hud!.TerrainSwitch.ButtonPressed = !_hud.TerrainSwitch.ButtonPressed;
                 break;
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.N }:
                 _hud!.NightVisionSwitch.ButtonPressed = !_hud.NightVisionSwitch.ButtonPressed;
@@ -1797,7 +1814,8 @@ public partial class FirstPersonMode : Node
             $"{(_tooSteep ? " · Too steep to climb (F: fly)" : "")}\n" +
             "Drag to look · W A S D move (Shift: faster) · Wheel: speed · F: " +
             $"{(_flying ? "walk" : "fly")}{(_flying ? " · Space / C: up / down" : "")} · " +
-            "M: magnify · T: calendar · G / K / N: fog, clouds, night vision · Esc: back");
+            "M: magnify · T: calendar · G / K / R / N: fog, clouds, terrain, night vision · " +
+            "Esc: back");
     }
 
     private static string Speed(double metersPerSecond) => metersPerSecond < 1000

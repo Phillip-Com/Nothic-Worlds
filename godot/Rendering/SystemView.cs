@@ -73,6 +73,8 @@ public partial class SystemView : Node3D
     private OrbitGuideVisual? _guide;
     private SystemScale _scale = SystemScale.Readable;
     private bool _showTerrain = true;
+    private bool _standingTerrain = true;
+    private Guid? _standingOn;
     private VisualStyle _style = VisualStyle.Painterly;
     private Dictionary<Guid, DisplayBody> _layout = [];
     private Guid _focusId;
@@ -136,9 +138,17 @@ public partial class SystemView : Node3D
     /// The body a first-person eye stands on (VISION.md REN-06), or null. While set, the scene
     /// is centered on the eye, so the ground right around it keeps its precision, and the other
     /// bodies, orbit lines, and belts are hidden: the sky draws the bodies at their true size
-    /// instead.
+    /// instead. Its painted terrain follows <see cref="StandingTerrain"/> meanwhile.
     /// </summary>
-    public Guid? StandingOn { get; set; }
+    public Guid? StandingOn
+    {
+        get => _standingOn;
+        set
+        {
+            _standingOn = value;
+            ApplyTerrainSwitches();
+        }
+    }
 
     /// <summary>
     /// Where the eye is, in the space the standing body is drawn in (its radii from its middle:
@@ -238,7 +248,7 @@ public partial class SystemView : Node3D
 
     /// <summary>
     /// Whether painted terrain shows on the globes (View ▸ Terrain), for every globe at once,
-    /// including ones added later.
+    /// including ones added later; but not the one stood on (<see cref="StandingTerrain"/>).
     /// </summary>
     public bool ShowTerrain
     {
@@ -246,12 +256,35 @@ public partial class SystemView : Node3D
         set
         {
             _showTerrain = value;
-            foreach (BodyVisual visual in _visuals.Values)
+            ApplyTerrainSwitches();
+        }
+    }
+
+    /// <summary>
+    /// Whether painted terrain shows on the body stood on while standing (the standing view's
+    /// Terrain switch), apart from View ▸ Terrain, so the map can keep it as the ground drops it.
+    /// </summary>
+    public bool StandingTerrain
+    {
+        get => _standingTerrain;
+        set
+        {
+            _standingTerrain = value;
+            ApplyTerrainSwitches();
+        }
+    }
+
+    // Whether a body's painted terrain shows, by whichever switch it follows now.
+    private bool TerrainShownOn(Guid bodyId) =>
+        bodyId == _standingOn ? _standingTerrain : _showTerrain;
+
+    private void ApplyTerrainSwitches()
+    {
+        foreach ((Guid id, BodyVisual visual) in _visuals)
+        {
+            if (visual.Surface is PlanetSurface surface)
             {
-                if (visual.Surface is PlanetSurface surface)
-                {
-                    surface.ShowTerrain = value;
-                }
+                surface.ShowTerrain = TerrainShownOn(id);
             }
         }
     }
@@ -872,7 +905,7 @@ public partial class SystemView : Node3D
                 Mesh = _sphere,
                 MaterialOverride = (ShaderMaterial)PlanetMaterial!.Duplicate(),
             };
-            surface.ShowTerrain = _showTerrain;
+            surface.ShowTerrain = TerrainShownOn(body.Id);
             Guid bodyId = body.Id;
             surface.DetailWanted += () => DetailWanted?.Invoke(bodyId);
             if (body.Kind == BodyKind.Comet)
