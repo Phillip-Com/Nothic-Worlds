@@ -43,8 +43,36 @@ public partial class WorldSession
         new(0x90, 0x90, 0x98),  // Slate
     ];
 
+    // Terrain types hidden by their eye in the Terrain panel: a view choice, never saved, and
+    // forgotten when the world closes.
+    private readonly HashSet<byte> _hiddenTerrain = [];
+
     /// <summary>The world's terrain types, in list order.</summary>
     public IReadOnlyList<TerrainType> TerrainTypes => World.TerrainTypes;
+
+    /// <summary>Whether a terrain type is hidden from view (VISION.md BOD-05).</summary>
+    public bool IsTerrainHidden(byte code) => _hiddenTerrain.Contains(code);
+
+    /// <summary>
+    /// Hides or shows a terrain type on every globe and on the ground while standing: hidden,
+    /// it's drawn as what's under it. Painting it still works. Not an edit, so not undone or
+    /// saved.
+    /// </summary>
+    public void SetTerrainHidden(byte code, bool hidden)
+    {
+        if (hidden ? !_hiddenTerrain.Add(code) : !_hiddenTerrain.Remove(code))
+        {
+            return;
+        }
+
+        foreach (Body body in World.Bodies)
+        {
+            if (System?.SurfaceFor(body.Id) is PlanetSurface surface)
+            {
+                surface.SetTerrainColors(World.TerrainTypes, _hiddenTerrain);
+            }
+        }
+    }
 
     /// <summary>
     /// Whether painted terrain shapes the ground (VISION.md BOD-07): each type's height, with
@@ -86,6 +114,7 @@ public partial class WorldSession
         var type = new TerrainType(code, $"New Terrain {number}",
             _newTerrainColors[World.TerrainTypes.Count % _newTerrainColors.Length]);
         RecordUndo("Add Terrain Type");
+        _hiddenTerrain.Remove(code);  // A deleted type's code, reused: the new one shows
         World.TerrainTypes.Add(type);
         TerrainTypesChanged();
         return type;
@@ -288,7 +317,7 @@ public partial class WorldSession
             return;
         }
 
-        surface.SetTerrainColors(World.TerrainTypes);
+        surface.SetTerrainColors(World.TerrainTypes, _hiddenTerrain);
         surface.SetShapes(body.Surface.Shapes, body.RadiusKm);
         TerrainGrid terrain = body.Surface.Terrain;
         if (ShownGroundAtOnce(body) is not HeightGrid shown

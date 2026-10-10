@@ -1010,15 +1010,16 @@ public partial class PlanetSurface : MeshInstance3D
 
     /// <summary>
     /// Sets the color each terrain code is drawn in (others stay unpainted), and the color of
-    /// water over it: its own for a type with the Water climate (VISION.md BOD-09).
+    /// water over it: its own for a type with the Water climate (VISION.md BOD-09). Hidden
+    /// types are drawn as unpainted, but their water keeps its color (VISION.md BOD-05).
     /// </summary>
-    public void SetTerrainColors(IEnumerable<TerrainType> types)
+    public void SetTerrainColors(IEnumerable<TerrainType> types, IReadOnlySet<byte> hidden)
     {
         SetWaterColors(types);
 
         // One RGBA pixel per code; alpha 0 (the default) draws as unpainted.
         var bytes = new byte[(byte.MaxValue + 1) * 4];
-        foreach (TerrainType type in types)
+        foreach (TerrainType type in types.Where(type => !hidden.Contains(type.Code)))
         {
             int at = type.Code * 4;
             (bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]) =

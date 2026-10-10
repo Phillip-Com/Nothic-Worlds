@@ -29,6 +29,7 @@ public static class AppSettings
     private const string CloudsKey = "show_clouds";
     private const string FogKey = "standing_fog";
     private const string NightVisionKey = "night_vision";
+    private const string StandingTerrainKey = "standing_terrain";
     private const string FilesSection = "files";
     private const string FoldsSection = "folds";
     private const string RecentWorldsKey = "recent_worlds";
@@ -129,6 +130,15 @@ public static class AppSettings
     {
         get => Load().GetValue(DisplaySection, FogKey, true).AsBool();
         set => Save(FogKey, value);
+    }
+
+    /// <summary>
+    /// Whether painted terrain shows on the ground while standing (VISION.md REN-06, BOD-05).
+    /// </summary>
+    public static bool StandingTerrain
+    {
+        get => Load().GetValue(DisplaySection, StandingTerrainKey, true).AsBool();
+        set => Save(StandingTerrainKey, value);
     }
 
     /// <summary>Whether night vision is on while standing (VISION.md REN-06).</summary>

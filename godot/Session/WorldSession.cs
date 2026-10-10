@@ -2168,6 +2168,7 @@ public partial class WorldSession : Node
     private void CloseCurrentWorld()
     {
         _terrainGround.Clear();
+        _hiddenTerrain.Clear();
         _shownGround.Clear();
         _roughGround.Clear();
         ForgetWater();
