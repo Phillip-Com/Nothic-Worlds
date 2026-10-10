@@ -121,6 +121,10 @@ public partial class FirstPersonHud : CanvasLayer
             "Show the painted terrain colors on the ground here, instead of its ground " +
             "(grass, rock, sand…); the map keeps its own");
         corner.AddChild(TerrainSwitch);
+        PlantsSwitch = Switch("Plants (V)",
+            "Show or hide the trees, bushes, and grass here (how many: File ▸ Settings, " +
+            "Standing plants)");
+        corner.AddChild(PlantsSwitch);
         NightVisionSwitch = Switch("Night Vision (N)",
             "Light up the night (and dim places) as if at dusk, to see the ground");
         corner.AddChild(NightVisionSwitch);
@@ -135,6 +139,9 @@ public partial class FirstPersonHud : CanvasLayer
 
     /// <summary>Shows or hides the painted terrain on the ground stood on.</summary>
     public Button TerrainSwitch { get; }
+
+    /// <summary>Shows or hides the plants while standing (VISION.md REN-06).</summary>
+    public Button PlantsSwitch { get; }
 
     /// <summary>Turns night vision on or off.</summary>
     public Button NightVisionSwitch { get; }

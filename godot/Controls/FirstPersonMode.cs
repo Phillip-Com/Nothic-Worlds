@@ -253,6 +253,7 @@ public partial class FirstPersonMode : Node
             }
         };
         _hud.NightVisionSwitch.Toggled += on => _sky.NightVision = AppSettings.NightVision = on;
+        ReadyPlants();
         _hud.TerrainSwitch.Toggled += on =>
         {
             AppSettings.StandingTerrain = on;
@@ -401,6 +402,7 @@ public partial class FirstPersonMode : Node
 
         _tiles?.QueueFree();
         _tiles = null;
+        FreePlants(models: true);
         _groundMaterials?.Hide();
         _groundMaterials = null;
         _deck?.QueueFree();
@@ -554,6 +556,7 @@ public partial class FirstPersonMode : Node
         _hud.FogSwitch.SetPressedNoSignal(_sky.ShowFog);
         _hud.CloudsSwitch.SetPressedNoSignal(Weather?.ShowClouds ?? true);
         _hud.TerrainSwitch.SetPressedNoSignal(System?.StandingTerrain ?? true);
+        SyncPlantsSwitch();
         _hud.NightVisionSwitch.SetPressedNoSignal(_sky.NightVision);
         ShowHelp();
     }
@@ -613,6 +616,9 @@ public partial class FirstPersonMode : Node
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.R }:
                 _hud!.TerrainSwitch.ButtonPressed = !_hud.TerrainSwitch.ButtonPressed;
                 break;
+            case InputEventKey { Pressed: true, Echo: false, Keycode: Key.V }:
+                TogglePlants();
+                break;
             case InputEventKey { Pressed: true, Echo: false, Keycode: Key.N }:
                 _hud!.NightVisionSwitch.ButtonPressed = !_hud.NightVisionSwitch.ButtonPressed;
                 break;
@@ -641,6 +647,7 @@ public partial class FirstPersonMode : Node
         }
 
         Move(globe, body, delta);
+        AgePlantsNote(delta);
         _sinceGroundBuilt += delta;
         _sinceBanksBuilt += delta;
         double radiusMeters = body.RadiusKm * 1000;
@@ -946,6 +953,7 @@ public partial class FirstPersonMode : Node
         _tiles!.Place(point => At(body, time, eye, displayRadius, point));
         PlaceRings(_deck!, body, time, eye, displayRadius);
         PlaceRivers(body, time, eye, displayRadius);
+        PlacePlants(body, time, eye, displayRadius);
     }
 
     // Puts the rivers' water, beds, and banks in the scene, relative to the eye.
@@ -1301,6 +1309,7 @@ public partial class FirstPersonMode : Node
         _banks!.Visible = shown;
         if (!shown)
         {
+            HidePlants();
             return;
         }
 
@@ -1359,6 +1368,7 @@ public partial class FirstPersonMode : Node
             globe.SetNearEye(_channelsAround, reach * NearEyeShare);
         }
 
+        KeepPlants(globe, body, tiles, _spot * (ground + height), _spot, heightMeters);
         TakeInBanks(globe, body);
         if (BanksDue(tiles))
         {
@@ -1649,6 +1659,8 @@ public partial class FirstPersonMode : Node
                 globe.SetNearEye(_channelsMiddle, outer * NearEyeShare);
             }
 
+            KeepPlants(globe, body, tiles, eye, FlatWalk.Point(flat), _heightMeters);
+
             TakeInBanks(globe, body);
             if (BanksDue(tiles))
             {
@@ -1662,7 +1674,13 @@ public partial class FirstPersonMode : Node
             }
         }
 
+        if (!tiles.Visible)
+        {
+            HidePlants();
+        }
+
         tiles.Place(point => At(body, time, eye, displayRadius, point));
+        PlacePlants(body, time, eye, displayRadius);
         PlacePatch(rock, body, time, eye, displayRadius);
         PlacePatch(_flatDeck!, body, time, eye, displayRadius);
         PlaceRivers(body, time, eye, displayRadius);
@@ -1853,10 +1871,11 @@ public partial class FirstPersonMode : Node
         _hud?.SetHelp($"Standing on {body?.Name} · {(_flying ? "Flying" : "Walking")} · " +
             $"{Speed(metersPerSecond)} ({name})" +
             $"{(_magnify ? " · Magnified" : "")}" +
-            $"{(_tooSteep ? " · Too steep to climb (F: fly)" : "")}\n" +
+            $"{(_tooSteep ? " · Too steep to climb (F: fly)" : "")}{PlantsNote()}\n" +
             "Drag to look · W A S D move (Shift: faster) · Wheel: speed · F: " +
             $"{(_flying ? "walk" : "fly")}{(_flying ? " · Space / C: up / down" : "")} · " +
-            "M: magnify · T: calendar · G / K / R / N: fog, clouds, terrain, night vision · " +
+            "M: magnify · T: calendar · G / K / R / V / N: fog, clouds, terrain, plants, " +
+            "night vision · " +
             "Esc: back");
     }
 

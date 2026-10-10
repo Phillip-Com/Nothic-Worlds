@@ -93,11 +93,27 @@ public sealed class GroundMaterials
             _shownOn = globe;
         }
 
-        // No air, no snow; otherwise the line sits lower on colder worlds.
-        material.SetShaderParameter("has_snow_line", body.HasAtmosphere);
-        material.SetShaderParameter("snow_line_meters", (float)(EquatorSnowLineMeters
-            + (body.AverageTemperatureC - EarthAverageC) * SnowLineMetersPerDegree));
+        double? snowLine = SnowLineMeters(body);
+        material.SetShaderParameter("has_snow_line", snowLine is not null);
+        material.SetShaderParameter("snow_line_meters", (float)(snowLine ?? 0));
     }
+
+    /// <summary>
+    /// How high the snow line is at a body's equator, in meters above its radius; null
+    /// without air (no snow). It sits lower on colder worlds.
+    /// </summary>
+    public static double? SnowLineMeters(Body body) => body.HasAtmosphere
+        ? EquatorSnowLineMeters
+            + (body.AverageTemperatureC - EarthAverageC) * SnowLineMetersPerDegree
+        : null;
+
+    /// <summary>
+    /// How high the snow line is at a latitude (degrees), given its height at the equator:
+    /// lower toward the poles, as ground_material in planet_surface.gdshaderinc has it
+    /// (without the shader's ragged edge).
+    /// </summary>
+    public static double SnowLineAt(double equatorMeters, double latitudeDegrees) =>
+        equatorMeters - 5000 * Math.Pow(Math.Abs(latitudeDegrees) / 75, 2);
 
     /// <summary>
     /// Takes the materials off the globe they were shown on, if any (and if it's still there).
