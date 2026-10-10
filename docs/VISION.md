@@ -224,7 +224,7 @@ screen filter; stored per world (format v25); Painterly the default for every wo
 Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 (`WorldSession.SetStyle`, one undo step).
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Owner's choices:** walk or fly; the sky at true size and place with a magnify switch; day and
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
@@ -234,7 +234,9 @@ clicking; true heights while standing; switches for fog, clouds, and night visio
 request, 2026-10-08; night vision as brightened true colors, not green); ground that stays put
 as you move, on globes and flat worlds alike, the water's surface built with it, and a
 **Standing ground detail** setting (Low, Standard, High; named so by the owner, 2026-10-09);
-walking stops at slopes over 50°, flying goes anywhere (owner's choice, 2026-10-09).
+walking stops at slopes over 50°, flying goes anywhere (owner's choice, 2026-10-09); a
+remembered Terrain switch that hides the painted colors underfoot, apart from View ▸ Terrain,
+so the map keeps them (owner's choice, 2026-10-09; on by default until ground materials).
 **Built:**
 - Core: `BodyOrientation.ToSystem` / `ShapeToSystem`; `Simulation/SkyView.cs` (`From`,
   `FromFlat`, `SolarTimeHours`, `BodyAt`); `Geometry/FlatWalk.cs` and `GlobeWalk` for moving
@@ -267,11 +269,13 @@ a little past the eye's horizon (~19 km). The rim and underside of a flat world 
   sky gradient, bodies as lit discs, clouds from the live weather via
   `PlanetSurface.CopyCloudsTo` and `cloud_layer.gdshaderinc`, haze as fog), `cloud_deck.gdshader`
   (clouds seen from above), `falling_weather.gdshader` (rain and snow over the view).
-- `UI/FirstPersonHud.cs`, `UI/CompassStrip.cs`. Fog (G), Clouds (K), and Night Vision (N)
+- `UI/FirstPersonHud.cs`, `UI/CompassStrip.cs`. Fog (G), Clouds (K), Terrain (R), and Night
+  Vision (N)
   switches under the Calendar button: `SurfaceSky.ShowFog`, `SurfaceSky.ShowNightVision` (more
   ambient light and exposure, scaled by how dark it is); Clouds is the same switch as View ▸
-  Clouds (`WeatherDisplay.ShowClouds`). All three are remembered on this computer
-  (`AppSettings.StandingFog`, `ShowClouds`, `NightVision`; owner's choice). The view's visibility of hidden UI is noted before any is
+  Clouds (`WeatherDisplay.ShowClouds`); Terrain sets `SystemView.StandingTerrain`, which the
+  body stood on follows instead of `ShowTerrain`. All four are remembered on this computer
+  (`AppSettings.StandingFog`, `ShowClouds`, `StandingTerrain`, `NightVision`; owner's choice). The view's visibility of hidden UI is noted before any is
   hidden, so the terrain brush still works after leaving.
 - **Ground clearance** (Core `Geometry/GroundClearance.cs`): the camera's near distance follows
   the nearest ground in any direction (rings around the eye out to its height above the ground
@@ -604,13 +608,15 @@ feature on a star (its rocks drawn, not saved); nebulas are a backdrop around th
 **Limits:** Godot only carves in the scene, on the main thread, so each change still pauses
 the app (~0.17 s on the desktop); fully removing it needs carving code of our own.
 
-**BOD-05 — Terrain/biome painting** · Implemented (M11: PRs #33–#35) · Base
+**BOD-05 — Terrain/biome painting** · Implemented (M11: PRs #33–#35; hiding types: PR #119) · Base
 **Intent:** Paint terrain types onto bodies, such as ocean, mountains, swamps, forests, and fields.
 **Owner's choices:** an editable list of types per world (12 defaults); without a map the terrain
 is the surface, over a map a see-through overlay (View ▸ Terrain); its own Terrain panel; a grid
 of 1,024 × 1,024 cells a face (about 10 km on an Earth-sized planet); unpainted ground drawn
 grey once a planet without a map has any terrain; a Tool On/Off switch (P) for painting,
-sculpting, and shapes, so drags can turn the view (owner's request, 2026-10-08).
+sculpting, and shapes, so drags can turn the view (owner's request, 2026-10-08); an eye on each
+type in the list hides it everywhere, drawn as what's under it, until the world closes (never
+saved; owner's choice, 2026-10-09).
 **Built:** Core `Geometry/CubeSphere.cs` (equal-angle cube faces; the shader repeats its math,
 spelled out in docs/world-format.md); `Model/TerrainGrid.cs` (immutable 64 × 64 tiles shared
 between versions; `Paint`, `PaintStroke`, `Replace`, `FacesChangedFrom`, `TilesChangedFrom`);
@@ -619,7 +625,9 @@ between versions; `Paint`, `PaintStroke`, `Replace`, `FacesChangedFrom`, `TilesC
 plus a palette, with smooth edges up close (`terrain_near`) and an averaged far copy so it never
 flickers (kept per face in `PlanetSurface`, so a stroke averages only the tiles it touched); `Session/WorldSession.Terrain.cs`; `Controls/TerrainBrush.cs`; `UI/TerrainPanel.cs`.
 The tool switch is a `ToolSwitch` (UI-05); Water mode has its own buttons, so it's off there
-with a tooltip saying so.
+with a tooltip saying so. The type list is a `Tree` with an eye button per row (`UI/EyeIcon.cs`,
+drawn in code); hidden types are `WorldSession.SetTerrainHidden`, drawn with alpha 0 in the
+palette but keeping their water color, and the hint says when the chosen type is hidden.
 **Reuse:** `TerrainGrid`'s shared-tile pattern for any per-cell data (heights use it).
 
 **BOD-06 — Custom surface appearance** · Implemented (M16: PR #42) · Base
