@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §7). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 34** (see **Version history** at the end)
+**Current format version: 35** (see **Version history** at the end)
 
 ## Container
 
@@ -32,7 +32,7 @@ list them all.
 
 ```json
 {
-  "formatVersion": 34,
+  "formatVersion": 35,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -128,12 +128,13 @@ list them all.
   ],
   "terrainTypes": [
     { "code": 1, "name": "Ocean", "color": "#1F4E79", "climate": "water",
-      "height": -3000, "edge": 0.3, "variation": 800, "featureSize": 200, "ground": "sand" },
+      "height": -3000, "edge": 0.3, "variation": 800, "featureSize": 200, "ground": "sand",
+      "plants": "none" },
     { "code": 5, "name": "Forest", "color": "#2F6B35", "climate": "forest", "height": 300,
-      "variation": 80, "ground": "forest-floor" },
+      "variation": 80, "ground": "forest-floor", "plants": "forest" },
     { "code": 13, "name": "Crystal Wastes", "color": "#B0E0E6", "climate": "desert",
       "height": 1200, "edge": 0.8, "variation": 900, "featureSize": 25, "roughness": 0.6,
-      "ground": "gravel" }
+      "ground": "gravel", "plants": "rocky" }
   ],
   "terrainShapesGround": true,
   "weatherPins": [
@@ -311,6 +312,7 @@ list them all.
 | `…terrainTypes[].roughness` | no | 0 (smooth) to 1 (craggy): how rough the type's ground is up close, its `variation` carried on into features too small for the height grid (`BOD-12`). Omitted for 0. See **Roughness up close** below. |
 | `…terrainTypes[].climate` | yes | How it affects weather pins (`WTH-03`): `"open-land"`, `"water"`, `"forest"`, `"desert"`, `"wetland"`, `"mountains"`, or `"ice"` |
 | `…terrainTypes[].ground` | yes | What the type's ground looks like up close while standing (`REN-06`), under water its bottom: `"grass"`, `"dry-grass"`, `"forest-floor"`, `"sand"`, `"mud"`, `"rock"`, `"snow"`, or `"gravel"`. Version 34 on. |
+| `…terrainTypes[].plants` | yes | What grows on the type while standing (`REN-06`): `"none"`, `"grass"`, `"meadow"`, `"woodland"`, `"forest"`, `"conifer-forest"`, `"jungle"`, `"scrub"`, `"marsh"`, or `"rocky"`. Where they stand is worked out from the world, not saved. Version 35 on. |
 | `weatherPins` | no | Named spots whose weather is shown (`WTH-01`), in the order added. Omitted when there are none. Up to 1,000. |
 | `…weatherPins[].id`, `name` | yes | GUID, unique among weather pins; name not empty, up to 100 characters |
 | `…weatherPins[].body` | yes | The `id` of the planet or moon it's on (not a star) |
@@ -686,6 +688,7 @@ If anything fails, the existing world file is left untouched.
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
 | 33 | Terrain roughness (BOD-12): terrain types gain optional `roughness` | Nothing to change: older types are smooth (0), as they always looked; only new worlds' default types start rough |
+| 35 | Plants (REN-06): terrain types gain `plants` | A type named Jungle gets `"jungle"`; others get a guess from their climate (water and ice → none, desert → scrub, forest → forest, wetland → marsh, mountains → rocky) or, for open land, their ground (grass → meadow, dry grass → grass, forest floor → woodland, sand → scrub, mud → marsh, rock and gravel → rocky, snow → none) |
 | 34 | Ground materials (REN-06): terrain types gain `ground` | Each type gets a guess from its climate (water and desert → sand, forest → forest floor, wetland → mud, mountains → rock, ice → snow) or, for open land, its color (near white → snow, very dark → mud, green → grass, grey → gravel, red → sand, otherwise dry grass) |
 | 32 | River depth (BOD-11): rivers gain optional `depth`, `depthVariation`, `depthSpacing` and `depthSmoothness` | Nothing to change: older rivers are Auto with an even bed |
 | 31 | Rivers and lakes (M42): optional `rivers` and `lakes` | Nothing to change: version 30 worlds have none |

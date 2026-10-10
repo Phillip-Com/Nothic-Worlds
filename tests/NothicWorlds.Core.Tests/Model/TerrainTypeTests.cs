@@ -46,6 +46,44 @@ public sealed class TerrainTypeTests
     }
 
     [Fact]
+    public void Defaults_HaveThePlantsTheirClimateAndGroundSuggest_ButJungle()
+    {
+        Assert.All(TerrainType.Defaults.Where(type => type.Name != "Jungle"), type =>
+            Assert.Equal(TerrainType.GuessPlants(type.Climate, type.Ground), type.Plants));
+        Assert.Equal(PlantCover.Jungle,
+            TerrainType.Defaults.Single(type => type.Name == "Jungle").Plants);
+    }
+
+    [Theory]
+    [InlineData(ClimateKind.Water, GroundKind.Grass, PlantCover.None)]
+    [InlineData(ClimateKind.Ice, GroundKind.Grass, PlantCover.None)]
+    [InlineData(ClimateKind.Desert, GroundKind.Gravel, PlantCover.Scrub)]
+    [InlineData(ClimateKind.Forest, GroundKind.Sand, PlantCover.Forest)]
+    [InlineData(ClimateKind.Wetland, GroundKind.Grass, PlantCover.Marsh)]
+    [InlineData(ClimateKind.Mountains, GroundKind.Grass, PlantCover.Rocky)]
+    [InlineData(ClimateKind.OpenLand, GroundKind.Grass, PlantCover.Meadow)]
+    [InlineData(ClimateKind.OpenLand, GroundKind.DryGrass, PlantCover.Grass)]
+    [InlineData(ClimateKind.OpenLand, GroundKind.ForestFloor, PlantCover.Woodland)]
+    [InlineData(ClimateKind.OpenLand, GroundKind.Sand, PlantCover.Scrub)]
+    [InlineData(ClimateKind.OpenLand, GroundKind.Mud, PlantCover.Marsh)]
+    [InlineData(ClimateKind.OpenLand, GroundKind.Rock, PlantCover.Rocky)]
+    [InlineData(ClimateKind.OpenLand, GroundKind.Gravel, PlantCover.Rocky)]
+    [InlineData(ClimateKind.OpenLand, GroundKind.Snow, PlantCover.None)]
+    public void GuessPlants_GoesByClimate_ThenGround(
+        ClimateKind climate, GroundKind ground, PlantCover expected)
+    {
+        Assert.Equal(expected, TerrainType.GuessPlants(climate, ground));
+    }
+
+    [Fact]
+    public void Problem_UnknownPlants_IsReported()
+    {
+        TerrainType odd = TerrainType.Defaults[0] with { Plants = (PlantCover)99 };
+
+        Assert.NotNull(TerrainType.Problem([odd]));
+    }
+
+    [Fact]
     public void Problem_UnknownGround_IsReported()
     {
         TerrainType odd = TerrainType.Defaults[0] with { Ground = (GroundKind)99 };

@@ -62,6 +62,7 @@ internal sealed class TerrainTypeDocument
     public double? FeatureSize { get; init; }  // Added in version 30, km; omitted for 50
     public double? Roughness { get; init; }  // Added in format version 33; omitted for 0
     public string? Ground { get; init; }  // Added in format version 34; refused if missing
+    public string? Plants { get; init; }  // Added in format version 35; refused if missing
 }
 
 internal sealed class JournalEntryDocument

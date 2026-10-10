@@ -73,6 +73,7 @@ public partial class TerrainPanel : CanvasLayer
     private ColorPickerButton _color = null!;
     private OptionButton _climate = null!;
     private OptionButton _ground = null!;
+    private OptionButton _plants = null!;
     private CheckButton _shapesGround = null!;
     private SpinBox _height = null!;
     private HSlider _edge = null!;
@@ -434,6 +435,24 @@ public partial class TerrainPanel : CanvasLayer
         _ground.ItemSelected += _ => Commit();
         groundRow.AddChild(_ground);
         box.AddChild(groundRow);
+
+        var plantsRow = new HBoxContainer();
+        plantsRow.AddChild(new Label { Text = "Plants" });
+        _plants = new Dropdown
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "What grows on this terrain while standing: trees, bushes, grass, " +
+                "and rocks",
+        };
+        foreach (PlantCover cover in Enum.GetValues<PlantCover>())
+        {
+            _plants.AddItem(PlantText.Name(cover), (int)cover);
+            _plants.SetItemTooltip(_plants.ItemCount - 1, PlantText.Use(cover));
+        }
+
+        _plants.ItemSelected += _ => Commit();
+        plantsRow.AddChild(_plants);
+        box.AddChild(plantsRow);
         box.AddChild(BuildShapingRows());
         _problem = new Label
         {
@@ -630,6 +649,7 @@ public partial class TerrainPanel : CanvasLayer
             Color = _color.Color.ToRgbColor(),
             Climate = (ClimateKind)_climate.GetSelectedId(),
             Ground = (GroundKind)_ground.GetSelectedId(),
+            Plants = (PlantCover)_plants.GetSelectedId(),
             HeightMeters = (int)Math.Round(_height.MetricValue()),
             Edge = Math.Round(_edge.Value, 2),
             VariationMeters = (int)Math.Round(_variation.MetricValue()),
@@ -797,6 +817,7 @@ public partial class TerrainPanel : CanvasLayer
         _color.Disabled = type is null;
         _climate.Disabled = type is null;
         _ground.Disabled = type is null;
+        _plants.Disabled = type is null;
         _height.Editable = type is not null;
         _edge.Editable = type is not null;
         _variation.Editable = type is not null;
@@ -823,6 +844,7 @@ public partial class TerrainPanel : CanvasLayer
         _color.Color = type.Color.ToGodot();
         _climate.Select(_climate.GetItemIndex((int)type.Climate));
         _ground.Select(_ground.GetItemIndex((int)type.Ground));
+        _plants.Select(_plants.GetItemIndex((int)type.Plants));
         _height.ShowMetric(type.HeightMeters);
         if (!_edgeDragging)
         {
