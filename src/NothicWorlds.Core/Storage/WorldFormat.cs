@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 33;
+    public const int CurrentVersion = 34;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -64,6 +64,18 @@ internal static partial class WorldFormat
         [ClimateKind.Wetland] = "wetland",
         [ClimateKind.Mountains] = "mountains",
         [ClimateKind.Ice] = "ice",
+    };
+
+    private static readonly Dictionary<GroundKind, string> _groundNames = new()
+    {
+        [GroundKind.Grass] = "grass",
+        [GroundKind.DryGrass] = "dry-grass",
+        [GroundKind.ForestFloor] = "forest-floor",
+        [GroundKind.Sand] = "sand",
+        [GroundKind.Mud] = "mud",
+        [GroundKind.Rock] = "rock",
+        [GroundKind.Snow] = "snow",
+        [GroundKind.Gravel] = "gravel",
     };
 
     private static readonly Dictionary<ShapeKind, string> _shapeKindNames = new()
@@ -273,6 +285,10 @@ internal static partial class WorldFormat
         // 32 → 33: terrain types gained an optional "roughness" (BOD-12). Older types are
         // smooth (0), as they always looked.
         document => document,
+
+        // 33 → 34: terrain types gained a "ground" (REN-06, ground materials), guessed from
+        // each type's climate and color (TerrainType.GuessGround).
+        AddTerrainGrounds,
     ];
 
     // The variations and feature sizes the version 30 upgrade gives types by name. Deliberately
@@ -410,12 +426,37 @@ internal static partial class WorldFormat
         return document;
     }
 
+    private static JsonObject AddTerrainGrounds(JsonObject document)
+    {
+        if (document["terrainTypes"] is JsonArray types)
+        {
+            foreach (JsonObject type in types.OfType<JsonObject>())
+            {
+                // A type whose climate or color can't be read is refused on loading anyway,
+                // with its usual message, so it's left as it is.
+                if (Text(type["climate"]) is string climateName
+                    && _climateNames.ContainsValue(climateName)
+                    && Text(type["color"]) is string colorText
+                    && RgbColor.TryParseHex(colorText, out RgbColor color))
+                {
+                    type["ground"] ??= GroundName(
+                        TerrainType.GuessGround(ParseClimate(climateName), color));
+                }
+            }
+        }
+
+        return document;
+    }
+
+    // A JSON value's text, or null if it isn't text.
+    private static string? Text(JsonNode? node) =>
+        node?.GetValueKind() == System.Text.Json.JsonValueKind.String
+            ? node.GetValue<string>()
+            : null;
+
     // A terrain type's name in an older document, trimmed, or null if it isn't text (loading
     // then refuses it with its usual message).
-    private static string? TypeName(JsonObject type) =>
-        type["name"]?.GetValueKind() == System.Text.Json.JsonValueKind.String
-            ? type["name"]!.GetValue<string>().Trim()
-            : null;
+    private static string? TypeName(JsonObject type) => Text(type["name"])?.Trim();
 
     private static JsonObject AddTerrainHeights(JsonObject document)
     {
@@ -490,6 +531,8 @@ internal static partial class WorldFormat
 
     public static string ClimateName(ClimateKind kind) => _climateNames[kind];
 
+    public static string GroundName(GroundKind kind) => _groundNames[kind];
+
     public static string ShapeName(BodyShape shape) => _shapeNames[shape];
 
     public static BodyShape ParseShape(string? name) => Parse(_shapeNames, name, "body shape");
@@ -535,6 +578,9 @@ internal static partial class WorldFormat
 
     public static ClimateKind ParseClimate(string? name) =>
         Parse(_climateNames, name, "terrain climate");
+
+    public static GroundKind ParseGround(string? name) =>
+        Parse(_groundNames, name, "terrain ground");
 
     /// <summary>The name written for a calendar fit, or null for none (left out).</summary>
     public static string? CalendarFitName(CalendarFit fit) =>
