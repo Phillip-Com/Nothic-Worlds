@@ -56,7 +56,9 @@ branch and PR.
 - PR descriptions: **What** and **why**, **How to test**, **Decisions made** by Claude, **Open
   questions**. Keep them short.
 - The owner merges. Claude never merges its own PRs or force-pushes shared branches.
-- Never commit secrets, personal data, or large generated/binary files.
+- Never commit secrets, personal data, or large generated/binary files. Exception (owner,
+  2026-10-09): CC0 art for the standing view (photo textures at 1K, low-poly models) in
+  `godot/Assets/`, kept small and credited in a `CREDITS.md` beside them.
 
 ## 4. Code Quality
 

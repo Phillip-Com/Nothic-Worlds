@@ -224,7 +224,7 @@ screen filter; stored per world (format v25); Painterly the default for every wo
 Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 (`WorldSession.SetStyle`, one undo step).
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120; ground materials: PR #121) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Owner's choices:** walk or fly; the sky at true size and place with a magnify switch; day and
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
@@ -235,8 +235,12 @@ request, 2026-10-08; night vision as brightened true colors, not green); ground 
 as you move, on globes and flat worlds alike, the water's surface built with it, and a
 **Standing ground detail** setting (Low, Standard, High; named so by the owner, 2026-10-09);
 walking stops at slopes over 50°, flying goes anywhere (owner's choice, 2026-10-09); a
-remembered Terrain switch that hides the painted colors underfoot, apart from View ▸ Terrain,
-so the map keeps them (owner's choice, 2026-10-09; on by default until ground materials); a
+remembered Terrain switch that shows the painted colors underfoot instead of the ground
+materials, apart from View ▸ Terrain, so the map keeps them (owner's choice, 2026-10-09; off by
+default since ground materials); **ground materials** (owner's choices, 2026-10-09): each
+terrain type picks a ground (grass, dry grass, forest floor, sand, mud, rock, snow, gravel),
+drawn as a CC0 photo material tinted partway toward the type's color, with bare rock on steep
+slopes and snow above a snow line that falls with latitude; a
 sense of scale: speed in km/h or mph, a rangefinder both at a crosshair in the middle and under
 the mouse, and the journal's and timeline's pins on the compass with their distances (owner's
 choices, 2026-10-09; no markers of one's own, no labels in the 3D view).
@@ -288,10 +292,29 @@ a little past the eye's horizon (~19 km). The rim and underside of a flat world 
   Each tile's skirt hangs at least to the lowest of its edge points within eight either way
   (`GroundTileGrid.SkirtDepths`), so where a tile's edge runs up a cliff the crack against a
   coarser neighbor (seen as slits of sky through the cliff face) stays closed.
-- **Ground detail** (`eye_level_ground` in `planet_surface.gdshaderinc`): three layers of noise
-  matched to the ground **by its color** (grass, sand, snow, water, rock), placed in double
-  precision by `FirstPersonMode.SetGroundDetail`; bumps shade the color rather than tilt the
-  normal.
+- **Ground detail** (`eye_level_ground` in `planet_surface.gdshaderinc`): with the Terrain
+  switch on, three layers of noise matched to the ground **by its color** (grass, sand, snow,
+  water, rock), placed in double precision by `FirstPersonMode.SetGroundDetail`; bumps shade
+  the color rather than tilt the normal.
+- **Ground materials** (`Rendering/GroundMaterials.cs`, `ground_material` in
+  `planet_surface.gdshaderinc`; textures in `godot/Assets/Ground/`, 4.3 MB, see its
+  `CREDITS.md`; only in the standing shaders, `planet_standing.gdshader` and its styles, which
+  `PlanetSurface.ShowsGroundMaterials` swaps in, so the globe views don't carry the code): a
+  color and normal map per `GroundKind` (Core `Model/GroundKind.cs`;
+  `TerrainType.Ground`, format v34, guessed from climate and color by
+  `TerrainType.GuessGround`), loaded into two texture arrays on standing and let go on
+  leaving. The kind per pixel comes from the painted cells' `terrain_pair` (shared with
+  `terrain_near`) through a `ground_palette` (`PlanetSurface.SetGroundKinds`), with ragged
+  edges; unpainted ground is gravel, and ground without terrain goes by its color. Rock where
+  the lit shape is steeper than about 40°; snow above `snow_line_meters` (5,000 m at the
+  equator on an Earth-warm world, 150 m lower per °C colder, lower toward the poles; none
+  without air). Sampled from three sides by the lit shape, 2 m (rock, mud 4 m) up close, 8
+  times that further off, then the average; two turned looks in 16 m patches and each
+  texture's broad light evened out, so repeats don't line up; broad noise patches over it.
+  The tint keeps the photo's lightness (30% of the type's). Placed like the detail (a second
+  origin, `ground_broad_origin`, for the 64 m patches). About 1–2 ms more GPU than the painted
+  colors (measured in PR #121). Limits: snow doesn't follow the seasons; slopes come from the
+  height map (about 10 km cells), so small rough cliffs keep their type's ground.
 - **Scale** (`Controls/FirstPersonMode.Scale.cs`): the rangefinder, Core
   `Geometry/GroundRange.cs`, steps out along a line of sight (steps 2% of the distance, then
   halving) over the drawn ground's heights, stopping at the water's surface (at the bottom when
@@ -629,7 +652,8 @@ of 1,024 × 1,024 cells a face (about 10 km on an Earth-sized planet); unpainted
 grey once a planet without a map has any terrain; a Tool On/Off switch (P) for painting,
 sculpting, and shapes, so drags can turn the view (owner's request, 2026-10-08); an eye on each
 type in the list hides it everywhere, drawn as what's under it, until the world closes (never
-saved; owner's choice, 2026-10-09).
+saved; owner's choice, 2026-10-09); each type's ground while standing, a Ground choice under
+Climate (`REN-06`; owner's choice, 2026-10-09).
 **Built:** Core `Geometry/CubeSphere.cs` (equal-angle cube faces; the shader repeats its math,
 spelled out in docs/world-format.md); `Model/TerrainGrid.cs` (immutable 64 × 64 tiles shared
 between versions; `Paint`, `PaintStroke`, `Replace`, `FacesChangedFrom`, `TilesChangedFrom`);
@@ -1051,4 +1075,8 @@ answered, move the answer into the relevant entry above and remove the question 
 ## 6. Idea Inbox
 
 New raw ideas go here first, then get sorted into a feature area once reviewed.
+
+- **Seasonal snow** (`REN-06`, 2026-10-09): snow on the ground from the weather's snowfall and
+  temperature through the year, instead of the fixed snow line (needs snow to build up and
+  melt in the simulation).
 

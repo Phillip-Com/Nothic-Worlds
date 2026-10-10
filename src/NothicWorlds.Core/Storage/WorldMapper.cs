@@ -137,6 +137,7 @@ internal static class WorldMapper
                 ? null
                 : type.FeatureSizeKm,
             Roughness = type.Roughness == 0 ? null : type.Roughness,
+            Ground = WorldFormat.GroundName(type.Ground),
         };
     }
 
@@ -151,7 +152,8 @@ internal static class WorldMapper
         return new TerrainType((byte)document.Code, document.Name ?? "", color,
             WorldFormat.ParseClimate(document.Climate), document.Height ?? 0,
             document.Edge ?? 0, document.Variation ?? 0,
-            document.FeatureSize ?? TerrainType.DefaultFeatureSizeKm, document.Roughness ?? 0);
+            document.FeatureSize ?? TerrainType.DefaultFeatureSizeKm, document.Roughness ?? 0,
+            WorldFormat.ParseGround(document.Ground));
     }
 
     private static WeatherPinDocument ToDocument(WeatherPin pin)
