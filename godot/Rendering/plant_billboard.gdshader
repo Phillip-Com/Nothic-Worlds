@@ -40,7 +40,7 @@ void vertex() {
 	sheet_uv = vec2((float(column) + VERTEX.x + 0.5) / float(columns),
 		(float(row) + 1.0 - VERTEX.y) / float(rows));
 	brightness = INSTANCE_CUSTOM.b;
-	plant_fade = plant_fade_at(plant_distance(MODEL_MATRIX, INV_VIEW_MATRIX));
+	plant_fade = plant_fade_at(plant_distance(MODEL_MATRIX));
 }
 
 void fragment() {

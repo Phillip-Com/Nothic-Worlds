@@ -23,15 +23,18 @@ uniform float sway_speed = 1.0;
 
 varying float plant_fade;
 
+// The eye is at the scene's middle while standing. It's used rather than the camera's place,
+// which in the shadows' pass is the sun's: so a plant casts a shadow only while it's drawn.
+
 // How far a plant is from the eye, in meters.
-float plant_distance(mat4 model, mat4 inv_view) {
-	return length(model[3].xyz - inv_view[3].xyz) * meters_per_unit;
+float plant_distance(mat4 model) {
+	return length(model[3].xyz) * meters_per_unit;
 }
 
 // How far the eye is across from a plant's middle (its up line), in meters.
-float plant_across(mat4 model, mat4 inv_view) {
+float plant_across(mat4 model) {
 	vec3 up = normalize(model[1].xyz);
-	vec3 to_eye = inv_view[3].xyz - model[3].xyz;
+	vec3 to_eye = -model[3].xyz;
 	return length(to_eye - up * dot(to_eye, up)) * meters_per_unit;
 }
 

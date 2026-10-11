@@ -20,6 +20,7 @@ public partial class SettingsWindow : AcceptDialog
     private Dropdown _clouds = null!;
     private Dropdown _standingGround = null!;
     private Dropdown _standingPlants = null!;
+    private Dropdown _standingShadows = null!;
     private Dropdown _antiAliasing = null!;
     private Dropdown _resolution = null!;
     private Dropdown _frameRate = null!;
@@ -65,6 +66,12 @@ public partial class SettingsWindow : AcceptDialog
             [("Off", (int)StandingPlantDetail.Off), ("Low", (int)StandingPlantDetail.Low),
                 ("Standard", (int)StandingPlantDetail.Standard),
                 ("High", (int)StandingPlantDetail.High)]);
+        _standingShadows = Row(grid, "Standing shadows",
+            "How far the sun's shadows reach around you while standing, and how sharp: " +
+            "High is for a dedicated graphics card",
+            [("Off", (int)StandingShadowDetail.Off), ("Low", (int)StandingShadowDetail.Low),
+                ("Standard", (int)StandingShadowDetail.Standard),
+                ("High", (int)StandingShadowDetail.High)]);
         _antiAliasing = Row(grid, "Smooth edges",
             "Smooths the jagged edges of globes, rings, and lines. 4× is the cleanest and uses " +
             "more video memory",
@@ -81,8 +88,8 @@ public partial class SettingsWindow : AcceptDialog
                 ("60 a second", (int)FrameRateLimit.Sixty),
                 ("30 a second", (int)FrameRateLimit.Thirty)]);
         Dropdown[] options =
-            [_relief, _clouds, _standingGround, _standingPlants, _antiAliasing, _resolution,
-                _frameRate];
+            [_relief, _clouds, _standingGround, _standingPlants, _standingShadows,
+                _antiAliasing, _resolution, _frameRate];
         foreach (Dropdown option in options)
         {
             option.ItemSelected += _ => ChooseOptions();
@@ -150,6 +157,7 @@ public partial class SettingsWindow : AcceptDialog
         Pick(_clouds, (int)options.CloudDetail);
         Pick(_standingGround, (int)options.StandingGroundDetail);
         Pick(_standingPlants, (int)options.StandingPlants);
+        Pick(_standingShadows, (int)options.StandingShadows);
         Pick(_antiAliasing, (int)options.AntiAliasing);
         Pick(_resolution, (int)options.RenderScale);
         Pick(_frameRate, (int)options.FrameRateLimit);
@@ -182,6 +190,7 @@ public partial class SettingsWindow : AcceptDialog
             (CloudDetail)_clouds.GetSelectedId(),
             (StandingGroundDetail)_standingGround.GetSelectedId(),
             (StandingPlantDetail)_standingPlants.GetSelectedId(),
+            (StandingShadowDetail)_standingShadows.GetSelectedId(),
             (AntiAliasing)_antiAliasing.GetSelectedId(),
             (RenderScale)_resolution.GetSelectedId(),
             (FrameRateLimit)_frameRate.GetSelectedId()));

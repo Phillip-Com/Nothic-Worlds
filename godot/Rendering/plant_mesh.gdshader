@@ -11,8 +11,8 @@ varying vec3 tint;
 void vertex() {
 	tint = INSTANCE_CUSTOM.rgb;
 	VERTEX = plant_swayed(VERTEX, INSTANCE_CUSTOM.a * 6.2831853, TIME);
-	plant_fade = plant_fade_at(plant_distance(MODEL_MATRIX, INV_VIEW_MATRIX))
-		* plant_clear_at(plant_across(MODEL_MATRIX, INV_VIEW_MATRIX));
+	plant_fade = plant_fade_at(plant_distance(MODEL_MATRIX))
+		* plant_clear_at(plant_across(MODEL_MATRIX));
 }
 
 void fragment() {

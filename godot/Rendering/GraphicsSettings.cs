@@ -106,6 +106,7 @@ public partial class GraphicsSettings : Node
         {
             Standing.StandingGroundDetail = Options.StandingGroundDetail;
             Standing.StandingPlants = Options.StandingPlants;
+            Standing.StandingShadows = Options.StandingShadows;
         }
     }
 }
