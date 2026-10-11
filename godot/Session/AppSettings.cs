@@ -22,6 +22,7 @@ public static class AppSettings
     private const string CloudDetailKey = "cloud_detail";
     private const string StandingGroundDetailKey = "ground_detail";
     private const string StandingPlantsKey = "standing_plants";
+    private const string StandingShadowsKey = "standing_shadows";
     private const string AntiAliasingKey = "anti_aliasing";
     private const string RenderScaleKey = "render_scale";
     private const string FrameRateKey = "frame_rate_limit";
@@ -78,6 +79,7 @@ public static class AppSettings
             Read(file, CloudDetailKey, defaults.CloudDetail),
             Read(file, StandingGroundDetailKey, defaults.StandingGroundDetail),
             Read(file, StandingPlantsKey, defaults.StandingPlants),
+            Read(file, StandingShadowsKey, defaults.StandingShadows),
             Read(file, AntiAliasingKey, defaults.AntiAliasing),
             Read(file, RenderScaleKey, defaults.RenderScale),
             Read(file, FrameRateKey, defaults.FrameRateLimit));
@@ -92,6 +94,7 @@ public static class AppSettings
         file.SetValue(DisplaySection, StandingGroundDetailKey,
             options.StandingGroundDetail.ToString());
         file.SetValue(DisplaySection, StandingPlantsKey, options.StandingPlants.ToString());
+        file.SetValue(DisplaySection, StandingShadowsKey, options.StandingShadows.ToString());
         file.SetValue(DisplaySection, AntiAliasingKey, options.AntiAliasing.ToString());
         file.SetValue(DisplaySection, RenderScaleKey, options.RenderScale.ToString());
         file.SetValue(DisplaySection, FrameRateKey, options.FrameRateLimit.ToString());

@@ -141,21 +141,24 @@ public partial class StandingPlants : Node3D
             for (int shape = 0; shape < shapes.Length; shape++)
             {
                 _meshes[(model, shape, false)] = AddBatch(_near, $"{model}{shape}",
-                    shapes[shape].Mesh, material);
+                    shapes[shape].Mesh, material, castsShadow: true);
                 if (shapes[shape].Simple is ArrayMesh simple)
                 {
                     _meshes[(model, shape, true)] = AddBatch(_near, $"{model}{shape}Simple",
-                        simple, material);
+                        simple, material, castsShadow: true);
                 }
             }
         }
 
-        _grass = AddBatch(_near, "Grass", models.Tuft, _grassMaterial);
+        // Grass catches the sun's shadows but casts none (owner's choice): too many for what
+        // they'd show.
+        _grass = AddBatch(_near, "Grass", models.Tuft, _grassMaterial, castsShadow: false);
         _impostors = new PlantImpostors(models);
         AddChild(_impostors);
         _billboardMaterial.SetShaderParameter("rows", _impostors.Rows);
         _billboardMaterial.SetShaderParameter("columns", PlantImpostors.Columns);
-        _billboards = AddBatch(_far, "Billboards", MakeQuad(), _billboardMaterial);
+        _billboards = AddBatch(_far, "Billboards", MakeQuad(), _billboardMaterial,
+            castsShadow: false);
     }
 
     /// <summary>Required by Godot; the plants are made with the other constructor.</summary>
@@ -241,7 +244,10 @@ public partial class StandingPlants : Node3D
         return material;
     }
 
-    private static Batch AddBatch(Node3D parent, string name, Mesh mesh, Material material)
+    // A batch of one model shape; trees, bushes and stones cast the sun's shadows
+    // (StandingSun), but only as far as they reach.
+    private static Batch AddBatch(Node3D parent, string name, Mesh mesh, Material material,
+        bool castsShadow)
     {
         var multi = new MultiMesh
         {
@@ -254,7 +260,9 @@ public partial class StandingPlants : Node3D
             Name = name,
             Multimesh = multi,
             MaterialOverride = material,
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            CastShadow = castsShadow
+                ? GeometryInstance3D.ShadowCastingSetting.On
+                : GeometryInstance3D.ShadowCastingSetting.Off,
             Visible = false,
         };
         parent.AddChild(node);

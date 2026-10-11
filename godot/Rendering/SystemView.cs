@@ -899,6 +899,12 @@ public partial class SystemView : Node3D
             pair => new DisplayBody(pair.Value.Position * scale, pair.Value.Radius * scale));
     }
 
+    /// <summary>
+    /// The render layer of the stars' lights (layer 20): the standing camera leaves it out,
+    /// lit by a <see cref="StandingSun"/> instead. A world tree's glow stays on layer 1.
+    /// </summary>
+    public const uint StarLightLayer = 1u << 19;
+
     // A light like a star's: it reaches everything, with no fall-off. It's kept apart from the
     // scaled body, so the body's size doesn't change its reach.
     private OmniLight3D CreateLight(Body body, Color color)
@@ -909,6 +915,7 @@ public partial class SystemView : Node3D
             OmniRange = (float)LightRange,
             OmniAttenuation = 0.0f,
             LightColor = color,
+            Layers = body.Kind == BodyKind.Star ? StarLightLayer : 1,
         };
         AddChild(light);
         return light;

@@ -114,6 +114,12 @@ public sealed class SurfaceSky
         _standing.FogSkyAffect = 0;
         _standing.FogSunScatter = 0;
         _standing.FogHeightDensity = 0;
+        // A soft glow around what's brighter than white: the sun's disc and its glare, and
+        // sunlit ground at its brightest (owner's choice: always on while standing).
+        _standing.GlowEnabled = true;
+        _standing.GlowHdrThreshold = 1;
+        _standing.GlowIntensity = 0.6f;
+        _standing.GlowBlendMode = Godot.Environment.GlowBlendModeEnum.Screen;
         _material.SetShaderParameter("space_color", original.BackgroundColor);
         scene.Environment = _standing;
     }
@@ -305,11 +311,12 @@ public sealed class SurfaceSky
 
     /// <summary>
     /// Hazes the ground toward the sky's color at the horizon with distance, on a world with
-    /// air: half gone at <paramref name="halfKm"/>. <paramref name="unitsPerKm"/> is the
-    /// scene's scale; the color follows the sun's height and the cloud cover (0 to 1).
+    /// air: half gone at <paramref name="halfKm"/> from an eye at the base, and thinner as the
+    /// eye rises <paramref name="eyeKm"/> above it, as the air does. <paramref name="unitsPerKm"/>
+    /// is the scene's scale; the color follows the sun's height and the cloud cover (0 to 1).
     /// </summary>
-    public void ShowHaze(bool air, double unitsPerKm, double halfKm, double sunAltitudeDegrees,
-        double cloudCover)
+    public void ShowHaze(bool air, double unitsPerKm, double halfKm, double eyeKm,
+        double sunAltitudeDegrees, double cloudCover)
     {
         if (_standing is null)
         {
@@ -317,12 +324,16 @@ public sealed class SurfaceSky
         }
 
         _standing.FogEnabled = air && ShowFog;
-        _standing.FogDensity = (float)(Math.Log(2) / (halfKm * unitsPerKm));
+        _standing.FogDensity = (float)(Math.Log(2) * SunlightThroughAir.AirShare(eyeKm)
+            / (halfKm * unitsPerKm));
         _standing.FogSkyAffect = 0;
+        // Haze toward the sun is lit by it (StandingSun), reddened as it sets.
+        _standing.FogSunScatter = HazeSunScatter;
 
-        // The sky shader's daylight, at the horizon: pale blue, greyer under cloud.
+        // The sky shader's daylight at the horizon (daylight() in surface_sky.gdshader), so
+        // far ground fades into the sky behind it; greyer under cloud.
         float light = (float)Daylight(sunAltitudeDegrees);
-        Color clear = new(0.77f, 0.86f, 0.96f), overcast = new(0.72f, 0.74f, 0.77f);
+        Color clear = new(0.55f, 0.7f, 0.92f), overcast = new(0.72f, 0.74f, 0.77f);
         _standing.FogLightColor = clear.Lerp(overcast, (float)Math.Clamp(cloudCover, 0, 1))
             * light;
     }
@@ -365,12 +376,16 @@ public sealed class SurfaceSky
         _standing.FogDensity =
             (float)(Math.Log(2) / (UnderwaterHalfMeters / 1000 * unitsPerKm));
         _standing.FogSkyAffect = 1;
+        _standing.FogSunScatter = 0;
         float light = (float)(Daylight(sunAltitudeDegrees) * Math.Exp(-depthMeters / 60));
         _standing.FogLightColor = (water ?? StandardWater) * Math.Max(light, 0.02f);
     }
 
     /// <summary>The color of water over land, which no water terrain colors.</summary>
     public static readonly Color StandardWater = new(0.1f, 0.32f, 0.36f);
+
+    // How brightly haze toward the sun is lit by it.
+    private const float HazeSunScatter = 0.35f;
 
     /// <summary>How far one can see under water: half gone at this many meters.</summary>
     public const double UnderwaterHalfMeters = 9;

@@ -422,6 +422,7 @@ public partial class FirstPersonMode : Node
         _flatDeck = null;
         _camera?.QueueFree();
         _camera = null;
+        FreeSun();
         _overhead?.QueueFree();
         _overhead = null;
         _overheadCamera = null;
@@ -487,6 +488,7 @@ public partial class FirstPersonMode : Node
         AddChild(_camera);
         _camera.MakeCurrent();
         BuildOverhead();
+        MakeSun();
         if (TimeBar is not null)
         {
             TimeBar.KeepShown = true;
@@ -703,11 +705,11 @@ public partial class FirstPersonMode : Node
         }
 
         UpdateWeather(id, time, delta);
+        double eyeKm = (_groundMeters + _heightMeters) / 1000;
         SkyView? seen = _flat is FlatSpot spot
-            ? SkyView.FromFlat(Session.World.Bodies, body, spot,
-                (_groundMeters + _heightMeters) / 1000, time)
-            : SkyView.From(Session.World.Bodies, body, SphericalPolygon.FromUnit(_spot),
-                (groundRadius - 1) * body.RadiusKm + _heightMeters / 1000, time);
+            ? SkyView.FromFlat(Session.World.Bodies, body, spot, eyeKm, time)
+            : SkyView.From(Session.World.Bodies, body, SphericalPolygon.FromUnit(_spot), eyeKm,
+                time);
         if (seen is not SkyView sky)
         {
             return;
@@ -715,6 +717,7 @@ public partial class FirstPersonMode : Node
 
         _sky.ShowBodies(Session.World.Bodies, body, sky, frame, _magnify, Nebulas?.SkyTexture);
         _sky.ShowStars(Nebulas?.Stars, Nebulas?.ShowConstellations ?? true);
+        ShowSunlight(body, sky, frame, eyeKm, place.Radius / radiusMeters);
         Basis toBody = BodyBasis(body, time).Transposed();
         double sunAltitude = sky.Star?.AltitudeDegrees ?? -90;
         double unitsPerKm = place.Radius / body.RadiusKm;
@@ -727,7 +730,7 @@ public partial class FirstPersonMode : Node
         {
             _flatDeck.Visible = deck && _flat is { Face: FlatFace.Top };
         }
-        _sky.ShowHaze(body.HasAtmosphere, place.Radius / body.RadiusKm, HazeKm(),
+        _sky.ShowHaze(body.HasAtmosphere, place.Radius / body.RadiusKm, HazeKm(), eyeKm,
             sky.Star?.AltitudeDegrees ?? -90, _weather?.CloudCover ?? 0);
         _sky.ShowNightVision(sunAltitude);
         ShowWater(globe, eyeLift, radiusMeters, place.Radius, sunAltitude, unitsPerKm);
