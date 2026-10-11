@@ -57,9 +57,14 @@ public sealed partial class StandingSun : DirectionalLight3D
         LightEnergy = strength;
 
         double meters = ReachMeters;
-        (ShadowMode mode, int size) = Detail == StandingShadowDetail.High
-            ? (ShadowMode.Parallel2Splits, 4096)
-            : (ShadowMode.Orthogonal, 2048);
+        // Low's smaller map is lighter to draw (owner's choice, 2026-10-11), its shorter reach
+        // keeping it about as sharp.
+        (ShadowMode mode, int size) = Detail switch
+        {
+            StandingShadowDetail.Low => (ShadowMode.Orthogonal, 1024),
+            StandingShadowDetail.High => (ShadowMode.Parallel2Splits, 4096),
+            _ => (ShadowMode.Orthogonal, 2048),
+        };
         ShadowEnabled = Detail != StandingShadowDetail.Off;
         DirectionalShadowMode = mode;
         DirectionalShadowMaxDistance = (float)(meters * unitsPerMeter);

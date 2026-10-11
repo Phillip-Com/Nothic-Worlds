@@ -292,9 +292,9 @@ a little past the eye's horizon (~19 km). The rim and underside of a flat world 
   are on `SystemView.StarLightLayer`, which it leaves out; the minimap keeps them). Its color
   and strength come from Core `Simulation/SunlightThroughAir.cs` (the air crossed by the
   light, after Kasten and Young, reddens blue first; thinner higher up). Shadows reach 50 m
-  (Low), 100 m (Standard), or 300 m in two cascades (High). `SurfaceSky` adds glow (over
-  white only) and haze in the sky shader's horizon color, lit toward the sun and thinned by
-  `SunlightThroughAir.AirShare` at the eye's height. Limits: far mountains cast no shadows;
+  (Low, a 1024 map), 100 m (Standard, 2048), or 300 m in two cascades (High, 4096).
+  `SurfaceSky` adds glow (over white only) and haze in the sky shader's horizon color, lit
+  toward the sun and thinned by `SunlightThroughAir.AirShare` at the eye's height. Limits: far mountains cast no shadows;
   the ambient light doesn't follow the sky.
 - `UI/FirstPersonHud.cs`, `UI/CompassStrip.cs`. Fog (G), Clouds (K), Terrain (R), and Night
   Vision (N)
