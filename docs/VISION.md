@@ -224,7 +224,7 @@ screen filter; stored per world (format v25); Painterly the default for every wo
 Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 (`WorldSession.SetStyle`, one undo step).
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120; ground materials: PR #121; plants: PR #122) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120; ground materials: PR #121; plants: PR #122; drawn in meters: PR #123) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Owner's choices:** walk or fly; the sky at true size and place with a magnify switch; day and
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
@@ -255,8 +255,10 @@ Plants switch (V) while standing.
   over flat worlds and globes.
 - `Controls/FirstPersonMode.cs`: View ▸ Stand Here… (a click picks the spot, through
   `PinPlacer`), its own camera, Esc back. While standing `SystemView` puts the origin at the eye
-  (`StandingOn`, `StandingEye`) and hides other bodies. The rivers' water, beds, and banks
-  around the eye are worked out again on workers as it moves (`BOD-11`).
+  (`StandingOn`, `StandingEye`), hides other bodies, and draws the scene in meters on the body
+  stood on (`StandingScale`, PR #123): the engine's shadows have fixed smallest distances of
+  about a millimeter in scene units, kilometers at the layout's own scale. The rivers' water,
+  beds, and banks around the eye are worked out again on workers as it moves (`BOD-11`).
 - **Ground tiles** (owner's plan, 2026-10-08): Core `Geometry/GroundTile.cs`,
   `GroundTileGrid` (layout, skirt, morph pairs), `GroundTileSelection` (which tiles, finer near
   the eye, a parent standing in until all four quarters are built, but a tile just come into
