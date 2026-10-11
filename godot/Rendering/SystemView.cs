@@ -159,6 +159,14 @@ public partial class SystemView : Node3D
     /// <summary>Each body's display position and size, as last placed.</summary>
     public IReadOnlyDictionary<Guid, DisplayBody> Layout => _layout;
 
+    /// <summary>
+    /// How many times larger than the system's layout the scene is drawn: 1, or while
+    /// <see cref="StandingOn"/> a body, so many that a unit is a meter on it. The engine's
+    /// shadows (and other parts of it) have fixed smallest distances, a millimeter or so in
+    /// units, which at the layout's own scale would be kilometers on the ground.
+    /// </summary>
+    public double StandingScale { get; private set; } = 1;
+
     public override void _Ready()
     {
         if (Session is null || Camera is null || PlanetMaterial is null)
@@ -442,6 +450,8 @@ public partial class SystemView : Node3D
             return;
         }
 
+        ScaleForStanding(world);
+
         if (!_layout.TryGetValue(FollowMerges(_focusId), out DisplayBody focus))
         {
             return;
@@ -493,6 +503,14 @@ public partial class SystemView : Node3D
         }
 
         _guide?.Update(ShowOrbitGuide ? HighlightedOrbit : null, _layout, _scale, ToScene);
+        if (StandingOn is not null)
+        {
+            // The globe's camera is set aside while standing: fitted to the scaled scene, it
+            // would start from there on leaving.
+            Placed?.Invoke();
+            return;
+        }
+
         FitCamera(radius);
         if (_flightProgress < 1.0 && Camera is not null)
         {
@@ -508,9 +526,10 @@ public partial class SystemView : Node3D
     private void PlaceBody(BodyVisual visual, Body body, DisplayBody place, double timeDays)
     {
         visual.Root.Visible = true;
-        if (visual.Light is not null)
+        if (visual.Light is OmniLight3D reach)
         {
-            visual.Light.Visible = true;
+            reach.Visible = true;
+            reach.OmniRange = (float)(LightRange * StandingScale);
         }
 
         visual.Root.Transform = new Transform3D(
@@ -859,6 +878,27 @@ public partial class SystemView : Node3D
     private static BodyKind DrawnAs(BodyKind kind) =>
         kind is BodyKind.Star or BodyKind.WorldTree ? kind : BodyKind.Planet;
 
+    // How far a star's light reaches, in units at the layout's own scale: past everything.
+    private const double LightRange = 1e7;
+
+    // Scales the layout up while standing (see StandingScale), about the system's middle: so
+    // the eye's place, worked out from it, scales with it.
+    private void ScaleForStanding(World world)
+    {
+        StandingScale = 1;
+        if (StandingOn is not Guid standing
+            || world.Bodies.Find(b => b.Id == standing) is not Body ground
+            || !_layout.TryGetValue(standing, out DisplayBody stand) || stand.Radius <= 0)
+        {
+            return;
+        }
+
+        double scale = ground.RadiusKm * 1000 / stand.Radius;
+        StandingScale = scale;
+        _layout = _layout.ToDictionary(pair => pair.Key,
+            pair => new DisplayBody(pair.Value.Position * scale, pair.Value.Radius * scale));
+    }
+
     // A light like a star's: it reaches everything, with no fall-off. It's kept apart from the
     // scaled body, so the body's size doesn't change its reach.
     private OmniLight3D CreateLight(Body body, Color color)
@@ -866,7 +906,7 @@ public partial class SystemView : Node3D
         var light = new OmniLight3D
         {
             Name = $"Light {body.Name}",
-            OmniRange = 1e7f,
+            OmniRange = (float)LightRange,
             OmniAttenuation = 0.0f,
             LightColor = color,
         };
