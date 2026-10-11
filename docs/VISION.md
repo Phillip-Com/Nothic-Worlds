@@ -176,7 +176,7 @@ enough on screen).
 - `Session/AppSettings.cs`: settings that belong to the computer, in `user://settings.cfg`
   (a missing or damaged file gives the defaults).
 - `UI/SettingsWindow.cs`, `Rendering/GraphicsOptions.cs` (the options and presets, Standing
-  ground detail among them, `REN-06`), `Rendering/GraphicsSettings.cs` (puts
+  ground detail, plants, and shadows among them, `REN-06`), `Rendering/GraphicsSettings.cs` (puts
   them into effect).
 - **Level of detail** (`PlanetSurface.ScreenRadius`, always on): under 200 px a sculpted globe
   uses the Low relief mesh; under 60 px every globe uses a coarse sphere; 15% hysteresis.
@@ -224,7 +224,7 @@ screen filter; stored per world (format v25); Painterly the default for every wo
 Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 (`WorldSession.SetStyle`, one undo step).
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120; ground materials: PR #121; plants: PR #122; drawn in meters: PR #123) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120; ground materials: PR #121; plants: PR #122; drawn in meters: PR #123; lighting: PR #124) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Owner's choices:** walk or fly; the sky at true size and place with a magnify switch; day and
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
@@ -248,7 +248,11 @@ choices, 2026-10-09; no markers of one's own, no labels in the 3D view); **plant
 woodland, forest, conifer forest, jungle, scrub, marsh, rocky), drawn with CC0 low-poly models
 (Quaternius) and short grass made in code, far trees as flat pictures; a **Standing plants**
 setting (Off, Low, Standard, High; High is the Advanced tier) in the presets, and a remembered
-Plants switch (V) while standing.
+Plants switch (V) while standing; **lighting** (owner's choices, 2026-10-10): the sun's own
+light from where it is in the sky, dimmer and redder as it sets, casting shadows near the eye
+(trees, bushes, and stones cast them, grass only catches them), a **Standing shadows** setting
+(Off, Low, Standard, High; High is the Advanced tier) in the presets, and always a soft glow
+around the sun and haze that matches the sky, lit toward the sun and thinner higher up.
 **Built:**
 - Core: `BodyOrientation.ToSystem` / `ShapeToSystem`; `Simulation/SkyView.cs` (`From`,
   `FromFlat`, `SolarTimeHours`, `BodyAt`); `Geometry/FlatWalk.cs` and `GlobeWalk` for moving
@@ -283,6 +287,15 @@ a little past the eye's horizon (~19 km). The rim and underside of a flat world 
   sky gradient, bodies as lit discs, clouds from the live weather via
   `PlanetSurface.CopyCloudsTo` and `cloud_layer.gdshaderinc`, haze as fog), `cloud_deck.gdshader`
   (clouds seen from above), `falling_weather.gdshader` (rain and snow over the view).
+- **Lighting** (PR #124): `Rendering/StandingSun.cs`, a directional light from the sun's place
+  in the sky, takes the place of the star's light for the standing camera (the stars' lights
+  are on `SystemView.StarLightLayer`, which it leaves out; the minimap keeps them). Its color
+  and strength come from Core `Simulation/SunlightThroughAir.cs` (the air crossed by the
+  light, after Kasten and Young, reddens blue first; thinner higher up). Shadows reach 50 m
+  (Low), 100 m (Standard), or 300 m in two cascades (High). `SurfaceSky` adds glow (over
+  white only) and haze in the sky shader's horizon color, lit toward the sun and thinned by
+  `SunlightThroughAir.AirShare` at the eye's height. Limits: far mountains cast no shadows;
+  the ambient light doesn't follow the sky.
 - `UI/FirstPersonHud.cs`, `UI/CompassStrip.cs`. Fog (G), Clouds (K), Terrain (R), and Night
   Vision (N)
   switches under the Calendar button: `SurfaceSky.ShowFog`, `SurfaceSky.ShowNightVision` (more
@@ -351,7 +364,7 @@ a little past the eye's horizon (~19 km). The rim and underside of a flat world 
   bush the eye stands in left out). Low, Standard, and High set the reaches and how thick.
   On flat worlds, on the top face. About 2 ms more GPU in a meadow and 4–5 ms in a thick
   forest at Standard on the baseline laptop (measured in PR #122). Limits: plants don't follow
-  the seasons; they cast no shadows yet; walking passes through them; ground that isn't
+  the seasons; grass casts no shadows; walking passes through them; ground that isn't
   painted grows nothing.
 **Reuse:** `SkyView` for anything about what's in a world's sky; `GroundTiles` for anything
 drawn at the ground's height around the eye (give it a recipe); `FirstPersonGround.Build` for a
@@ -1105,6 +1118,9 @@ answered, move the answer into the relevant entry above and remove the question 
 
 New raw ideas go here first, then get sorted into a feature area once reviewed.
 
+- **Far mountain shadows** (`REN-06`, 2026-10-10): mountains casting shadows across valleys
+  kilometers away while standing, past the sun's shadows near the eye (owner's choice to
+  leave for later).
 - **Seasonal snow** (`REN-06`, 2026-10-09): snow on the ground from the weather's snowfall and
   temperature through the year, instead of the fixed snow line (needs snow to build up and
   melt in the simulation).
