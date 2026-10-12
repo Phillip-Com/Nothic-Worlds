@@ -109,6 +109,7 @@ below and in docs/DECISIONS.md.
 | 41 | Map and time while standing | `REN-08` | #97 |
 | 42 | Rivers and lakes | `BOD-11` | #98–#100 |
 | — | Opening and editing without freezing | `REN-03`, `BOD-11` | #101–#103 |
+| 43 | Roads | `BOD-13` | #125– |
 
 ---
 
@@ -844,6 +845,39 @@ builds it (`GroundTileRecipe.MorphHeight`). The session keeps each body's (`Roug
 **Limits:** from orbit nothing changes (the features are smaller than the globe draws). At
 Low ground detail they thin out far off (from about 5 km, none past 15 km) so the tiles meet
 the globe's own ground; at Standard and High they reach the farthest peak (see `REN-06`). A type with no variation can't be rough.
+
+**BOD-13 — Roads** · In progress (M43: on the map, PR #125) · Base
+**Intent:** A road tool that works like rivers, starting with fantasy roads: a **stone highway**,
+one large paved road laid by a work crew along the most efficient line, tunneling through hills
+and crossing rivers on solid stone bridges; and **dirt paths**, many paths that split and
+intertwine, all leading to the same place, wearing the ground to well-traveled dirt and going
+around hard obstacles (round a hill thick with plants rather than over it), meeting like a
+bottleneck at a wooden bridge to cross a river before spreading out again. Roads that overlap
+mix and make better ways for people to take (owner's request, 2026-10-11).
+**Owner's choices** (2026-10-11): roads are lines saved with the world, **drawn** (keep their
+clicked line) or **routed** (find the easiest way for their style through clicked places, again
+when the ground or water changes); a Roads mode in the Terrain panel beside Water; also **cart
+tracks** (two ruts, following the land) and **old roads** (ruined, overgrown highways); and,
+on their own, **fords** where paths cross shallow streams, **boardwalks** over marsh, and
+**switchbacks** up steep slopes. Built in steps: the map (data and routing), highways up close
+(cuttings, banks, stone bridges), dirt paths up close (strands, worn ground, wooden bridges,
+fords, boardwalks, switchbacks), **tunnels** last, then cart tracks' and old roads' looks.
+**Built:**
+- Data (format v36): `Model/Road.cs` (style, kind, points, width), `RoadStyle`, `RoadKind`,
+  `RoadRules`. Only these are saved; the ways are worked out each time (docs/world-format.md).
+- Core `Simulation/`: `RoadCosts` (each style's going: slope, plants by the terrain type's
+  `Plants`, bridges into rivers, a share off where earlier roads run; no way through the sea or
+  lakes), `RoadCourse.Route` (A* over `WaterCells`, borrowing `WaterScratch`; a stretch too long
+  for the cheapest search is searched again steered harder), `BodyRoads.For` (all of a body's
+  roads in order, each favoring those before), `RoadCourseShown`. Reuses `RiverLine.Densified`
+  and `Smoothed`.
+- `Session/WorldSession.Roads.cs` (edits with undo; ways worked out in the background after the
+  water, from `ShowWater`); `Rendering/RoadRenderer.cs` (lines on the globe in each style's
+  color, dirt paths dashed); `UI/RoadSection.cs` (the Roads mode); `RegionEditor`'s line
+  drawing snaps a click near another road onto it, so roads join.
+**Limits:** for now roads show only on the map, not up close. Ways are a height cell apart
+(about 10 km on an Earth-sized world), so they go round hills and woods that size; smaller ones
+wait for the up-close steps. A drawn road's points can't be moved yet (delete and redraw).
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
