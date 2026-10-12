@@ -44,6 +44,7 @@
 [ext_resource type="Script" uid="uid://dfnfodhejd5f0" path="res://UI/SkyPage.cs" id="42_sky_page"]
 [ext_resource type="Script" path="res://UI/CalendarPanel.cs" id="43_calendar_panel"]
 [ext_resource type="Script" path="res://Rendering/RiverRenderer.cs" id="44_river_renderer"]
+[ext_resource type="Script" path="res://Rendering/RoadRenderer.cs" id="45_road_renderer"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -178,7 +179,7 @@ Camera = NodePath("../PlanetCamera")
 Toolbar = NodePath("../MapToolbar")
 SystemPanel = NodePath("../SystemPanel")
 
-[node name="TerrainPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "Brush", "Shapes", "Weather", "Placer", "LineDrawer", "Rivers")]
+[node name="TerrainPanel" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar", "Brush", "Shapes", "Weather", "Placer", "LineDrawer", "Rivers", "Roads")]
 script = ExtResource("31_terrain_panel")
 Weather = NodePath("../WeatherDisplay")
 Session = NodePath("../WorldSession")
@@ -188,6 +189,7 @@ Shapes = NodePath("../ShapeHandles")
 Placer = NodePath("../PinPlacer")
 LineDrawer = NodePath("../RegionEditor")
 Rivers = NodePath("../RiverRenderer")
+Roads = NodePath("../RoadRenderer")
 
 [node name="CutEditor" type="CanvasLayer" parent="." node_paths=PackedStringArray("Session", "Toolbar")]
 script = ExtResource("13_cut")
@@ -255,6 +257,11 @@ System = NodePath("../SystemView")
 
 [node name="RiverRenderer" type="Node" parent="." node_paths=PackedStringArray("Session", "System")]
 script = ExtResource("44_river_renderer")
+Session = NodePath("../WorldSession")
+System = NodePath("../SystemView")
+
+[node name="RoadRenderer" type="Node" parent="." node_paths=PackedStringArray("Session", "System")]
+script = ExtResource("45_road_renderer")
 Session = NodePath("../WorldSession")
 System = NodePath("../SystemView")
 
