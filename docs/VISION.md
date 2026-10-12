@@ -848,7 +848,7 @@ Low ground detail they thin out far off (from about 5 km, none past 15 km) so th
 the globe's own ground; at Standard and High they reach the farthest peak (see `REN-06`). A type with no variation can't be rough.
 
 **BOD-13 — Roads** · In progress (M43: on the map, PR #125; highways up close, PR #126; dirt
-paths up close, PR #127) · Base
+paths up close, PR #127; tunnels, PR #128) · Base
 **Intent:** A road tool that works like rivers, starting with fantasy roads: a **stone highway**,
 one large paved road laid by a work crew along the most efficient line, tunneling through hills
 and crossing rivers on solid stone bridges; and **dirt paths**, many paths that split and
@@ -865,13 +865,18 @@ on their own, **fords** where paths cross shallow streams, **boardwalks** over m
 (cuttings, banks, stone bridges), dirt paths up close (strands, worn ground, wooden bridges,
 fords, boardwalks, switchbacks), **tunnels** last, then cart tracks' and old roads' looks.
 Highways up close (2026-10-12): a grade of at most **8%**; cuttings and banks at most **15 m**
-deep (past that the road follows the ground, until tunnels); paved with a CC0 photo of Roman
+deep (banks: past that the road follows the ground); paved with a CC0 photo of Roman
 paving, toned grey; bridges of **round stone arches**, each at most about 20 m across, with piers in the
 water and low walls along the sides.
 Dirt paths up close (2026-10-12): built in one step; worn ground is the **mud photo made drier,
 finer, and lighter** so it doesn't blend into mud terrain; **one CC0 photo of weathered planks**
 for wooden bridges and boardwalks; **fords** where the water is at most **12 m** wide (wider:
 a wooden bridge); **switchbacks** above a **15%** grade, reaching up to **40 m** either side.
+Tunnels (2026-10-12): a highway tunnels where a cutting would be deeper than **15 m** for at
+least **40 m** (a shorter stretch is cut deeper; tunnels closer than 40 m are one where the
+hill covers the road between); each portal a **stone front with a round arch**, of the
+bridges' stone; inside, **torches that glow** but light nothing, and the farther in, the
+darker; tunnels **dashed on the minimap** (the globe's lines stay as they are).
 **Built:**
 - Data (format v36): `Model/Road.cs` (style, kind, points, width), `RoadStyle`, `RoadKind`,
   `RoadRules`. Only these are saved; the ways are worked out each time (docs/world-format.md).
@@ -921,6 +926,22 @@ a wooden bridge); **switchbacks** above a **15%** grade, reaching up to **40 m**
   half size, lighter, drier, and matte, its edges frayed finely, the ground under it showing
   through more at its edges; wood (w 10) is a tenth ground material (`PlanksLayer`,
   `planks_*`) read along its grain from UV.
+- Tunnels: Core `RoadProfile` keeps a highway on its grade where the ground is over 15 m
+  above it for 40 m or more (`RoadTunnel`, `TunnelsUnder`, `InTunnel`); `RoadCarving` leaves
+  the ground alone over a tunnel but for `PortalCutMeters` (4 m) in from each portal, where
+  the cutting runs on behind the front, so a hill's face rises behind it, and sinks the
+  coarser ground at each portal out of sight under the road (`StoneTunnel.Hides`: 20 m in
+  front, under the strips, to 5 m behind, under the block), so the arch opens onto the vault
+  with no shader work. Rough terrain fades over tunnels as along roads (the hill covers them
+  as their profile was laid for), but plants grow there (`BeyondSidesMeters(..., tunnels)`).
+  `StoneTunnel` builds the vault (a paved floor, walls 4 m high, a round arch; pieces 10 m
+  long overlapping at bends), its torches every 25 m on alternate sides, and each portal's
+  front and block, in bridges' frames (`BridgeShown.Between`); `RoadStrips.Near` adds them
+  to the bridges' mesh and gives the portals near the eye (`TunnelPortal`). How dark each
+  point is (`BridgePoint.Dark`) goes in the mesh's color: the shader takes the sky's and
+  sun's light off by it (AO), and flames (w 12) glow. Walkers who come in by a portal walk
+  on the road (`TunnelFloorMeters`, `FirstPersonMode.Walked`), so its walls stop them like a
+  cliff; on the hill they stay on the hill. `PathStretches` dashes tunnels on the minimap.
 **Limits:** cart tracks and old roads show only on the map and the minimap so far. A dirt
 path's strands lie on the ground without shaping it, and only its crossings come with fords,
 bridges, or boardwalks; a dirt path crossing a highway or another path makes no junction. Its
@@ -930,7 +951,11 @@ Ways are a height cell apart (about 10 km on an Earth-sized world), so they go r
 woods that size; smaller ones wait for the up-close steps. The height grid is smooth at that
 scale, so a highway on most ground needs only shallow cuttings. Where roads cross or meet, the
 nearer one shapes the ground (no junction is laid). A bridge runs straight between its ends. A
-drawn road's points can't be moved yet (delete and redraw).
+drawn road's points can't be moved yet (delete and redraw). Tunnels are laid on the smooth
+ground; rough terrain faded over them may still dip near a tunnel's vault on very rough
+ground. Inside a tunnel the rangefinder reads the hill over it (0 m away), and the torches
+light nothing. A portal's block is flat-topped; far off, where the coarser ground's squares
+are wider than its block, a sliver of the hill's face can show over its front.
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
