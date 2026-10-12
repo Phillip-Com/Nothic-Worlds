@@ -10,8 +10,9 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The Terrain panel (VISION.md BOD-05; owner's choice: its own panel, one at a time with the
-/// others on the right): Paint, Erase, Sculpt, Shapes (BOD-04; owner's choice: here), or Water
-/// (BOD-11: rivers and lakes, <see cref="WaterSection"/>), the brush size, the sculpting brushes
+/// others on the right): Paint, Erase, Sculpt, Shapes (BOD-04; owner's choice: here), Water
+/// (BOD-11: rivers and lakes, <see cref="WaterSection"/>), or Roads (BOD-13,
+/// <see cref="RoadSection"/>), the brush size, the sculpting brushes
 /// and their strength, the shapes (<see cref="ShapesSection"/>), and the world's terrain types,
 /// which can be added, renamed, recolored, and deleted. While
 /// it's open, dragging on the selected planet or moon paints with the selected type or sculpts
@@ -54,6 +55,8 @@ public partial class TerrainPanel : CanvasLayer
     private Button _shapesButton = null!;
     private Button _waterButton = null!;
     private WaterSection? _water;
+    private Button _roadsButton = null!;
+    private RoadSection? _roads;
     private Control _brushSize = null!;
     private ShapesSection? _shapes;
     private Control _sculptTools = null!;
@@ -114,6 +117,9 @@ public partial class TerrainPanel : CanvasLayer
     /// <summary>Draws the rivers, the one selected in Water mode lighter.</summary>
     [Export] public RiverRenderer? Rivers { get; set; }
 
+    /// <summary>Draws the roads, the one selected in Roads mode lighter.</summary>
+    [Export] public RoadRenderer? Roads { get; set; }
+
     /// <summary>
     /// The live weather, whose clouds hide while the panel is open (owner's choice), so the
     /// ground shows.
@@ -130,6 +136,7 @@ public partial class TerrainPanel : CanvasLayer
             Weather?.SetSurfaceEditing("Terrain", value);
             UpdateVisibility();
             UpdateWater();
+            UpdateRoads();
             ShowHint();
         }
     }
@@ -221,8 +228,14 @@ public partial class TerrainPanel : CanvasLayer
             "Add or cut spheres, boxes, cylinders, and cones: holes, hollows, craters, structures");
         _waterButton = CreateButton("Water", Refresh,
             "Add lakes and rivers: drawn, or running downhill to the sea");
-        foreach (Button button in
-            new[] { _paintButton, _eraseButton, _sculptButton, _shapesButton, _waterButton })
+        _roadsButton = CreateButton("Roads", Refresh,
+            "Add roads: stone highways, dirt paths, cart tracks, and old roads, drawn or " +
+            "finding their own way");
+        foreach (Button button in new[]
+            {
+                _paintButton, _eraseButton, _sculptButton, _shapesButton, _waterButton,
+                _roadsButton,
+            })
         {
             button.ToggleMode = true;
             button.ButtonGroup = group;
@@ -279,6 +292,15 @@ public partial class TerrainPanel : CanvasLayer
             };
             _water.HintChanged += ShowHint;
             tools.AddChild(_water);
+            _roads = new RoadSection
+            {
+                Session = Session,
+                LineDrawer = LineDrawer,
+                Roads = Roads,
+                Toolbar = Toolbar,
+            };
+            _roads.HintChanged += ShowHint;
+            tools.AddChild(_roads);
         }
 
         return tools;
@@ -679,7 +701,8 @@ public partial class TerrainPanel : CanvasLayer
         _note.Visible = _note.Text != "";
         _tools.Visible = canPaint;
         _sculptTools.Visible = _sculptButton.ButtonPressed;
-        _brushSize.Visible = !_shapesButton.ButtonPressed && !_waterButton.ButtonPressed;
+        _brushSize.Visible = !_shapesButton.ButtonPressed && !_waterButton.ButtonPressed
+            && !_roadsButton.ButtonPressed;
         ShowToolSwitch();
         if (_shapes is not null)
         {
@@ -687,6 +710,7 @@ public partial class TerrainPanel : CanvasLayer
         }
 
         UpdateWater();
+        UpdateRoads();
         _shapesGround.SetPressedNoSignal(Session.TerrainShapesGround);
         _shapingNote.Visible = !Session.TerrainShapesGround;
         ShowList();
@@ -713,6 +737,11 @@ public partial class TerrainPanel : CanvasLayer
         if (_waterButton.ButtonPressed && _water is not null)
         {
             return _water.Hint();
+        }
+
+        if (_roadsButton.ButtonPressed && _roads is not null)
+        {
+            return _roads.Hint();
         }
 
         if (!_toolSwitch.ButtonPressed)
@@ -922,7 +951,7 @@ public partial class TerrainPanel : CanvasLayer
         Brush.RadiusDegrees = _sizeSlider.Value;
         bool shaping = _shapesButton.ButtonPressed;
         Brush.IsActive = Visible && _toolSwitch.ButtonPressed && !shaping
-            && !_waterButton.ButtonPressed
+            && !_waterButton.ButtonPressed && !_roadsButton.ButtonPressed
             && Session is { SelectedBodyHasSurface: true }
             && (sculpting || _eraseButton.ButtonPressed || _selectedCode is not null);
         if (Shapes is not null)
@@ -961,6 +990,29 @@ public partial class TerrainPanel : CanvasLayer
         _water.Visible = shown;
     }
 
+    // Shows the Roads section in Roads mode, with its road lit; out of it, stops any drawing it
+    // started, and no road is lit.
+    private void UpdateRoads()
+    {
+        if (_roads is null)
+        {
+            return;
+        }
+
+        bool shown = _open && _roadsButton.ButtonPressed
+            && Session is { SelectedBodyHasSurface: true };
+        if (_roads.Visible && !shown)
+        {
+            _roads.StopPlacing();
+            if (Roads is not null)
+            {
+                Roads.HighlightedId = null;
+            }
+        }
+
+        _roads.Visible = shown;
+    }
+
     // A small square of a color, for the type list.
     private ImageTexture Swatch(RgbColor color)
     {
@@ -975,11 +1027,12 @@ public partial class TerrainPanel : CanvasLayer
         return swatch;
     }
 
-    // Water mode has its own Place and Draw buttons, so the switch is off there.
+    // Water and Roads modes have their own Place and Draw buttons, so the switch is off there.
     private void ShowToolSwitch()
     {
         _toolSwitch.SetUnavailable(_waterButton.ButtonPressed
             ? "Water has its own buttons for placing lakes and drawing rivers"
+            : _roadsButton.ButtonPressed ? "Roads has its own buttons for adding roads"
             : null);
     }
 

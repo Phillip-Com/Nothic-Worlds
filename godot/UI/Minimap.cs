@@ -4,9 +4,10 @@ namespace NothicWorlds.UI;
 
 /// <summary>
 /// The round minimap in the first-person view (VISION.md REN-08; owner's choice): what a camera
-/// above the spot sees, north up, with an arrow for where the eye stands and which way it
-/// faces. The wheel over it or its + and − buttons zoom; a click on it asks to travel there.
-/// It only shows what it's given; <see cref="Controls.FirstPersonMode"/> places the camera.
+/// above the spot sees, north up, with the roads over it (BOD-13) and an arrow for where the
+/// eye stands and which way it faces. The wheel over it or its + and − buttons zoom; a click
+/// on it asks to travel there. It only shows what it's given;
+/// <see cref="Controls.FirstPersonMode"/> places the camera.
 /// </summary>
 public partial class Minimap : Control
 {
@@ -24,12 +25,16 @@ public partial class Minimap : Control
         }
         """;
 
+    // How long each dash of a dashed line is, and the gap after it, in pixels.
+    private const float DashPixels = 5;
+
     private static readonly Color _ring = new(0.75f, 0.78f, 0.86f, 0.9f);
     private static readonly Color _arrow = new(1.0f, 0.82f, 0.30f);
     private readonly TextureRect _picture;
     private readonly Control _marks;  // Over the picture: the ring, north, and the arrow
     private readonly Label _scale;
     private float _heading;
+    private IReadOnlyList<MinimapLine> _lines = [];
 
     /// <summary>Makes the minimap; give it a picture with <see cref="SetPicture"/>.</summary>
     public Minimap()
@@ -100,10 +105,22 @@ public partial class Minimap : Control
         _marks.QueueRedraw();
     }
 
+    /// <summary>The lines drawn over the map (the roads), replacing those before.</summary>
+    public void SetLines(IReadOnlyList<MinimapLine> lines)
+    {
+        _lines = lines;
+        _marks.QueueRedraw();
+    }
+
     private void DrawMarks()
     {
         var middle = new Vector2(Diameter, Diameter) / 2;
         float radius = Diameter / 2f;
+        foreach (MinimapLine line in _lines)
+        {
+            DrawLine(line, middle, radius);
+        }
+
         _marks.DrawArc(middle, radius - 1, 0, Mathf.Tau, 64, _ring, 2, antialiased: true);
         _marks.DrawString(ThemeDB.FallbackFont, middle + new Vector2(-5, -radius + 18), "N",
             HorizontalAlignment.Left, -1, 15, _ring);
@@ -115,6 +132,77 @@ public partial class Minimap : Control
             Rotated(new(-7, 8))];
         _marks.DrawColoredPolygon(arrow, _arrow);
         _marks.DrawPolyline([.. arrow, arrow[0]], Colors.Black, 1.5f, antialiased: true);
+    }
+
+    // A line cut at the map's round edge, on a dark edge of its own so it reads over any
+    // ground. Its map points (north up) become the control's (y down). Dashes run on along the
+    // whole line, not each piece of it (a road's pieces can be shorter than a dash).
+    private void DrawLine(MinimapLine line, Vector2 middle, float radius)
+    {
+        float along = 0;  // How far along the line, in pixels, for its dashes
+        for (int i = 1; i < line.Points.Length; i++)
+        {
+            if (InsideCircle(line.Points[i - 1], line.Points[i]) is not var (from, to))
+            {
+                continue;
+            }
+
+            Vector2 a = middle + new Vector2(from.X, -from.Y) * radius;
+            Vector2 b = middle + new Vector2(to.X, -to.Y) * radius;
+            float length = a.DistanceTo(b);
+            if (!line.Dashed || length < 1e-4f)
+            {
+                DrawStroke(a, b, line);
+                along += length;
+                continue;
+            }
+
+            Vector2 step = (b - a) / length;
+            for (float start = 0; start < length;)
+            {
+                float phase = (along + start) % (2 * DashPixels);
+                bool on = phase < DashPixels;
+                float end = Math.Min(length, start + (on ? DashPixels : 2 * DashPixels) - phase);
+                if (on)
+                {
+                    DrawStroke(a + step * start, a + step * end, line);
+                }
+
+                start = end;
+            }
+
+            along += length;
+        }
+    }
+
+    private void DrawStroke(Vector2 from, Vector2 to, MinimapLine line)
+    {
+        _marks.DrawLine(from, to, Colors.Black with { A = 0.6f }, line.Width + 2,
+            antialiased: true);
+        _marks.DrawLine(from, to, line.Color, line.Width, antialiased: true);
+    }
+
+    // The part of the segment from a to b inside the unit circle, or null if none is.
+    private static (Vector2 From, Vector2 To)? InsideCircle(Vector2 a, Vector2 b)
+    {
+        // Where |a + t (b − a)| = 1: a quadratic in t; the inside is between its roots.
+        Vector2 d = b - a;
+        float qa = d.Dot(d), qb = 2 * a.Dot(d), qc = a.Dot(a) - 1;
+        if (qa < 1e-12f)
+        {
+            return qc <= 0 ? (a, b) : null;
+        }
+
+        float disc = qb * qb - 4 * qa * qc;
+        if (disc <= 0)
+        {
+            return null;
+        }
+
+        float root = Mathf.Sqrt(disc);
+        float enter = Math.Max(0, (-qb - root) / (2 * qa));
+        float leave = Math.Min(1, (-qb + root) / (2 * qa));
+        return enter < leave ? (a + d * enter, a + d * leave) : null;
     }
 
     public override void _GuiInput(InputEvent @event)

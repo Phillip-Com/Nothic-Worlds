@@ -235,10 +235,18 @@ public partial class WorldSession
         MarkChanged(systemChanged: false);
     }
 
+    // Brings a body's water up to date with its ground, rivers, and lakes, and then its roads
+    // (which go around and across the water; see ShowRoads).
+    private void ShowWater(Body body)
+    {
+        ShowWaterOnly(body);
+        ShowRoads(body);
+    }
+
     // Brings a body's water up to date with its ground, rivers, and lakes: shows it straight
     // away if it's known, or starts working it out. While the body's ground is still being
     // prepared, it waits: preparing shows the terrain again when it's done, and so the water.
-    private void ShowWater(Body body)
+    private void ShowWaterOnly(Body body)
     {
         if (!body.HasSurface)
         {

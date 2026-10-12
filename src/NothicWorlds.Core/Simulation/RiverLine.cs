@@ -33,7 +33,11 @@ public static class RiverLine
         return path;
     }
 
-    private static List<Vector3D> Densified(IReadOnlyList<Vector3D> points)
+    /// <summary>
+    /// A line through <paramref name="points"/> with its long stretches cut into steps of at
+    /// most <see cref="StepDegrees"/>, so it follows the globe (roads use it too).
+    /// </summary>
+    public static List<Vector3D> Densified(IReadOnlyList<Vector3D> points)
     {
         var path = new List<Vector3D> { points[0] };
         for (int i = 1; i < points.Count; i++)
@@ -53,9 +57,11 @@ public static class RiverLine
         return path;
     }
 
-    // Chaikin's corner cutting: each corner is replaced by two points a quarter of the way
-    // along its sides. The source and the mouth stay where they are.
-    private static List<Vector3D> Smoothed(List<Vector3D> path)
+    /// <summary>
+    /// The path with its corners cut (Chaikin's corner cutting: each corner is replaced by two
+    /// points a quarter of the way along its sides). Its ends stay where they are.
+    /// </summary>
+    public static List<Vector3D> Smoothed(List<Vector3D> path)
     {
         if (path.Count < 3)
         {

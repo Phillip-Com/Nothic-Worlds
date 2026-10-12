@@ -42,6 +42,7 @@ public partial class RegionEditor : CanvasLayer
     // While drawing a line, what's done with it: given its points, it returns what's wrong
     // (drawing goes on), or null.
     private Func<IReadOnlyList<GeoCoordinate>, string?>? _lineFinished;
+    private Func<IEnumerable<GeoCoordinate>>? _snapTargets;
     private Guid? _editingRegionId;
     private int? _dragging;
 
@@ -131,10 +132,13 @@ public partial class RegionEditor : CanvasLayer
     /// <summary>
     /// Starts drawing an open line on the selected body (a planet or moon), showing
     /// <paramref name="prompt"/>. Enter finishes it with at least two points, which go to
-    /// <paramref name="finished"/>: it returns what's wrong with them, or null.
+    /// <paramref name="finished"/>: it returns what's wrong with them, or null. A click near
+    /// one of <paramref name="snapTargets"/> on screen (spots along other lines) puts the point
+    /// on it, so lines can join.
     /// </summary>
     public void StartDrawingLine(string prompt,
-        Func<IReadOnlyList<GeoCoordinate>, string?> finished)
+        Func<IReadOnlyList<GeoCoordinate>, string?> finished,
+        Func<IEnumerable<GeoCoordinate>>? snapTargets = null)
     {
         Stop();
         if (Session?.SelectedBody is not { HasSurface: true } body)
@@ -144,6 +148,7 @@ public partial class RegionEditor : CanvasLayer
 
         _drawingBodyId = body.Id;
         _lineFinished = finished;
+        _snapTargets = snapTargets;
         Toolbar?.ShowInfo(prompt, autoHide: false);
         _overlay.QueueRedraw();
     }
@@ -172,6 +177,7 @@ public partial class RegionEditor : CanvasLayer
         _drawing.Clear();
         _drawingBodyId = null;
         _lineFinished = null;
+        _snapTargets = null;
         _editingRegionId = null;
         _overlay?.QueueRedraw();
         if (wasActive)
@@ -242,9 +248,25 @@ public partial class RegionEditor : CanvasLayer
             return false;  // Missed the globe: let the camera have it.
         }
 
-        _drawing.Add(spot);
+        _drawing.Add(SnappedTo(spot, mouse));
         _overlay.QueueRedraw();
         return true;
+    }
+
+    // The snap target nearest the mouse on screen, within grabbing distance, or the spot.
+    private GeoCoordinate SnappedTo(GeoCoordinate spot, Vector2 mouse)
+    {
+        GeoCoordinate best = spot;
+        float bestPixels = GrabPixels;
+        foreach (GeoCoordinate target in _snapTargets?.Invoke() ?? [])
+        {
+            if (ScreenOf(target) is Vector2 at && at.DistanceTo(mouse) <= bestPixels)
+            {
+                (best, bestPixels) = (target, at.DistanceTo(mouse));
+            }
+        }
+
+        return best;
     }
 
     private void Finish()
@@ -293,6 +315,7 @@ public partial class RegionEditor : CanvasLayer
         _drawing.Clear();
         _drawingBodyId = null;
         _lineFinished = null;
+        _snapTargets = null;
         Stopped?.Invoke();
         _overlay.QueueRedraw();
     }

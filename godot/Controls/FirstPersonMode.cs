@@ -1951,6 +1951,7 @@ public partial class FirstPersonMode : Node
             up * (float)height);
         _hud!.Minimap.Show(double.RadiansToDegrees(_heading),
             $"{UnitText.Format(Quantity.Distance, spanMeters / 1000)} across");
+        ShowRoadsOnMap(body, spanMeters);
     }
 
     // Travels to a spot clicked on the minimap (VISION.md REN-08), from -1 to 1 across it (x

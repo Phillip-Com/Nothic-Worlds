@@ -16,7 +16,7 @@ namespace NothicWorlds.Core.Storage;
 internal static partial class WorldFormat
 {
     /// <summary>The format version this code writes, and the newest it can read.</summary>
-    public const int CurrentVersion = 35;
+    public const int CurrentVersion = 36;
 
     /// <summary>Name of the world data entry inside the file.</summary>
     public const string DocumentEntryName = "world.json";
@@ -116,6 +116,20 @@ internal static partial class WorldFormat
     {
         [RiverKind.Drawn] = "drawn",
         [RiverKind.Natural] = "natural",
+    };
+
+    private static readonly Dictionary<RoadStyle, string> _roadStyleNames = new()
+    {
+        [RoadStyle.StoneHighway] = "stone-highway",
+        [RoadStyle.DirtPaths] = "dirt-paths",
+        [RoadStyle.CartTrack] = "cart-track",
+        [RoadStyle.OldRoad] = "old-road",
+    };
+
+    private static readonly Dictionary<RoadKind, string> _roadKindNames = new()
+    {
+        [RoadKind.Drawn] = "drawn",
+        [RoadKind.Routed] = "routed",
     };
 
     private static readonly Dictionary<VisualStyle, string> _styleNames = new()
@@ -308,6 +322,9 @@ internal static partial class WorldFormat
         // from each type's climate and ground (TerrainType.GuessPlants); one named Jungle, as
         // the default is, gets jungle.
         AddTerrainPlants,
+
+        // 35 → 36: the world gained optional "roads" (BOD-13, roads). Older worlds have none.
+        document => document,
     ];
 
     // The variations and feature sizes the version 30 upgrade gives types by name. Deliberately
@@ -599,6 +616,16 @@ internal static partial class WorldFormat
 
     public static RiverKind ParseRiverKind(string? name) =>
         Parse(_riverKindNames, name, "river kind");
+
+    public static string RoadStyleName(RoadStyle style) => _roadStyleNames[style];
+
+    public static RoadStyle ParseRoadStyle(string? name) =>
+        Parse(_roadStyleNames, name, "road style");
+
+    public static string RoadKindName(RoadKind kind) => _roadKindNames[kind];
+
+    public static RoadKind ParseRoadKind(string? name) =>
+        Parse(_roadKindNames, name, "road kind");
 
     public static VisualStyle ParseStyle(string? name) => Parse(_styleNames, name, "style");
 
