@@ -98,6 +98,7 @@ public partial class RiverBankStrip : MeshInstance3D
         var normals = new List<Vector3>();
         var customs = new List<float>();
         var grain = new List<Vector2>();
+        var light = new List<Color>();
         var indices = new List<int>();
         foreach (BridgeShown bridge in bridges)
         {
@@ -135,9 +136,12 @@ public partial class RiverBankStrip : MeshInstance3D
                     {
                         BridgeMaterial.Paving => PavedW + 1,
                         BridgeMaterial.Wood => WoodW,
+                        BridgeMaterial.Flame => FlameW,
                         _ => StoneW + 1,
                     }]);
                 grain.Add(new Vector2((float)point.U, (float)point.V));
+                float sky = 1 - (float)point.Dark;
+                light.Add(new Color(sky, sky, sky));
             }
 
             // Each triangle wound clockwise seen from the way it faces, as Godot draws front
@@ -159,7 +163,8 @@ public partial class RiverBankStrip : MeshInstance3D
         return indices.Count == 0
             ? null
             : new Surface(middle, [.. positions], [.. normals], [.. customs], [.. indices],
-                [.. grain]);
+                [.. grain])
+            { Light = [.. light] };
     }
 
     /// <summary>
@@ -185,6 +190,11 @@ public partial class RiverBankStrip : MeshInstance3D
             arrays[(int)Mesh.ArrayType.TexUV] = grain;
         }
 
+        if (surface.Light is { } light)
+        {
+            arrays[(int)Mesh.ArrayType.Color] = light;
+        }
+
         arrays[(int)Mesh.ArrayType.Index] = surface.Indices;
         var mesh = new ArrayMesh();
         mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arrays,
@@ -194,9 +204,10 @@ public partial class RiverBankStrip : MeshInstance3D
     }
 
     // What a paved point's w, and a bridge's bare stone's, start from in place of 1; a worn
-    // point's; and wood's (planet_surface.gdshaderinc reads w past 2.5 as paving, past 4.5 as
-    // stone, past 6.5 as worn ground, and past 8.5 as wood).
-    private const float PavedW = 3, StoneW = 5, WornW = 7, WoodW = 10;
+    // point's; wood's; and a torch's flame's (planet_surface.gdshaderinc reads w past 2.5 as
+    // paving, past 4.5 as stone, past 6.5 as worn ground, past 8.5 as wood, and past 11.5 as a
+    // flame).
+    private const float PavedW = 3, StoneW = 5, WornW = 7, WoodW = 10, FlameW = 12;
 
     private static Vector3D Unit(Vector3D v) => v * (1 / Math.Max(v.Length, 1e-30));
 
@@ -228,5 +239,12 @@ public partial class RiverBankStrip : MeshInstance3D
     /// point's place in the wood's grain on a bridge's mesh (else null).
     /// </summary>
     internal sealed record Surface(Vector3D Middle, Vector3[] Positions, Vector3[] Normals,
-        float[] Customs, int[] Indices, Vector2[]? Grain);
+        float[] Customs, int[] Indices, Vector2[]? Grain)
+    {
+        /// <summary>
+        /// How much of the sky's light reaches each point (in its color; deep in a tunnel
+        /// little does), on a bridge's mesh; else null, all of it.
+        /// </summary>
+        public Color[]? Light { get; init; }
+    }
 }

@@ -3,14 +3,20 @@ using NothicWorlds.Core.Geometry;
 namespace NothicWorlds.Core.Simulation;
 
 /// <summary>
-/// Gathers a bridge's points and triangles (<see cref="StoneBridge"/>,
-/// <see cref="WoodenBridge"/>), each face with its own points so its edges stay sharp.
+/// Gathers a bridge's or tunnel's points and triangles (<see cref="StoneBridge"/>,
+/// <see cref="WoodenBridge"/>, <see cref="StoneTunnel"/>), each face with its own points so its
+/// edges stay sharp.
 /// </summary>
 internal sealed class BridgeMesh
 {
     public List<BridgePoint> Points { get; } = [];
 
     public List<int> Triangles { get; } = [];
+
+    /// <summary>
+    /// How dark each point is (<see cref="BridgePoint.Dark"/>), from where it is; none: 0.
+    /// </summary>
+    public Func<Vector3D, double>? Dark { get; init; }
 
     /// <summary>
     /// A face of four corners in order round it, facing <paramref name="normal"/>, made of
@@ -26,7 +32,8 @@ internal sealed class BridgeMesh
         foreach (Vector3D corner in new[] { a, b, c, d })
         {
             Points.Add(new BridgePoint(corner, normal, material, corner.Dot(along),
-                corner.Dot(across)));
+                corner.Dot(across))
+            { Dark = Dark?.Invoke(corner) ?? 0 });
         }
 
         bool forward = (b - a).Cross(c - a).Dot(normal) >= 0;

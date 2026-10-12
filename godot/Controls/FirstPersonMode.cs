@@ -416,6 +416,7 @@ public partial class FirstPersonMode : Node
         _rivers = null;
         _banks?.QueueFree();
         _banks = null;
+        _portals = [];
         _bridges?.QueueFree();
         _bridges = null;
         _channels = null;
@@ -528,7 +529,7 @@ public partial class FirstPersonMode : Node
         _bridges = new RiverBankStrip
         {
             Name = "Bridges",
-            CastShadow = GeometryInstance3D.ShadowCastingSetting.On,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.DoubleSided,
             Visible = flat is null,
         };
         AddChild(_bridges);
@@ -846,9 +847,15 @@ public partial class FirstPersonMode : Node
         }
 
         // Never under the drawn ground, which can stand above the ground's height between its
-        // points (see GroundTiles.HighestAround).
+        // points (see GroundTiles.HighestAround), unless in a tunnel, under it, or at its
+        // portal, where that ground is hidden.
         double ground = CarvedRadius(globe, body, _spot);
-        return _tiles?.HighestAround(_spot) is double drawn ? Math.Max(ground, drawn) : ground;
+        bool inTunnel = _carving?.TunnelFloorMeters(_spot) is double floor
+            && Math.Abs((ground - 1) * body.RadiusKm * 1000 - floor) < 1e-6;
+        inTunnel |= _portals.Any(portal => portal.Covers(_spot));
+        return !inTunnel && _tiles?.HighestAround(_spot) is double drawn
+            ? Math.Max(ground, drawn)
+            : ground;
     }
 
     // How far the eye is from the nearest surface it could look at closely, in meters: the
@@ -1016,7 +1023,7 @@ public partial class FirstPersonMode : Node
         PathStrands? strands = Strands;
         if (_carving is not { } carving || (channels is null && roads is null && strands is null))
         {
-            ShowBanks(globe, body, null, null, middle);
+            ShowBanks(globe, body, null, null, [], middle);
             return;
         }
 
@@ -1046,9 +1053,10 @@ public partial class FirstPersonMode : Node
                 channels, carving.Carve, eye, radiusKm, GroundMeters, CoarseMeters,
                 SkirtMeters);
             List<BridgeShown> bridges = [];
+            List<TunnelPortal> portals = [];
             if (roads is not null)
             {
-                (List<List<BankPoint[]>> paved, bridges) = RoadStrips.Near(roads,
+                (List<List<BankPoint[]>> paved, bridges, portals) = RoadStrips.Near(roads,
                     carving.Carve, eye, radiusKm, reachMeters, GroundMeters, CoarseMeters,
                     SkirtMeters);
                 strips.AddRange(paved);
@@ -1061,7 +1069,8 @@ public partial class FirstPersonMode : Node
             }
 
             return (RiverBankStrip.Prepare(strips, middle, pointAt, placeAt),
-                RiverBankStrip.PrepareBridges(bridges, middle, pointAt, placeAt));
+                RiverBankStrip.PrepareBridges(bridges, middle, pointAt, placeAt),
+                portals.ToArray());
         }), middle);
     }
 
@@ -1082,16 +1091,18 @@ public partial class FirstPersonMode : Node
             return;
         }
 
-        (RiverBankStrip.Surface? strips, RiverBankStrip.Surface? bridges) =
-            pending.Strips.Result;
-        ShowBanks(globe, body, strips, bridges, pending.Middle);
+        (RiverBankStrip.Surface? strips, RiverBankStrip.Surface? bridges,
+            TunnelPortal[] portals) = pending.Strips.Result;
+        ShowBanks(globe, body, strips, bridges, portals, pending.Middle);
     }
 
     // Draws the beds and banks of the rivers and the roads' strips worked out, and the
-    // bridges (none: nothing), around `middle`.
+    // bridges and tunnels (none: nothing), around `middle`, the coarser ground hidden in the
+    // tunnels' `portals`, where walkers don't stand on the coarser ground.
     private void ShowBanks(PlanetSurface globe, Body body, RiverBankStrip.Surface? strips,
-        RiverBankStrip.Surface? bridges, Vector3D middle)
+        RiverBankStrip.Surface? bridges, TunnelPortal[] portals, Vector3D middle)
     {
+        _portals = portals;
         _banks!.MaterialOverride = globe.MaterialOverride;
         _banks.Show(strips, middle);
         SetGroundDetail(_banks, middle, body.RadiusKm);
@@ -1263,7 +1274,8 @@ public partial class FirstPersonMode : Node
 
         double radiusMeters = body.RadiusKm * 1000;
         double carved = carving.Carve(direction, (ground - 1) * radiusMeters);
-        return 1 + Math.Max(carved, carving.DeckMeters(direction) ?? carved) / radiusMeters;
+        carved = Math.Max(carved, carving.DeckMeters(direction) ?? carved);
+        return 1 + Walked(carving, direction, carved) / radiusMeters;
     }
 
     // The height the water's surface is built at, in radii above the base: the water's,
@@ -1791,6 +1803,7 @@ public partial class FirstPersonMode : Node
         Vector3D direction = FlatDisc.DirectionFor(topPoint);
         double carved = carving.Carve(direction, lift * radiusMeters);
         carved = Math.Max(carved, carving.DeckMeters(direction) ?? carved);
+        carved = Walked(carving, direction, carved);
         return Math.Max(carved / radiusMeters, PlanetSurface.FlatDeepestLift);
     }
 
@@ -2090,6 +2103,7 @@ public partial class FirstPersonMode : Node
     // The rivers' beds and banks, and the roads' strips and bridges, being worked out
     // (StartBanks), and where they're drawn around.
     private sealed record PendingBanks(
-        Task<(RiverBankStrip.Surface? Strips, RiverBankStrip.Surface? Bridges)> Strips,
+        Task<(RiverBankStrip.Surface? Strips, RiverBankStrip.Surface? Bridges,
+            TunnelPortal[] Portals)> Strips,
         Vector3D Middle);
 }

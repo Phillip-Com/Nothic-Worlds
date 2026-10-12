@@ -68,25 +68,91 @@ public sealed class RoadProfileTests
     }
 
     [Fact]
-    public void AtACliff_TheRoadCutsAndBanksNoMoreThanItsLimit_AndClimbsMoreSteeply()
+    public void AtACliff_TheRoadBanksNoMoreThanItsLimit_AndTunnelsIntoIt_OnItsGrade()
     {
         // A cliff 100 m high at longitude 0.
         static double Cliff(Vector3D direction) => East(direction) < 0 ? 100 : 200;
         RoadProfile road = RoadProfile.For(Highway(), RadiusKm, Cliff, null)!;
 
-        double steepest = 0;
+        RoadTunnel tunnel = Assert.Single(road.Tunnels);
+        Assert.InRange(East(road.Points[tunnel.First]), 0, RoadProfile.SampleMeters);
+        Assert.True(tunnel.LengthMeters >= RoadProfile.MinTunnelMeters);
         for (int i = 0; i < road.Points.Count; i++)
         {
-            Assert.InRange(road.RoadMeters[i] - road.GroundMeters[i],
-                -RoadProfile.MaxCutMeters - 1e-9, RoadProfile.MaxCutMeters + 1e-9);
-            if (i > 0)
+            double over = road.RoadMeters[i] - road.GroundMeters[i];
+            Assert.True(over <= RoadProfile.MaxCutMeters + 1e-9, $"{over} at {i}");
+            if (i < tunnel.First || i > tunnel.Last)
             {
-                steepest = Math.Max(steepest, (road.RoadMeters[i] - road.RoadMeters[i - 1])
-                    / (road.AlongMeters[i] - road.AlongMeters[i - 1]));
+                Assert.True(over >= -RoadProfile.MaxCutMeters - 1e-9, $"{over} at {i}");
+            }
+            else
+            {
+                Assert.True(over < -RoadProfile.MaxCutMeters, $"{over} at {i}");
             }
         }
 
-        Assert.True(steepest > RoadProfile.MaxGrade);
+        for (int i = tunnel.First + 1; i <= tunnel.Last; i++)
+        {
+            Assert.True(road.InTunnel(i - 1));
+            double grade = Math.Abs(road.RoadMeters[i] - road.RoadMeters[i - 1])
+                / (road.AlongMeters[i] - road.AlongMeters[i - 1]);
+            Assert.True(grade <= RoadProfile.MaxGrade + 1e-9, $"{grade} at {i}");
+        }
+
+        Assert.False(road.InTunnel(tunnel.Last));
+    }
+
+    // A mesa 200 m high and 800 m across, centered on longitude 0, with a notch `notchMeters`
+    // high (over the ground around the mesa) 16 m across in its middle (none: null).
+    internal static Func<Vector3D, double> Mesa(double? notchMeters = null) => direction =>
+    {
+        double east = Math.Abs(East(direction));
+        return east >= 400 ? 100 : east < 8 && notchMeters is double notch ? 100 + notch : 300;
+    };
+
+    [Fact]
+    public void UnderAMesa_OneTunnelRunsThrough()
+    {
+        RoadProfile road = RoadProfile.For(Highway(), RadiusKm, Mesa(), null)!;
+
+        RoadTunnel tunnel = Assert.Single(road.Tunnels);
+        Assert.InRange(East(road.Points[tunnel.First]), -400, -390);
+        Assert.InRange(East(road.Points[tunnel.Last]), 390, 400);
+        Assert.Equal(road.AlongMeters[tunnel.Last] - road.AlongMeters[tunnel.First],
+            tunnel.LengthMeters, 9);
+    }
+
+    [Fact]
+    public void ANotchInTheHill_SplitsTheTunnel_OnlyWhereItLeavesTooLittleOverTheRoad()
+    {
+        RoadProfile whole = RoadProfile.For(Highway(), RadiusKm, Mesa(), null)!;
+        int middle = Enumerable.Range(0, whole.Points.Count)
+            .MinBy(i => Math.Abs(East(whole.Points[i])));
+        double roadUp = whole.RoadMeters[middle] - 100;
+        double cover = StoneTunnel.CoverMeters(4 + RoadCarving.ShoulderMeters);
+
+        // Covered (yet shallower than a tunnel): one tunnel; too shallow to cover it: two.
+        RoadProfile covered = RoadProfile.For(Highway(), RadiusKm, Mesa(roadUp + cover + 1),
+            null)!;
+        RoadProfile open = RoadProfile.For(Highway(), RadiusKm, Mesa(roadUp + cover - 3),
+            null)!;
+
+        Assert.Single(covered.Tunnels);
+        Assert.Equal(2, open.Tunnels.Count);
+        Assert.False(open.InTunnel(middle));
+    }
+
+    [Fact]
+    public void AShortStretchTooDeepForACutting_IsCutDeeper_NotTunneled()
+    {
+        // A ridge 60 m high and only about 25 m across at its deepest cutting.
+        static double Ridge(Vector3D direction) =>
+            100 + 60 * Math.Exp(-Math.Pow(East(direction) / 12, 2));
+        RoadProfile road = RoadProfile.For(Highway(), RadiusKm, Ridge, null)!;
+
+        Assert.Empty(road.Tunnels);
+        Assert.Contains(Enumerable.Range(0, road.Points.Count), i =>
+            road.GroundMeters[i] - road.RoadMeters[i] > RoadProfile.MaxCutMeters);
     }
 
     [Fact]
@@ -140,5 +206,7 @@ public sealed class RoadProfileTests
 
         Assert.Equal(first.RoadMeters, second.RoadMeters);
         Assert.Equal(first.Bridges, second.Bridges);
+        RoadProfile mesa = RoadProfile.For(course, RadiusKm, Mesa(), null)!;
+        Assert.Equal(mesa.Tunnels, RoadProfile.For(course, RadiusKm, Mesa(), null)!.Tunnels);
     }
 }

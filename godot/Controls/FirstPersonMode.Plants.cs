@@ -267,7 +267,7 @@ public partial class FirstPersonMode
         return point =>
         {
             Vector3D direction = toDirection(point);
-            return carving?.BeyondBanksMeters(direction, 1) <= 0
+            return carving?.BeyondBanksMeters(direction, 1, tunnels: false) <= 0
                 || strands?.OnPath(direction, PathPlantsMeters) == true;
         };
     }

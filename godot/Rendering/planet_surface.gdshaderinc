@@ -183,10 +183,15 @@ varying float eye_level_ground;
 
 // What a road built there (VISION.md BOD-13): 1 on its paving and a stone bridge's road and
 // walls' tops, 2 on a bridge's bare stone, 3 on a dirt path's worn strand, 4 on a wooden
-// bridge's or boardwalk's wood, else 0. RiverBankStrip brings CUSTOM0.w twice as much more
-// there (on a strand, 7 plus how worn it is; on wood, 10). Built ground always shows its
-// material, even with the terrain's colors (a strand only where it's worn through).
+// bridge's or boardwalk's wood, 5 on a tunnel's torches' flames, else 0. RiverBankStrip brings
+// CUSTOM0.w twice as much more there (on a strand, 7 plus how worn it is; on wood, 10; on a
+// flame, 12). Built ground always shows its material, even with the terrain's colors (a strand
+// only where it's worn through).
 varying float built;
+
+// How much of the sky's light reaches a point (VISION.md BOD-13): little deep in a tunnel,
+// from RiverBankStrip's colors; else all of it (a mesh without colors reads white).
+varying float sky_light;
 
 // How worn a dirt path's strand is (0 at its edges, 1 in its middle), and where wood is in its
 // grain (meters along and across it), from RiverBankStrip.
@@ -848,8 +853,9 @@ void vertex() {
 	// each around its own middle rather than the globe's, so its positions keep their
 	// precision; it brings each point's direction from the globe's middle along (CUSTOM0,
 	// w = 1) and is lifted already. Other meshes have no CUSTOM0 (it reads as 0).
-	built = CUSTOM0.w > 8.5 ? 4.0 : CUSTOM0.w > 6.5 ? 3.0 : CUSTOM0.w > 4.5 ? 2.0
-		: CUSTOM0.w > 2.5 ? 1.0 : 0.0;
+	built = CUSTOM0.w > 11.5 ? 5.0 : CUSTOM0.w > 8.5 ? 4.0 : CUSTOM0.w > 6.5 ? 3.0
+		: CUSTOM0.w > 4.5 ? 2.0 : CUSTOM0.w > 2.5 ? 1.0 : 0.0;
+	sky_light = COLOR.r;
 	worn = built > 2.5 && built < 3.5 ? CUSTOM0.w - 7.0 : 0.0;
 	wood_uv = UV;
 	float ground_w = built > 2.5 ? 2.0 : CUSTOM0.w - 2.0 * built;
@@ -1399,5 +1405,16 @@ void fragment() {
 		ALBEDO = ROCK_COLOR;
 		EMISSION = vec3(0.0);
 		ROUGHNESS = 1.0;
+	}
+
+	// A tunnel's torches glow (lighting nothing); deep in it, little of the sky's light, or
+	// the sun's past its walls, reaches.
+	if (built > 4.5) {
+		ALBEDO = vec3(0.05, 0.03, 0.02);
+		EMISSION = vec3(6.0, 2.6, 0.7);
+	}
+	if (sky_light < 0.999) {
+		AO = sky_light;
+		AO_LIGHT_AFFECT = 1.0;
 	}
 }
