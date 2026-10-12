@@ -181,6 +181,11 @@ varying vec3 local_direction;
 // its own slope (its bed and banks) rather than the ground's heights.
 varying float eye_level_ground;
 
+// What a road built there (VISION.md BOD-13): 1 on its paving and a stone bridge's road and
+// walls' tops, 2 on a bridge's bare stone, else 0. RiverBankStrip brings CUSTOM0.w twice as
+// much more there. Built ground always shows its material, even with the terrain's colors.
+varying float built;
+
 // Fine detail on that ground near the eye (VISION.md REN-06): its position from the point the
 // mesh is built around (in globe radii, precise near the eye), where that point is in the
 // detail's noise (FirstPersonMode works it out in double precision for each mesh, wrapped to
@@ -209,7 +214,7 @@ const mat3 DETAIL_TURN_B = mat3(vec3(1.0, 2.0, 2.0), vec3(2.0, 1.0, -2.0), vec3(
 uniform sampler2DArray ground_colors : source_color, filter_linear_mipmap_anisotropic,
 	repeat_enable;
 uniform sampler2DArray ground_normals : filter_linear_mipmap_anisotropic, repeat_enable;
-uniform vec3 ground_averages[8];
+uniform vec3 ground_averages[9];
 uniform sampler2D ground_palette : source_color, filter_nearest, repeat_disable;
 // Snow lies above this height at the equator (meters), lower toward the poles; none without
 // air (GroundMaterials.ShowOn).
@@ -220,16 +225,18 @@ uniform float snow_line_meters = 5000.0;
 instance uniform vec3 ground_broad_origin = vec3(0.0);
 const float GROUND_BROAD_METERS = 64.0;
 
-// Some ground kinds (GroundKind), and each one's texture size in meters, which must divide the
-// detail noise's repeat (GROUND_DETAIL_METERS times PATTERN_NOISE_SIZE, 128 m) so the
-// textures stay put as the ground is rebuilt; and how rough each is to the light.
+// Some ground kinds (GroundKind, then the roads' paving, GroundMaterials.PavingLayer), and
+// each one's texture size in meters, which must divide the detail noise's repeat
+// (GROUND_DETAIL_METERS times PATTERN_NOISE_SIZE, 128 m) so the textures stay put as the
+// ground is rebuilt; and how rough each is to the light.
 const int GROUND_GRASS = 0;
 const int GROUND_SAND = 3;
 const int GROUND_ROCK = 5;
 const int GROUND_SNOW = 6;
 const int GROUND_GRAVEL = 7;
-const float GROUND_TILE_METERS[8] = float[8](2.0, 2.0, 2.0, 2.0, 4.0, 4.0, 2.0, 2.0);
-const float GROUND_ROUGHNESS[8] = float[8](0.95, 0.95, 0.95, 0.9, 0.6, 0.85, 0.7, 0.9);
+const int GROUND_PAVING = 8;
+const float GROUND_TILE_METERS[9] = float[9](2.0, 2.0, 2.0, 2.0, 4.0, 4.0, 2.0, 2.0, 8.0);
+const float GROUND_ROUGHNESS[9] = float[9](0.95, 0.95, 0.95, 0.9, 0.6, 0.85, 0.7, 0.9, 0.8);
 // How far a material's color is pulled toward its terrain's painted color (owner's choice:
 // partway, so the palette still shows), and how much of the painted color's lightness comes
 // with it (the photo's own lightness is the more realistic).
@@ -817,7 +824,9 @@ void vertex() {
 	// each around its own middle rather than the globe's, so its positions keep their
 	// precision; it brings each point's direction from the globe's middle along (CUSTOM0,
 	// w = 1) and is lifted already. Other meshes have no CUSTOM0 (it reads as 0).
-	eye_level_ground = CUSTOM0.w > 0.5 ? CUSTOM0.w : 0.0;
+	built = CUSTOM0.w > 4.5 ? 2.0 : CUSTOM0.w > 2.5 ? 1.0 : 0.0;
+	float ground_w = CUSTOM0.w - 2.0 * built;
+	eye_level_ground = ground_w > 0.5 ? ground_w : 0.0;
 	ground_offset = VERTEX;
 	if (CUSTOM0.w > 0.5) {
 		local_direction = CUSTOM0.xyz;
@@ -1084,11 +1093,15 @@ vec3 ground_material(vec3 direction, vec3 up, vec3 normal, vec3 drawn, float lat
 			best_kind >= 0 ? best_tint : unpainted_color, blend);
 	}
 
-	// Bare rock where it's steeper than about 40 degrees; snow above the line, on ground not
-	// too steep to hold it, and never under water. Their own colors, untinted.
+	// Paving on the roads and a bridge's bare stone (VISION.md BOD-13); bare rock where it's
+	// steeper than about 40 degrees; snow above the line, on ground not too steep to hold it,
+	// and never under water. Their own colors, untinted.
 	float level = dot(normal, up);
 	bool own_color = false;
-	if (level + 0.12 * ragged < 0.77) {
+	if (built > 0.5) {
+		kind = built > 1.5 ? GROUND_ROCK : GROUND_PAVING;
+		own_color = true;
+	} else if (level + 0.12 * ragged < 0.77) {
 		own_color = kind != GROUND_ROCK;
 		kind = GROUND_ROCK;
 	} else if (has_snow_line) {
@@ -1224,8 +1237,9 @@ void fragment() {
 		float pixel_size = 2.0 / (PROJECTION_MATRIX[1][1] * VIEWPORT_SIZE.y);
 		float meters_per_pixel = meters_away * pixel_size / facing;
 #ifdef GROUND_MATERIALS
-		if (!terrain_shown) {
-			// The ground's shape as it's lit (kept for the lighting below).
+		if (!terrain_shown || built > 0.5) {
+			// The ground's shape as it's lit (kept for the lighting below); what a road built
+			// faces its own way (a bridge's walls and arches).
 			vec3 up = flat_disc ? vec3(0.0, 1.0, 0.0) : direction;
 			vec3 shape = up;
 			if (has_heights) {
@@ -1233,6 +1247,9 @@ void fragment() {
 					: relief_normal(direction, pixel_angle);
 				relief_known = true;
 				shape = relief;
+			}
+			if (built > 0.5) {
+				shape = normalize(transpose(mat3(VIEW_MATRIX) * mat3(MODEL_MATRIX)) * NORMAL);
 			}
 			vec3 tilted;
 			color = ground_material(direction, up, shape, color, latitude, pixel_angle,
@@ -1244,7 +1261,7 @@ void fragment() {
 			bump_meters = ground_detail(color, meters_per_pixel);
 		}
 		float depth = water_level - ground_height(direction, 0.0);
-		if (has_water && depth > 0.0) {
+		if (has_water && depth > 0.0 && built < 0.5) {
 			color *= 1.0 + 0.9 * caustics(depth, meters_per_pixel);
 		}
 	}

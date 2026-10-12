@@ -70,7 +70,7 @@ public sealed class RiverCarving
     public double Carve(Vector3D direction, double groundMeters)
     {
         List<(int River, int Segment)> near = Gather(direction, 0, 0);
-        return Shape(near, direction, groundMeters, cellMeters: null);
+        return Shape(near, direction, groundMeters, cellMeters: null).Carved;
     }
 
     /// <summary>
@@ -91,8 +91,62 @@ public sealed class RiverCarving
             return null;
         }
 
+        return (direction, groundMeters) =>
+        {
+            (double carved, double sink) = Shape(Gather(direction, margin, leastReach),
+                direction, groundMeters, cellMeters);
+            return carved - sink;
+        };
+    }
+
+    /// <summary>
+    /// As <see cref="UnderStripNear"/>, but giving the carved height and how far it's sunk
+    /// under the strip apart (so other carving can be done in between: see
+    /// <see cref="GroundCarving"/>). Safe to call from several threads at once.
+    /// </summary>
+    public Func<Vector3D, double, (double Carved, double Sink)>? PartsNear(Vector3D center,
+        double radius, double cellMeters)
+    {
+        double margin = SinkReachMeters(cellMeters) / _radiusMeters;
+        double leastReach = LeastShareOfCell * cellMeters;
+        if (Gather(center * (1 / center.Length), radius + margin, leastReach).Count == 0)
+        {
+            return null;
+        }
+
         return (direction, groundMeters) => Shape(Gather(direction, margin, leastReach),
             direction, groundMeters, cellMeters);
+    }
+
+    /// <summary>
+    /// The heights of the water's surface and of the bed of the river whose water reaches
+    /// within <paramref name="marginMeters"/> of a unit direction (the highest water, if
+    /// several), in meters; null over dry ground. Roads bridge over it (VISION.md BOD-13).
+    /// </summary>
+    public (double WaterMeters, double BedMeters)? WaterOver(Vector3D direction,
+        double marginMeters)
+    {
+        (double Water, double Bed)? found = null;
+        foreach ((int r, int s) in Gather(direction, marginMeters / _radiusMeters, 0))
+        {
+            RiverProfile river = _rivers[r];
+            (double away, double t) = Nearest(direction, river.Points[s], river.Points[s + 1]);
+            double edge = Lerp(river.WaterHalfWidthMeters[s], river.WaterHalfWidthMeters[s + 1],
+                t);
+            if (away > edge + marginMeters)
+            {
+                continue;
+            }
+
+            double water = Lerp(river.WaterMeters[s], river.WaterMeters[s + 1], t);
+            double bed = Lerp(river.BedMeters[s], river.BedMeters[s + 1], t);
+            if (found is not { } known || water > known.Water)
+            {
+                found = (water, bed);
+            }
+        }
+
+        return found;
     }
 
     /// <summary>
@@ -161,11 +215,11 @@ public sealed class RiverCarving
         return nearest;
     }
 
-    // The ground carved by the segments given, and sunk (with cells `cellMeters` wide) under
-    // the strip: by more under banks steeper than BankSlope below the water, which its cells'
-    // flat faces would otherwise poke through.
-    private double Shape(List<(int River, int Segment)> near, Vector3D direction,
-        double groundMeters, double? cellMeters)
+    // The ground carved by the segments given, and how far it's sunk (with cells `cellMeters`
+    // wide) under the strip: by more under banks steeper than BankSlope below the water, which
+    // its cells' flat faces would otherwise poke through.
+    private (double Carved, double Sink) Shape(List<(int River, int Segment)> near,
+        Vector3D direction, double groundMeters, double? cellMeters)
     {
         double fade = cellMeters is double cell ? SinkReachMeters(cell) : 0;
         double carved = groundMeters, cover = 0, steeper = 0;
@@ -191,8 +245,8 @@ public sealed class RiverCarving
         }
 
         return cellMeters is double width
-            ? carved - cover * (MinSinkMeters + SinkPerCell * width) - steeper
-            : carved;
+            ? (carved, cover * (MinSinkMeters + SinkPerCell * width) + steeper)
+            : (carved, 0);
     }
 
     // How much deeper a river's bed is, `t` of the way along segment s, than banks rising at

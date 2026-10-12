@@ -178,8 +178,8 @@ public sealed class RiverProfile
     }
 
     // A path with points added along its long legs, so none is more than `step` meters long
-    // on a body radiusMeters in radius.
-    private static Vector3D[] Sampled(List<Vector3D> path, double radiusMeters,
+    // on a body radiusMeters in radius (roads' profiles use it too).
+    internal static Vector3D[] Sampled(List<Vector3D> path, double radiusMeters,
         double stepMeters)
     {
         var sampled = new List<Vector3D>(path.Count);
