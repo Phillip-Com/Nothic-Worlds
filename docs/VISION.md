@@ -865,7 +865,7 @@ on their own, **fords** where paths cross shallow streams, **boardwalks** over m
 fords, boardwalks, switchbacks), **tunnels** last, then cart tracks' and old roads' looks.
 Highways up close (2026-10-12): a grade of at most **8%**; cuttings and banks at most **15 m**
 deep (past that the road follows the ground, until tunnels); paved with a CC0 photo of Roman
-paving; bridges of **round stone arches**, each at most about 20 m across, with piers in the
+paving, toned grey; bridges of **round stone arches**, each at most about 20 m across, with piers in the
 water and low walls along the sides.
 **Built:**
 - Data (format v36): `Model/Road.cs` (style, kind, points, width), `RoadStyle`, `RoadKind`,

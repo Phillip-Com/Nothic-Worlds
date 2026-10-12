@@ -235,6 +235,7 @@ const int GROUND_ROCK = 5;
 const int GROUND_SNOW = 6;
 const int GROUND_GRAVEL = 7;
 const int GROUND_PAVING = 8;
+const float PAVING_COLOR_KEPT = 0.35;
 const float GROUND_TILE_METERS[9] = float[9](2.0, 2.0, 2.0, 2.0, 4.0, 4.0, 2.0, 2.0, 8.0);
 const float GROUND_ROUGHNESS[9] = float[9](0.95, 0.95, 0.95, 0.9, 0.6, 0.85, 0.7, 0.9, 0.8);
 // How far a material's color is pulled toward its terrain's painted color (owner's choice:
@@ -1150,6 +1151,11 @@ vec3 ground_material(vec3 direction, vec3 up, vec3 normal, vec3 drawn, float lat
 
 	// Broad patches of lighter and darker ground, so the texture's repeat doesn't show.
 	color *= 0.8 + 0.25 * broad + 0.15 * medium;
+	// The paving's photo reads warm and golden in the sun: it keeps only this share of its
+	// color, toward grey stone (owner's choice, 2026-10-12).
+	if (kind == GROUND_PAVING) {
+		color = mix(vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), color, PAVING_COLOR_KEPT);
+	}
 	roughness = GROUND_ROUGHNESS[kind];
 	return color * pull;
 }
