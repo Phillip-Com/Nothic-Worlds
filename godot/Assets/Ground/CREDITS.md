@@ -15,6 +15,10 @@ OpenGL-style normal maps only, and saved again as JPEG at quality 85.
 | `rock_*` | ambientCG Rock060 | Lennart Demes | https://ambientcg.com/view?id=Rock060 |
 | `snow_*` | ambientCG Snow010A | Lennart Demes | https://ambientcg.com/view?id=Snow010A |
 | `gravel_*` | ambientCG Ground110 | Lennart Demes | https://ambientcg.com/view?id=Ground110 |
+| `paving_*` | ambientCG PavingStones054 | Lennart Demes | https://ambientcg.com/view?id=PavingStones054 |
+
+The paving (the stone highways, VISION.md `BOD-13`) comes at 683 × 1024; it is laid three across
+and two down, so its stones keep their shape, and scaled to 1024 × 1024.
 
 Licenses: https://docs.ambientcg.com/license/ and https://polyhaven.com/license.
 

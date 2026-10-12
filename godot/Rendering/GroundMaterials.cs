@@ -5,16 +5,25 @@ namespace NothicWorlds.Rendering;
 
 /// <summary>
 /// The photo materials of the ground up close while standing (VISION.md REN-06): a color and a
-/// normal map for each <see cref="GroundKind"/> (CC0, from ambientCG and Poly Haven; see
+/// normal map for each <see cref="GroundKind"/>, and one for the stone highways' paving
+/// (VISION.md BOD-13; all CC0, from ambientCG and Poly Haven; see
 /// <c>Assets/Ground/CREDITS.md</c>), loaded into two texture arrays, one layer per kind in the
-/// enum's order, which planet_surface.gdshaderinc picks from per pixel. Made when the standing
+/// enum's order and the paving last (<see cref="PavingLayer"/>), which
+/// planet_surface.gdshaderinc picks from per pixel. Made when the standing
 /// view opens and let go when it closes, so the globe views never hold them.
 /// </summary>
 public sealed class GroundMaterials
 {
-    // The texture files' names, in GroundKind order.
+    /// <summary>
+    /// The layer of the roads' paving, after the ground kinds' (GROUND_PAVING in
+    /// planet_surface.gdshaderinc).
+    /// </summary>
+    public static readonly int PavingLayer = Enum.GetValues<GroundKind>().Length;
+
+    // The texture files' names, in GroundKind order, then the paving's.
     private static readonly string[] _fileNames =
-        ["grass", "dry_grass", "forest_floor", "sand", "mud", "rock", "snow", "gravel"];
+        ["grass", "dry_grass", "forest_floor", "sand", "mud", "rock", "snow", "gravel",
+            "paving"];
 
     // How many pixels across and down each color map's average is taken from.
     private const int AverageSamples = 32;
@@ -47,7 +56,7 @@ public sealed class GroundMaterials
     /// </exception>
     public static GroundMaterials Load()
     {
-        if (_fileNames.Length != Enum.GetValues<GroundKind>().Length)
+        if (_fileNames.Length != PavingLayer + 1)
         {
             throw new InvalidOperationException("Every ground kind needs its textures.");
         }
