@@ -3,13 +3,15 @@ using NothicWorlds.Core.Geometry;
 namespace NothicWorlds.Core.Simulation;
 
 /// <summary>
-/// The fine strips along the stone highways near a first-person eye (VISION.md BOD-13), as
+/// The fine strips along the roads laid up close near a first-person eye (VISION.md BOD-13), as
 /// <see cref="RiverBanks"/> are along rivers: for each stretch in reach, its paving (marked so
-/// the ground's material paves it) and a strip down each side, over its shoulder and its
+/// the ground's material paves it; on a dirt path's crossing, worn ground) and a strip down
+/// each side, over its shoulder and its
 /// cutting's or bank's slope (as <see cref="GroundCarving"/> shapes them, rivers too) to a
-/// skirt that blends into the coarser ground; and the stone bridges in reach
-/// (<see cref="StoneBridge"/>). Rows run across, from one skirt's edge to the other, in the
-/// order <see cref="RiverBanks"/>' rows do. Worked out on one thread (it's meant for a worker).
+/// skirt that blends into the coarser ground; and the bridges in reach
+/// (<see cref="StoneBridge"/>, <see cref="WoodenBridge"/>). Rows run across, from one skirt's
+/// edge to the other, in the order <see cref="RiverBanks"/>' rows do. Worked out on one thread
+/// (it's meant for a worker).
 /// </summary>
 public static class RoadStrips
 {
@@ -153,7 +155,7 @@ public static class RoadStrips
         Func<Vector3D, double> skirtMeters)
     {
         double halfWidth = road.HalfWidthMeters;
-        double shoulder = halfWidth + RoadCarving.ShoulderMeters;
+        double shoulder = halfWidth + road.ShoulderMeters;
         double reach = Math.Max(row.ReachMeters, shoulder + 1);
         double skirt = skirtMeters(row.Direction);
         double lift = MinLiftMeters + LiftShare * row.FromEye;
@@ -165,7 +167,10 @@ public static class RoadStrips
         side.AddRange(_side.Select(share => (shoulder + share * (reach - shoulder), 0.0, 0.0)));
         side.AddRange(_skirt.Select(share => (reach + share * skirt, share, 0.0)));
 
-        BankPoint At(double across, double skirtShare, double raise, bool paved)
+        StripSurface surface = road.Surface == RoadSurface.Dirt
+            ? StripSurface.Worn
+            : StripSurface.Paving;
+        BankPoint At(double across, double skirtShare, double raise, StripSurface surface)
         {
             Vector3D direction = row.Direction + row.Side * (across / radiusMeters);
             direction *= 1 / direction.Length;
@@ -173,14 +178,18 @@ public static class RoadStrips
             double meters = skirtShare == 0
                 ? shaped
                 : shaped + (coarseMeters(direction) + lift - shaped) * skirtShare;
-            return new BankPoint(direction, meters, 1 - skirtShare, paved);
+            return new BankPoint(direction, meters, 1 - skirtShare, surface);
         }
 
-        BankPoint[] right = [.. side.Select(o => At(o.Across, o.Skirt, o.Lift, false))];
+        BankPoint[] right = [.. side.Select(o =>
+            At(o.Across, o.Skirt, o.Lift, StripSurface.Ground))];
         BankPoint[] left = [.. Enumerable.Reverse(side)
-            .Select(o => At(-o.Across, o.Skirt, o.Lift, false))];
+            .Select(o => At(-o.Across, o.Skirt, o.Lift, StripSurface.Ground))];
         BankPoint[] paving = [.. _paving.Select(share =>
-            At(share * halfWidth, 0, pavingLift, true))];
+            At(share * halfWidth, 0, pavingLift, surface) with
+            {
+                Wear = surface == StripSurface.Worn ? 1 - Math.Abs(share) : 0,
+            })];
         return (left, paving, right);
     }
 

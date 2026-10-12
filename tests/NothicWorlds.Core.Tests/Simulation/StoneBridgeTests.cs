@@ -41,8 +41,10 @@ public sealed class StoneBridgeTests
         }
 
         // Only faces looking straight up are paved: its road and its walls' tops.
-        Assert.All(points.Where(p => p.Paved), p => Assert.Equal(1, p.Normal.Z, 9));
-        Assert.Contains(points, p => p.Paved && Math.Abs(p.Position.Z - deck) < 1e-9);
+        Assert.All(points.Where(p => p.Material == BridgeMaterial.Paving), p =>
+            Assert.Equal(1, p.Normal.Z, 9));
+        Assert.Contains(points, p =>
+            p.Material == BridgeMaterial.Paving && Math.Abs(p.Position.Z - deck) < 1e-9);
     }
 
     [Fact]

@@ -33,9 +33,10 @@ public sealed class RoadStripsTests
         Assert.Equal(6, strips.Count);
         Assert.Single(bridges);
         List<BankPoint[]> paving = strips[4];
-        Assert.All(paving, row => Assert.All(row, point => Assert.True(point.Paved)));
+        Assert.All(paving, row => Assert.All(row, point =>
+            Assert.Equal(StripSurface.Paving, point.Surface)));
         Assert.All(strips[3].Concat(strips[5]), row =>
-            Assert.All(row, point => Assert.False(point.Paved)));
+            Assert.All(row, point => Assert.Equal(StripSurface.Ground, point.Surface)));
 
         // No row runs over the bridge, and every row runs the same way across.
         RoadBridge bridge = Assert.Single(_road.Bridges);
@@ -75,7 +76,8 @@ public sealed class RoadStripsTests
         BridgeShown bridge = Assert.Single(Near(1_000).Bridges);
         RoadBridge span = Assert.Single(_road.Bridges);
 
-        BridgePoint start = bridge.Points.First(p => p.Paved && p.Position.X == 0);
+        BridgePoint start = bridge.Points.First(p =>
+            p.Material == BridgeMaterial.Paving && p.Position.X == 0);
         (Vector3D direction, double meters) = bridge.Place(start with
         {
             Position = start.Position with { Y = 0 },

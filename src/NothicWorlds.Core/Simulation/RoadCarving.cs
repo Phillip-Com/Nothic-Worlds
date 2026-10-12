@@ -20,7 +20,7 @@ public sealed class RoadCarving
     /// <summary>How steeply a bank's sides fall: meters down for each meter out.</summary>
     public const double BankSlope = 0.67;
 
-    /// <summary>The level ground either side of the paving, in meters.</summary>
+    /// <summary>The level ground either side of a highway's paving, in meters.</summary>
     public const double ShoulderMeters = 1;
 
     // How much farther than its height needs a road's sides are let reach, in meters (the
@@ -47,13 +47,13 @@ public sealed class RoadCarving
 
     private readonly double _radiusMeters;
     private readonly IReadOnlyList<RoadProfile> _roads;
-    private readonly bool[][] _bridged;  // Whether each road's segments are on a bridge
+    private readonly int[][] _bridgeAt;  // Which bridge each road's segments are on (-1: none)
     private readonly Level[][] _trees;   // Each road's search tree, its segments first
 
     private RoadCarving(IReadOnlyList<RoadProfile> roads, double radiusMeters)
     {
         (_roads, _radiusMeters) = (roads, radiusMeters);
-        _bridged = [.. roads.Select(Bridged)];
+        _bridgeAt = [.. roads.Select(BridgeAt)];
         _trees = [.. roads.Select(Tree)];
     }
 
@@ -68,12 +68,12 @@ public sealed class RoadCarving
         new(roads, radiusKm * 1000);
 
     /// <summary>
-    /// How far out a road's sides reach from its middle where it runs
+    /// How far out a highway's sides reach from its middle where it runs
     /// <paramref name="heightMeters"/> above or below the ground, in meters, for paving
     /// <paramref name="halfWidthMeters"/> to each side.
     /// </summary>
     public static double ReachMeters(double halfWidthMeters, double heightMeters) =>
-        halfWidthMeters + ShoulderMeters + Math.Abs(heightMeters) / BankSlope + SlackMeters;
+        ReachMeters(halfWidthMeters, ShoulderMeters, heightMeters);
 
     /// <summary>
     /// How far past a road's sides coarser ground with cells this wide (in meters) is sunk
@@ -140,7 +140,16 @@ public sealed class RoadCarving
         }
 
         (int r, int s, double away, double t) = closest;
-        if (!_bridged[r][s] || away > _roads[r].HalfWidthMeters)
+        if (_bridgeAt[r][s] is not (>= 0 and int b))
+        {
+            return null;
+        }
+
+        RoadBridge bridge = _roads[r].Bridges[b];
+        double half = bridge.HalfWidthMeters > 0
+            ? bridge.HalfWidthMeters
+            : _roads[r].HalfWidthMeters;
+        if (away > half)
         {
             return null;
         }
@@ -149,7 +158,7 @@ public sealed class RoadCarving
     }
 
     // Whether segment s of road r is on a bridge.
-    internal bool IsBridged(int r, int s) => _bridged[r][s];
+    internal bool IsBridged(int r, int s) => _bridgeAt[r][s] >= 0;
 
     // How far the sides of segment s of road r reach out from its middle, in meters.
     internal double SegmentReachMeters(int r, int s) => _trees[r][0].ReachMeters[s];
@@ -166,7 +175,7 @@ public sealed class RoadCarving
             double fade = SinkReachMeters(cell), cover = 0;
             foreach (Closeness near in each)
             {
-                if (!_bridged[near.Road][near.Segment])
+                if (!IsBridged(near.Road, near.Segment))
                 {
                     double beyond = near.Away - _trees[near.Road][0].ReachMeters[near.Segment];
                     cover = Math.Max(cover, Math.Clamp(1 - beyond / fade, 0, 1));
@@ -177,7 +186,7 @@ public sealed class RoadCarving
         }
 
         if (Closest(each) is not { } closest
-            || _bridged[closest.Road][closest.Segment])
+            || IsBridged(closest.Road, closest.Segment))
         {
             return (groundMeters, sink);
         }
@@ -186,7 +195,7 @@ public sealed class RoadCarving
 
         RoadProfile profile = _roads[road];
         double height = Lerp(profile.RoadMeters[segment], profile.RoadMeters[segment + 1], along);
-        double past = distance - profile.HalfWidthMeters - ShoulderMeters;
+        double past = distance - profile.HalfWidthMeters - profile.ShoulderMeters;
         if (past <= 0)
         {
             return (height, sink);
@@ -298,19 +307,26 @@ public sealed class RoadCarving
         }
     }
 
-    // Whether each of a road's segments is on one of its bridges.
-    private static bool[] Bridged(RoadProfile road)
+    // How far out a road's sides reach from its middle (as the public ReachMeters), for a
+    // shoulder this wide.
+    private static double ReachMeters(double halfWidthMeters, double shoulderMeters,
+        double heightMeters) =>
+        halfWidthMeters + shoulderMeters + Math.Abs(heightMeters) / BankSlope + SlackMeters;
+
+    // Which of a road's bridges each of its segments is on (-1: none).
+    private static int[] BridgeAt(RoadProfile road)
     {
-        var bridged = new bool[road.Points.Count - 1];
-        foreach (RoadBridge bridge in road.Bridges)
+        var at = new int[road.Points.Count - 1];
+        Array.Fill(at, -1);
+        for (int b = 0; b < road.Bridges.Count; b++)
         {
-            for (int s = bridge.First; s < bridge.Last; s++)
+            for (int s = road.Bridges[b].First; s < road.Bridges[b].Last; s++)
             {
-                bridged[s] = true;
+                at[s] = b;
             }
         }
 
-        return bridged;
+        return at;
     }
 
     // A road's search tree: balls around its segments (with how far their sides reach out),
@@ -328,7 +344,7 @@ public sealed class RoadCarving
             radii[s] = (to - from).Length / 2;
             double height = Math.Max(Math.Abs(road.RoadMeters[s] - road.GroundMeters[s]),
                 Math.Abs(road.RoadMeters[s + 1] - road.GroundMeters[s + 1]));
-            reach[s] = ReachMeters(road.HalfWidthMeters, height);
+            reach[s] = ReachMeters(road.HalfWidthMeters, road.ShoulderMeters, height);
         }
 
         List<Level> levels = [new Level(centers, radii, reach)];

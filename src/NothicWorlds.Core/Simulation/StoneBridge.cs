@@ -59,7 +59,7 @@ public static class StoneBridge
         double halfWidthMeters, double startMeters, double endMeters, double waterMeters,
         double bedMeters)
     {
-        var mesh = new Builder();
+        var mesh = new BridgeMesh();
         double deckHalf = halfWidthMeters, outer = halfWidthMeters + WallThicknessMeters;
         double foot = Math.Min(bedMeters, waterMeters) - FootingMeters;
         double Deck(double x) => startMeters + (endMeters - startMeters)
@@ -79,9 +79,9 @@ public static class StoneBridge
             }
 
             mesh.Quad(new(x0, outer, b0), new(x1, outer, b1), new(x1, outer, WallTop(x1)),
-                new(x0, outer, WallTop(x0)), new(0, 1, 0), paved: false);
+                new(x0, outer, WallTop(x0)), new(0, 1, 0), BridgeMaterial.Stone);
             mesh.Quad(new(x1, -outer, b1), new(x0, -outer, b0), new(x0, -outer, WallTop(x0)),
-                new(x1, -outer, WallTop(x1)), new(0, -1, 0), paved: false);
+                new(x1, -outer, WallTop(x1)), new(0, -1, 0), BridgeMaterial.Stone);
         }
 
         // The underside: the arches' curves, and the piers' faces under where they spring.
@@ -97,29 +97,29 @@ public static class StoneBridge
 
             var normal = new Vector3D(dz / length, 0, -dx / length);
             mesh.Quad(new(x0, -outer, b0), new(x1, -outer, b1), new(x1, outer, b1),
-                new(x0, outer, b0), normal, paved: false);
+                new(x0, outer, b0), normal, BridgeMaterial.Stone);
         }
 
         // The road over it, the walls' inner faces and tops, and the ends.
         mesh.Quad(new(0, -deckHalf, Deck(0)), new(lengthMeters, -deckHalf, Deck(lengthMeters)),
             new(lengthMeters, deckHalf, Deck(lengthMeters)), new(0, deckHalf, Deck(0)),
-            new(0, 0, 1), paved: true);
+            new(0, 0, 1), BridgeMaterial.Paving);
         foreach (double side in new[] { 1.0, -1.0 })
         {
             double inner = side * deckHalf, edge = side * outer;
             mesh.Quad(new(0, inner, Deck(0)), new(lengthMeters, inner, Deck(lengthMeters)),
                 new(lengthMeters, inner, WallTop(lengthMeters)), new(0, inner, WallTop(0)),
-                new(0, -side, 0), paved: false);
+                new(0, -side, 0), BridgeMaterial.Stone);
             mesh.Quad(new(0, inner, WallTop(0)), new(lengthMeters, inner, WallTop(lengthMeters)),
                 new(lengthMeters, edge, WallTop(lengthMeters)), new(0, edge, WallTop(0)),
-                new(0, 0, 1), paved: true);
+                new(0, 0, 1), BridgeMaterial.Paving);
         }
 
         mesh.Quad(new(0, outer, foot), new(0, outer, WallTop(0)), new(0, -outer, WallTop(0)),
-            new(0, -outer, foot), new(-1, 0, 0), paved: false);
+            new(0, -outer, foot), new(-1, 0, 0), BridgeMaterial.Stone);
         mesh.Quad(new(lengthMeters, -outer, foot), new(lengthMeters, -outer, WallTop(lengthMeters)),
             new(lengthMeters, outer, WallTop(lengthMeters)), new(lengthMeters, outer, foot),
-            new(1, 0, 0), paved: false);
+            new(1, 0, 0), BridgeMaterial.Stone);
         return (mesh.Points, mesh.Triangles);
     }
 
@@ -152,31 +152,5 @@ public static class StoneBridge
 
         points.Add((lengthMeters, foot));
         return points;
-    }
-
-    // Gathers the bridge's points and triangles, each face with its own points so its edges
-    // stay sharp.
-    private sealed class Builder
-    {
-        public List<BridgePoint> Points { get; } = [];
-
-        public List<int> Triangles { get; } = [];
-
-        // A face of four corners in order round it, facing `normal`; the triangles turn
-        // counterclockwise seen from that side.
-        public void Quad(Vector3D a, Vector3D b, Vector3D c, Vector3D d, Vector3D normal,
-            bool paved)
-        {
-            int first = Points.Count;
-            foreach (Vector3D corner in new[] { a, b, c, d })
-            {
-                Points.Add(new BridgePoint(corner, normal, paved));
-            }
-
-            bool forward = (b - a).Cross(c - a).Dot(normal) >= 0;
-            Triangles.AddRange(forward
-                ? [first, first + 1, first + 2, first, first + 2, first + 3]
-                : [first, first + 2, first + 1, first, first + 3, first + 2]);
-        }
     }
 }
