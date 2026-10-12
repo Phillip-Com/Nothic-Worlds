@@ -40,11 +40,12 @@ public sealed class RoadProfile
     // laid, in meters, so the road doesn't follow every bump.
     private const double SmoothingMeters = 100;
 
-    private RoadProfile(Vector3D[] points, double[] along, double halfWidth, double[] road,
-        double[] ground, List<RoadBridge> bridges)
+    private RoadProfile(Vector3D[] points, double[] along, double halfWidth, double shoulder,
+        double[] road, double[] ground, List<RoadBridge> bridges, RoadSurface surface)
     {
-        (Points, AlongMeters, HalfWidthMeters, RoadMeters, GroundMeters, Bridges) =
-            (points, along, halfWidth, road, ground, bridges);
+        (Points, AlongMeters, HalfWidthMeters, ShoulderMeters, RoadMeters, GroundMeters) =
+            (points, along, halfWidth, shoulder, road, ground);
+        (Bridges, Surface) = (bridges, surface);
     }
 
     /// <summary>
@@ -56,8 +57,14 @@ public sealed class RoadProfile
     /// <summary>How far each point is from the first, in meters.</summary>
     public IReadOnlyList<double> AlongMeters { get; }
 
-    /// <summary>Half the paving's width, in meters.</summary>
+    /// <summary>Half the paving's (or worn ground's) width, in meters.</summary>
     public double HalfWidthMeters { get; }
+
+    /// <summary>The level ground either side of it, in meters.</summary>
+    public double ShoulderMeters { get; }
+
+    /// <summary>What it's surfaced with.</summary>
+    public RoadSurface Surface { get; }
 
     /// <summary>The height of the road's surface at each point, in meters.</summary>
     public IReadOnlyList<double> RoadMeters { get; }
@@ -77,8 +84,9 @@ public sealed class RoadProfile
     /// <summary>
     /// The profile of <paramref name="course"/> on a body <paramref name="radiusKm"/> in
     /// radius, whose smooth ground is <paramref name="groundMeters"/> high at each direction,
-    /// crossing <paramref name="rivers"/> (none: null). Null if it isn't a stone highway (the
-    /// other styles come later), or its way is a single point.
+    /// crossing <paramref name="rivers"/> (none: null). Null if it isn't a stone highway (dirt
+    /// paths are laid by <see cref="DirtPath"/>; cart tracks and old roads come later), or its
+    /// way is a single point.
     /// </summary>
     public static RoadProfile? For(RoadCourseShown course, double radiusKm,
         Func<Vector3D, double> groundMeters, RiverCarving? rivers)
@@ -96,14 +104,8 @@ public sealed class RoadProfile
             return null;
         }
 
-        var along = new double[count];
-        var ground = new double[count];
-        for (int i = 0; i < count; i++)
-        {
-            along[i] = i == 0 ? 0 : along[i - 1] + radiusMeters
-                * Math.Acos(Math.Clamp(points[i - 1].Dot(points[i]), -1, 1));
-            ground[i] = groundMeters(points[i]);
-        }
+        double[] along = AlongOf(points, radiusMeters);
+        double[] ground = [.. points.Select(groundMeters)];
 
         double[] road = Smoothed(ground, along);
         LimitGrade(road, along);
@@ -114,31 +116,73 @@ public sealed class RoadProfile
             road[i] = ground[i] + (road[i] - ground[i]) * Math.Min(1, end / EndMeters);
         }
 
-        List<RoadBridge> bridges = rivers is null ? [] : BridgesOver(points, along, rivers);
-        RaiseForBridges(road, along, bridges);
-        return new RoadProfile(points, along, course.WidthMeters / 2, road, ground, bridges);
+        List<RoadBridge> bridges = rivers is null
+            ? []
+            : BridgesOver(points, along, rivers, BridgeMarginMeters);
+        RaiseForBridges(road, along, bridges, MaxGrade, bridge => bridge.WaterMeters
+            + StoneBridge.ClearanceMeters(bridge.LengthMeters));
+        return new RoadProfile(points, along, course.WidthMeters / 2,
+            RoadCarving.ShoulderMeters, road, ground, bridges, RoadSurface.Paving);
+    }
+
+    /// <summary>
+    /// A road laid as given: along <paramref name="points"/> (unit directions, first first,
+    /// <paramref name="along"/> meters from the first), its surface
+    /// <paramref name="halfWidthMeters"/> to each side with <paramref name="shoulderMeters"/>
+    /// level either side, at <paramref name="roadMeters"/> over ground at
+    /// <paramref name="groundMeters"/>, crossing <paramref name="bridges"/>.
+    /// </summary>
+    internal static RoadProfile Laid(Vector3D[] points, double[] along, double halfWidthMeters,
+        double shoulderMeters, double[] roadMeters, double[] groundMeters,
+        List<RoadBridge> bridges, RoadSurface surface) =>
+        new(points, along, halfWidthMeters, shoulderMeters, roadMeters, groundMeters, bridges,
+            surface);
+
+    /// <summary>
+    /// How far each of <paramref name="points"/> (unit directions) is from the first along
+    /// them, in meters, on a body <paramref name="radiusMeters"/> in radius.
+    /// </summary>
+    internal static double[] AlongOf(IReadOnlyList<Vector3D> points, double radiusMeters)
+    {
+        var along = new double[points.Count];
+        for (int i = 1; i < points.Count; i++)
+        {
+            along[i] = along[i - 1] + radiusMeters
+                * Math.Acos(Math.Clamp(points[i - 1].Dot(points[i]), -1, 1));
+        }
+
+        return along;
     }
 
     // The ground averaged over SmoothingMeters either side of each point (fewer at the ends).
-    private static double[] Smoothed(double[] ground, double[] along)
+    private static double[] Smoothed(double[] ground, double[] along) =>
+        Averaged(ground, along, SmoothingMeters);
+
+    /// <summary>
+    /// <paramref name="values"/> at points <paramref name="along"/> meters along a line, each
+    /// averaged with those within <paramref name="halfWindowMeters"/> either side of it (fewer
+    /// at the ends).
+    /// </summary>
+    internal static double[] Averaged(IReadOnlyList<double> values, IReadOnlyList<double> along,
+        double halfWindowMeters)
     {
-        int count = ground.Length;
+        int count = values.Count;
         var sums = new double[count + 1];
         for (int i = 0; i < count; i++)
         {
-            sums[i + 1] = sums[i] + ground[i];
+            sums[i + 1] = sums[i] + values[i];
         }
 
         var smooth = new double[count];
         int from = 0, to = 0;
         for (int i = 0; i < count; i++)
         {
-            while (along[i] - along[from] > SmoothingMeters)
+            while (along[i] - along[from] > halfWindowMeters)
             {
                 from++;
             }
 
-            while (to < count - 1 && along[to + 1] - along[i] <= SmoothingMeters)
+            while (to < count - 1 && along[to + 1] - along[i] <= halfWindowMeters)
             {
                 to++;
             }
@@ -166,28 +210,32 @@ public sealed class RoadProfile
         }
     }
 
-    // The bridges over the rivers: each run of points over a river's water (or within
-    // BridgeMarginMeters of it), from the dry point before it to the dry point after, with
-    // the highest water and the lowest bed under it. Runs whose ends meet are one bridge.
-    private static List<RoadBridge> BridgesOver(Vector3D[] points, double[] along,
-        RiverCarving rivers)
+    /// <summary>
+    /// The bridges over the rivers: each run of points over a river's water (or within
+    /// <paramref name="marginMeters"/> of it), from the dry point before it to the dry point
+    /// after, with the highest water, the lowest bed, and the widest water under it. Runs whose
+    /// ends meet are one bridge.
+    /// </summary>
+    internal static List<RoadBridge> BridgesOver(IReadOnlyList<Vector3D> points,
+        IReadOnlyList<double> along, RiverCarving rivers, double marginMeters)
     {
         var bridges = new List<RoadBridge>();
-        int count = points.Length;
+        int count = points.Count;
         for (int i = 0; i < count; i++)
         {
-            if (rivers.WaterOver(points[i], BridgeMarginMeters) is not { } first)
+            if (rivers.WaterOver(points[i], marginMeters) is not { } first)
             {
                 continue;
             }
 
-            (double water, double bed) = first;
+            (double water, double bed, double width) = first;
             int end = i;
             while (end + 1 < count
-                && rivers.WaterOver(points[end + 1], BridgeMarginMeters) is { } next)
+                && rivers.WaterOver(points[end + 1], marginMeters) is { } next)
             {
                 end++;
                 (water, bed) = (Math.Max(water, next.WaterMeters), Math.Min(bed, next.BedMeters));
+                width = Math.Max(width, next.WidthMeters);
             }
 
             int start = Math.Max(i - 1, 0), last = Math.Min(end + 1, count - 1);
@@ -199,11 +247,12 @@ public sealed class RoadProfile
                     Last = last,
                     WaterMeters = Math.Max(before.WaterMeters, water),
                     BedMeters = Math.Min(before.BedMeters, bed),
+                    WaterWidthMeters = Math.Max(before.WaterWidthMeters, width),
                 };
             }
             else if (last > start)
             {
-                bridges.Add(new RoadBridge(start, last, water, bed));
+                bridges.Add(new RoadBridge(start, last, water, bed) { WaterWidthMeters = width });
             }
 
             i = end;
@@ -215,10 +264,14 @@ public sealed class RoadProfile
         })];
     }
 
-    // Lifts the road at each bridge's ends to carry its arches over the water, with banks
-    // climbing to it at MaxGrade (as high as they need: a bridge's approach isn't held to
-    // MaxCutMeters); between its ends the bridge runs straight.
-    private static void RaiseForBridges(double[] road, double[] along, List<RoadBridge> bridges)
+    /// <summary>
+    /// Lifts the road at each bridge's ends to at least <paramref name="deckMeters"/> (high
+    /// enough to carry it over the water), with banks climbing to it at
+    /// <paramref name="grade"/> (as high as they need: a highway bridge's approach isn't held
+    /// to MaxCutMeters); between its ends the bridge runs straight.
+    /// </summary>
+    internal static void RaiseForBridges(double[] road, IReadOnlyList<double> along,
+        List<RoadBridge> bridges, double grade, Func<RoadBridge, double> deckMeters)
     {
         if (bridges.Count == 0)
         {
@@ -229,19 +282,19 @@ public sealed class RoadProfile
         Array.Fill(least, double.NegativeInfinity);
         foreach (RoadBridge bridge in bridges)
         {
-            double deck = bridge.WaterMeters + StoneBridge.ClearanceMeters(bridge.LengthMeters);
+            double deck = deckMeters(bridge);
             least[bridge.First] = Math.Max(least[bridge.First], deck);
             least[bridge.Last] = Math.Max(least[bridge.Last], deck);
         }
 
         for (int i = 1; i < road.Length; i++)
         {
-            least[i] = Math.Max(least[i], least[i - 1] - MaxGrade * (along[i] - along[i - 1]));
+            least[i] = Math.Max(least[i], least[i - 1] - grade * (along[i] - along[i - 1]));
         }
 
         for (int i = road.Length - 2; i >= 0; i--)
         {
-            least[i] = Math.Max(least[i], least[i + 1] - MaxGrade * (along[i + 1] - along[i]));
+            least[i] = Math.Max(least[i], least[i + 1] - grade * (along[i + 1] - along[i]));
         }
 
         for (int i = 0; i < road.Length; i++)

@@ -182,9 +182,16 @@ varying vec3 local_direction;
 varying float eye_level_ground;
 
 // What a road built there (VISION.md BOD-13): 1 on its paving and a stone bridge's road and
-// walls' tops, 2 on a bridge's bare stone, else 0. RiverBankStrip brings CUSTOM0.w twice as
-// much more there. Built ground always shows its material, even with the terrain's colors.
+// walls' tops, 2 on a bridge's bare stone, 3 on a dirt path's worn strand, 4 on a wooden
+// bridge's or boardwalk's wood, else 0. RiverBankStrip brings CUSTOM0.w twice as much more
+// there (on a strand, 7 plus how worn it is; on wood, 10). Built ground always shows its
+// material, even with the terrain's colors (a strand only where it's worn through).
 varying float built;
+
+// How worn a dirt path's strand is (0 at its edges, 1 in its middle), and where wood is in its
+// grain (meters along and across it), from RiverBankStrip.
+varying float worn;
+varying vec2 wood_uv;
 
 // Fine detail on that ground near the eye (VISION.md REN-06): its position from the point the
 // mesh is built around (in globe radii, precise near the eye), where that point is in the
@@ -214,7 +221,7 @@ const mat3 DETAIL_TURN_B = mat3(vec3(1.0, 2.0, 2.0), vec3(2.0, 1.0, -2.0), vec3(
 uniform sampler2DArray ground_colors : source_color, filter_linear_mipmap_anisotropic,
 	repeat_enable;
 uniform sampler2DArray ground_normals : filter_linear_mipmap_anisotropic, repeat_enable;
-uniform vec3 ground_averages[9];
+uniform vec3 ground_averages[10];
 uniform sampler2D ground_palette : source_color, filter_nearest, repeat_disable;
 // Snow lies above this height at the equator (meters), lower toward the poles; none without
 // air (GroundMaterials.ShowOn).
@@ -231,13 +238,29 @@ const float GROUND_BROAD_METERS = 64.0;
 // ground is rebuilt; and how rough each is to the light.
 const int GROUND_GRASS = 0;
 const int GROUND_SAND = 3;
+const int GROUND_MUD = 4;
 const int GROUND_ROCK = 5;
 const int GROUND_SNOW = 6;
 const int GROUND_GRAVEL = 7;
 const int GROUND_PAVING = 8;
+const int GROUND_PLANKS = 9;
 const float PAVING_COLOR_KEPT = 0.35;
-const float GROUND_TILE_METERS[9] = float[9](2.0, 2.0, 2.0, 2.0, 4.0, 4.0, 2.0, 2.0, 8.0);
-const float GROUND_ROUGHNESS[9] = float[9](0.95, 0.95, 0.95, 0.9, 0.6, 0.85, 0.7, 0.9, 0.8);
+const float GROUND_TILE_METERS[10] =
+	float[10](2.0, 2.0, 2.0, 2.0, 4.0, 4.0, 2.0, 2.0, 8.0, 2.0);
+const float GROUND_ROUGHNESS[10] =
+	float[10](0.95, 0.95, 0.95, 0.9, 0.6, 0.85, 0.7, 0.9, 0.8, 0.85);
+
+// A dirt path's worn ground is the mud's photo made to read as dry, trodden earth, not wet mud
+// (owner's choice, 2026-10-12): finer (this share of the mud's size), lighter and a little
+// warmer (these factors), keeping this share of its color, and matte; with the ground it's
+// worn into showing through it (its stones, roots, and tufts), from this much at its edges to
+// this much in its middle.
+const float DIRT_GRAIN = 0.5;
+const vec3 DIRT_LIGHTEN = vec3(1.65, 1.5, 1.28);
+const float DIRT_COLOR_KEPT = 0.5;
+const float DIRT_ROUGHNESS = 0.95;
+const float DIRT_THROUGH_EDGE = 0.45;
+const float DIRT_THROUGH_MIDDLE = 0.15;
 // How far a material's color is pulled toward its terrain's painted color (owner's choice:
 // partway, so the palette still shows), and how much of the painted color's lightness comes
 // with it (the photo's own lightness is the more realistic).
@@ -825,8 +848,11 @@ void vertex() {
 	// each around its own middle rather than the globe's, so its positions keep their
 	// precision; it brings each point's direction from the globe's middle along (CUSTOM0,
 	// w = 1) and is lifted already. Other meshes have no CUSTOM0 (it reads as 0).
-	built = CUSTOM0.w > 4.5 ? 2.0 : CUSTOM0.w > 2.5 ? 1.0 : 0.0;
-	float ground_w = CUSTOM0.w - 2.0 * built;
+	built = CUSTOM0.w > 8.5 ? 4.0 : CUSTOM0.w > 6.5 ? 3.0 : CUSTOM0.w > 4.5 ? 2.0
+		: CUSTOM0.w > 2.5 ? 1.0 : 0.0;
+	worn = built > 2.5 && built < 3.5 ? CUSTOM0.w - 7.0 : 0.0;
+	wood_uv = UV;
+	float ground_w = built > 2.5 ? 2.0 : CUSTOM0.w - 2.0 * built;
 	eye_level_ground = ground_w > 0.5 ? ground_w : 0.0;
 	ground_offset = VERTEX;
 	if (CUSTOM0.w > 0.5) {
@@ -1094,12 +1120,23 @@ vec3 ground_material(vec3 direction, vec3 up, vec3 normal, vec3 drawn, float lat
 			best_kind >= 0 ? best_tint : unpainted_color, blend);
 	}
 
-	// Paving on the roads and a bridge's bare stone (VISION.md BOD-13); bare rock where it's
+	// Paving on the roads, a bridge's bare stone, and wood (VISION.md BOD-13); a dirt path's
+	// worn ground where it's worn through (raggedly, toward its edges); bare rock where it's
 	// steeper than about 40 degrees; snow above the line, on ground not too steep to hold it,
 	// and never under water. Their own colors, untinted.
 	float level = dot(normal, up);
 	bool own_color = false;
-	if (built > 0.5) {
+	int under_kind = kind;
+	// Its edges fray finely (about half a meter), as trodden ground does, and wander a little.
+	bool dirt = built > 2.5 && built < 3.5
+		&& worn + 0.7 * (value_noise(q * 8.0 + 7.3) - 0.5) + 0.3 * (fine - 0.5) > 0.35;
+	if (built > 3.5) {
+		kind = GROUND_PLANKS;
+		own_color = true;
+	} else if (dirt) {
+		kind = GROUND_MUD;
+		own_color = true;
+	} else if (built > 0.5 && built < 2.5) {
 		kind = built > 1.5 ? GROUND_ROCK : GROUND_PAVING;
 		own_color = true;
 	} else if (level + 0.12 * ragged < 0.77) {
@@ -1131,21 +1168,31 @@ vec3 ground_material(vec3 direction, vec3 up, vec3 normal, vec3 drawn, float lat
 	// can't pick out the way it would the near one's; past that its average, where a pixel
 	// covers much of a texture (which would only shimmer, and costs the most). Each fades into
 	// the next, so a pixel reads at most two.
-	float texels = meters_per_pixel / GROUND_TILE_METERS[kind];
+	// Wood is laid along its own grain (the planks across a deck, along a rail), so it's read
+	// by where it is in that, not the ground's three ways.
+	float grain = dirt ? DIRT_GRAIN : 1.0;
+	float texels = meters_per_pixel / (GROUND_TILE_METERS[kind] * grain);
 	float near_seen = 1.0 - smoothstep(0.03, 0.12, texels);
 	float far_seen = 1.0 - smoothstep(0.1, 0.5, texels / 8.0);
 	float turned = smoothstep(0.4, 0.6, medium);  // Patches about 16 m across
 	vec3 color = average;
 	vec3 bent = normal;
-	if (far_seen > 0.0 && near_seen < 1.0) {
-		vec3 far_bent;
-		color = mix(average, ground_sample(kind, 8.0, normal, turned, far_bent), far_seen);
-		bent = normalize(mix(normal, far_bent, far_seen));
-	}
-	if (near_seen > 0.0) {
-		vec3 near_bent;
-		color = mix(color, ground_sample(kind, 1.0, normal, turned, near_bent), near_seen);
-		bent = normalize(mix(bent, near_bent, near_seen));
+	if (kind == GROUND_PLANKS) {
+		color = texture(ground_colors, vec3(wood_uv / GROUND_TILE_METERS[kind],
+			float(kind))).rgb;
+	} else {
+		if (far_seen > 0.0 && near_seen < 1.0) {
+			vec3 far_bent;
+			color = mix(average, ground_sample(kind, 8.0 * grain, normal, turned, far_bent),
+				far_seen);
+			bent = normalize(mix(normal, far_bent, far_seen));
+		}
+		if (near_seen > 0.0) {
+			vec3 near_bent;
+			color = mix(color, ground_sample(kind, grain, normal, turned, near_bent),
+				near_seen);
+			bent = normalize(mix(bent, near_bent, near_seen));
+		}
 	}
 	tilted = bent;
 
@@ -1157,6 +1204,18 @@ vec3 ground_material(vec3 direction, vec3 up, vec3 normal, vec3 drawn, float lat
 		color = mix(vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), color, PAVING_COLOR_KEPT);
 	}
 	roughness = GROUND_ROUGHNESS[kind];
+	if (dirt) {
+		color = mix(vec3(dot(color, luma)), color, DIRT_COLOR_KEPT) * DIRT_LIGHTEN;
+		vec3 under = ground_averages[under_kind];
+		if (near_seen > 0.0) {
+			vec3 under_bent;
+			under = mix(under, ground_sample(under_kind, 1.0, normal, turned, under_bent),
+				near_seen);
+		}
+		under *= 0.8 + 0.25 * broad + 0.15 * medium;
+		color = mix(color, under, mix(DIRT_THROUGH_EDGE, DIRT_THROUGH_MIDDLE, worn));
+		roughness = DIRT_ROUGHNESS;
+	}
 	return color * pull;
 }
 #endif
@@ -1243,9 +1302,10 @@ void fragment() {
 		float pixel_size = 2.0 / (PROJECTION_MATRIX[1][1] * VIEWPORT_SIZE.y);
 		float meters_per_pixel = meters_away * pixel_size / facing;
 #ifdef GROUND_MATERIALS
-		if (!terrain_shown || built > 0.5) {
+		if (!terrain_shown || (built > 0.5 && (built < 2.5 || built > 3.5)) || worn > 0.5) {
 			// The ground's shape as it's lit (kept for the lighting below); what a road built
-			// faces its own way (a bridge's walls and arches).
+			// faces its own way (a bridge's walls and arches), but a path's strand, lying on
+			// the ground, is lit as the ground is.
 			vec3 up = flat_disc ? vec3(0.0, 1.0, 0.0) : direction;
 			vec3 shape = up;
 			if (has_heights) {
@@ -1254,7 +1314,7 @@ void fragment() {
 				relief_known = true;
 				shape = relief;
 			}
-			if (built > 0.5) {
+			if (built > 0.5 && (built < 2.5 || built > 3.5)) {
 				shape = normalize(transpose(mat3(VIEW_MATRIX) * mat3(MODEL_MATRIX)) * NORMAL);
 			}
 			vec3 tilted;

@@ -5,12 +5,12 @@ namespace NothicWorlds.Rendering;
 
 /// <summary>
 /// The photo materials of the ground up close while standing (VISION.md REN-06): a color and a
-/// normal map for each <see cref="GroundKind"/>, and one for the stone highways' paving
-/// (VISION.md BOD-13; all CC0, from ambientCG and Poly Haven; see
-/// <c>Assets/Ground/CREDITS.md</c>), loaded into two texture arrays, one layer per kind in the
-/// enum's order and the paving last (<see cref="PavingLayer"/>), which
-/// planet_surface.gdshaderinc picks from per pixel. Made when the standing
-/// view opens and let go when it closes, so the globe views never hold them.
+/// normal map for each <see cref="GroundKind"/>, one for the stone highways' paving, and one for
+/// the dirt paths' wooden bridges and boardwalks (VISION.md BOD-13; all CC0, from ambientCG and
+/// Poly Haven; see <c>Assets/Ground/CREDITS.md</c>), loaded into two texture arrays, one layer
+/// per kind in the enum's order, then the paving (<see cref="PavingLayer"/>) and the planks
+/// (<see cref="PlanksLayer"/>), which planet_surface.gdshaderinc picks from per pixel. Made
+/// when the standing view opens and let go when it closes, so the globe views never hold them.
 /// </summary>
 public sealed class GroundMaterials
 {
@@ -20,10 +20,16 @@ public sealed class GroundMaterials
     /// </summary>
     public static readonly int PavingLayer = Enum.GetValues<GroundKind>().Length;
 
-    // The texture files' names, in GroundKind order, then the paving's.
+    /// <summary>
+    /// The layer of the wooden bridges' planks, after the paving's (GROUND_PLANKS in
+    /// planet_surface.gdshaderinc).
+    /// </summary>
+    public static readonly int PlanksLayer = PavingLayer + 1;
+
+    // The texture files' names, in GroundKind order, then the paving's and the planks'.
     private static readonly string[] _fileNames =
         ["grass", "dry_grass", "forest_floor", "sand", "mud", "rock", "snow", "gravel",
-            "paving"];
+            "paving", "planks"];
 
     // How many pixels across and down each color map's average is taken from.
     private const int AverageSamples = 32;
@@ -56,7 +62,7 @@ public sealed class GroundMaterials
     /// </exception>
     public static GroundMaterials Load()
     {
-        if (_fileNames.Length != PavingLayer + 1)
+        if (_fileNames.Length != PlanksLayer + 1)
         {
             throw new InvalidOperationException("Every ground kind needs its textures.");
         }

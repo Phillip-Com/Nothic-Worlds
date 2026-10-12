@@ -16,9 +16,14 @@ OpenGL-style normal maps only, and saved again as JPEG at quality 85.
 | `snow_*` | ambientCG Snow010A | Lennart Demes | https://ambientcg.com/view?id=Snow010A |
 | `gravel_*` | ambientCG Ground110 | Lennart Demes | https://ambientcg.com/view?id=Ground110 |
 | `paving_*` | ambientCG PavingStones054 | Lennart Demes | https://ambientcg.com/view?id=PavingStones054 |
+| `planks_*` | ambientCG Planks039 | Lennart Demes | https://ambientcg.com/view?id=Planks039 |
 
 The paving (the stone highways, VISION.md `BOD-13`) comes at 683 × 1024; it is laid three across
 and two down, so its stones keep their shape, and scaled to 1024 × 1024.
+
+The planks (the dirt paths' wooden bridges and boardwalks, `BOD-13`) come at 1024 × 512; they
+are laid twice, one over the other, to make 1024 × 1024. The dirt paths' worn ground reuses the
+mud, made drier, finer, and lighter in the shader (owner's choice, 2026-10-12).
 
 Licenses: https://docs.ambientcg.com/license/ and https://polyhaven.com/license.
 

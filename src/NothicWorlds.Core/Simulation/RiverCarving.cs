@@ -121,12 +121,13 @@ public sealed class RiverCarving
     /// <summary>
     /// The heights of the water's surface and of the bed of the river whose water reaches
     /// within <paramref name="marginMeters"/> of a unit direction (the highest water, if
-    /// several), in meters; null over dry ground. Roads bridge over it (VISION.md BOD-13).
+    /// several), and how wide its water is there, in meters; null over dry ground. Roads
+    /// bridge or ford it (VISION.md BOD-13).
     /// </summary>
-    public (double WaterMeters, double BedMeters)? WaterOver(Vector3D direction,
-        double marginMeters)
+    public (double WaterMeters, double BedMeters, double WidthMeters)? WaterOver(
+        Vector3D direction, double marginMeters)
     {
-        (double Water, double Bed)? found = null;
+        (double Water, double Bed, double Width)? found = null;
         foreach ((int r, int s) in Gather(direction, marginMeters / _radiusMeters, 0))
         {
             RiverProfile river = _rivers[r];
@@ -142,7 +143,7 @@ public sealed class RiverCarving
             double bed = Lerp(river.BedMeters[s], river.BedMeters[s + 1], t);
             if (found is not { } known || water > known.Water)
             {
-                found = (water, bed);
+                found = (water, bed, 2 * edge);
             }
         }
 

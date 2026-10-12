@@ -20,6 +20,9 @@ public partial class FirstPersonMode
     // How long the help line says why V did nothing, in seconds.
     private const double PlantsNoteSeconds = 4;
 
+    // How far past a dirt path's worn strand plants keep off it, in meters (VISION.md BOD-13).
+    private const double PathPlantsMeters = 0.3;
+
     // The short grass's own colors (sRGB): green, and yellowed on dry, sandy, or stony
     // ground; and how far each is taken toward its terrain type's color.
     private static readonly Color _greenGrass = new(0.36f, 0.5f, 0.18f);
@@ -237,10 +240,7 @@ public partial class FirstPersonMode
             HashCode.Combine(coverVersion, tiles.ShownVersion, snowLine),
             coverVersion,
             tiles.ShownHeights(),
-            carving is null
-                ? static _ => false
-                : (Func<Vector3D, bool>)(point =>
-                    carving.BeyondBanksMeters(toDirection(point), 1) <= 0),
+            OnBanksOrPaths(carving, Strands, toDirection),
             hasWater
                 ? (point, height) => globe.WaterRadiusAt(toDirection(point)) is double water
                     && baseHeight + water - 1 > height
@@ -252,6 +252,24 @@ public partial class FirstPersonMode
             point => covers.TryGetValue(terrain.CodeAt(toDirection(point)), out var cover)
                 ? cover
                 : (PlantCover.None, default));
+    }
+
+    // Whether a point (as plants are placed) is on a river's banks, a road, or near a dirt
+    // path's worn strand, where plants don't grow.
+    private static Func<Vector3D, bool> OnBanksOrPaths(GroundCarving? carving,
+        PathStrands? strands, Func<Vector3D, Vector3D> toDirection)
+    {
+        if (carving is null && strands is null)
+        {
+            return static _ => false;
+        }
+
+        return point =>
+        {
+            Vector3D direction = toDirection(point);
+            return carving?.BeyondBanksMeters(direction, 1) <= 0
+                || strands?.OnPath(direction, PathPlantsMeters) == true;
+        };
     }
 
     // A terrain type's short grass: green or dry by its ground, taken partway toward its

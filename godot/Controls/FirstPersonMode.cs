@@ -1003,17 +1003,18 @@ public partial class FirstPersonMode : Node
             ToGodot(ToSystem(body, time, middle - eye) * displayRadius));
 
     // Starts working out the beds and banks of the rivers around the eye, and the roads'
-    // paving, sides, and bridges (VISION.md BOD-11, BOD-13), to be drawn finely over the
-    // coarser ground, on a worker: `coarseRadius` gives how far out that ground is shown at a
-    // direction, in radii (or null off it), and must be safe off the main thread; `pointAt`
-    // and `placeAt` as RiverBankStrip.Build. TakeInBanks draws them.
+    // paving, sides, bridges, and worn strands (VISION.md BOD-11, BOD-13), to be drawn finely
+    // over the coarser ground, on a worker: `coarseRadius` gives how far out that ground is
+    // shown at a direction, in radii (or null off it), and must be safe off the main thread;
+    // `pointAt` and `placeAt` as RiverBankStrip.Build. TakeInBanks draws them.
     private void StartBanks(PlanetSurface globe, Body body, Vector3D eye, Vector3D middle,
         Func<Vector3D, double?> coarseRadius, Func<Vector3D, double, Vector3D> pointAt,
         Func<Vector3D, double, Vector3D> placeAt)
     {
         RiverChannels? channels = _channels is { Stretches.Count: > 0 } some ? some : null;
         RoadCarving? roads = _carving?.Roads;
-        if (_carving is not { } carving || (channels is null && roads is null))
+        PathStrands? strands = Strands;
+        if (_carving is not { } carving || (channels is null && roads is null && strands is null))
         {
             ShowBanks(globe, body, null, null, middle);
             return;
@@ -1051,6 +1052,12 @@ public partial class FirstPersonMode : Node
                     carving.Carve, eye, radiusKm, reachMeters, GroundMeters, CoarseMeters,
                     SkirtMeters);
                 strips.AddRange(paved);
+            }
+
+            if (strands is not null)
+            {
+                strips.AddRange(strands.RibbonsNear(carving.Carve, GroundMeters, CoarseMeters,
+                    eye, reachMeters));
             }
 
             return (RiverBankStrip.Prepare(strips, middle, pointAt, placeAt),
@@ -1497,7 +1504,8 @@ public partial class FirstPersonMode : Node
             return false;
         }
 
-        bool strips = _channels is { Stretches.Count: > 0 } || _carving?.Roads is not null;
+        bool strips = _channels is { Stretches.Count: > 0 } || _carving?.Roads is not null
+            || Strands is not null;
         if (!_banksStale && (!strips || tiles.ShownVersion == _banksShownVersion))
         {
             return false;

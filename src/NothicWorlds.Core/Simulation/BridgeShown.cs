@@ -3,8 +3,9 @@ using NothicWorlds.Core.Geometry;
 namespace NothicWorlds.Core.Simulation;
 
 /// <summary>
-/// A highway's stone bridge as it's drawn near a first-person eye (VISION.md BOD-13): its
-/// stone (<see cref="StoneBridge"/>) in its own frame, and where that frame lies on the body.
+/// A road's bridge as it's drawn near a first-person eye (VISION.md BOD-13): its stone
+/// (<see cref="StoneBridge"/>) or wood (<see cref="WoodenBridge"/>) in its own frame, and where
+/// that frame lies on the body.
 /// </summary>
 /// <param name="Start">Where it starts, as a unit direction.</param>
 /// <param name="End">Where it ends, as a unit direction.</param>
@@ -25,9 +26,12 @@ public sealed record BridgeShown(Vector3D Start, Vector3D End, Vector3D Side,
         side *= 1 / Math.Max(side.Length, 1e-12);
         double length = Math.Max(bridge.LengthMeters,
             (end - start).Length * radiusMeters);
-        (List<BridgePoint> points, List<int> triangles) = StoneBridge.Build(length,
-            road.HalfWidthMeters, road.RoadMeters[bridge.First], road.RoadMeters[bridge.Last],
-            bridge.WaterMeters, bridge.BedMeters);
+        double from = road.RoadMeters[bridge.First], to = road.RoadMeters[bridge.Last];
+        double half = bridge.HalfWidthMeters > 0 ? bridge.HalfWidthMeters : road.HalfWidthMeters;
+        (List<BridgePoint> points, List<int> triangles) = bridge.Kind == BridgeKind.Stone
+            ? StoneBridge.Build(length, half, from, to, bridge.WaterMeters, bridge.BedMeters)
+            : WoodenBridge.Build(length, half, from, to, bridge.BedMeters,
+                rails: bridge.Kind == BridgeKind.Wooden);
         return new BridgeShown(start, end, side, length, radiusMeters, points, triangles);
     }
 
