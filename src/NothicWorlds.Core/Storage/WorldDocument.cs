@@ -19,6 +19,7 @@ internal sealed class WorldDocument
     public List<WeatherPinDocument>? WeatherPins { get; init; }  // Added in format version 9
     public List<RiverDocument?>? Rivers { get; init; }  // Added in format version 31
     public List<LakeDocument?>? Lakes { get; init; }  // Added in format version 31
+    public List<RoadDocument?>? Roads { get; init; }  // Added in format version 36
     public List<JournalEntryDocument>? Journal { get; init; }  // Added in format version 7
     public List<TimelineDocument>? Timelines { get; init; }  // Added in format version 7
     public List<EventDocument>? Events { get; init; }  // Added in format version 7
@@ -116,6 +117,17 @@ internal sealed class LakeDocument
     public required double Longitude { get; init; }
     public required int Level { get; init; }
     public bool? FlowsOut { get; init; }  // Omitted when it doesn't
+}
+
+internal sealed class RoadDocument
+{
+    public required Guid Id { get; init; }
+    public required Guid Body { get; init; }
+    public required string Name { get; init; }
+    public required string Style { get; init; }
+    public required string Kind { get; init; }
+    public required List<double[]?> Points { get; init; }  // [latitude, longitude] each
+    public required double Width { get; init; }  // Meters
 }
 
 internal sealed class RegionDocument

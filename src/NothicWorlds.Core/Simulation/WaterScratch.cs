@@ -2,7 +2,8 @@ namespace NothicWorlds.Core.Simulation;
 
 /// <summary>
 /// Working space over every cell for the water's searches (rivers finding their way down,
-/// lakes filling; see <see cref="RiverCourse"/> and <see cref="LakeFill"/>): a search can reach
+/// lakes filling; see <see cref="RiverCourse"/> and <see cref="LakeFill"/>) and the roads'
+/// (<see cref="RoadCourse"/>): a search can reach
 /// hundreds of thousands of cells, and sets and dictionaries of them took most of its time. A
 /// cell counts as marked only if it carries the stamp a search took, so nothing needs clearing
 /// between searches. One is kept and lent out; a search running while it's lent makes its own.
@@ -11,12 +12,18 @@ internal sealed class WaterScratch
 {
     private static WaterScratch? _spare;
     private int _stamp;
+    private float[]? _costs;
 
     /// <summary>Each cell's latest stamp.</summary>
     public int[] Stamps { get; } = new int[WaterCells.Count];
 
     /// <summary>Where a search reached each cell from.</summary>
     public int[] CameFrom { get; } = new int[WaterCells.Count];
+
+    /// <summary>
+    /// The cost of the cheapest way found to each cell (roads only, so made when first wanted).
+    /// </summary>
+    public float[] Costs => _costs ??= new float[WaterCells.Count];
 
     /// <summary>The cells waiting to be searched.</summary>
     public HeightQueue Queue { get; } = new();

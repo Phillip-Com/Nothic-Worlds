@@ -4,7 +4,7 @@ This is the specification for Nothic Worlds save files. It's engine-independent:
 can read a zip file and JSON can read a world, without Godot (CLAUDE.md §7). Code:
 `src/NothicWorlds.Core/Storage/` (`WorldPackage` reads and writes it).
 
-**Current format version: 35** (see **Version history** at the end)
+**Current format version: 36** (see **Version history** at the end)
 
 ## Container
 
@@ -32,7 +32,7 @@ list them all.
 
 ```json
 {
-  "formatVersion": 35,
+  "formatVersion": 36,
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "Aerth",
   "createdUtc": "2026-09-30T12:00:00+00:00",
@@ -152,6 +152,14 @@ list them all.
   "lakes": [
     { "id": "a3a3a3a3-a3a3-a3a3-a3a3-a3a3a3a3a3a3", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       "name": "Still Mere", "latitude": 35, "longitude": 45.5, "level": 640, "flowsOut": true }
+  ],
+  "roads": [
+    { "id": "a4a4a4a4-a4a4-a4a4-a4a4-a4a4a4a4a4a4", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "name": "Kingsway", "style": "stone-highway", "kind": "routed",
+      "points": [[5, 10], [6.5, 12.25], [8, 15]], "width": 12 },
+    { "id": "a5a5a5a5-a5a5-a5a5-a5a5-a5a5a5a5a5a5", "body": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "name": "Shepherd Trails", "style": "dirt-paths", "kind": "drawn",
+      "points": [[-3, 20], [-4.5, 21]], "width": 30 }
   ],
   "regions": [
     {
@@ -333,6 +341,13 @@ list them all.
 | `…lakes[].latitude`, `longitude` | yes | A spot in the lake: −90 to 90, −180 to 180 |
 | `…lakes[].level` | yes | The height of its surface in meters from the body's radius, a whole number from −12,000 to 12,000 |
 | `…lakes[].flowsOut` | no | `true` if a river flows out of it. Omitted when it doesn't. |
+| `roads` | no | Roads on planets and moons (`BOD-13`), in the order added. Omitted when there are none. Up to 2,000. See **Roads** below. |
+| `…roads[].id`, `name` | yes | GUID, unique among roads; name not empty, up to 100 characters |
+| `…roads[].body` | yes | The `id` of the planet or moon it's on (not a star or comet) |
+| `…roads[].style` | yes | `"stone-highway"`, `"dirt-paths"`, `"cart-track"`, or `"old-road"` |
+| `…roads[].kind` | yes | `"drawn"` (its points are its course) or `"routed"` (it passes through its points, finding its way between them) |
+| `…roads[].points` | yes | 2 to 2,000 `[latitude, longitude]` pairs (−90 to 90, −180 to 180), first first |
+| `…roads[].width` | yes | Meters, 1 to 200: how wide the road is, or for dirt paths, the band they wander within |
 | `regions` | no | Areas outlined on planets and moons (`LORE-01`), in drawing order (later on top). Omitted when there are none. Up to 5,000. They may overlap. |
 | `…regions[].id` | yes | GUID, unique among regions |
 | `…regions[].body` | yes | The `id` of the planet or moon it's on (not a star) |
@@ -559,6 +574,15 @@ smaller of `A` and `D`, as Auto's are (so a deeper river only has a lower bed), 
 - The seed is the river's `id` as .NET writes a GUID's 16 bytes (the first three groups
   little-endian), read as four little-endian signed 32-bit numbers XORed together.
 
+## Roads (`roads`)
+
+Only what's listed above is saved. A drawn road runs straight (along the globe) from point to
+point. A routed road's way between its points is worked out by the app from the ground, the
+water, and what grows on each terrain type (`plants`), whenever it's drawn, so it follows them
+as they change; how is up to the app and may get better in later versions, so a reader without
+it can draw a routed road through its points. Roads are worked out in the order listed, each
+favoring the ways of those before it.
+
 ## The star field (`starSeed`)
 
 Constellations name stars by id, so every reader must make exactly the same stars from a seed
@@ -687,6 +711,7 @@ If anything fails, the existing world file is left untouched.
 | 7 | Journals and timelines (M7): optional `journal`, `timelines`, and `events` | Nothing to change: version 6 worlds have none |
 | 8 | Region outlines (M8): optional `regions`; places gain an optional `region` | Nothing to change: version 7 worlds have none |
 | 9 | Weather pins (M9): bodies gain `averageTemperature`; optional `weatherPins` | Each body gets `averageTemperature` 15; worlds have no weather pins |
+| 36 | Roads (BOD-13): optional `roads` | Nothing to change: version 35 worlds have none |
 | 33 | Terrain roughness (BOD-12): terrain types gain optional `roughness` | Nothing to change: older types are smooth (0), as they always looked; only new worlds' default types start rough |
 | 35 | Plants (REN-06): terrain types gain `plants` | A type named Jungle gets `"jungle"`; others get a guess from their climate (water and ice → none, desert → scrub, forest → forest, wetland → marsh, mountains → rocky) or, for open land, their ground (grass → meadow, dry grass → grass, forest floor → woodland, sand → scrub, mud → marsh, rock and gravel → rocky, snow → none) |
 | 34 | Ground materials (REN-06): terrain types gain `ground` | Each type gets a guess from its climate (water and desert → sand, forest → forest floor, wetland → mud, mountains → rock, ice → snow) or, for open land, its color (near white → snow, very dark → mud, green → grass, grey → gravel, red → sand, otherwise dry grass) |

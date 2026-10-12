@@ -28,6 +28,7 @@ internal static class WorldMapper
             WeatherPins = NullIfEmpty(world.WeatherPins.Select(ToDocument)),
             Rivers = NullIfEmpty(world.Rivers.Select(r => (RiverDocument?)ToDocument(r))),
             Lakes = NullIfEmpty(world.Lakes.Select(l => (LakeDocument?)ToDocument(l))),
+            Roads = NullIfEmpty(world.Roads.Select(r => (RoadDocument?)ToDocument(r))),
             Journal = NullIfEmpty(world.Journal.Select(ToDocument)),
             Timelines = NullIfEmpty(world.Timelines.Select(ToDocument)),
             Events = NullIfEmpty(world.Events.Select(ToDocument)),
@@ -106,6 +107,8 @@ internal static class WorldMapper
         world.Rivers.AddRange((document.Rivers ?? []).Select(ToRiver));
         world.Lakes.AddRange((document.Lakes ?? []).Select(ToLake));
         RequireNoProblem(WaterRules.Problem(world));
+        world.Roads.AddRange((document.Roads ?? []).Select(ToRoad));
+        RequireNoProblem(RoadRules.Problem(world));
         world.Journal.AddRange((document.Journal ?? []).Select(ToEntry));
         world.Timelines.AddRange((document.Timelines ?? []).Select(ToTimeline));
         world.Events.AddRange((document.Events ?? []).Select(ToEvent));
@@ -221,6 +224,39 @@ internal static class WorldMapper
             WidthKm = document.Width ?? 1,
             Depth = new RiverDepth(document.Depth, document.DepthVariation ?? 0,
                 document.DepthSpacing ?? 1, document.DepthSmoothness ?? 1),
+        };
+    }
+
+    private static RoadDocument ToDocument(Road road)
+    {
+        return new RoadDocument
+        {
+            Id = road.Id,
+            Body = road.BodyId,
+            Name = road.Name,
+            Style = WorldFormat.RoadStyleName(road.Style),
+            Kind = WorldFormat.RoadKindName(road.Kind),
+            Points = [.. road.Points
+                .Select(p => (double[]?)[p.LatitudeDegrees, p.LongitudeDegrees])],
+            Width = road.WidthMeters,
+        };
+    }
+
+    // Checked fully afterwards by RoadRules.Problem (through Road.Problem).
+    private static Road ToRoad(RoadDocument? document)
+    {
+        Require(document?.Points is not null, "a road is incomplete");
+        Require(document!.Points.All(p => p is { Length: 2 } && IsOnGlobe(p[0], p[1])),
+            "a road's course is invalid");
+        return new Road
+        {
+            Id = document.Id,
+            BodyId = document.Body,
+            Name = document.Name ?? "",
+            Style = WorldFormat.ParseRoadStyle(document.Style),
+            Kind = WorldFormat.ParseRoadKind(document.Kind),
+            Points = [.. document.Points.Select(p => new GeoCoordinate(p![0], p[1]))],
+            WidthMeters = document.Width,
         };
     }
 
