@@ -9,7 +9,8 @@ namespace NothicWorlds.Core.Simulation;
 /// portal, a stone front with a round arch across the end of the cutting, built out as a block
 /// over the hill's face. Built in pieces, each in its own frame as a bridge is
 /// (<see cref="BridgePoint"/>: x along the road into the tunnel, y across it to the left, z up,
-/// heights as the ground's).
+/// heights as the ground's). An old road's tunnel (owner's choice, 2026-10-12) is the same of
+/// weathered stone, with no torches.
 /// </summary>
 public static class StoneTunnel
 {
@@ -121,11 +122,12 @@ public static class StoneTunnel
     /// <paramref name="startMeters"/> at its start and <paramref name="endMeters"/> at its end,
     /// <paramref name="innerHalfMeters"/> from the middle to each wall;
     /// <paramref name="alongMeters"/> from the tunnel's first portal in a tunnel
-    /// <paramref name="tunnelMeters"/> long (for how dark it is, and where its torches are).
+    /// <paramref name="tunnelMeters"/> long (for how dark it is, and where its torches are);
+    /// an <paramref name="old"/> road's weathered, without torches.
     /// </summary>
     public static (List<BridgePoint> Points, List<int> Triangles) Vault(double lengthMeters,
         double innerHalfMeters, double startMeters, double endMeters, double alongMeters,
-        double tunnelMeters)
+        double tunnelMeters, bool old = false)
     {
         var mesh = new BridgeMesh
         {
@@ -144,6 +146,10 @@ public static class StoneTunnel
             new(x1, inner, Floor(x1)), new(x0, inner, Floor(x0)), new(0, 0, 1),
             BridgeMaterial.Paving);
         Arch(mesh, x0, x1, inner, Floor);
+        if (old)
+        {
+            return Weathered(mesh);
+        }
 
         // The torches whose places along the tunnel fall in this piece.
         double first = Math.Ceiling((alongMeters - TorchMeters / 2) / TorchMeters);
@@ -166,10 +172,11 @@ public static class StoneTunnel
     /// A portal's front and block, for a tunnel <paramref name="innerHalfMeters"/> from its
     /// middle to each wall, its road at <paramref name="roadMeters"/>, and the ground
     /// <paramref name="depthMeters"/> over it there: the front faces out of the tunnel (to
-    /// less x), its arch open onto the vault, and the block reaches back over the tunnel.
+    /// less x), its arch open onto the vault, and the block reaches back over the tunnel. An
+    /// <paramref name="old"/> road's is weathered.
     /// </summary>
     public static (List<BridgePoint> Points, List<int> Triangles) Portal(
-        double innerHalfMeters, double roadMeters, double depthMeters)
+        double innerHalfMeters, double roadMeters, double depthMeters, bool old = false)
     {
         var mesh = new BridgeMesh();
         double inner = innerHalfMeters, spring = SpringMeters;
@@ -246,8 +253,13 @@ public static class StoneTunnel
             new(BlockMeters, -half, top), new(front, -half, top), new(0, -1, 0),
             BridgeMaterial.Stone);
         Arch(mesh, front, 0, inner, Floor);
-        return (mesh.Points, mesh.Triangles);
+        return old ? Weathered(mesh) : (mesh.Points, mesh.Triangles);
     }
+
+    // The mesh's points and triangles, all of its stone and paving weathered.
+    private static (List<BridgePoint> Points, List<int> Triangles) Weathered(BridgeMesh mesh) =>
+        ([.. mesh.Points.Select(point => point with { Material = BridgeMaterial.Weathered })],
+            mesh.Triangles);
 
     // The vault's walls and arch from x0 to x1 over a floor at `floor(x)`, facing in.
     private static void Arch(BridgeMesh mesh, double x0, double x1, double inner,

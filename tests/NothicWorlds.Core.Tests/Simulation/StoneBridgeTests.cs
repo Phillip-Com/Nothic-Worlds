@@ -57,4 +57,44 @@ public sealed class StoneBridgeTests
         double crown = points.Where(p => p.Normal.Z < -0.99).Max(p => p.Position.Z);
         Assert.Equal(deck - StoneBridge.CrownMeters, crown, 6);
     }
+
+    [Fact]
+    public void AnOldBridge_IsWeathered_ItsWallsBroken_TheSameEveryTime()
+    {
+        double deck = 10 + StoneBridge.ClearanceMeters(60);
+        (List<BridgePoint> points, List<int> triangles) = StoneBridge.Build(60, 4, deck, deck,
+            10, 7, ruinSeed: 42);
+
+        Assert.All(points, p => Assert.Equal(BridgeMaterial.Weathered, p.Material));
+        Assert.Equal(0, triangles.Count % 3);
+        for (int t = 0; t < triangles.Count; t += 3)
+        {
+            BridgePoint a = points[triangles[t]], b = points[triangles[t + 1]];
+            BridgePoint c = points[triangles[t + 2]];
+            Vector3D facing = (b.Position - a.Position).Cross(c.Position - a.Position);
+            Assert.True(facing.Dot(a.Normal) > 0);
+        }
+
+        // Each side's wall, in pieces: most standing, some fallen to a stub, some gone (each
+        // piece a box, with 12 of its points at its top).
+        int pieces = (int)Math.Round(60 / StoneBridge.WallPieceMeters);
+        foreach (double side in new[] { 1.0, -1.0 })
+        {
+            int TopsAt(double meters) => points.Count(p => p.Position.Y * side > 4 - 1e-9
+                && Math.Abs(p.Position.Z - (deck + meters)) < 1e-9) / 12;
+            int standing = TopsAt(StoneBridge.WallHeightMeters), stubs = TopsAt(0.3);
+            Assert.InRange(standing, pieces / 2, pieces - 1);
+            Assert.InRange(stubs, 1, pieces / 2);
+            Assert.True(standing + stubs < pieces);
+        }
+
+        // The road runs out under its walls, so where one's gone, there's no hole.
+        Assert.Contains(points, p => p.Normal.Z > 0.99 && Math.Abs(p.Position.Z - deck) < 1e-9
+            && Math.Abs(p.Position.Y) > 4 + StoneBridge.WallThicknessMeters - 1e-9);
+
+        (List<BridgePoint> again, _) = StoneBridge.Build(60, 4, deck, deck, 10, 7, 42);
+        Assert.Equal(points, again);
+        (List<BridgePoint> other, _) = StoneBridge.Build(60, 4, deck, deck, 10, 7, 43);
+        Assert.NotEqual(points, other);
+    }
 }

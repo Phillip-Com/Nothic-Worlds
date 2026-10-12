@@ -74,16 +74,23 @@ public sealed class GroundCarving
     /// none is nearer): rough terrain fades out toward them (VISION.md BOD-12), and plants
     /// don't grow on them. A tunnel's road counts only with <paramref name="tunnels"/> (rough
     /// terrain fades over it, so the hill covers it as its profile was laid for, but plants
-    /// grow there). Safe to call from several threads at once.
+    /// grow there), and an old road only with <paramref name="oldRoads"/> (plants grow on it:
+    /// <see cref="OnOldPaving"/>). Safe to call from several threads at once.
     /// </summary>
     public double BeyondBanksMeters(Vector3D direction, double withinMeters,
-        bool tunnels = true)
+        bool tunnels = true, bool oldRoads = true)
     {
         double nearest = Rivers?.BeyondBanksMeters(direction, withinMeters) ?? withinMeters;
         return nearest > 0 && Roads is { } roads
-            ? roads.BeyondSidesMeters(direction, nearest, tunnels)
+            ? roads.BeyondSidesMeters(direction, nearest, tunnels, oldRoads)
             : nearest;
     }
+
+    /// <summary>
+    /// Whether a unit direction is on an old road's paving
+    /// (<see cref="RoadCarving.OnOldPaving"/>).
+    /// </summary>
+    public bool OnOldPaving(Vector3D direction) => Roads?.OnOldPaving(direction) == true;
 
     /// <summary>
     /// The height of a bridge's road at a unit direction, in meters, if one is there; else

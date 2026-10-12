@@ -37,11 +37,15 @@ public sealed class DirtPathTests
         RadiusKm, _ => 100)!], RadiusKm);
 
     [Fact]
-    public void OnlyDirtPaths_AreLaidAsStrands()
+    public void OnlyDirtPathsAndCartTracks_AreLaidAsStrands()
     {
         Assert.Null(DirtPath.For(Path(style: RoadStyle.StoneHighway), RadiusKm, _ => 100, null,
             _ => false));
+        Assert.Null(DirtPath.For(Path(style: RoadStyle.OldRoad), RadiusKm, _ => 100, null,
+            _ => false));
         Assert.NotNull(DirtPath.For(Path(), RadiusKm, _ => 100, null, _ => false));
+        Assert.NotNull(DirtPath.For(Path(style: RoadStyle.CartTrack), RadiusKm, _ => 100, null,
+            _ => false));
     }
 
     [Fact]
@@ -253,5 +257,88 @@ public sealed class DirtPathTests
         Assert.All(strands.RibbonsNear((_, ground) => ground, _ => 100, _ => 101, on, 200)
             .SelectMany(strip => strip).SelectMany(row => row), point =>
                 Assert.InRange(point.Meters, 101, 101.5));
+    }
+
+    // A cart track 4 m wide drawn east along the equator.
+    private static RoadCourseShown Track(Guid? id = null) =>
+        Path(id, RoadStyle.CartTrack, 4);
+
+    [Fact]
+    public void ACartTrack_IsTwoRuts_AGaugeApart_TheGroundBetweenKeptClear()
+    {
+        DirtPath track = Laid(Track(Guid.Empty));
+
+        List<PathStrand> ruts = [.. track.Strands.Where(strand => strand.Worn)];
+        Assert.Equal(2, ruts.Count);
+        Assert.All(ruts, rut =>
+        {
+            Assert.True(rut.Rut);
+            Assert.Equal(DirtPath.RutHalfWidthMeters, rut.HalfWidthMeters);
+            Assert.All(rut.Points, point =>
+                Assert.Equal(DirtPath.RutGaugeMeters / 2, Math.Abs(North(point)), 3));
+        });
+        Assert.Contains(ruts, rut => North(rut.Points[0]) > 0);
+        Assert.Contains(ruts, rut => North(rut.Points[0]) < 0);
+
+        // Plants keep off its width (between the ruts too), but grow beside it.
+        PathStrands strands = PathStrands.For([track], RadiusKm);
+        Assert.True(strands.OnPath(WaterGround.At(0, 0), 0));
+        Vector3D edge = WaterGround.At(1.9 / MetersPerDegree, 0);
+        Assert.True(strands.OnPath(edge, 0));
+        Vector3D beside = WaterGround.At(3 / MetersPerDegree, 0);
+        Assert.False(strands.OnPath(beside, 0.3));
+
+        // Only the ruts are drawn, as ruts.
+        List<List<BankPoint[]>> ribbons = strands.RibbonsNear((_, ground) => ground, _ => 100,
+            _ => 99, WaterGround.At(0, 0), 200);
+        Assert.Equal(2, ribbons.Count);
+        Assert.All(ribbons.SelectMany(strip => strip).SelectMany(row => row), point =>
+        {
+            Assert.Equal(StripSurface.Rut, point.Surface);
+            Assert.InRange(Math.Abs(North(point.Direction)), 0.4, 1.1);
+        });
+    }
+
+    [Fact]
+    public void UpASlope_ACartTrackSwitchesBack_WherePathsWouldClimbStraight()
+    {
+        // A slope 12% steep for 200 m in the middle: under a path's limit, over a cart's.
+        static double Ground(Vector3D direction) =>
+            100 + 0.12 * Math.Clamp(East(direction), -100, 100);
+        Assert.All(Laid(Path(), Ground).Strands.Where(strand => strand.Index == 0), strand =>
+            Assert.All(strand.Points, point => Assert.InRange(Math.Abs(North(point)), 0, 15)));
+
+        DirtPath track = Laid(Track(), Ground);
+        PathStrand rut = track.Strands.First(strand => strand.Rut);
+        double widest = rut.Points.Max(point => Math.Abs(North(point)));
+        Assert.InRange(widest, 20, DirtPath.CartMaxSwingMeters + 2);
+
+        // It climbs the 24 m over a longer way than straight, at about its grade.
+        var climb = rut.Points.Where(point => Math.Abs(East(point)) < 100).ToList();
+        double length = climb.Zip(climb.Skip(1)).Sum(pair =>
+            (pair.First - pair.Second).Length * RadiusKm * 1000);
+        Assert.InRange(24 / length, 0.05, DirtPath.CartMaxGrade);
+    }
+
+    [Fact]
+    public void ACartTrack_CrossesWaterAndMarsh_ThreeMetersWide()
+    {
+        DirtPath bridged = Laid(Track(), rivers: River(0.05));
+        RoadProfile crossing = Assert.Single(bridged.Crossings);
+        Assert.Equal(DirtPath.CartHalfWidthMeters, crossing.HalfWidthMeters);
+        RoadBridge bridge = Assert.Single(crossing.Bridges);
+        Assert.Equal(BridgeKind.Wooden, bridge.Kind);
+        Assert.Equal(DirtPath.CartHalfWidthMeters, bridge.HalfWidthMeters);
+
+        // Its ruts break off where it crosses, as a path's strand does.
+        Assert.Equal(4, bridged.Strands.Count(strand => strand.Rut));
+
+        static bool Marsh(Vector3D direction) => Math.Abs(East(direction)) < 100;
+        DirtPath boardwalked = Laid(Track(), isMarsh: Marsh);
+        Assert.All(Assert.Single(boardwalked.Crossings).Bridges, board =>
+        {
+            Assert.Equal(BridgeKind.Boardwalk, board.Kind);
+            Assert.Equal(DirtPath.CartHalfWidthMeters, board.HalfWidthMeters);
+        });
     }
 }

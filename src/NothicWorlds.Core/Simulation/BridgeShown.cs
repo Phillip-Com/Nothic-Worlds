@@ -18,8 +18,12 @@ public sealed record BridgeShown(Vector3D Start, Vector3D End, Vector3D Side,
     double LengthMeters, double RadiusMeters, IReadOnlyList<BridgePoint> Points,
     IReadOnlyList<int> Triangles)
 {
-    /// <summary>The bridge <paramref name="bridge"/> along <paramref name="road"/>.</summary>
-    public static BridgeShown Of(RoadProfile road, RoadBridge bridge, double radiusMeters)
+    /// <summary>
+    /// The bridge <paramref name="bridge"/> along <paramref name="road"/>; an
+    /// <paramref name="old"/> one's stone weathered and its walls broken.
+    /// </summary>
+    public static BridgeShown Of(RoadProfile road, RoadBridge bridge, double radiusMeters,
+        bool old = false)
     {
         Vector3D start = road.Points[bridge.First], end = road.Points[bridge.Last];
         double length = Math.Max(bridge.LengthMeters,
@@ -27,7 +31,8 @@ public sealed record BridgeShown(Vector3D Start, Vector3D End, Vector3D Side,
         double from = road.RoadMeters[bridge.First], to = road.RoadMeters[bridge.Last];
         double half = bridge.HalfWidthMeters > 0 ? bridge.HalfWidthMeters : road.HalfWidthMeters;
         (List<BridgePoint> points, List<int> triangles) = bridge.Kind == BridgeKind.Stone
-            ? StoneBridge.Build(length, half, from, to, bridge.WaterMeters, bridge.BedMeters)
+            ? StoneBridge.Build(length, half, from, to, bridge.WaterMeters, bridge.BedMeters,
+                old ? SeededNoise.Seed(start) : null)
             : WoodenBridge.Build(length, half, from, to, bridge.BedMeters,
                 rails: bridge.Kind == BridgeKind.Wooden);
         return Between(start, end, length, radiusMeters, points, triangles);

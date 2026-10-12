@@ -8,7 +8,9 @@ namespace NothicWorlds.Core.Simulation;
 /// water, and low walls along its sides). Built in the bridge's own frame, in meters: x along
 /// it from its start, y across it (to the left), z up (heights as the ground's), so it can be
 /// drawn wherever the road puts it. Arches spring from just over the water; piers and the
-/// abutments at the ends reach down below the river's bed, into the ground.
+/// abutments at the ends reach down below the river's bed, into the ground. An old road's
+/// bridge (owner's choice, 2026-10-12) is the same, of weathered stone, its walls broken: a
+/// piece in <see cref="WallPieceMeters"/> fallen to a stub here and there, or gone.
 /// </summary>
 public static class StoneBridge
 {
@@ -23,6 +25,13 @@ public static class StoneBridge
 
     /// <summary>How far over the water the arches spring, in meters.</summary>
     public const double SpringAboveWaterMeters = 0.3;
+
+    /// <summary>How long each piece of an old bridge's walls is, in meters.</summary>
+    public const double WallPieceMeters = 2;
+
+    // What share of an old bridge's wall pieces are fallen to a stub, and gone, and how high
+    // a stub stands, in meters.
+    private const double FallenShare = 0.25, GoneShare = 0.1, StubMeters = 0.3;
 
     // How far below the bed the piers and abutments reach, in meters.
     private const double FootingMeters = 1;
@@ -53,18 +62,25 @@ public static class StoneBridge
     /// <paramref name="lengthMeters"/> long carrying a road <paramref name="halfWidthMeters"/>
     /// to each side, its road at <paramref name="startMeters"/> at the start and
     /// <paramref name="endMeters"/> at the end (straight between), over water at
-    /// <paramref name="waterMeters"/> and a bed at <paramref name="bedMeters"/>.
+    /// <paramref name="waterMeters"/> and a bed at <paramref name="bedMeters"/>; an old road's,
+    /// weathered and its walls broken as <paramref name="ruinSeed"/> has them, if given.
     /// </summary>
     public static (List<BridgePoint> Points, List<int> Triangles) Build(double lengthMeters,
         double halfWidthMeters, double startMeters, double endMeters, double waterMeters,
-        double bedMeters)
+        double bedMeters, ulong? ruinSeed = null)
     {
         var mesh = new BridgeMesh();
+        bool old = ruinSeed is not null;
+        BridgeMaterial stone = old ? BridgeMaterial.Weathered : BridgeMaterial.Stone;
+        BridgeMaterial paving = old ? BridgeMaterial.Weathered : BridgeMaterial.Paving;
         double deckHalf = halfWidthMeters, outer = halfWidthMeters + WallThicknessMeters;
         double foot = Math.Min(bedMeters, waterMeters) - FootingMeters;
         double Deck(double x) => startMeters + (endMeters - startMeters)
             * (lengthMeters > 0 ? x / lengthMeters : 0);
         double WallTop(double x) => Deck(x) + WallHeightMeters;
+
+        // An old bridge's sides reach only to its road: its walls are built in pieces.
+        double SideTop(double x) => old ? Deck(x) : WallTop(x);
 
         List<(double X, double Bottom)> underside = Underside(lengthMeters, waterMeters, foot);
 
@@ -78,10 +94,10 @@ public static class StoneBridge
                 continue;
             }
 
-            mesh.Quad(new(x0, outer, b0), new(x1, outer, b1), new(x1, outer, WallTop(x1)),
-                new(x0, outer, WallTop(x0)), new(0, 1, 0), BridgeMaterial.Stone);
-            mesh.Quad(new(x1, -outer, b1), new(x0, -outer, b0), new(x0, -outer, WallTop(x0)),
-                new(x1, -outer, WallTop(x1)), new(0, -1, 0), BridgeMaterial.Stone);
+            mesh.Quad(new(x0, outer, b0), new(x1, outer, b1), new(x1, outer, SideTop(x1)),
+                new(x0, outer, SideTop(x0)), new(0, 1, 0), stone);
+            mesh.Quad(new(x1, -outer, b1), new(x0, -outer, b0), new(x0, -outer, SideTop(x0)),
+                new(x1, -outer, SideTop(x1)), new(0, -1, 0), stone);
         }
 
         // The underside: the arches' curves, and the piers' faces under where they spring.
@@ -97,31 +113,62 @@ public static class StoneBridge
 
             var normal = new Vector3D(dz / length, 0, -dx / length);
             mesh.Quad(new(x0, -outer, b0), new(x1, -outer, b1), new(x1, outer, b1),
-                new(x0, outer, b0), normal, BridgeMaterial.Stone);
+                new(x0, outer, b0), normal, stone);
         }
 
-        // The road over it, the walls' inner faces and tops, and the ends.
-        mesh.Quad(new(0, -deckHalf, Deck(0)), new(lengthMeters, -deckHalf, Deck(lengthMeters)),
-            new(lengthMeters, deckHalf, Deck(lengthMeters)), new(0, deckHalf, Deck(0)),
-            new(0, 0, 1), BridgeMaterial.Paving);
+        // The road over it (an old one's out to its sides, under its broken walls), the walls'
+        // inner faces and tops, and the ends.
+        double road = old ? outer : deckHalf;
+        mesh.Quad(new(0, -road, Deck(0)), new(lengthMeters, -road, Deck(lengthMeters)),
+            new(lengthMeters, road, Deck(lengthMeters)), new(0, road, Deck(0)),
+            new(0, 0, 1), paving);
         foreach (double side in new[] { 1.0, -1.0 })
         {
+            if (old)
+            {
+                BrokenWall(mesh, lengthMeters, side, deckHalf, outer, Deck, ruinSeed!.Value);
+                continue;
+            }
+
             double inner = side * deckHalf, edge = side * outer;
             mesh.Quad(new(0, inner, Deck(0)), new(lengthMeters, inner, Deck(lengthMeters)),
                 new(lengthMeters, inner, WallTop(lengthMeters)), new(0, inner, WallTop(0)),
-                new(0, -side, 0), BridgeMaterial.Stone);
+                new(0, -side, 0), stone);
             mesh.Quad(new(0, inner, WallTop(0)), new(lengthMeters, inner, WallTop(lengthMeters)),
                 new(lengthMeters, edge, WallTop(lengthMeters)), new(0, edge, WallTop(0)),
-                new(0, 0, 1), BridgeMaterial.Paving);
+                new(0, 0, 1), paving);
         }
 
-        mesh.Quad(new(0, outer, foot), new(0, outer, WallTop(0)), new(0, -outer, WallTop(0)),
-            new(0, -outer, foot), new(-1, 0, 0), BridgeMaterial.Stone);
-        mesh.Quad(new(lengthMeters, -outer, foot), new(lengthMeters, -outer, WallTop(lengthMeters)),
-            new(lengthMeters, outer, WallTop(lengthMeters)), new(lengthMeters, outer, foot),
-            new(1, 0, 0), BridgeMaterial.Stone);
+        mesh.Quad(new(0, outer, foot), new(0, outer, SideTop(0)), new(0, -outer, SideTop(0)),
+            new(0, -outer, foot), new(-1, 0, 0), stone);
+        mesh.Quad(new(lengthMeters, -outer, foot), new(lengthMeters, -outer, SideTop(lengthMeters)),
+            new(lengthMeters, outer, SideTop(lengthMeters)), new(lengthMeters, outer, foot),
+            new(1, 0, 0), stone);
         return (mesh.Points, mesh.Triangles);
     }
+
+    // One side's wall on an old bridge (`side` 1: the left): in pieces WallPieceMeters long,
+    // some fallen to a stub and some gone, by the seed; the road at `deck` along it.
+    private static void BrokenWall(BridgeMesh mesh, double lengthMeters, double side,
+        double deckHalf, double outer, Func<double, double> deck, ulong seed)
+    {
+        (double y0, double y1) = side > 0 ? (deckHalf, outer) : (-outer, -deckHalf);
+        int pieces = Math.Max(1, (int)Math.Round(lengthMeters / WallPieceMeters));
+        for (int k = 0; k < pieces; k++)
+        {
+            double chance = (SeededNoise.Hashed(seed, side > 0 ? 1 : 2, k) + 1) / 2;
+            if (chance < GoneShare)
+            {
+                continue;
+            }
+
+            double height = chance < GoneShare + FallenShare ? StubMeters : WallHeightMeters;
+            double x0 = lengthMeters * k / pieces, x1 = lengthMeters * (k + 1) / pieces;
+            mesh.Box(x0, x1, y0, y1, deck(x0), deck(x1), deck(x0) + height, deck(x1) + height,
+                BridgeMaterial.Weathered, new Vector3D(1, 0, 0));
+        }
+    }
+
 
     // The radius of each arch between piers this far apart, in meters.
     private static double ArchRadius(double spanMeters) =>

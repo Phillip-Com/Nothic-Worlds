@@ -84,7 +84,8 @@ public static class RoadStrips
             {
                 if (InReach(road, bridge, eye, radiusMeters, reachMeters))
                 {
-                    bridges.Add(BridgeShown.Of(road, bridge, radiusMeters));
+                    bridges.Add(BridgeShown.Of(road, bridge, radiusMeters,
+                        road.Surface == RoadSurface.OldPaving));
                 }
             }
 
@@ -104,6 +105,7 @@ public static class RoadStrips
         List<TunnelPortal> portals)
     {
         double inner = road.HalfWidthMeters + road.ShoulderMeters;
+        bool old = road.Surface == RoadSurface.OldPaving;
         bool Near(int i) => radiusMeters * Math.Acos(Math.Clamp(road.Points[i].Dot(eye), -1, 1))
             <= reachMeters;
         for (int s = tunnel.First; s < tunnel.Last; s++)
@@ -116,7 +118,8 @@ public static class RoadStrips
             double length = road.AlongMeters[s + 1] - road.AlongMeters[s];
             (List<BridgePoint> points, List<int> triangles) = StoneTunnel.Vault(length, inner,
                 road.RoadMeters[s], road.RoadMeters[s + 1],
-                road.AlongMeters[s] - road.AlongMeters[tunnel.First], tunnel.LengthMeters);
+                road.AlongMeters[s] - road.AlongMeters[tunnel.First], tunnel.LengthMeters,
+                old);
             bridges.Add(BridgeShown.Between(road.Points[s], road.Points[s + 1], length,
                 radiusMeters, points, triangles));
         }
@@ -130,7 +133,7 @@ public static class RoadStrips
 
             double depth = road.GroundMeters[at] - road.RoadMeters[at];
             (List<BridgePoint> points, List<int> triangles) = StoneTunnel.Portal(inner,
-                road.RoadMeters[at], depth);
+                road.RoadMeters[at], depth, old);
             BridgeShown shown = BridgeShown.Between(road.Points[at], road.Points[at + inward],
                 Math.Abs(road.AlongMeters[at + inward] - road.AlongMeters[at]), radiusMeters,
                 points, triangles);
@@ -220,9 +223,12 @@ public static class RoadStrips
         side.AddRange(_side.Select(share => (shoulder + share * (reach - shoulder), 0.0, 0.0)));
         side.AddRange(_skirt.Select(share => (reach + share * skirt, share, 0.0)));
 
-        StripSurface surface = road.Surface == RoadSurface.Dirt
-            ? StripSurface.Worn
-            : StripSurface.Paving;
+        StripSurface surface = road.Surface switch
+        {
+            RoadSurface.Dirt => StripSurface.Worn,
+            RoadSurface.OldPaving => StripSurface.OldPaving,
+            _ => StripSurface.Paving,
+        };
         BankPoint At(double across, double skirtShare, double raise, StripSurface surface)
         {
             Vector3D direction = row.Direction + row.Side * (across / radiusMeters);
@@ -241,7 +247,9 @@ public static class RoadStrips
         BankPoint[] paving = [.. _paving.Select(share =>
             At(share * halfWidth, 0, pavingLift, surface) with
             {
-                Wear = surface == StripSurface.Worn ? 1 - Math.Abs(share) : 0,
+                Wear = surface is StripSurface.Worn or StripSurface.OldPaving
+                    ? 1 - Math.Abs(share)
+                    : 0,
             })];
         return (left, paving, right);
     }

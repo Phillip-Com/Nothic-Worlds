@@ -16,4 +16,7 @@ public enum BridgeMaterial
 
     /// <summary>A tunnel's torches' flames, which glow.</summary>
     Flame,
+
+    /// <summary>An old road's bridge or tunnel's weathered, mossy stone, its road too.</summary>
+    Weathered,
 }
