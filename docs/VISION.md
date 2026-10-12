@@ -847,7 +847,8 @@ builds it (`GroundTileRecipe.MorphHeight`). The session keeps each body's (`Roug
 Low ground detail they thin out far off (from about 5 km, none past 15 km) so the tiles meet
 the globe's own ground; at Standard and High they reach the farthest peak (see `REN-06`). A type with no variation can't be rough.
 
-**BOD-13 — Roads** · In progress (M43: on the map, PR #125; highways up close, PR #126) · Base
+**BOD-13 — Roads** · In progress (M43: on the map, PR #125; highways up close, PR #126; dirt
+paths up close, PR #127) · Base
 **Intent:** A road tool that works like rivers, starting with fantasy roads: a **stone highway**,
 one large paved road laid by a work crew along the most efficient line, tunneling through hills
 and crossing rivers on solid stone bridges; and **dirt paths**, many paths that split and
@@ -867,6 +868,10 @@ Highways up close (2026-10-12): a grade of at most **8%**; cuttings and banks at
 deep (past that the road follows the ground, until tunnels); paved with a CC0 photo of Roman
 paving, toned grey; bridges of **round stone arches**, each at most about 20 m across, with piers in the
 water and low walls along the sides.
+Dirt paths up close (2026-10-12): built in one step; worn ground is the **mud photo made drier,
+finer, and lighter** so it doesn't blend into mud terrain; **one CC0 photo of weathered planks**
+for wooden bridges and boardwalks; **fords** where the water is at most **12 m** wide (wider:
+a wooden bridge); **switchbacks** above a **15%** grade, reaching up to **40 m** either side.
 **Built:**
 - Data (format v36): `Model/Road.cs` (style, kind, points, width), `RoadStyle`, `RoadKind`,
   `RoadRules`. Only these are saved; the ways are worked out each time (docs/world-format.md).
@@ -893,14 +898,34 @@ water and low walls along the sides.
   channels, then roads' shaping: what the tiles, strips, walking, plants, rangefinder and rough
   terrain's fading all follow), `RoadStrips` (paving and sides near the eye, as `RiverBanks`),
   `StoneBridge` (arches, piers, walls, in the bridge's own frame) and `BridgeShown`.
-  `RiverCarving.PartsNear`/`WaterOver` (where to bridge). `FirstPersonMode.Highways.cs` works
-  the profiles out again when the roads, ground, or rivers change; `StartBanks` builds the
+  `RiverCarving.PartsNear`/`WaterOver` (where to bridge, and how wide the water is).
+  `FirstPersonMode.LaidRoads.cs` works the profiles out again when the roads, ground, rivers,
+  or plants change; `StartBanks` builds the
   strips with the rivers' banks in one mesh, and the bridges in another (`RiverBankStrip`,
   `PrepareBridges`; they cast shadows); walkers cross on a bridge's road (`DeckMeters`).
   Paving is a ninth ground material (`GroundMaterials.PavingLayer`, `paving_*` in
   `Assets/Ground`): `planet_surface.gdshaderinc` reads it, and a bridge's bare stone, from
   CUSTOM0.w (`built`), shown even with the terrain's colors.
-**Limits:** dirt paths, cart tracks, and old roads show only on the map and the minimap so far.
+- Dirt paths up close: Core `DirtPath` (worked out every 5 m along the way: 3 to 7 strands in
+  the band, each on its own lane plus seeded noise, leaning to the flatter side, extra ones
+  coming and going and rejoining a neighbor, all gathering over 40 m to one at crossings,
+  switchbacks, and ends; switchbacks' corners placed by how much the slope has climbed, so each
+  leg climbs alike, rounded over 4 m; each crossing a short `RoadProfile` of `RoadSurface.Dirt`
+  laid through `RoadCarving` as a highway is, with a ford 0.4 m under the water, a wooden
+  bridge (`WoodenBridge`, `BridgeKind.Wooden`, 3 m wide, its deck 0.8 m over the water at
+  least) or a boardwalk (one bridge a step, 1.5 m wide, 0.5 m over the marsh), no steeper than
+  15% to it). `PathStrands` (all strands' search tree: plants keep 0.3 m off them; worn
+  ribbons near the eye, out to 800 m, lying over the ground as it's shaped or drawn,
+  whichever's higher). `BankPoint.Surface`/`Wear`, `BridgePoint.Material` and its grain
+  (`BridgeMesh`, shared with `StoneBridge`). Worn ground (CUSTOM0.w 7–8) is the mud photo at
+  half size, lighter, drier, and matte, its edges frayed finely, the ground under it showing
+  through more at its edges; wood (w 10) is a tenth ground material (`PlanksLayer`,
+  `planks_*`) read along its grain from UV.
+**Limits:** cart tracks and old roads show only on the map and the minimap so far. A dirt
+path's strands lie on the ground without shaping it, and only its crossings come with fords,
+bridges, or boardwalks; a dirt path crossing a highway or another path makes no junction. Its
+strands lean only from the slope (plants vary on the terrain grid, far wider than a band).
+Wood shows its photo without its normal map. A plant's model can still overhang a strand.
 Ways are a height cell apart (about 10 km on an Earth-sized world), so they go round hills and
 woods that size; smaller ones wait for the up-close steps. The height grid is smooth at that
 scale, so a highway on most ground needs only shallow cuttings. Where roads cross or meet, the
