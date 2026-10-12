@@ -20,7 +20,7 @@ public sealed class RiverBanksTests
         RiverChannels.Near([_river], _eye, RadiusKm, 20_000);
 
     private static List<List<BankPoint[]>> Strips() =>
-        RiverBanks.Strips(_channels, RiverCarving.For([_river], RadiusKm), _eye, RadiusKm,
+        RiverBanks.Strips(_channels, RiverCarving.For([_river], RadiusKm).Carve, _eye, RadiusKm,
             _ => 100, _ => 99, _ => 5);
 
     [Fact]

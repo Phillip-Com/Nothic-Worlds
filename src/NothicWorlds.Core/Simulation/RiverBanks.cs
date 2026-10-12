@@ -33,14 +33,17 @@ public static class RiverBanks
     private const double LiftShare = 0.005, MinLiftMeters = 0.05;
 
     /// <summary>
-    /// The strips along the stretches of <paramref name="channels"/>, cut by
-    /// <paramref name="carving"/>, around <paramref name="eye"/> on a body
-    /// <paramref name="radiusKm"/> in radius: <paramref name="groundMeters"/> gives the
-    /// ground's height at a direction, <paramref name="coarseMeters"/> the coarser drawn
+    /// The strips along the stretches of <paramref name="channels"/>, cut as
+    /// <paramref name="carve"/> gives the ground's height at a direction from its height there
+    /// (the rivers' channels, and the roads' shaping: <see cref="GroundCarving"/>), around
+    /// <paramref name="eye"/> on a body <paramref name="radiusKm"/> in radius:
+    /// <paramref name="groundMeters"/> gives the ground's height at a direction,
+    /// <paramref name="coarseMeters"/> the coarser drawn
     /// ground's (where the skirts end), and <paramref name="skirtMeters"/> how wide the skirt
     /// beyond each bank must be there (past where the coarser ground is sunk under it).
     /// </summary>
-    public static List<List<BankPoint[]>> Strips(RiverChannels channels, RiverCarving carving,
+    public static List<List<BankPoint[]>> Strips(RiverChannels channels,
+        Func<Vector3D, double, double> carve,
         Vector3D eye, double radiusKm, Func<Vector3D, double> groundMeters,
         Func<Vector3D, double> coarseMeters, Func<Vector3D, double> skirtMeters)
     {
@@ -83,7 +86,7 @@ public static class RiverBanks
         var built = new BankPoint[rows.Count][];
         for (int r = 0; r < rows.Count; r++)
         {
-            built[r] = Row(carving, stretchOf[rows[r].Strip], rows[r].Step, eye, radiusMeters,
+            built[r] = Row(carve, stretchOf[rows[r].Strip], rows[r].Step, eye, radiusMeters,
                 groundMeters, coarseMeters, skirtMeters);
         }
         return [.. rows.Select((row, r) => (row.Strip, Row: built[r]))
@@ -92,7 +95,8 @@ public static class RiverBanks
     }
 
     // The row across the river at step i of a stretch.
-    private static BankPoint[] Row(RiverCarving carving, IReadOnlyList<ChannelPoint> stretch,
+    private static BankPoint[] Row(Func<Vector3D, double, double> carve,
+        IReadOnlyList<ChannelPoint> stretch,
         int i, Vector3D eye, double radiusMeters, Func<Vector3D, double> groundMeters,
         Func<Vector3D, double> coarseMeters, Func<Vector3D, double> skirtMeters)
     {
@@ -121,7 +125,7 @@ public static class RiverBanks
         {
             Vector3D direction = point.Direction + side * (offset.Across / radiusMeters);
             direction *= 1 / direction.Length;
-            double carved = carving.Carve(direction, groundMeters(direction));
+            double carved = carve(direction, groundMeters(direction));
             double meters = offset.Skirt == 0
                 ? carved
                 : carved + (coarseMeters(direction) + lift - carved) * offset.Skirt;

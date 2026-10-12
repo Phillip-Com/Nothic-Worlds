@@ -131,7 +131,7 @@ public partial class FirstPersonMode
         double radiusKm = body.RadiusKm, radiusMeters = radiusKm * 1000;
         Vector3D spot = _spot;
         FlatSpot? flat = _flat;
-        RiverCarving? carving = _profiles is { Carving: var some } ? some : null;
+        GroundCarving? carving = _carving;
         return meters =>
         {
             double smallest = Math.Max(TerrainRoughness.FinestMeters, meters * RangeDetailShare);

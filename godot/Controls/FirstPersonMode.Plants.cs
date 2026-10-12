@@ -230,7 +230,7 @@ public partial class FirstPersonMode
         (TerrainGrid terrain, TerrainType[] types) = _plantCover!.Value;
         var covers = types.ToDictionary(type => type.Code, type => (type.Plants,
             GrassColor(type)));
-        RiverCarving? carving = _profiles is { Carving: { IsEmpty: false } some } ? some : null;
+        GroundCarving? carving = _carving is { IsEmpty: false } some ? some : null;
         double? snowLine = GroundMaterials.SnowLineMeters(body);
         bool hasWater = globe.WaterRadius is not null || globe.HasLakes;
         return new PlantGround(

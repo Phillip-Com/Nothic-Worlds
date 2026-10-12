@@ -7,10 +7,13 @@ namespace NothicWorlds.Rendering;
 /// <summary>
 /// The fine strip of ground along the rivers around a first-person eye (VISION.md BOD-11; see
 /// <see cref="RiverBanks"/>): each river's bed and banks, drawn with the ground's own material
-/// over the coarser ground around the eye, so its flat cells never show along a river. Each
-/// point brings its place along to the shader as the ground's do (CUSTOM0), with w from 1 to
-/// 2 for how far its shading follows the strip's own slope rather than the ground's heights.
-/// Its positions are kept relative to a point near the eye, so they hold their precision.
+/// over the coarser ground around the eye, so its flat cells never show along a river; and the
+/// same along the stone highways (BOD-13, <see cref="RoadStrips"/>), or their stone bridges
+/// (<see cref="PrepareBridges"/>). Each point brings its place along to the shader as the
+/// ground's do (CUSTOM0), with w from 1 to 2 for how far its shading follows the strip's own
+/// slope rather than the ground's heights, 2 more on a road's paving and 4 more on a bridge's
+/// bare stone. Its positions are kept relative to a point near the eye, so they hold their
+/// precision.
 /// </summary>
 public partial class RiverBankStrip : MeshInstance3D
 {
@@ -61,7 +64,7 @@ public partial class RiverBankStrip : MeshInstance3D
                     normals.Add(NormalAt(points, row, across, pointAt, point));
                     Vector3D place = placeAt(point.Direction, point.Meters);
                     customs.AddRange([(float)place.X, (float)place.Y, (float)place.Z,
-                        (float)(1 + point.Shaped)]);
+                        (float)((point.Paved ? PavedW : 1) + point.Shaped)]);
                     if (row > 0 && across > 0)
                     {
                         int d = first + row * width + across, c = d - 1;
@@ -69,6 +72,74 @@ public partial class RiverBankStrip : MeshInstance3D
                         indices.AddRange([a, b, c, b, d, c]);
                     }
                 }
+            }
+        }
+
+        return indices.Count == 0
+            ? null
+            : new Surface(middle, [.. positions], [.. normals], [.. customs], [.. indices]);
+    }
+
+    /// <summary>
+    /// Works out the mesh of the stone bridges around <paramref name="middle"/> (see
+    /// <see cref="Prepare"/>), shaded by their own faces, their roads and walls' tops paved;
+    /// null with none. Safe off the main thread.
+    /// </summary>
+    internal static Surface? PrepareBridges(List<BridgeShown> bridges, Vector3D middle,
+        Func<Vector3D, double, Vector3D> pointAt, Func<Vector3D, double, Vector3D> placeAt)
+    {
+        var positions = new List<Vector3>();
+        var normals = new List<Vector3>();
+        var customs = new List<float>();
+        var indices = new List<int>();
+        foreach (BridgeShown bridge in bridges)
+        {
+            // The bridge's own frame where it lies, from points along, across, and above its
+            // middle.
+            double deck = bridge.Points.Count > 0 ? bridge.Points.Max(p => p.Position.Z) : 0;
+            Vector3D At(double x, double y, double z)
+            {
+                (Vector3D direction, double meters) = bridge.Place(
+                    new BridgePoint(new Vector3D(x, y, z), default, false));
+                return pointAt(direction, meters);
+            }
+
+            double half = bridge.LengthMeters / 2;
+            Vector3D center = At(half, 0, deck);
+            Vector3D along = Unit(At(half + 1, 0, deck) - center);
+            Vector3D across = Unit(At(half, 1, deck) - center);
+            Vector3D up = Unit(At(half, 0, deck + 1) - center);
+
+            int first = positions.Count;
+            var placed = new Vector3D[bridge.Points.Count];
+            for (int i = 0; i < bridge.Points.Count; i++)
+            {
+                BridgePoint point = bridge.Points[i];
+                (Vector3D direction, double meters) = bridge.Place(point);
+                placed[i] = pointAt(direction, meters);
+                Vector3D at0 = placed[i] - middle;
+                positions.Add(new Vector3((float)at0.X, (float)at0.Y, (float)at0.Z));
+                Vector3D normal = Unit(along * point.Normal.X + across * point.Normal.Y
+                    + up * point.Normal.Z);
+                normals.Add(new Vector3((float)normal.X, (float)normal.Y, (float)normal.Z));
+                Vector3D place = placeAt(direction, meters);
+                customs.AddRange([(float)place.X, (float)place.Y, (float)place.Z,
+                    (point.Paved ? PavedW : StoneW) + 1]);
+            }
+
+            // Each triangle wound clockwise seen from the way it faces, as Godot draws front
+            // faces.
+            for (int t = 0; t + 2 < bridge.Triangles.Count; t += 3)
+            {
+                int a = bridge.Triangles[t], b = bridge.Triangles[t + 1];
+                int c = bridge.Triangles[t + 2];
+                Vector3D facing = (placed[b] - placed[a]).Cross(placed[c] - placed[a]);
+                Vector3 normal = normals[first + a];
+                bool counter = facing.X * normal.X + facing.Y * normal.Y
+                    + facing.Z * normal.Z > 0;
+                indices.AddRange(counter
+                    ? [first + a, first + c, first + b]
+                    : [first + a, first + b, first + c]);
             }
         }
 
@@ -102,6 +173,12 @@ public partial class RiverBankStrip : MeshInstance3D
                 << (int)Mesh.ArrayFormat.FormatCustom0Shift));
         Mesh = mesh;
     }
+
+    // What a paved point's w, and a bridge's bare stone's, start from in place of 1
+    // (planet_surface.gdshaderinc reads w past 2.5 as paving, past 4.5 as stone).
+    private const float PavedW = 3, StoneW = 5;
+
+    private static Vector3D Unit(Vector3D v) => v * (1 / Math.Max(v.Length, 1e-30));
 
     // Which way the strip faces at a point: across its row and along the river, turned to
     // face up from the ground.
