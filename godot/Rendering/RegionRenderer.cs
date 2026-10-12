@@ -8,7 +8,8 @@ namespace NothicWorlds.Rendering;
 /// <summary>
 /// Draws the regions on each globe (VISION.md LORE-01; owner's choice: a colored outline with a
 /// light fill): one mesh per globe, a child of its surface so it turns and tilts with the body,
-/// lifted just above the map. A body's mesh is rebuilt only when its regions change.
+/// drawn over the map (see <see cref="SurfaceOverlay"/>). A body's mesh is rebuilt only when
+/// its regions change.
 /// </summary>
 /// <remarks>
 /// The fill is cut into small triangles that hug the sphere (see
@@ -18,8 +19,6 @@ namespace NothicWorlds.Rendering;
 public partial class RegionRenderer : Node
 {
     private const string MeshName = "Regions";
-    private const float FillLift = 1.0015f;
-    private const float OutlineLift = 1.003f;
     private const double StepDegrees = 1.5;
     private const float FillAlpha = 0.18f;
 
@@ -28,13 +27,6 @@ public partial class RegionRenderer : Node
     private readonly Dictionary<Guid,
         (List<Region> Regions, Guid? Highlight, BodyShape Shape, int Relief)> _built = [];
 
-    private readonly StandardMaterial3D _material = new()
-    {
-        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-        VertexColorUseAsAlbedo = true,
-        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-    };
 
     private bool _shown = true;
     private Guid? _highlighted;
@@ -82,6 +74,19 @@ public partial class RegionRenderer : Node
 
     public override void _Process(double delta)
     {
+        // Standing on a body, its ground is drawn up close instead (FirstPersonMode); these,
+        // drawn over the ground, would show through everything near the eye.
+        if (System is not null)
+        {
+            foreach (Guid id in _built.Keys)
+            {
+                if (System.SurfaceFor(id)?.GetNodeOrNull<MeshInstance3D>(MeshName) is { } mesh)
+                {
+                    mesh.Visible = System.StandingOn != id;
+                }
+            }
+        }
+
         // The relief changes with the View menu's exaggeration, not only with edits.
         if (System is not null && _built.Any(pair => System.SurfaceFor(pair.Key) is { } globe
             && globe.ReliefVersion != pair.Value.Relief))
@@ -120,7 +125,7 @@ public partial class RegionRenderer : Node
 
             if (mesh is null)
             {
-                mesh = new MeshInstance3D { Name = MeshName, MaterialOverride = _material };
+                mesh = new MeshInstance3D { Name = MeshName };
                 mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
                 globe.AddChild(mesh);
             }
@@ -130,7 +135,8 @@ public partial class RegionRenderer : Node
         }
     }
 
-    private static ArrayMesh? BuildMesh(List<Region> regions, Guid? highlight, PlanetSurface globe)
+    private static ArrayMesh? BuildMesh(List<Region> regions, Guid? highlight,
+        PlanetSurface globe)
     {
         BodyShape shape = globe.Shape;
         if (regions.Count == 0)
@@ -150,7 +156,7 @@ public partial class RegionRenderer : Node
                 foreach (Vector3D point in fill)
                 {
                     fillPoints.Add(GlobeShape.SurfacePoint(shape, point,
-                        FillLift * globe.SurfaceRadiusAt(point)));
+                        globe.SurfaceRadiusAt(point)));
                     fillColors.Add(color with { A = FillAlpha });
                 }
             }
@@ -163,7 +169,7 @@ public partial class RegionRenderer : Node
                     { SphericalPolygon.ToUnit(path[i - 1]), SphericalPolygon.ToUnit(path[i]) })
                 {
                     linePoints.Add(GlobeShape.SurfacePoint(
-                        shape, end, OutlineLift * globe.SurfaceRadiusAt(end)));
+                        shape, end, globe.SurfaceRadiusAt(end)));
                 }
                 lineColors.Add(line);
                 lineColors.Add(line);
@@ -171,13 +177,15 @@ public partial class RegionRenderer : Node
         }
 
         var mesh = new ArrayMesh();
-        AddSurface(mesh, Mesh.PrimitiveType.Triangles, fillPoints, fillColors);
-        AddSurface(mesh, Mesh.PrimitiveType.Lines, linePoints, lineColors);
+        AddSurface(mesh, Mesh.PrimitiveType.Triangles, fillPoints, fillColors,
+            SurfaceOverlay.Create(SurfaceOverlay.Layer.RegionFill, shape));
+        AddSurface(mesh, Mesh.PrimitiveType.Lines, linePoints, lineColors,
+            SurfaceOverlay.Create(SurfaceOverlay.Layer.RegionOutline, shape));
         return mesh;
     }
 
-    private static void AddSurface(
-        ArrayMesh mesh, Mesh.PrimitiveType primitive, List<Vector3> points, List<Color> colors)
+    private static void AddSurface(ArrayMesh mesh, Mesh.PrimitiveType primitive,
+        List<Vector3> points, List<Color> colors, Material material)
     {
         if (points.Count == 0)
         {
@@ -189,5 +197,6 @@ public partial class RegionRenderer : Node
         arrays[(int)Mesh.ArrayType.Vertex] = points.ToArray();
         arrays[(int)Mesh.ArrayType.Color] = colors.ToArray();
         mesh.AddSurfaceFromArrays(primitive, arrays);
+        mesh.SurfaceSetMaterial(mesh.GetSurfaceCount() - 1, material);
     }
 }

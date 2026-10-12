@@ -16,8 +16,6 @@ namespace NothicWorlds.Rendering;
 public partial class RiverRenderer : Node
 {
     private const string MeshName = "Rivers";
-    private const float RibbonLift = 1.0008f;
-    private const float LineLift = 1.0012f;
 
     private static readonly Color _water = new(0.24f, 0.52f, 0.86f);
     private static readonly Color _highlight = new(0.85f, 0.95f, 1f);
@@ -27,12 +25,6 @@ public partial class RiverRenderer : Node
     private readonly Dictionary<Guid, (IReadOnlyList<RiverCourseShown> Courses,
         Guid? Highlight, BodyShape Shape, int Relief)> _built = [];
 
-    private readonly StandardMaterial3D _material = new()
-    {
-        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-        VertexColorUseAsAlbedo = true,
-        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-    };
 
     private Guid? _highlighted;
 
@@ -69,7 +61,7 @@ public partial class RiverRenderer : Node
     public override void _Process(double delta)
     {
         // Standing on a body, its rivers are drawn up close instead (FirstPersonMode); these,
-        // lifted to show from orbit, would float in its sky.
+        // drawn over the ground, would show through everything near the eye.
         if (System is not null)
         {
             foreach (Guid id in _built.Keys)
@@ -119,7 +111,7 @@ public partial class RiverRenderer : Node
 
             if (mesh is null)
             {
-                mesh = new MeshInstance3D { Name = MeshName, MaterialOverride = _material };
+                mesh = new MeshInstance3D { Name = MeshName };
                 mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
                 globe.AddChild(mesh);
             }
@@ -148,8 +140,8 @@ public partial class RiverRenderer : Node
             AddRibbon(ribbon, ribbonColors, path, course.WidthKm / radiusKm, color, globe);
             for (int i = 1; i < path.Count; i++)
             {
-                lines.Add(Place(globe, path[i - 1], LineLift));
-                lines.Add(Place(globe, path[i], LineLift));
+                lines.Add(Place(globe, path[i - 1]));
+                lines.Add(Place(globe, path[i]));
                 lineColors.Add(color);
                 lineColors.Add(color);
             }
@@ -161,8 +153,10 @@ public partial class RiverRenderer : Node
         }
 
         var mesh = new ArrayMesh();
-        AddSurface(mesh, Mesh.PrimitiveType.Triangles, ribbon, ribbonColors);
-        AddSurface(mesh, Mesh.PrimitiveType.Lines, lines, lineColors);
+        AddSurface(mesh, Mesh.PrimitiveType.Triangles, ribbon, ribbonColors,
+            SurfaceOverlay.Create(SurfaceOverlay.Layer.RiverRibbon, globe.Shape));
+        AddSurface(mesh, Mesh.PrimitiveType.Lines, lines, lineColors,
+            SurfaceOverlay.Create(SurfaceOverlay.Layer.RiverLine, globe.Shape));
         return mesh;
     }
 
@@ -180,8 +174,8 @@ public partial class RiverRenderer : Node
             Vector3D side = Cross(here, along);
             double half = widthRadians / 2 * (0.2 + 0.8 * i / (path.Count - 1));
             side = side.Length > 1e-12 ? side * (half / side.Length) : Vector3D.Zero;
-            Vector3 left = Place(globe, Unit(here + side), RibbonLift);
-            Vector3 right = Place(globe, Unit(here - side), RibbonLift);
+            Vector3 left = Place(globe, Unit(here + side));
+            Vector3 right = Place(globe, Unit(here - side));
             if (i > 0)
             {
                 points.AddRange([previousLeft, previousRight, left, left, previousRight, right]);
@@ -195,16 +189,16 @@ public partial class RiverRenderer : Node
         }
     }
 
-    private static Vector3 Place(PlanetSurface globe, Vector3D direction, float lift) =>
-        GlobeShape.SurfacePoint(globe.Shape, direction, lift * globe.SurfaceRadiusAt(direction));
+    private static Vector3 Place(PlanetSurface globe, Vector3D direction) =>
+        GlobeShape.SurfacePoint(globe.Shape, direction, globe.SurfaceRadiusAt(direction));
 
     private static Vector3D Unit(Vector3D v) => v * (1 / v.Length);
 
     private static Vector3D Cross(Vector3D a, Vector3D b) =>
         new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
 
-    private static void AddSurface(
-        ArrayMesh mesh, Mesh.PrimitiveType primitive, List<Vector3> points, List<Color> colors)
+    private static void AddSurface(ArrayMesh mesh, Mesh.PrimitiveType primitive,
+        List<Vector3> points, List<Color> colors, Material material)
     {
         if (points.Count == 0)
         {
@@ -216,5 +210,6 @@ public partial class RiverRenderer : Node
         arrays[(int)Mesh.ArrayType.Vertex] = points.ToArray();
         arrays[(int)Mesh.ArrayType.Color] = colors.ToArray();
         mesh.AddSurfaceFromArrays(primitive, arrays);
+        mesh.SurfaceSetMaterial(mesh.GetSurfaceCount() - 1, material);
     }
 }

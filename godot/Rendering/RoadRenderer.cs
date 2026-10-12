@@ -16,9 +16,6 @@ public partial class RoadRenderer : Node
 {
     private const string MeshName = "Roads";
 
-    // Just above the rivers' line, so a road crossing a river shows over it.
-    private const float LineLift = 1.0013f;
-
     // How long each dash of dirt paths is, and the gap after it, in radians of arc.
     private const double DashRadians = 0.005;
 
@@ -28,12 +25,6 @@ public partial class RoadRenderer : Node
     // its relief), so it's rebuilt only when that changes.
     private readonly Dictionary<Guid, (IReadOnlyList<RoadCourseShown> Ways,
         Guid? Highlight, BodyShape Shape, int Relief)> _built = [];
-
-    private readonly StandardMaterial3D _material = new()
-    {
-        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-        VertexColorUseAsAlbedo = true,
-    };
 
     private Guid? _highlighted;
 
@@ -78,7 +69,8 @@ public partial class RoadRenderer : Node
 
     public override void _Process(double delta)
     {
-        // Standing on a body, these lines, lifted to show from orbit, would float in its sky.
+        // Standing on a body, these lines, drawn over the ground, would show through everything
+        // near the eye.
         if (System is not null)
         {
             foreach (Guid id in _built.Keys)
@@ -126,7 +118,7 @@ public partial class RoadRenderer : Node
 
             if (mesh is null)
             {
-                mesh = new MeshInstance3D { Name = MeshName, MaterialOverride = _material };
+                mesh = new MeshInstance3D { Name = MeshName };
                 mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
                 globe.AddChild(mesh);
             }
@@ -182,6 +174,9 @@ public partial class RoadRenderer : Node
         arrays[(int)Mesh.ArrayType.Color] = colors.ToArray();
         var mesh = new ArrayMesh();
         mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Lines, arrays);
+
+        // Over the rivers' line, so a road crossing a river shows over it.
+        mesh.SurfaceSetMaterial(0, SurfaceOverlay.Create(SurfaceOverlay.Layer.Road, globe.Shape));
         return mesh;
     }
 
@@ -193,6 +188,5 @@ public partial class RoadRenderer : Node
     }
 
     private static Vector3 Place(PlanetSurface globe, Vector3D direction) =>
-        GlobeShape.SurfacePoint(globe.Shape, direction,
-            LineLift * globe.SurfaceRadiusAt(direction));
+        GlobeShape.SurfacePoint(globe.Shape, direction, globe.SurfaceRadiusAt(direction));
 }
