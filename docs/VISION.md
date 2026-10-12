@@ -847,7 +847,7 @@ builds it (`GroundTileRecipe.MorphHeight`). The session keeps each body's (`Roug
 Low ground detail they thin out far off (from about 5 km, none past 15 km) so the tiles meet
 the globe's own ground; at Standard and High they reach the farthest peak (see `REN-06`). A type with no variation can't be rough.
 
-**BOD-13 — Roads** · In progress (M43: on the map, PR #125) · Base
+**BOD-13 — Roads** · In progress (M43: on the map, PR #125; highways up close, PR #126) · Base
 **Intent:** A road tool that works like rivers, starting with fantasy roads: a **stone highway**,
 one large paved road laid by a work crew along the most efficient line, tunneling through hills
 and crossing rivers on solid stone bridges; and **dirt paths**, many paths that split and
@@ -863,6 +863,10 @@ on their own, **fords** where paths cross shallow streams, **boardwalks** over m
 **switchbacks** up steep slopes. Built in steps: the map (data and routing), highways up close
 (cuttings, banks, stone bridges), dirt paths up close (strands, worn ground, wooden bridges,
 fords, boardwalks, switchbacks), **tunnels** last, then cart tracks' and old roads' looks.
+Highways up close (2026-10-12): a grade of at most **8%**; cuttings and banks at most **15 m**
+deep (past that the road follows the ground, until tunnels); paved with a CC0 photo of Roman
+paving; bridges of **round stone arches**, each at most about 20 m across, with piers in the
+water and low walls along the sides.
 **Built:**
 - Data (format v36): `Model/Road.cs` (style, kind, points, width), `RoadStyle`, `RoadKind`,
   `RoadRules`. Only these are saved; the ways are worked out each time (docs/world-format.md).
@@ -880,9 +884,28 @@ fords, boardwalks, switchbacks), **tunnels** last, then cart tracks' and old roa
   `FirstPersonMode.Roads.cs` places them as seen straight down from above the spot (on a flat
   world, by `FlatDisc.TopPointFor`), and `Minimap` draws them over its picture as
   `MinimapLine`s, cut at its edge, dirt paths dashed.
-**Limits:** for now roads show only on the map and the minimap, not in the view itself. Ways are a height cell apart
-(about 10 km on an Earth-sized world), so they go round hills and woods that size; smaller ones
-wait for the up-close steps. A drawn road's points can't be moved yet (delete and redraw).
+- Stone highways up close: Core `RoadProfile` (the road's height every 10 m: the smooth ground
+  averaged, held to the grade and to 15 m from the ground, down to the ground at its ends, and
+  lifted onto bridges with banks up to them; reuses `RiverProfile.Sampled`), `RoadBridge`,
+  `RoadCarving` (the ground level across the paving and a 1 m shoulder, cuttings at 1:1 and
+  banks at 1:1.5 to meet it, left alone under bridges and past the ends; the coarser ground
+  sunk under the strip; a search tree like `RiverCarving`'s), `GroundCarving` (rivers'
+  channels, then roads' shaping: what the tiles, strips, walking, plants, rangefinder and rough
+  terrain's fading all follow), `RoadStrips` (paving and sides near the eye, as `RiverBanks`),
+  `StoneBridge` (arches, piers, walls, in the bridge's own frame) and `BridgeShown`.
+  `RiverCarving.PartsNear`/`WaterOver` (where to bridge). `FirstPersonMode.Highways.cs` works
+  the profiles out again when the roads, ground, or rivers change; `StartBanks` builds the
+  strips with the rivers' banks in one mesh, and the bridges in another (`RiverBankStrip`,
+  `PrepareBridges`; they cast shadows); walkers cross on a bridge's road (`DeckMeters`).
+  Paving is a ninth ground material (`GroundMaterials.PavingLayer`, `paving_*` in
+  `Assets/Ground`): `planet_surface.gdshaderinc` reads it, and a bridge's bare stone, from
+  CUSTOM0.w (`built`), shown even with the terrain's colors.
+**Limits:** dirt paths, cart tracks, and old roads show only on the map and the minimap so far.
+Ways are a height cell apart (about 10 km on an Earth-sized world), so they go round hills and
+woods that size; smaller ones wait for the up-close steps. The height grid is smooth at that
+scale, so a highway on most ground needs only shallow cuttings. Where roads cross or meet, the
+nearer one shapes the ground (no junction is laid). A bridge runs straight between its ends. A
+drawn road's points can't be moved yet (delete and redraw).
 
 ### 4.5 Orbits & Simulation (`SIM`)
 
