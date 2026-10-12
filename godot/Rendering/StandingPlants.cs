@@ -25,6 +25,10 @@ public partial class StandingPlants : Node3D
     private const double UndergrowthSquareMeters = 32;
     private const double GrassSquareMeters = 8;
 
+    // What share of the shrubs that would grow on an old road's paving do (owner's choice,
+    // 2026-10-12: grass and scattered shrubs, no trees).
+    private const double OldRoadShrubShare = 0.35;
+
     // Each layer's own spots (PlantScatter's layer).
     private const int TreeLayer = 0;
     private const int UndergrowthLayer = 1;
@@ -469,6 +473,8 @@ public partial class StandingPlants : Node3D
         if (ground.Height(spot.Base) is not double height
             || ground.Wet(spot.Base, height)
             || ground.InRiver(spot.Base)
+            || (spot.Kind != SpotKind.Grass && ground.OnOldRoad(spot.Base)
+                && (tree || spot.Rank > OldRoadShrubShare))
             || ground.Snowy(spot.Base, height, tree ? TreeLineMeters : 0))
         {
             return;

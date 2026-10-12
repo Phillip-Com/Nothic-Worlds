@@ -183,18 +183,21 @@ varying float eye_level_ground;
 
 // What a road built there (VISION.md BOD-13): 1 on its paving and a stone bridge's road and
 // walls' tops, 2 on a bridge's bare stone, 3 on a dirt path's worn strand, 4 on a wooden
-// bridge's or boardwalk's wood, 5 on a tunnel's torches' flames, else 0. RiverBankStrip brings
-// CUSTOM0.w twice as much more there (on a strand, 7 plus how worn it is; on wood, 10; on a
-// flame, 12). Built ground always shows its material, even with the terrain's colors (a strand
-// only where it's worn through).
+// bridge's or boardwalk's wood, 5 on a tunnel's torches' flames, 6 on an old road's broken
+// paving, 7 on an old road's weathered stone, 8 on a cart track's rut, else 0. RiverBankStrip
+// brings CUSTOM0.w twice as much more there up to 5 (on a strand, 7 plus how worn it is; on
+// wood, 10; on a flame, 12), then 13 plus how far it is toward the middle on old paving, 15
+// on weathered stone, and 16 plus how worn on a rut. Built ground always shows its material,
+// even with the terrain's colors (a strand only where it's worn through).
 varying float built;
 
 // How much of the sky's light reaches a point (VISION.md BOD-13): little deep in a tunnel,
 // from RiverBankStrip's colors; else all of it (a mesh without colors reads white).
 varying float sky_light;
 
-// How worn a dirt path's strand is (0 at its edges, 1 in its middle), and where wood is in its
-// grain (meters along and across it), from RiverBankStrip.
+// How worn a dirt path's strand or a cart track's rut is (0 at its edges, 1 in its middle), or
+// how far toward an old road's middle its paving is, and where wood is in its grain (meters
+// along and across it), from RiverBankStrip.
 varying float worn;
 varying vec2 wood_uv;
 
@@ -266,6 +269,17 @@ const float DIRT_COLOR_KEPT = 0.5;
 const float DIRT_ROUGHNESS = 0.95;
 const float DIRT_THROUGH_EDGE = 0.45;
 const float DIRT_THROUGH_MIDDLE = 0.15;
+// A cart track's ruts are worn ground pressed hard by wheels: darker than a path's, so lightened
+// only by these factors.
+const vec3 RUT_LIGHTEN = vec3(1.1, 1.04, 0.96);
+// An old road's paving (owner's choice, 2026-10-12): broken in patches about this many meters
+// across, about 40% of it gone and more toward its edges (gone where how far toward its middle
+// it is plus the noise falls under this), soil showing in some of the gaps and the ground
+// beside in the rest; its stone darker, by this factor, and mossy in patches.
+const float OLD_PAVING_PATCH_METERS = 1.5;
+const float OLD_PAVING_KEPT = 0.22;
+const float OLD_STONE_DARKEN = 0.72;
+const vec3 MOSS_COLOR = vec3(0.16, 0.2, 0.09);
 // How far a material's color is pulled toward its terrain's painted color (owner's choice:
 // partway, so the palette still shows), and how much of the painted color's lightness comes
 // with it (the photo's own lightness is the more realistic).
@@ -853,10 +867,13 @@ void vertex() {
 	// each around its own middle rather than the globe's, so its positions keep their
 	// precision; it brings each point's direction from the globe's middle along (CUSTOM0,
 	// w = 1) and is lifted already. Other meshes have no CUSTOM0 (it reads as 0).
-	built = CUSTOM0.w > 11.5 ? 5.0 : CUSTOM0.w > 8.5 ? 4.0 : CUSTOM0.w > 6.5 ? 3.0
+	built = CUSTOM0.w > 15.5 ? 8.0 : CUSTOM0.w > 14.5 ? 7.0 : CUSTOM0.w > 12.5 ? 6.0
+		: CUSTOM0.w > 11.5 ? 5.0 : CUSTOM0.w > 8.5 ? 4.0 : CUSTOM0.w > 6.5 ? 3.0
 		: CUSTOM0.w > 4.5 ? 2.0 : CUSTOM0.w > 2.5 ? 1.0 : 0.0;
 	sky_light = COLOR.r;
-	worn = built > 2.5 && built < 3.5 ? CUSTOM0.w - 7.0 : 0.0;
+	worn = built > 2.5 && built < 3.5 ? CUSTOM0.w - 7.0
+		: built > 5.5 && built < 6.5 ? CUSTOM0.w - 13.0
+		: built > 7.5 ? CUSTOM0.w - 16.0 : 0.0;
 	wood_uv = UV;
 	float ground_w = built > 2.5 ? 2.0 : CUSTOM0.w - 2.0 * built;
 	eye_level_ground = ground_w > 0.5 ? ground_w : 0.0;
@@ -1126,17 +1143,32 @@ vec3 ground_material(vec3 direction, vec3 up, vec3 normal, vec3 drawn, float lat
 			best_kind >= 0 ? best_tint : unpainted_color, blend);
 	}
 
-	// Paving on the roads, a bridge's bare stone, and wood (VISION.md BOD-13); a dirt path's
-	// worn ground where it's worn through (raggedly, toward its edges); bare rock where it's
+	// Paving on the roads, a bridge's bare stone, an old road's weathered stone, and wood
+	// (VISION.md BOD-13); a dirt path's or cart track's worn ground where it's worn through
+	// (raggedly, toward its edges); bare rock where it's
 	// steeper than about 40 degrees; snow above the line, on ground not too steep to hold it,
 	// and never under water. Their own colors, untinted.
 	float level = dot(normal, up);
 	bool own_color = false;
 	int under_kind = kind;
-	// Its edges fray finely (about half a meter), as trodden ground does, and wander a little.
-	bool dirt = built > 2.5 && built < 3.5
-		&& worn + 0.7 * (value_noise(q * 8.0 + 7.3) - 0.5) + 0.3 * (fine - 0.5) > 0.35;
-	if (built > 3.5) {
+	// An old road's paving is laid in patches (OLD_PAVING_KEPT), with soil or the ground
+	// beside between; its stone, and its bridges' and tunnels', is weathered.
+	bool rut = built > 7.5;
+	bool old_paving = built > 5.5 && built < 6.5;
+	vec3 patch_q = q * GROUND_DETAIL_METERS / OLD_PAVING_PATCH_METERS;
+	bool laid = old_paving
+		&& 0.6 * worn + 1.6 * (value_noise(patch_q + 11.7) - 0.5) + 0.3 * (fine - 0.5)
+			> OLD_PAVING_KEPT;
+	bool soil = old_paving && !laid && value_noise(patch_q * 0.7 + 5.1) > 0.5;
+	bool weathered = (built > 6.5 && built < 7.5) || laid;
+	// A strand's or rut's edges fray finely (about half a meter), as trodden ground does, and
+	// wander a little.
+	bool dirt = soil || (((built > 2.5 && built < 3.5) || rut)
+		&& worn + 0.7 * (value_noise(q * 8.0 + 7.3) - 0.5) + 0.3 * (fine - 0.5) > 0.35);
+	if (weathered) {
+		kind = laid ? GROUND_PAVING : GROUND_ROCK;
+		own_color = true;
+	} else if (built > 3.5 && built < 4.5) {
 		kind = GROUND_PLANKS;
 		own_color = true;
 	} else if (dirt) {
@@ -1209,9 +1241,17 @@ vec3 ground_material(vec3 direction, vec3 up, vec3 normal, vec3 drawn, float lat
 	if (kind == GROUND_PAVING) {
 		color = mix(vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), color, PAVING_COLOR_KEPT);
 	}
+	// Old stone is darker, and mossy in patches, most on what faces up.
+	if (weathered) {
+		float moss = smoothstep(0.6, 0.85, value_noise(q * 2.0 + 2.3))
+			* smoothstep(0.35, 0.65, value_noise(q * 10.0 + 1.7))
+			* (0.3 + 0.7 * max(dot(normal, up), 0.0));
+		color = mix(color * OLD_STONE_DARKEN, MOSS_COLOR, 0.6 * moss);
+	}
 	roughness = GROUND_ROUGHNESS[kind];
 	if (dirt) {
-		color = mix(vec3(dot(color, luma)), color, DIRT_COLOR_KEPT) * DIRT_LIGHTEN;
+		color = mix(vec3(dot(color, luma)), color, DIRT_COLOR_KEPT)
+			* (rut ? RUT_LIGHTEN : DIRT_LIGHTEN);
 		vec3 under = ground_averages[under_kind];
 		if (near_seen > 0.0) {
 			vec3 under_bent;
@@ -1308,7 +1348,8 @@ void fragment() {
 		float pixel_size = 2.0 / (PROJECTION_MATRIX[1][1] * VIEWPORT_SIZE.y);
 		float meters_per_pixel = meters_away * pixel_size / facing;
 #ifdef GROUND_MATERIALS
-		if (!terrain_shown || (built > 0.5 && (built < 2.5 || built > 3.5)) || worn > 0.5) {
+		if (!terrain_shown || (built > 0.5 && (built < 2.5 || (built > 3.5 && built < 7.5)))
+				|| worn > 0.5) {
 			// The ground's shape as it's lit (kept for the lighting below); what a road built
 			// faces its own way (a bridge's walls and arches), but a path's strand, lying on
 			// the ground, is lit as the ground is.
@@ -1320,7 +1361,7 @@ void fragment() {
 				relief_known = true;
 				shape = relief;
 			}
-			if (built > 0.5 && (built < 2.5 || built > 3.5)) {
+			if (built > 0.5 && (built < 2.5 || (built > 3.5 && built < 7.5))) {
 				shape = normalize(transpose(mat3(VIEW_MATRIX) * mat3(MODEL_MATRIX)) * NORMAL);
 			}
 			vec3 tilted;
@@ -1409,7 +1450,7 @@ void fragment() {
 
 	// A tunnel's torches glow (lighting nothing); deep in it, little of the sky's light, or
 	// the sun's past its walls, reaches.
-	if (built > 4.5) {
+	if (built > 4.5 && built < 5.5) {
 		ALBEDO = vec3(0.05, 0.03, 0.02);
 		EMISSION = vec3(6.0, 2.6, 0.7);
 	}

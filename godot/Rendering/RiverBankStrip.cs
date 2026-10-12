@@ -69,6 +69,8 @@ public partial class RiverBankStrip : MeshInstance3D
                         {
                             StripSurface.Paving => PavedW + point.Shaped,
                             StripSurface.Worn => WornW + point.Wear,
+                            StripSurface.Rut => RutW + point.Wear,
+                            StripSurface.OldPaving => OldPavedW + point.Wear,
                             _ => 1 + point.Shaped,
                         })]);
                     if (row > 0 && across > 0)
@@ -137,6 +139,7 @@ public partial class RiverBankStrip : MeshInstance3D
                         BridgeMaterial.Paving => PavedW + 1,
                         BridgeMaterial.Wood => WoodW,
                         BridgeMaterial.Flame => FlameW,
+                        BridgeMaterial.Weathered => WeatheredW,
                         _ => StoneW + 1,
                     }]);
                 grain.Add(new Vector2((float)point.U, (float)point.V));
@@ -204,10 +207,12 @@ public partial class RiverBankStrip : MeshInstance3D
     }
 
     // What a paved point's w, and a bridge's bare stone's, start from in place of 1; a worn
-    // point's; wood's; and a torch's flame's (planet_surface.gdshaderinc reads w past 2.5 as
-    // paving, past 4.5 as stone, past 6.5 as worn ground, past 8.5 as wood, and past 11.5 as a
-    // flame).
+    // point's; wood's; a torch's flame's; an old road's paving's; its weathered stone's; and a
+    // rut's (planet_surface.gdshaderinc reads w past 2.5 as paving, past 4.5 as stone, past 6.5
+    // as worn ground, past 8.5 as wood, past 11.5 as a flame, past 12.5 as old paving, past
+    // 14.5 as weathered stone, and past 15.5 as a rut).
     private const float PavedW = 3, StoneW = 5, WornW = 7, WoodW = 10, FlameW = 12;
+    private const float OldPavedW = 13, WeatheredW = 15, RutW = 16;
 
     private static Vector3D Unit(Vector3D v) => v * (1 / Math.Max(v.Length, 1e-30));
 
