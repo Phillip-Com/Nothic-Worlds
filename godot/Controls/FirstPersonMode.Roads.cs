@@ -10,7 +10,8 @@ namespace NothicWorlds.Controls;
 /// <summary>
 /// The roads on the minimap while standing (VISION.md BOD-13, REN-08; owner's request,
 /// 2026-10-11): each road's way, as seen straight down from above the spot like the map's
-/// picture, in its style's color (dirt paths dashed, as on the globe).
+/// picture, in its style's color (dirt paths dashed, as on the globe, and highways through
+/// their tunnels).
 /// </summary>
 public partial class FirstPersonMode
 {
@@ -34,23 +35,30 @@ public partial class FirstPersonMode
         Func<Vector3D, Vector2?>? toMap = ways.Count == 0 ? null
             : MapPlacer(spanMeters / 2 / (body.RadiusKm * 1000));
         var lines = new List<MinimapLine>();
+        double radiusMeters = body.RadiusKm * 1000;
         foreach (RoadCourseShown way in toMap is null ? [] : ways)
         {
-            // Split where the way goes out of sight (round the far side of a globe).
-            var run = new List<Vector2>();
-            foreach (Vector3D point in way.Path)
+            List<(double, double)> tunnels = _tunnelSpans.GetValueOrDefault(way.RoadId) ?? [];
+            foreach ((List<Vector3D> points, bool inTunnel) in PathStretches.Split(way.Path,
+                radiusMeters, tunnels))
             {
-                if (toMap!(point) is Vector2 at)
+                // Split where the way goes out of sight (round the far side of a globe).
+                bool dashed = inTunnel || way.Style == RoadStyle.DirtPaths;
+                var run = new List<Vector2>();
+                foreach (Vector3D point in points)
                 {
-                    run.Add(at);
-                    continue;
+                    if (toMap!(point) is Vector2 at)
+                    {
+                        run.Add(at);
+                        continue;
+                    }
+
+                    AddRun(lines, run, way.Style, dashed);
+                    run.Clear();
                 }
 
-                AddRun(lines, run, way.Style);
-                run.Clear();
+                AddRun(lines, run, way.Style, dashed);
             }
-
-            AddRun(lines, run, way.Style);
         }
 
         _hud.Minimap.SetLines(lines);
@@ -85,12 +93,13 @@ public partial class FirstPersonMode
                 (float)(direction.Dot(north) / halfRadii));
     }
 
-    private static void AddRun(List<MinimapLine> lines, List<Vector2> run, RoadStyle style)
+    private static void AddRun(List<MinimapLine> lines, List<Vector2> run, RoadStyle style,
+        bool dashed)
     {
         if (run.Count >= 2)
         {
             lines.Add(new MinimapLine([.. run], RoadRenderer.ColorOf(style),
-                MapLineWidth(style), Dashed: style == RoadStyle.DirtPaths));
+                MapLineWidth(style), dashed));
         }
     }
 }
