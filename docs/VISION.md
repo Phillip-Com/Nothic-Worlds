@@ -895,8 +895,10 @@ a **10%** grade with bends up to **60 m** either side, fords water at most **12 
   and `Smoothed`.
 - `Session/WorldSession.Roads.cs` (edits with undo; ways worked out in the background after the
   water, from `ShowWater`); `Rendering/RoadRenderer.cs` (lines on the globe in each style's
-  color, dirt paths dashed); `UI/RoadSection.cs` (the Roads mode); `RegionEditor`'s line
-  drawing snaps a click near another road onto it, so roads join.
+  color, dirt paths dashed; on the ground and drawn over it, hidden only past the horizon, by
+  `SurfaceOverlay`, as rivers and regions are, so a road shows where it was clicked at any
+  zoom); `UI/RoadSection.cs` (the Roads mode); `RegionEditor`'s line drawing snaps a click near
+  another road onto it, so roads join.
 - While standing, the roads are on the minimap (owner's request, 2026-10-11):
   `FirstPersonMode.Roads.cs` places them as seen straight down from above the spot (on a flat
   world, by `FlatDisc.TopPointFor`), and `Minimap` draws them over its picture as
