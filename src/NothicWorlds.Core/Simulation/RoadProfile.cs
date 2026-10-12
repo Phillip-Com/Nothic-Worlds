@@ -6,13 +6,15 @@ namespace NothicWorlds.Core.Simulation;
 /// <summary>
 /// A stone highway along its way, for drawing it up close (VISION.md BOD-13; owner's choices,
 /// 2026-10-12): laid on an even grade no steeper than <see cref="MaxGrade"/>, cut into the
-/// ground where it rises and banked up where it dips, by at most <see cref="MaxCutMeters"/>
-/// (past that it follows the ground more steeply, until tunnels come), coming down to the
-/// ground at its ends (over <see cref="EndMeters"/>), and carried over each
-/// river on a stone bridge (<see cref="StoneBridge"/>) high enough for its arches, with banks
-/// rising to it. In steps of <see cref="SampleMeters"/> along its way: its height, the
-/// ground's under it, and where it's on a bridge. It depends only on the road, the ground,
-/// and the rivers, never on where an eye is.
+/// ground where it rises and banked up where it dips, its banks at most
+/// <see cref="MaxCutMeters"/> high (past that it follows the ground more steeply), coming down
+/// to the ground at its ends (over <see cref="EndMeters"/>), carried over each river on a
+/// stone bridge (<see cref="StoneBridge"/>) high enough for its arches, with banks rising to
+/// it, and through a tunnel (<see cref="StoneTunnel"/>) where a cutting would be deeper than
+/// <see cref="MaxCutMeters"/> for at least <see cref="MinTunnelMeters"/> (a shorter stretch is
+/// cut deeper). In steps of <see cref="SampleMeters"/> along its way: its height, the ground's
+/// under it, and where it's on a bridge or in a tunnel. It depends only on the road, the
+/// ground, and the rivers, never on where an eye is.
 /// </summary>
 public sealed class RoadProfile
 {
@@ -23,9 +25,17 @@ public sealed class RoadProfile
     public const double MaxGrade = 0.08;
 
     /// <summary>
-    /// The deepest a highway cuts into the ground, or banks up over it, in meters.
+    /// The deepest a highway cuts into the ground (deeper, it tunnels), or banks up over it,
+    /// in meters.
     /// </summary>
     public const double MaxCutMeters = 15;
+
+    /// <summary>
+    /// The shortest tunnel, in meters (owner's choice, 2026-10-12): a shorter stretch where a
+    /// cutting would be deeper than <see cref="MaxCutMeters"/> is cut deeper instead, and
+    /// tunnels closer together than this are one, where the hill between covers the road.
+    /// </summary>
+    public const double MinTunnelMeters = 40;
 
     /// <summary>
     /// How far from each end a road comes down to the ground, in meters (where its cutting or
@@ -41,11 +51,12 @@ public sealed class RoadProfile
     private const double SmoothingMeters = 100;
 
     private RoadProfile(Vector3D[] points, double[] along, double halfWidth, double shoulder,
-        double[] road, double[] ground, List<RoadBridge> bridges, RoadSurface surface)
+        double[] road, double[] ground, List<RoadBridge> bridges, List<RoadTunnel> tunnels,
+        RoadSurface surface)
     {
         (Points, AlongMeters, HalfWidthMeters, ShoulderMeters, RoadMeters, GroundMeters) =
             (points, along, halfWidth, shoulder, road, ground);
-        (Bridges, Surface) = (bridges, surface);
+        (Bridges, Tunnels, Surface) = (bridges, tunnels, surface);
     }
 
     /// <summary>
@@ -81,6 +92,15 @@ public sealed class RoadProfile
     public bool OnBridge(int segment) =>
         Bridges.Any(bridge => segment >= bridge.First && segment < bridge.Last);
 
+    /// <summary>The tunnels along it, first first.</summary>
+    public IReadOnlyList<RoadTunnel> Tunnels { get; }
+
+    /// <summary>
+    /// Whether the segment from point <paramref name="segment"/> to the next is in a tunnel.
+    /// </summary>
+    public bool InTunnel(int segment) =>
+        Tunnels.Any(tunnel => segment >= tunnel.First && segment < tunnel.Last);
+
     /// <summary>
     /// The profile of <paramref name="course"/> on a body <paramref name="radiusKm"/> in
     /// radius, whose smooth ground is <paramref name="groundMeters"/> high at each direction,
@@ -111,7 +131,7 @@ public sealed class RoadProfile
         LimitGrade(road, along);
         for (int i = 0; i < count; i++)
         {
-            road[i] = Math.Clamp(road[i], ground[i] - MaxCutMeters, ground[i] + MaxCutMeters);
+            road[i] = Math.Min(road[i], ground[i] + MaxCutMeters);
             double end = Math.Min(along[i], along[^1] - along[i]);
             road[i] = ground[i] + (road[i] - ground[i]) * Math.Min(1, end / EndMeters);
         }
@@ -121,8 +141,11 @@ public sealed class RoadProfile
             : BridgesOver(points, along, rivers, BridgeMarginMeters);
         RaiseForBridges(road, along, bridges, MaxGrade, bridge => bridge.WaterMeters
             + StoneBridge.ClearanceMeters(bridge.LengthMeters));
-        return new RoadProfile(points, along, course.WidthMeters / 2,
-            RoadCarving.ShoulderMeters, road, ground, bridges, RoadSurface.Paving);
+        double halfWidth = course.WidthMeters / 2;
+        List<RoadTunnel> tunnels = TunnelsUnder(road, ground, along, bridges,
+            StoneTunnel.CoverMeters(halfWidth + RoadCarving.ShoulderMeters));
+        return new RoadProfile(points, along, halfWidth, RoadCarving.ShoulderMeters, road,
+            ground, bridges, tunnels, RoadSurface.Paving);
     }
 
     /// <summary>
@@ -136,7 +159,7 @@ public sealed class RoadProfile
         double shoulderMeters, double[] roadMeters, double[] groundMeters,
         List<RoadBridge> bridges, RoadSurface surface) =>
         new(points, along, halfWidthMeters, shoulderMeters, roadMeters, groundMeters, bridges,
-            surface);
+            [], surface);
 
     /// <summary>
     /// How far each of <paramref name="points"/> (unit directions) is from the first along
@@ -262,6 +285,56 @@ public sealed class RoadProfile
         {
             LengthMeters = along[bridge.Last] - along[bridge.First],
         })];
+    }
+
+    /// <summary>
+    /// The tunnels under the ground: each run of points where the road is more than
+    /// <see cref="MaxCutMeters"/> under the ground, from its first such point to its last;
+    /// runs less than <see cref="MinTunnelMeters"/> apart are one where the ground between is
+    /// at least <paramref name="coverMeters"/> over the road; and of those, each at least
+    /// <see cref="MinTunnelMeters"/> long and clear of the bridges.
+    /// </summary>
+    internal static List<RoadTunnel> TunnelsUnder(IReadOnlyList<double> road,
+        IReadOnlyList<double> ground, IReadOnlyList<double> along,
+        IReadOnlyList<RoadBridge> bridges, double coverMeters)
+    {
+        var runs = new List<(int First, int Last)>();
+        for (int i = 0; i < road.Count; i++)
+        {
+            if (ground[i] - road[i] <= MaxCutMeters)
+            {
+                continue;
+            }
+
+            int last = i;
+            while (last + 1 < road.Count && ground[last + 1] - road[last + 1] > MaxCutMeters)
+            {
+                last++;
+            }
+
+            bool joined = runs.Count > 0
+                && along[i] - along[runs[^1].Last] < MinTunnelMeters
+                && Enumerable.Range(runs[^1].Last, i - runs[^1].Last)
+                    .All(j => ground[j] - road[j] >= coverMeters);
+            if (joined)
+            {
+                runs[^1] = (runs[^1].First, last);
+            }
+            else
+            {
+                runs.Add((i, last));
+            }
+
+            i = last;
+        }
+
+        return [.. runs
+            .Where(run => along[run.Last] - along[run.First] >= MinTunnelMeters
+                && !bridges.Any(bridge => bridge.First <= run.Last && bridge.Last >= run.First))
+            .Select(run => new RoadTunnel(run.First, run.Last)
+            {
+                LengthMeters = along[run.Last] - along[run.First],
+            })];
     }
 
     /// <summary>

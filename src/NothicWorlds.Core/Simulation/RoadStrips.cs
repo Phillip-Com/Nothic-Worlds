@@ -8,8 +8,9 @@ namespace NothicWorlds.Core.Simulation;
 /// the ground's material paves it; on a dirt path's crossing, worn ground) and a strip down
 /// each side, over its shoulder and its
 /// cutting's or bank's slope (as <see cref="GroundCarving"/> shapes them, rivers too) to a
-/// skirt that blends into the coarser ground; and the bridges in reach
-/// (<see cref="StoneBridge"/>, <see cref="WoodenBridge"/>). Rows run across, from one skirt's
+/// skirt that blends into the coarser ground; the bridges in reach
+/// (<see cref="StoneBridge"/>, <see cref="WoodenBridge"/>); and the tunnels' vaults and portals
+/// in reach (<see cref="StoneTunnel"/>). Rows run across, from one skirt's
 /// edge to the other, in the order <see cref="RiverBanks"/>' rows do. Worked out on one thread
 /// (it's meant for a worker).
 /// </summary>
@@ -36,21 +37,24 @@ public static class RoadStrips
     private const double LiftShare = 0.005, MinLiftMeters = 0.05;
 
     /// <summary>
-    /// The strips and bridges of <paramref name="roads"/> within
+    /// The strips, bridges (with the tunnels' pieces), and tunnels' portals of
+    /// <paramref name="roads"/> within
     /// <paramref name="reachMeters"/> of <paramref name="eye"/> (a unit direction) on a body
     /// <paramref name="radiusKm"/> in radius: <paramref name="carve"/> gives the ground's
     /// shaped height at a direction from its height there, <paramref name="groundMeters"/>
     /// that height, <paramref name="coarseMeters"/> the coarser drawn ground's (where the
     /// skirts end), and <paramref name="skirtMeters"/> how wide each skirt must be there.
     /// </summary>
-    public static (List<List<BankPoint[]>> Strips, List<BridgeShown> Bridges) Near(
-        RoadCarving roads, Func<Vector3D, double, double> carve, Vector3D eye, double radiusKm,
-        double reachMeters, Func<Vector3D, double> groundMeters,
+    public static (List<List<BankPoint[]>> Strips, List<BridgeShown> Bridges,
+        List<TunnelPortal> Portals) Near(RoadCarving roads,
+        Func<Vector3D, double, double> carve, Vector3D eye, double radiusKm, double reachMeters,
+        Func<Vector3D, double> groundMeters,
         Func<Vector3D, double> coarseMeters, Func<Vector3D, double> skirtMeters)
     {
         double radiusMeters = radiusKm * 1000;
         var strips = new List<List<BankPoint[]>>();
         var bridges = new List<BridgeShown>();
+        var portals = new List<TunnelPortal>();
         for (int r = 0; r < roads.Roads.Count; r++)
         {
             RoadProfile road = roads.Roads[r];
@@ -83,12 +87,61 @@ public static class RoadStrips
                     bridges.Add(BridgeShown.Of(road, bridge, radiusMeters));
                 }
             }
+
+            foreach (RoadTunnel tunnel in road.Tunnels)
+            {
+                TunnelNear(road, tunnel, eye, radiusMeters, reachMeters, bridges, portals);
+            }
         }
 
-        return (strips, bridges);
+        return (strips, bridges, portals);
     }
 
-    // The rows of a road in reach, in stretches broken where it's out of reach or on a bridge.
+    // The pieces of a tunnel's vault in reach (one for each of its segments), and its portals
+    // in reach, each with its front and block.
+    private static void TunnelNear(RoadProfile road, RoadTunnel tunnel, Vector3D eye,
+        double radiusMeters, double reachMeters, List<BridgeShown> bridges,
+        List<TunnelPortal> portals)
+    {
+        double inner = road.HalfWidthMeters + road.ShoulderMeters;
+        bool Near(int i) => radiusMeters * Math.Acos(Math.Clamp(road.Points[i].Dot(eye), -1, 1))
+            <= reachMeters;
+        for (int s = tunnel.First; s < tunnel.Last; s++)
+        {
+            if (!Near(s) && !Near(s + 1))
+            {
+                continue;
+            }
+
+            double length = road.AlongMeters[s + 1] - road.AlongMeters[s];
+            (List<BridgePoint> points, List<int> triangles) = StoneTunnel.Vault(length, inner,
+                road.RoadMeters[s], road.RoadMeters[s + 1],
+                road.AlongMeters[s] - road.AlongMeters[tunnel.First], tunnel.LengthMeters);
+            bridges.Add(BridgeShown.Between(road.Points[s], road.Points[s + 1], length,
+                radiusMeters, points, triangles));
+        }
+
+        foreach ((int at, int inward) in new[] { (tunnel.First, 1), (tunnel.Last, -1) })
+        {
+            if (!Near(at))
+            {
+                continue;
+            }
+
+            double depth = road.GroundMeters[at] - road.RoadMeters[at];
+            (List<BridgePoint> points, List<int> triangles) = StoneTunnel.Portal(inner,
+                road.RoadMeters[at], depth);
+            BridgeShown shown = BridgeShown.Between(road.Points[at], road.Points[at + inward],
+                Math.Abs(road.AlongMeters[at + inward] - road.AlongMeters[at]), radiusMeters,
+                points, triangles);
+            bridges.Add(shown);
+            portals.Add(new TunnelPortal(shown,
+                StoneTunnel.HiddenHalfWidthMeters(inner, depth)));
+        }
+    }
+
+    // The rows of a road in reach, in stretches broken where it's out of reach, on a bridge,
+    // or in a tunnel.
     private static List<List<Row>> Stretches(RoadCarving roads, int r, Vector3D eye,
         double radiusMeters, double reachMeters)
     {
@@ -100,7 +153,7 @@ public static class RoadStrips
         {
             Vector3D from = road.Points[s], to = road.Points[s + 1];
             double length = road.AlongMeters[s + 1] - road.AlongMeters[s];
-            if (roads.IsBridged(r, s)
+            if (roads.IsOffGround(r, s)
                 || (eye - from).Length * radiusMeters - length > reachMeters)
             {
                 stretch = null;
@@ -118,7 +171,7 @@ public static class RoadStrips
                 double spacing = Math.Max(MinRowMeters, RowShare * fromEye);
                 double here = road.AlongMeters[s] + at;
                 bool last = t >= 1 && (s + 1 >= road.Points.Count - 1
-                    || roads.IsBridged(r, s + 1));
+                    || roads.IsOffGround(r, s + 1));
                 if (fromEye > reachMeters)
                 {
                     stretch = null;

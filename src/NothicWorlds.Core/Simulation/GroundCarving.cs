@@ -72,13 +72,16 @@ public sealed class GroundCarving
     /// How far a unit direction is past the nearest river's banks or road's sides, in meters
     /// (0 on them), looking no farther than <paramref name="withinMeters"/> (which it gives if
     /// none is nearer): rough terrain fades out toward them (VISION.md BOD-12), and plants
-    /// don't grow on them. Safe to call from several threads at once.
+    /// don't grow on them. A tunnel's road counts only with <paramref name="tunnels"/> (rough
+    /// terrain fades over it, so the hill covers it as its profile was laid for, but plants
+    /// grow there). Safe to call from several threads at once.
     /// </summary>
-    public double BeyondBanksMeters(Vector3D direction, double withinMeters)
+    public double BeyondBanksMeters(Vector3D direction, double withinMeters,
+        bool tunnels = true)
     {
         double nearest = Rivers?.BeyondBanksMeters(direction, withinMeters) ?? withinMeters;
         return nearest > 0 && Roads is { } roads
-            ? roads.BeyondSidesMeters(direction, nearest)
+            ? roads.BeyondSidesMeters(direction, nearest, tunnels)
             : nearest;
     }
 
@@ -87,4 +90,11 @@ public sealed class GroundCarving
     /// null.
     /// </summary>
     public double? DeckMeters(Vector3D direction) => Roads?.DeckMeters(direction);
+
+    /// <summary>
+    /// The height of the road in a tunnel at a unit direction, in meters, if one is there;
+    /// else null (<see cref="RoadCarving.TunnelFloorMeters"/>).
+    /// </summary>
+    public double? TunnelFloorMeters(Vector3D direction) =>
+        Roads?.TunnelFloorMeters(direction);
 }

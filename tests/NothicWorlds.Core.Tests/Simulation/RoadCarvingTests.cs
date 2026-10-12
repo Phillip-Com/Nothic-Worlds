@@ -95,4 +95,45 @@ public sealed class RoadCarvingTests
         Assert.Equal(100, _level.BeyondSidesMeters(Beside(reach + 100), 1_000), 3);
         Assert.Equal(50, _level.BeyondSidesMeters(Beside(reach + 100), 50));
     }
+
+    [Fact]
+    public void OverATunnel_TheGroundIsLeftAlone_AndWalkersInsideWalkOnItsRoad()
+    {
+        RoadProfile road = RoadProfile.For(RoadProfileTests.Highway(), RadiusKm,
+            RoadProfileTests.Mesa(), null)!;
+        RoadCarving carving = RoadCarving.For([road], RadiusKm);
+        int middle = Enumerable.Range(0, road.Points.Count)
+            .MinBy(i => Math.Abs(RoadProfileTests.East(road.Points[i])));
+        Vector3D over = road.Points[middle];
+
+        Assert.Equal(300, carving.Shape(over, 300), 9);
+        Assert.Equal(300, carving.Shape(Beside(20, 0), 300), 9);
+
+        // Just inside each portal, the cutting runs on (behind the portal's front).
+        RoadTunnel tunnel = Assert.Single(road.Tunnels);
+        int first = tunnel.First, last = tunnel.Last;
+        Vector3D inside = road.Points[first] * 0.8 + road.Points[first + 1] * 0.2;
+        inside *= 1 / inside.Length;
+        double floor = road.RoadMeters[first] * 0.8 + road.RoadMeters[first + 1] * 0.2;
+        Assert.Equal(floor, carving.Shape(inside, 300), 6);
+        Vector3D deeper = road.Points[last - 1];
+        Assert.Equal(300, carving.Shape(deeper, 300), 9);
+
+        // Coarser ground at a portal is sunk under its road (out of sight under the cutting's
+        // strips, the portal's front, and its block); deeper in, it's the hill.
+        Func<Vector3D, double, (double Shaped, double Sink)> parts =
+            carving.PartsNear(road.Points[first], 1e-4, 2)!;
+        (double shaped, double sink) = parts(inside, 300);
+        Assert.True(shaped - sink <= floor - StoneTunnel.HiddenBelowMeters + 1e-6);
+        Vector3D past = road.Points[first + 2];
+        (shaped, sink) = parts(past, 300);
+        Assert.Equal(300, shaped - sink, 9);
+        Assert.Equal(road.RoadMeters[middle], carving.TunnelFloorMeters(over)!.Value, 6);
+        Assert.Null(carving.TunnelFloorMeters(Beside(Shoulders + 1, 0)));
+        Assert.Null(_level.TunnelFloorMeters(Beside(0)));
+
+        // Plants grow over it (there's no road there), but rough terrain fades toward it.
+        Assert.Equal(50, carving.BeyondSidesMeters(over, 50, tunnels: false), 9);
+        Assert.Equal(0, carving.BeyondSidesMeters(over, 50), 9);
+    }
 }

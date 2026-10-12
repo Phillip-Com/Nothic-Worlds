@@ -21,8 +21,12 @@ public sealed class RoadStripsTests
     private static readonly Vector3D _eye = WaterGround.At(0, 300 / MetersPerDegree);
 
     private static (List<List<BankPoint[]>> Strips, List<BridgeShown> Bridges) Near(
-        double reachMeters) => RoadStrips.Near(_roads, _carving.Carve, _eye, RadiusKm,
-            reachMeters, _ => 100, _ => 99, _ => 5);
+        double reachMeters)
+    {
+        (List<List<BankPoint[]>> strips, List<BridgeShown> bridges, _) = RoadStrips.Near(
+            _roads, _carving.Carve, _eye, RadiusKm, reachMeters, _ => 100, _ => 99, _ => 5);
+        return (strips, bridges);
+    }
 
     [Fact]
     public void EachStretch_HasItsPavingBetweenItsSides_EndingAtTheBridge()
@@ -63,8 +67,8 @@ public sealed class RoadStripsTests
     public void RoadsOutOfReach_GiveNothing()
     {
         Vector3D far = WaterGround.At(1, 0);
-        (List<List<BankPoint[]>> strips, List<BridgeShown> bridges) = RoadStrips.Near(_roads,
-            _carving.Carve, far, RadiusKm, 1_000, _ => 100, _ => 99, _ => 5);
+        (List<List<BankPoint[]>> strips, List<BridgeShown> bridges, _) = RoadStrips.Near(
+            _roads, _carving.Carve, far, RadiusKm, 1_000, _ => 100, _ => 99, _ => 5);
 
         Assert.Empty(strips);
         Assert.Empty(bridges);
@@ -84,5 +88,37 @@ public sealed class RoadStripsTests
         });
         Assert.True((direction - _road.Points[span.First]).Length * RadiusKm * 1000 < 1e-3);
         Assert.Equal(_road.RoadMeters[span.First], meters, 9);
+    }
+
+    [Fact]
+    public void NearATunnel_ItsVaultAndPortalsAreLaid_AndNoStripRunsThroughIt()
+    {
+        RoadProfile road = RoadProfile.For(RoadProfileTests.Highway(), RadiusKm,
+            RoadProfileTests.Mesa(), null)!;
+        RoadCarving roads = RoadCarving.For([road], RadiusKm);
+        RoadTunnel tunnel = Assert.Single(road.Tunnels);
+        Vector3D eye = WaterGround.At(0, 0);
+
+        (List<List<BankPoint[]>> strips, List<BridgeShown> pieces, List<TunnelPortal> portals) =
+            RoadStrips.Near(roads, roads.Shape, eye, RadiusKm, 1_000, _ => 100, _ => 99,
+                _ => 5);
+
+        Assert.Equal(2, portals.Count);
+        Assert.Equal(tunnel.Last - tunnel.First + 2, pieces.Count);  // And no bridges
+        double from = RoadProfileTests.East(road.Points[tunnel.First]);
+        double to = RoadProfileTests.East(road.Points[tunnel.Last]);
+        Assert.All(strips.SelectMany(strip => strip).SelectMany(row => row), point =>
+        {
+            double east = RoadProfileTests.East(point.Direction);
+            Assert.True(east <= from + 1e-3 || east >= to - 1e-3, $"{east}");
+        });
+
+        // The coarser ground is sunk from in front of each portal to under its block.
+        TunnelPortal entrance = portals.MinBy(p => RoadProfileTests.East(p.Shown.Start))!;
+        double door = RoadProfileTests.East(entrance.Shown.Start);
+        Assert.True(entrance.Covers(WaterGround.At(0, (door - 10) / MetersPerDegree)));
+        Assert.True(entrance.Covers(WaterGround.At(0, (door + 3) / MetersPerDegree)));
+        Assert.False(entrance.Covers(WaterGround.At(0, (door - 30) / MetersPerDegree)));
+        Assert.False(entrance.Covers(WaterGround.At(0.01, (door - 10) / MetersPerDegree)));
     }
 }

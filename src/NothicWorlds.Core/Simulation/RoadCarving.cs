@@ -7,10 +7,13 @@ namespace NothicWorlds.Core.Simulation;
 /// paving and a shoulder either side, then cut back at <see cref="CutSlope"/> where the road
 /// runs below the ground (a cutting) or banked down at <see cref="BankSlope"/> where it runs
 /// above (a bank), until the slopes meet the ground. Under a bridge the ground is left as the
-/// river cut it. As <see cref="RiverCarving"/>, it depends only on the roads, not on where an
-/// eye is; the roads are drawn finely by a strip along each (<see cref="RoadStrips"/>), and
-/// the coarser ground under it is sunk out of sight. Where roads meet, the nearest one shapes
-/// the ground; past a road's ends it shapes nothing, as its strip ends square there.
+/// river cut it, and over a tunnel as it was, but for <see cref="PortalCutMeters"/> in from
+/// each portal, where the cutting runs on behind the portal's front (so a cliff's face rises
+/// behind it, not in front). As <see cref="RiverCarving"/>, it depends only on the roads, not
+/// on where an eye is; the roads are drawn finely by a strip along each
+/// (<see cref="RoadStrips"/>), and the coarser ground under it is sunk out of sight. Where
+/// roads meet, the nearest one shapes the ground; past a road's ends it shapes nothing, as its
+/// strip ends square there.
 /// </summary>
 public sealed class RoadCarving
 {
@@ -22,6 +25,12 @@ public sealed class RoadCarving
 
     /// <summary>The level ground either side of a highway's paving, in meters.</summary>
     public const double ShoulderMeters = 1;
+
+    /// <summary>
+    /// How far into a tunnel from each portal the cutting runs on, in meters (behind the
+    /// portal's front, under its block: <see cref="StoneTunnel.BlockMeters"/>).
+    /// </summary>
+    public const double PortalCutMeters = 4;
 
     // How much farther than its height needs a road's sides are let reach, in meters (the
     // ground beside it is rougher than its profile's smooth ground).
@@ -48,12 +57,15 @@ public sealed class RoadCarving
     private readonly double _radiusMeters;
     private readonly IReadOnlyList<RoadProfile> _roads;
     private readonly int[][] _bridgeAt;  // Which bridge each road's segments are on (-1: none)
+    private readonly bool[][] _tunneled; // Whether each road's segments are in a tunnel
     private readonly Level[][] _trees;   // Each road's search tree, its segments first
 
     private RoadCarving(IReadOnlyList<RoadProfile> roads, double radiusMeters)
     {
         (_roads, _radiusMeters) = (roads, radiusMeters);
         _bridgeAt = [.. roads.Select(BridgeAt)];
+        _tunneled = [.. roads.Select(road => Enumerable.Range(0, road.Points.Count - 1)
+            .Select(road.InTunnel).ToArray())];
         _trees = [.. roads.Select(Tree)];
     }
 
@@ -113,14 +125,21 @@ public sealed class RoadCarving
     /// <summary>
     /// How far a unit direction is past the nearest road's sides, in meters (0 on them or the
     /// road), looking no farther than <paramref name="withinMeters"/> (which it gives if no
-    /// road is nearer). Safe to call from several threads at once.
+    /// road is nearer); a road in a tunnel counts only with <paramref name="tunnels"/>. Safe
+    /// to call from several threads at once.
     /// </summary>
-    public double BeyondSidesMeters(Vector3D direction, double withinMeters)
+    public double BeyondSidesMeters(Vector3D direction, double withinMeters,
+        bool tunnels = true)
     {
         double nearest = withinMeters;
         foreach (Closeness near in NearestEach(Gather(direction, withinMeters / _radiusMeters,
             0), direction))
         {
+            if (!tunnels && _tunneled[near.Road][near.Segment])
+            {
+                continue;
+            }
+
             nearest = Math.Min(nearest,
                 Math.Max(0, near.Away - _trees[near.Road][0].ReachMeters[near.Segment]));
         }
@@ -157,8 +176,54 @@ public sealed class RoadCarving
         return Lerp(_roads[r].RoadMeters[s], _roads[r].RoadMeters[s + 1], t);
     }
 
+    /// <summary>
+    /// The height of the road in a tunnel at a unit direction, in meters, if it's in one
+    /// (between its walls); else null. Walkers who come in by a portal walk on it, under the
+    /// hill (VISION.md BOD-13).
+    /// </summary>
+    public double? TunnelFloorMeters(Vector3D direction)
+    {
+        if (Closest(NearestEach(Gather(direction, 0, 0), direction)) is not { } closest)
+        {
+            return null;
+        }
+
+        (int r, int s, double away, double t) = closest;
+        if (!_tunneled[r][s] || away > _roads[r].HalfWidthMeters + _roads[r].ShoulderMeters)
+        {
+            return null;
+        }
+
+        return Lerp(_roads[r].RoadMeters[s], _roads[r].RoadMeters[s + 1], t);
+    }
+
     // Whether segment s of road r is on a bridge.
     internal bool IsBridged(int r, int s) => _bridgeAt[r][s] >= 0;
+
+    // Whether segment s of road r is off the ground: on a bridge or in a tunnel.
+    internal bool IsOffGround(int r, int s) => IsBridged(r, s) || _tunneled[r][s];
+
+    // Whether a road shapes the ground at a point this near it: not on a bridge, nor in a
+    // tunnel past PortalCutMeters from its portals.
+    private bool Shapes(Closeness near)
+    {
+        (int r, int s) = (near.Road, near.Segment);
+        if (IsBridged(r, s))
+        {
+            return false;
+        }
+
+        if (!_tunneled[r][s])
+        {
+            return true;
+        }
+
+        RoadProfile road = _roads[r];
+        double along = Lerp(road.AlongMeters[s], road.AlongMeters[s + 1], near.T);
+        return road.Tunnels.Any(tunnel => s >= tunnel.First && s < tunnel.Last
+            && Math.Min(along - road.AlongMeters[tunnel.First],
+                road.AlongMeters[tunnel.Last] - along) < PortalCutMeters);
+    }
 
     // How far the sides of segment s of road r reach out from its middle, in meters.
     internal double SegmentReachMeters(int r, int s) => _trees[r][0].ReachMeters[s];
@@ -170,12 +235,14 @@ public sealed class RoadCarving
     {
         List<Closeness> each = NearestEach(segments, direction);
         double sink = 0;
+        double? hiddenUnder = null;
         if (cellMeters is double cell)
         {
+            hiddenUnder = HiddenUnder(each);
             double fade = SinkReachMeters(cell), cover = 0;
             foreach (Closeness near in each)
             {
-                if (!IsBridged(near.Road, near.Segment))
+                if (Shapes(near))
                 {
                     double beyond = near.Away - _trees[near.Road][0].ReachMeters[near.Segment];
                     cover = Math.Max(cover, Math.Clamp(1 - beyond / fade, 0, 1));
@@ -185,10 +252,18 @@ public sealed class RoadCarving
             sink = cover * (MinSinkMeters + SinkPerCell * cell);
         }
 
+        double shaped = Shaped(each, groundMeters);
+        return (shaped, hiddenUnder is double under ? Math.Max(sink, shaped - under) : sink);
+    }
+
+    // The ground's height, given its height there, shaped by the nearest of the roads' nearest
+    // segments (NearestEach).
+    private double Shaped(List<Closeness> each, double groundMeters)
+    {
         if (Closest(each) is not { } closest
-            || IsBridged(closest.Road, closest.Segment))
+            || !Shapes(new Closeness(closest.Road, closest.Segment, closest.Away, closest.T)))
         {
-            return (groundMeters, sink);
+            return groundMeters;
         }
 
         (int road, int segment, double distance, double along) = closest;
@@ -198,11 +273,47 @@ public sealed class RoadCarving
         double past = distance - profile.HalfWidthMeters - profile.ShoulderMeters;
         if (past <= 0)
         {
-            return (height, sink);
+            return height;
         }
 
         double cut = height + past * CutSlope, bank = height - past * BankSlope;
-        return (Math.Clamp(groundMeters, bank, cut), sink);
+        return Math.Clamp(groundMeters, bank, cut);
+    }
+
+    // How high coarser ground may be where it's sunk out of sight at a tunnel's portal
+    // (StoneTunnel.Hides), near the roads' nearest segments (NearestEach): a little under the
+    // portal's road, in meters. Null where it isn't.
+    private double? HiddenUnder(List<Closeness> each)
+    {
+        foreach (Closeness near in each)
+        {
+            RoadProfile road = _roads[near.Road];
+            if (road.Tunnels.Count == 0)
+            {
+                continue;
+            }
+
+            double inner = road.HalfWidthMeters + road.ShoulderMeters;
+            double along = Lerp(road.AlongMeters[near.Segment],
+                road.AlongMeters[near.Segment + 1], near.T);
+            foreach (RoadTunnel tunnel in road.Tunnels)
+            {
+                foreach ((int at, double into) in new[]
+                {
+                    (tunnel.First, along - road.AlongMeters[tunnel.First]),
+                    (tunnel.Last, road.AlongMeters[tunnel.Last] - along),
+                })
+                {
+                    if (StoneTunnel.Hides(into, near.Away, inner,
+                        road.GroundMeters[at] - road.RoadMeters[at]))
+                    {
+                        return road.RoadMeters[at] - StoneTunnel.HiddenBelowMeters;
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     // The nearest of the roads' nearest segments (NearestEach) whose sides reach the
