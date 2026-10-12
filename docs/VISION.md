@@ -394,8 +394,9 @@ background) and `star_sky.gdshaderinc`; `UI/SkyPage.cs`, `UI/SkyCanvas.cs` (the 
 **Intent:** Standing on a world, a minimap shows where the view is on the larger map (and can
 take you elsewhere with a click), and the clock and calendar can be run and read just as from
 the system view (owner's request, 2026-10-08).
-**Owner's choices:** a round, zoomable overhead minimap, north up, with your arrow; click to
-travel; the time bar stays and the Calendar opens over the view (button or T).
+**Owner's choices:** a round, zoomable overhead minimap, north up, with your arrow and the
+roads (`BOD-13`, 2026-10-11); click to travel; the time bar stays and the Calendar opens
+over the view (button or T).
 **Built:** `UI/Minimap.cs` (a second orthographic camera in its own 256 px `SubViewport`,
 `FirstPersonMode.BuildOverhead`, with its own even lighting); `GlobeWalk.FromOverhead` and
 `FlatWalk.Walk` for clicks; `TimeControls.KeepShown`, `CalendarPanel.KeepShown`.
@@ -875,7 +876,11 @@ fords, boardwalks, switchbacks), **tunnels** last, then cart tracks' and old roa
   water, from `ShowWater`); `Rendering/RoadRenderer.cs` (lines on the globe in each style's
   color, dirt paths dashed); `UI/RoadSection.cs` (the Roads mode); `RegionEditor`'s line
   drawing snaps a click near another road onto it, so roads join.
-**Limits:** for now roads show only on the map, not up close. Ways are a height cell apart
+- While standing, the roads are on the minimap (owner's request, 2026-10-11):
+  `FirstPersonMode.Roads.cs` places them as seen straight down from above the spot (on a flat
+  world, by `FlatDisc.TopPointFor`), and `Minimap` draws them over its picture as
+  `MinimapLine`s, cut at its edge, dirt paths dashed.
+**Limits:** for now roads show only on the map and the minimap, not in the view itself. Ways are a height cell apart
 (about 10 km on an Earth-sized world), so they go round hills and woods that size; smaller ones
 wait for the up-close steps. A drawn road's points can't be moved yet (delete and redraw).
 
