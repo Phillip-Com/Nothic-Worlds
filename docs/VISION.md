@@ -109,7 +109,7 @@ below and in docs/DECISIONS.md.
 | 41 | Map and time while standing | `REN-08` | #97 |
 | 42 | Rivers and lakes | `BOD-11` | #98–#100 |
 | — | Opening and editing without freezing | `REN-03`, `BOD-11` | #101–#103 |
-| 43 | Roads | `BOD-13` | #125– |
+| 43 | Roads | `BOD-13` | #125–#129 |
 
 ---
 
@@ -847,8 +847,8 @@ builds it (`GroundTileRecipe.MorphHeight`). The session keeps each body's (`Roug
 Low ground detail they thin out far off (from about 5 km, none past 15 km) so the tiles meet
 the globe's own ground; at Standard and High they reach the farthest peak (see `REN-06`). A type with no variation can't be rough.
 
-**BOD-13 — Roads** · In progress (M43: on the map, PR #125; highways up close, PR #126; dirt
-paths up close, PR #127; tunnels, PR #128) · Base
+**BOD-13 — Roads** · Implemented (M43: on the map, PR #125; highways up close, PR #126; dirt
+paths up close, PR #127; tunnels, PR #128; cart tracks and old roads, PR #129) · Base
 **Intent:** A road tool that works like rivers, starting with fantasy roads: a **stone highway**,
 one large paved road laid by a work crew along the most efficient line, tunneling through hills
 and crossing rivers on solid stone bridges; and **dirt paths**, many paths that split and
@@ -877,6 +877,13 @@ least **40 m** (a shorter stretch is cut deeper; tunnels closer than 40 m are on
 hill covers the road between); each portal a **stone front with a round arch**, of the
 bridges' stone; inside, **torches that glow** but light nothing, and the farther in, the
 darker; tunnels **dashed on the minimap** (the globe's lines stay as they are).
+Cart tracks and old roads (2026-10-12): an old road's paving is **broken in patches, about
+40% gone** (more toward its edges), soil and grass showing through; its bridges and tunnels
+**stand, weathered** (darker, mossy stone, gaps in the bridges' low walls, no torches), and
+it's always passable; **grass and scattered shrubs** grow on it, trees only on its edges and
+shoulders. A cart track is **two ruts** (worn ground, not sunk into it); it switchbacks above
+a **10%** grade with bends up to **60 m** either side, fords water at most **12 m** wide
+(wider: a wooden bridge), and its bridges and boardwalks are **3 m** wide.
 **Built:**
 - Data (format v36): `Model/Road.cs` (style, kind, points, width), `RoadStyle`, `RoadKind`,
   `RoadRules`. Only these are saved; the ways are worked out each time (docs/world-format.md).
@@ -942,7 +949,25 @@ darker; tunnels **dashed on the minimap** (the globe's lines stay as they are).
   sun's light off by it (AO), and flames (w 12) glow. Walkers who come in by a portal walk
   on the road (`TunnelFloorMeters`, `FirstPersonMode.Walked`), so its walls stop them like a
   cliff; on the hill they stay on the hill. `PathStretches` dashes tunnels on the minimap.
-**Limits:** cart tracks and old roads show only on the map and the minimap so far. A dirt
+- Cart tracks and old roads: `DirtPath` lays a cart track as a path with one strand on its
+  way (no lean or wander) and its own `Limits` (grade, swing, rounder hairpins, 3 m
+  crossings), drawn as two ruts `RutGaugeMeters` apart (`PathStrand.Rut`, `StripSurface.Rut`,
+  CUSTOM0.w 16–17: the worn ground darker), with a strip not drawn (`PathStrand.Worn` false)
+  keeping plants off its width. `RoadProfile` lays an old road as a highway
+  (`RoadSurface.OldPaving`): `RoadStrips` marks its paving `StripSurface.OldPaving` (w 13–14,
+  with how far toward the middle), and builds its bridges (`StoneBridge.Build`'s ruin seed,
+  from where the bridge starts: walls in 2 m pieces, a quarter fallen to a stub and a tenth
+  gone, the road out to the sides) and tunnels (`StoneTunnel`'s `old`: no torches) of
+  `BridgeMaterial.Weathered` (w 15). The shader breaks the paving by noise in patches about
+  1.5 m across, soil in some gaps and the ground beside in the rest, and darkens weathered
+  stone with moss in patches. `RoadCarving.OnOldPaving` and `BeyondSidesMeters(oldRoads:)`
+  let plants grow there (`PlantGround.OnOldRoad`: grass, and about a third of the shrubs;
+  no trees). `SeededNoise` (shared with the dirt paths' strands) makes the same breaks every
+  time.
+**Limits:** a cart track's ruts are drawn on the ground, not sunk into it, and become one worn
+band where it crosses water or marsh. Where an old road's paving is broken is worked out in
+the shader, so the plants growing on it don't know where its gaps are (grass grows on its
+paving too). A dirt
 path's strands lie on the ground without shaping it, and only its crossings come with fords,
 bridges, or boardwalks; a dirt path crossing a highway or another path makes no junction. Its
 strands lean only from the slope (plants vary on the terrain grid, far wider than a band).
