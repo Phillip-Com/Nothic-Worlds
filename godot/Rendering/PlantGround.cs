@@ -15,7 +15,10 @@ namespace NothicWorlds.Rendering;
 /// when it changes.</param>
 /// <param name="Height">The drawn ground's height at a base point (as the
 /// <see cref="ITileSurface"/> measures height), or null where none is drawn.</param>
-/// <param name="InRiver">Whether a base point is in a river or on its banks.</param>
+/// <param name="InRiver">Whether a base point is in a river or on its banks, or on a road.
+/// </param>
+/// <param name="OnOldRoad">Whether a base point is on an old road's paving, where grass and a
+/// few shrubs grow but no trees (VISION.md BOD-13).</param>
 /// <param name="Wet">Whether a base point, given its ground's height, is under water.</param>
 /// <param name="Snowy">Whether a base point, given its ground's height, is this many meters
 /// below the snow line or higher.</param>
@@ -23,6 +26,7 @@ namespace NothicWorlds.Rendering;
 public sealed record PlantGround(long Version, long CoverVersion,
     Func<Vector3D, double?> Height,
     Func<Vector3D, bool> InRiver,
+    Func<Vector3D, bool> OnOldRoad,
     Func<Vector3D, double, bool> Wet,
     Func<Vector3D, double, double, bool> Snowy,
     Func<Vector3D, (PlantCover Cover, Color Grass)> CoverAt);

@@ -14,7 +14,8 @@ namespace NothicWorlds.Core.Simulation;
 /// <see cref="MaxCutMeters"/> for at least <see cref="MinTunnelMeters"/> (a shorter stretch is
 /// cut deeper). In steps of <see cref="SampleMeters"/> along its way: its height, the ground's
 /// under it, and where it's on a bridge or in a tunnel. It depends only on the road, the
-/// ground, and the rivers, never on where an eye is.
+/// ground, and the rivers, never on where an eye is. An old road is laid as a highway is, its
+/// paving broken and its stone weathered (<see cref="RoadSurface.OldPaving"/>).
 /// </summary>
 public sealed class RoadProfile
 {
@@ -104,14 +105,15 @@ public sealed class RoadProfile
     /// <summary>
     /// The profile of <paramref name="course"/> on a body <paramref name="radiusKm"/> in
     /// radius, whose smooth ground is <paramref name="groundMeters"/> high at each direction,
-    /// crossing <paramref name="rivers"/> (none: null). Null if it isn't a stone highway (dirt
-    /// paths are laid by <see cref="DirtPath"/>; cart tracks and old roads come later), or its
-    /// way is a single point.
+    /// crossing <paramref name="rivers"/> (none: null). Null if it isn't a stone highway or an
+    /// old road (dirt paths and cart tracks are laid by <see cref="DirtPath"/>), or its way is
+    /// a single point.
     /// </summary>
     public static RoadProfile? For(RoadCourseShown course, double radiusKm,
         Func<Vector3D, double> groundMeters, RiverCarving? rivers)
     {
-        if (course.Style != RoadStyle.StoneHighway || course.Path.Count < 2)
+        if (course.Style is not (RoadStyle.StoneHighway or RoadStyle.OldRoad)
+            || course.Path.Count < 2)
         {
             return null;
         }
@@ -145,7 +147,8 @@ public sealed class RoadProfile
         List<RoadTunnel> tunnels = TunnelsUnder(road, ground, along, bridges,
             StoneTunnel.CoverMeters(halfWidth + RoadCarving.ShoulderMeters));
         return new RoadProfile(points, along, halfWidth, RoadCarving.ShoulderMeters, road,
-            ground, bridges, tunnels, RoadSurface.Paving);
+            ground, bridges, tunnels,
+            course.Style == RoadStyle.OldRoad ? RoadSurface.OldPaving : RoadSurface.Paving);
     }
 
     /// <summary>

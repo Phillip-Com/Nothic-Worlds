@@ -11,4 +11,10 @@ public enum StripSurface
 
     /// <summary>A dirt path's worn ground (VISION.md BOD-13).</summary>
     Worn,
+
+    /// <summary>A cart track's rut (VISION.md BOD-13).</summary>
+    Rut,
+
+    /// <summary>An old road's broken, overgrown paving (VISION.md BOD-13).</summary>
+    OldPaving,
 }

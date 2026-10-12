@@ -1,4 +1,5 @@
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 
 namespace NothicWorlds.Core.Tests.Simulation;
@@ -120,5 +121,28 @@ public sealed class RoadStripsTests
         Assert.True(entrance.Covers(WaterGround.At(0, (door + 3) / MetersPerDegree)));
         Assert.False(entrance.Covers(WaterGround.At(0, (door - 30) / MetersPerDegree)));
         Assert.False(entrance.Covers(WaterGround.At(0.01, (door - 10) / MetersPerDegree)));
+    }
+
+    [Fact]
+    public void AnOldRoad_IsLaidWithBrokenPaving_AndAWeatheredBridge()
+    {
+        RoadProfile road = RoadProfile.For(
+            RoadProfileTests.Highway(style: RoadStyle.OldRoad), RadiusKm, _ => 100,
+            RoadProfileTests.Stream)!;
+        RoadCarving roads = RoadCarving.For([road], RadiusKm);
+
+        (List<List<BankPoint[]>> strips, List<BridgeShown> bridges, _) = RoadStrips.Near(
+            roads, roads.Shape, _eye, RadiusKm, 1_000, _ => 100, _ => 99, _ => 5);
+
+        List<BankPoint[]> paving = strips[1];
+        Assert.All(paving, row =>
+        {
+            Assert.All(row, point => Assert.Equal(StripSurface.OldPaving, point.Surface));
+            Assert.Equal(1, row[2].Wear);
+            Assert.Equal(0, row[0].Wear);
+        });
+        BridgeShown bridge = Assert.Single(bridges);
+        Assert.All(bridge.Points, point =>
+            Assert.Equal(BridgeMaterial.Weathered, point.Material));
     }
 }

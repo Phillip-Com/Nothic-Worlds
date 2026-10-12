@@ -98,7 +98,7 @@ public sealed class PathStrands
     {
         double reach = Math.Min(reachMeters, RibbonReachMeters);
         var strips = new List<List<BankPoint[]>>();
-        foreach (PathStrand strand in Strands)
+        foreach (PathStrand strand in Strands.Where(strand => strand.Worn))
         {
             List<BankPoint[]>? strip = null;
             double lastRow = double.NegativeInfinity, along = 0;
@@ -178,7 +178,8 @@ public sealed class PathStrands
             Vector3D at = direction + side * (share * strand.HalfWidthMeters / _radiusMeters);
             at *= 1 / at.Length;
             double ground = Math.Max(carve(at, groundMeters(at)), coarseMeters(at));
-            row[k] = new BankPoint(at, ground + lift, 1, StripSurface.Worn, 1 - Math.Abs(share));
+            row[k] = new BankPoint(at, ground + lift, 1,
+                strand.Rut ? StripSurface.Rut : StripSurface.Worn, 1 - Math.Abs(share));
         }
 
         return row;

@@ -28,11 +28,16 @@ public sealed class RoadProfileTests
         RiverProfileTests.Longitude(direction) * MetersPerDegree;
 
     [Fact]
-    public void OnlyStoneHighways_AreLaidUpCloseSoFar()
+    public void HighwaysAndOldRoads_AreLaidAsHighways_OldRoadsPavingBroken()
     {
         Assert.Null(RoadProfile.For(Highway(style: RoadStyle.DirtPaths), RadiusKm, _ => 100,
             null));
-        Assert.NotNull(RoadProfile.For(Highway(), RadiusKm, _ => 100, null));
+        Assert.Null(RoadProfile.For(Highway(style: RoadStyle.CartTrack), RadiusKm, _ => 100,
+            null));
+        Assert.Equal(RoadSurface.Paving,
+            RoadProfile.For(Highway(), RadiusKm, _ => 100, null)!.Surface);
+        Assert.Equal(RoadSurface.OldPaving, RoadProfile.For(Highway(style: RoadStyle.OldRoad),
+            RadiusKm, _ => 100, null)!.Surface);
     }
 
     [Fact]

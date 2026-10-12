@@ -130,4 +130,21 @@ public sealed class StoneTunnelTests
         double ab = Side(y, z, a, b), bc = Side(y, z, b, c), ca = Side(y, z, c, a);
         return (ab >= 0 && bc >= 0 && ca >= 0) || (ab <= 0 && bc <= 0 && ca <= 0);
     }
+
+    [Fact]
+    public void AnOldTunnel_IsWeathered_WithNoTorches()
+    {
+        (List<BridgePoint> lit, _) = StoneTunnel.Vault(30, Inner, Road, Road, 0, 100);
+        (List<BridgePoint> old, List<int> triangles) = StoneTunnel.Vault(30, Inner, Road, Road,
+            0, 100, old: true);
+        (List<BridgePoint> portal, _) = StoneTunnel.Portal(Inner, Road, 20, old: true);
+
+        Assert.Contains(lit, p => p.Material == BridgeMaterial.Flame);
+        Assert.All(old.Concat(portal), p => Assert.Equal(BridgeMaterial.Weathered, p.Material));
+        Assert.True(old.Count < lit.Count);
+        Assert.All(triangles, index => Assert.InRange(index, 0, old.Count - 1));
+
+        // It darkens going in, as any tunnel does.
+        Assert.Contains(old, p => p.Dark > 0);
+    }
 }

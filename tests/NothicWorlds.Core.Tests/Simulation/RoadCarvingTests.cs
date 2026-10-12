@@ -1,4 +1,5 @@
 using NothicWorlds.Core.Geometry;
+using NothicWorlds.Core.Model;
 using NothicWorlds.Core.Simulation;
 
 namespace NothicWorlds.Core.Tests.Simulation;
@@ -135,5 +136,23 @@ public sealed class RoadCarvingTests
         // Plants grow over it (there's no road there), but rough terrain fades toward it.
         Assert.Equal(50, carving.BeyondSidesMeters(over, 50, tunnels: false), 9);
         Assert.Equal(0, carving.BeyondSidesMeters(over, 50), 9);
+    }
+
+    [Fact]
+    public void OnAnOldRoad_PlantsGrowOnItsPavingAndSides_ButNotOnAHighways()
+    {
+        RoadCarving old = RoadCarving.For([RoadProfile.For(
+            RoadProfileTests.Highway(style: RoadStyle.OldRoad), RadiusKm, _ => 100,
+            null)!], RadiusKm);
+
+        Assert.True(old.OnOldPaving(Beside(0)));
+        Assert.True(old.OnOldPaving(Beside(3.9)));
+        Assert.False(old.OnOldPaving(Beside(4.5)));
+        Assert.False(_level.OnOldPaving(Beside(0)));
+
+        // Plants grow there (but rough terrain still fades toward it).
+        Assert.Equal(0, old.BeyondSidesMeters(Beside(0), 1_000));
+        Assert.Equal(1_000, old.BeyondSidesMeters(Beside(0), 1_000, oldRoads: false));
+        Assert.Equal(0, _level.BeyondSidesMeters(Beside(0), 1_000, oldRoads: false));
     }
 }

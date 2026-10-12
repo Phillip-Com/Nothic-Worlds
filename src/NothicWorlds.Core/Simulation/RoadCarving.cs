@@ -125,17 +125,19 @@ public sealed class RoadCarving
     /// <summary>
     /// How far a unit direction is past the nearest road's sides, in meters (0 on them or the
     /// road), looking no farther than <paramref name="withinMeters"/> (which it gives if no
-    /// road is nearer); a road in a tunnel counts only with <paramref name="tunnels"/>. Safe
-    /// to call from several threads at once.
+    /// road is nearer); a road in a tunnel counts only with <paramref name="tunnels"/>, and an
+    /// old road only with <paramref name="oldRoads"/>. Safe to call from several threads at
+    /// once.
     /// </summary>
     public double BeyondSidesMeters(Vector3D direction, double withinMeters,
-        bool tunnels = true)
+        bool tunnels = true, bool oldRoads = true)
     {
         double nearest = withinMeters;
         foreach (Closeness near in NearestEach(Gather(direction, withinMeters / _radiusMeters,
             0), direction))
         {
-            if (!tunnels && _tunneled[near.Road][near.Segment])
+            if ((!tunnels && _tunneled[near.Road][near.Segment])
+                || (!oldRoads && _roads[near.Road].Surface == RoadSurface.OldPaving))
             {
                 continue;
             }
@@ -195,6 +197,26 @@ public sealed class RoadCarving
         }
 
         return Lerp(_roads[r].RoadMeters[s], _roads[r].RoadMeters[s + 1], t);
+    }
+
+    /// <summary>
+    /// Whether a unit direction is on an old road's broken paving, out in the open (not on a
+    /// bridge or in a tunnel), where grass and shrubs grow but trees don't (owner's choice,
+    /// 2026-10-12). Safe to call from several threads at once.
+    /// </summary>
+    public bool OnOldPaving(Vector3D direction)
+    {
+        foreach (Closeness near in NearestEach(Gather(direction, 0, 0), direction))
+        {
+            RoadProfile road = _roads[near.Road];
+            if (road.Surface == RoadSurface.OldPaving && near.Away <= road.HalfWidthMeters
+                && !IsOffGround(near.Road, near.Segment))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Whether segment s of road r is on a bridge.

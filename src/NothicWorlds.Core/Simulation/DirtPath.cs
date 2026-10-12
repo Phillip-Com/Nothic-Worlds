@@ -15,6 +15,10 @@ namespace NothicWorlds.Core.Simulation;
 /// crossings shape it, as short roads (<see cref="Crossings"/>, laid as highways are, through
 /// <see cref="RoadCarving"/>). It depends only on the path, the ground, the rivers, and where
 /// marsh is, never on where an eye is; the same path gives the same strands every time.
+/// A cart track (owner's choices, 2026-10-12) is laid the same way, but as two ruts
+/// <see cref="RutGaugeMeters"/> apart that never split, switchbacking above
+/// <see cref="CartMaxGrade"/> up to <see cref="CartMaxSwingMeters"/> either side, its fords,
+/// bridges, and boardwalks <see cref="CartHalfWidthMeters"/> to each side.
 /// </summary>
 public sealed class DirtPath
 {
@@ -56,6 +60,29 @@ public sealed class DirtPath
     /// <summary>Half the width of a wooden bridge's deck and a boardwalk's, in meters.</summary>
     public const double BridgeHalfWidthMeters = 1.5, BoardwalkHalfWidthMeters = 0.75;
 
+    /// <summary>
+    /// The steepest a cart track climbs straight up a slope (steeper, it switchbacks), and what
+    /// its switchbacks climb at.
+    /// </summary>
+    public const double CartMaxGrade = 0.10, CartSwitchbackGrade = 0.08;
+
+    /// <summary>
+    /// How far a cart track's switchbacks reach either side of its way, in meters.
+    /// </summary>
+    public const double CartMaxSwingMeters = 60;
+
+    /// <summary>
+    /// Half the width of a cart track where it crosses something (its ford's or bridge's road,
+    /// and its boardwalk), in meters.
+    /// </summary>
+    public const double CartHalfWidthMeters = 1.5;
+
+    /// <summary>How far apart a cart track's ruts are, middle to middle, in meters.</summary>
+    public const double RutGaugeMeters = 1.5;
+
+    /// <summary>Half the width of each of a cart track's ruts, in meters.</summary>
+    public const double RutHalfWidthMeters = 0.3;
+
     /// <summary>The level ground either side of a crossing's path, in meters.</summary>
     public const double ShoulderMeters = 0.3;
 
@@ -71,10 +98,15 @@ public sealed class DirtPath
     // steep stretch its switchbacks start, in meters.
     private const double SteepWindowMeters = 15, SteepPaddingMeters = 10;
 
-    // How far either side of each switchback's corner it's rounded off, in meters, in how many
-    // steps.
-    private const double HairpinMeters = 4;
+    // How many steps each switchback's corner is rounded off in.
     private const int HairpinSteps = 6;
+
+    // What a dirt path and a cart track can climb and how they're laid where they cross things
+    // (how far either side of each switchback's corner it's rounded off, in meters).
+    private static readonly Limits _pathLimits = new(MaxGrade, SwitchbackGrade, MaxSwingMeters,
+        4, TrunkHalfWidthMeters, BoardwalkHalfWidthMeters);
+    private static readonly Limits _cartLimits = new(CartMaxGrade, CartSwitchbackGrade,
+        CartMaxSwingMeters, 8, CartHalfWidthMeters, CartHalfWidthMeters);
 
     // How far the strands wander from their lanes (as a share of the band's half-width), over
     // about how long a stretch, in meters; and over how long each extra strand comes and goes.
@@ -116,16 +148,20 @@ public sealed class DirtPath
     /// The path <paramref name="course"/> up close on a body <paramref name="radiusKm"/> in
     /// radius, whose smooth ground is <paramref name="groundMeters"/> high at each direction,
     /// crossing <paramref name="rivers"/> (none: null), with marsh wherever
-    /// <paramref name="isMarsh"/> says. Null if it isn't a dirt path, or its way is a single
-    /// point.
+    /// <paramref name="isMarsh"/> says. Null if it isn't a dirt path or a cart track, or its
+    /// way is a single point.
     /// </summary>
     public static DirtPath? For(RoadCourseShown course, double radiusKm,
         Func<Vector3D, double> groundMeters, RiverCarving? rivers, Func<Vector3D, bool> isMarsh)
     {
-        if (course.Style != RoadStyle.DirtPaths || course.Path.Count < 2)
+        if (course.Style is not (RoadStyle.DirtPaths or RoadStyle.CartTrack)
+            || course.Path.Count < 2)
         {
             return null;
         }
+
+        bool cart = course.Style == RoadStyle.CartTrack;
+        Limits limits = cart ? _cartLimits : _pathLimits;
 
         double radiusMeters = radiusKm * 1000;
         Vector3D[] center = RiverProfile.Sampled([.. course.Path], radiusMeters, StepMeters);
@@ -148,7 +184,7 @@ public sealed class DirtPath
         List<Run> crossings = [.. wetRuns.Concat(marshRuns).OrderBy(run => run.First)];
         double[] fromCrossing = Distances(crossings, way.Along);
         double[] smooth = RoadProfile.Averaged(ground, way.Along, SteepWindowMeters);
-        List<Run> switchbacks = SteepRuns(smooth, way.Along, fromCrossing);
+        List<Run> switchbacks = SteepRuns(smooth, way.Along, fromCrossing, limits.MaxGrade);
 
         // How far the strands spread: none at crossings, switchbacks, and the ends.
         double[] fromAny = Distances([.. crossings.Concat(switchbacks)], way.Along);
@@ -156,26 +192,31 @@ public sealed class DirtPath
         double[] spread = [.. fromAny.Select((distance, i) => SmoothStep(Math.Min(distance,
             Math.Min(way.Along[i], total - way.Along[i])) / GatherMeters))];
 
-        ulong seed = Seed(course.RoadId);
+        ulong seed = SeededNoise.Seed(course.RoadId);
         double halfBand = Math.Max(0, course.WidthMeters / 2 - StrandHalfWidthMeters);
-        double[] lean = Lean(way, groundMeters, course.WidthMeters / 2);
+        // A cart track keeps to its way (its two ruts never split); a path's strands wander.
+        double[] lean = cart
+            ? new double[center.Length]
+            : Lean(way, groundMeters, course.WidthMeters / 2);
         double[][] offsets = Offsets(way.Along, spread, lean, halfBand, seed,
             course.WidthMeters, out double[][] presence);
+        double[] middle = cart ? new double[center.Length] : offsets[0];
 
-        (List<Vector3D> trunk, int[] trunkAt, List<int> stations) = Trunk(way, offsets[0],
-            switchbacks, smooth, lean);
+        (List<Vector3D> trunk, int[] trunkAt, List<int> stations) = Trunk(way, middle,
+            switchbacks, smooth, lean, limits);
         bool[] boardwalk = InRuns(marshRuns, center.Length);
         List<(int First, int Last)> pieces = Pieces(crossings, way.Along, trunkAt);
         var strands = new List<PathStrand>();
         int from = 0;
         foreach ((int first, int last) in pieces)
         {
-            AddPiece(strands, trunk, from, first, TrunkHalfWidthMeters, 0);
+            AddTrunkPiece(strands, trunk, from, first, cart, course.WidthMeters, radiusMeters);
             from = last;
         }
 
-        AddPiece(strands, trunk, from, trunk.Count - 1, TrunkHalfWidthMeters, 0);
-        for (int j = 1; j < _lanes.Length; j++)
+        AddTrunkPiece(strands, trunk, from, trunk.Count - 1, cart, course.WidthMeters,
+            radiusMeters);
+        for (int j = 1; j < _lanes.Length && !cart; j++)
         {
             AddPresent(strands, way, offsets[j], presence[j], j);
         }
@@ -185,7 +226,7 @@ public sealed class DirtPath
         {
             laid.Add(Crossing(trunk.GetRange(first, last - first + 1), radiusMeters,
                 groundMeters, rivers, i => stations[first + i] is >= 0 and int station
-                    && boardwalk[station]));
+                    && boardwalk[station], limits));
         }
 
         return new DirtPath(strands, laid);
@@ -209,7 +250,7 @@ public sealed class DirtPath
             presence[j] = new double[count];
             for (int i = 0; i < count; i++)
             {
-                own[j][i] = Math.Clamp(_lanes[j] + WanderShare * Noise(seed, j,
+                own[j][i] = Math.Clamp(_lanes[j] + WanderShare * SeededNoise.Noise(seed, j,
                     along[i] / WanderMeters) + lean[i], -1, 1);
             }
         }
@@ -221,7 +262,7 @@ public sealed class DirtPath
             double bar = (j + 1 - typical) * 0.4;
             for (int i = 0; i < count; i++)
             {
-                double on = j < MinStrands ? 1 : SmoothStep((Noise(seed, j + 16,
+                double on = j < MinStrands ? 1 : SmoothStep((SeededNoise.Noise(seed, j + 16,
                     along[i] / ComeAndGoMeters) - bar + 0.25) / 0.5);
                 double across = on * own[j][i] + (1 - on) * own[_parents[j]][i];
                 offsets[j][i] = spread[i] * halfBand * across;
@@ -257,8 +298,9 @@ public sealed class DirtPath
 
     // The stretches too steep to climb straight (by the ground averaged a little, `smooth`),
     // padded a little either side, and kept clear of the crossings (their approaches come
-    // first).
-    private static List<Run> SteepRuns(double[] smooth, double[] along, double[] fromCrossing)
+    // first); steep is over `maxGrade`.
+    private static List<Run> SteepRuns(double[] smooth, double[] along, double[] fromCrossing,
+        double maxGrade)
     {
         int count = smooth.Length;
         var steep = new bool[count];
@@ -277,7 +319,7 @@ public sealed class DirtPath
 
             double span = along[after] - along[before];
             steep[i] = span > 0
-                && Math.Abs(smooth[after] - smooth[before]) / span > MaxGrade
+                && Math.Abs(smooth[after] - smooth[before]) / span > maxGrade
                 && fromCrossing[i] > ApproachMeters + GatherMeters;
         }
 
@@ -298,7 +340,7 @@ public sealed class DirtPath
             }
 
             double rise = Math.Abs(smooth[last] - smooth[first]);
-            if (last > first && rise / (along[last] - along[first]) > MaxGrade)
+            if (last > first && rise / (along[last] - along[first]) > maxGrade)
             {
                 runs.Add(new Run(first, last));
             }
@@ -310,9 +352,9 @@ public sealed class DirtPath
     // The main strand, as points (unit directions); which of them each point of the way is
     // (-1 inside switchbacks); and which point of the way each of them is (-1 likewise): its
     // offset at each point, but zigzagging up each steep stretch (of the ground averaged a
-    // little, `smooth`).
+    // little, `smooth`) as its `limits` allow.
     private static (List<Vector3D> Points, int[] At, List<int> Stations) Trunk(Way way,
-        double[] offsets, List<Run> switchbacks, double[] smooth, double[] lean)
+        double[] offsets, List<Run> switchbacks, double[] smooth, double[] lean, Limits limits)
     {
         var points = new List<Vector3D>();
         var stations = new List<int>();
@@ -326,7 +368,7 @@ public sealed class DirtPath
                 Run run = switchbacks[next++];
                 at[run.First] = points.Count;
                 foreach ((double along, double across) in Zigzag(way.Along, smooth, run,
-                    lean[run.First] >= 0 ? 1 : -1))
+                    lean[run.First] >= 0 ? 1 : -1, limits))
                 {
                     points.Add(way.At(along, across));
                     stations.Add(-1);
@@ -349,11 +391,11 @@ public sealed class DirtPath
 
     // A steep stretch's switchbacks, over the ground averaged a little (`smooth`) at points
     // `along` the way: as (along, across) points, across the slope and back as often as it
-    // takes to climb at SwitchbackGrade, reaching at most MaxSwingMeters either side (first to
-    // `side`), each leg climbing as much (so they bunch up where it's steepest), its corners
-    // rounded, at most 2.5 m apart.
+    // takes to climb at its limits' switchback grade, reaching at most their swing either side
+    // (first to `side`), each leg climbing as much (so they bunch up where it's steepest), its
+    // corners rounded, at most 2.5 m apart.
     private static List<(double Along, double Across)> Zigzag(double[] along, double[] smooth,
-        Run run, int side)
+        Run run, int side, Limits limits)
     {
         var climbed = new double[run.Last - run.First + 1];
         for (int i = 1; i < climbed.Length; i++)
@@ -363,8 +405,8 @@ public sealed class DirtPath
         }
 
         double rise = climbed[^1];
-        double length = rise / SwitchbackGrade;
-        int legs = Math.Max(1, (int)Math.Ceiling(length / (2 * MaxSwingMeters)));
+        double length = rise / limits.SwitchbackGrade;
+        int legs = Math.Max(1, (int)Math.Ceiling(length / (2 * limits.SwingMeters)));
         double swing = length / (2 * legs);
         var corners = new List<(double Along, double Across)> { (along[run.First], 0) };
         for (int k = 0; k < legs; k++)
@@ -374,7 +416,7 @@ public sealed class DirtPath
         }
 
         corners.Add((along[run.Last], 0));
-        corners = Rounded(corners);
+        corners = Rounded(corners, limits.HairpinMeters);
 
         var points = new List<(double Along, double Across)> { corners[0] };
         for (int k = 1; k < corners.Count; k++)
@@ -408,10 +450,10 @@ public sealed class DirtPath
         return along[first + after - 1] + t * (along[first + after] - along[first + after - 1]);
     }
 
-    // A line with each corner rounded off over HairpinMeters either side of it (less on a
+    // A line with each corner rounded off over `hairpinMeters` either side of it (less on a
     // short leg), keeping its ends.
     private static List<(double Along, double Across)> Rounded(
-        List<(double Along, double Across)> line)
+        List<(double Along, double Across)> line, double hairpinMeters)
     {
         var rounded = new List<(double Along, double Across)> { line[0] };
         for (int k = 1; k + 1 < line.Count; k++)
@@ -421,7 +463,7 @@ public sealed class DirtPath
             (double aa, double xa) = line[k + 1];
             double before = Math.Sqrt((ab - a) * (ab - a) + (xb - x) * (xb - x));
             double after = Math.Sqrt((aa - a) * (aa - a) + (xa - x) * (xa - x));
-            double cut = Math.Min(HairpinMeters, 0.4 * Math.Min(before, after));
+            double cut = Math.Min(hairpinMeters, 0.4 * Math.Min(before, after));
             if (cut <= 0)
             {
                 continue;
@@ -491,9 +533,11 @@ public sealed class DirtPath
 
     // A crossing laid along `points` of the main strand: on the ground (as the rivers cut it),
     // down to a ford through water at most MaxFordWidthMeters wide, up onto a wooden bridge
-    // over wider water, and onto a boardwalk over marsh (where `isMarsh` says, by point).
+    // over wider water, and onto a boardwalk over marsh (where `isMarsh` says, by point); as
+    // wide and no steeper than its `limits`.
     private static RoadProfile Crossing(List<Vector3D> points, double radiusMeters,
-        Func<Vector3D, double> groundMeters, RiverCarving? rivers, Func<int, bool> isMarsh)
+        Func<Vector3D, double> groundMeters, RiverCarving? rivers, Func<int, bool> isMarsh,
+        Limits limits)
     {
         Vector3D[] at = [.. points];
         double[] along = RoadProfile.AlongOf(at, radiusMeters);
@@ -521,19 +565,22 @@ public sealed class DirtPath
             }
         }
 
-        Ford(road, along, fords);
-        RoadProfile.RaiseForBridges(road, along, bridges, MaxGrade, bridge => Math.Max(
+        Ford(road, along, fords, limits.MaxGrade);
+        RoadProfile.RaiseForBridges(road, along, bridges, limits.MaxGrade, bridge => Math.Max(
             bridge.WaterMeters + WoodenBridge.ClearanceMeters,
             Math.Max(ground[bridge.First], ground[bridge.Last])));
-        Boardwalks(road, ground, along, bridges, waters, isMarsh);
+        Boardwalks(road, ground, along, bridges, waters, isMarsh,
+            limits.BoardwalkHalfMeters);
         bridges.Sort((a, b) => a.First.CompareTo(b.First));
-        return RoadProfile.Laid(at, along, TrunkHalfWidthMeters, ShoulderMeters, road, ground,
+        return RoadProfile.Laid(at, along, limits.RoadHalfMeters, ShoulderMeters, road,
+            ground,
             bridges, RoadSurface.Dirt);
     }
 
     // Brings the path down to each ford: FordDepthMeters under the water across it, and down
-    // to that on either side no steeper than MaxGrade (cutting into the banks).
-    private static void Ford(double[] road, double[] along, List<RoadBridge> fords)
+    // to that on either side no steeper than `maxGrade` (cutting into the banks).
+    private static void Ford(double[] road, double[] along, List<RoadBridge> fords,
+        double maxGrade)
     {
         if (fords.Count == 0)
         {
@@ -557,12 +604,12 @@ public sealed class DirtPath
 
         for (int i = 1; i < road.Length; i++)
         {
-            most[i] = Math.Min(most[i], most[i - 1] + MaxGrade * (along[i] - along[i - 1]));
+            most[i] = Math.Min(most[i], most[i - 1] + maxGrade * (along[i] - along[i - 1]));
         }
 
         for (int i = road.Length - 2; i >= 0; i--)
         {
-            most[i] = Math.Min(most[i], most[i + 1] + MaxGrade * (along[i + 1] - along[i]));
+            most[i] = Math.Min(most[i], most[i + 1] + maxGrade * (along[i + 1] - along[i]));
         }
 
         for (int i = 0; i < road.Length; i++)
@@ -573,9 +620,10 @@ public sealed class DirtPath
 
     // Lays a boardwalk over each stretch of marsh not over water: its deck BoardwalkMeters over
     // the ground, coming down to it at its ends, one bridge for each step, so it follows the
-    // ground.
+    // ground; `halfWidth` to each side.
     private static void Boardwalks(double[] road, double[] ground, double[] along,
-        List<RoadBridge> bridges, List<RoadBridge> waters, Func<int, bool> isMarsh)
+        List<RoadBridge> bridges, List<RoadBridge> waters, Func<int, bool> isMarsh,
+        double halfWidth)
     {
         bool Wet(int i) => waters.Any(water => i >= water.First && i <= water.Last);
         int count = road.Length;
@@ -605,7 +653,7 @@ public sealed class DirtPath
                 {
                     LengthMeters = along[k + 1] - along[k],
                     Kind = BridgeKind.Boardwalk,
-                    HalfWidthMeters = BoardwalkHalfWidthMeters,
+                    HalfWidthMeters = halfWidth,
                 });
             }
 
@@ -613,15 +661,37 @@ public sealed class DirtPath
         }
     }
 
-    // Adds the piece of the main strand from point `first` to `last`, if it has length.
-    private static void AddPiece(List<PathStrand> strands, List<Vector3D> points, int first,
-        int last, double halfWidth, int index)
+    // Adds the piece of the main strand from point `first` to `last`, if it has length: a
+    // path's one worn strand, or a cart track's two ruts and the ground kept clear of plants
+    // across its width (`widthMeters`, at least between its ruts).
+    private static void AddTrunkPiece(List<PathStrand> strands, List<Vector3D> points,
+        int first, int last, bool cart, double widthMeters, double radiusMeters)
     {
-        if (last > first)
+        if (last <= first)
         {
-            strands.Add(new PathStrand(points.GetRange(first, last - first + 1), halfWidth,
-                index));
+            return;
         }
+
+        List<Vector3D> piece = points.GetRange(first, last - first + 1);
+        if (!cart)
+        {
+            strands.Add(new PathStrand(piece, TrunkHalfWidthMeters, 0));
+            return;
+        }
+
+        var way = new Way([.. piece], radiusMeters);
+        foreach ((double side, int index) in new[] { (1.0, 0), (-1.0, 1) })
+        {
+            strands.Add(new PathStrand([.. Enumerable.Range(0, piece.Count)
+                .Select(i => way.Beside(i, side * RutGaugeMeters / 2))], RutHalfWidthMeters,
+                index)
+            { Rut = true });
+        }
+
+        strands.Add(new PathStrand(piece, Math.Max(RutGaugeMeters, widthMeters) / 2, 0)
+        {
+            Worn = false,
+        });
     }
 
     // Adds the pieces of strand `index` where it's apart from the main one.
@@ -719,34 +789,11 @@ public sealed class DirtPath
         return t * t * (3 - 2 * t);
     }
 
-    // The path's own seed for its strands, from its id (the same on every machine).
-    private static ulong Seed(Guid roadId)
-    {
-        byte[] bytes = roadId.ToByteArray();
-        return BitConverter.ToUInt64(bytes, 0) ^ BitConverter.ToUInt64(bytes, 8);
-    }
-
-    // Smooth noise from -1 to 1 along a line, for channel `channel` of a path's seed: random
-    // values at whole numbers of `x`, eased between.
-    private static double Noise(ulong seed, int channel, double x)
-    {
-        double floor = Math.Floor(x);
-        long knot = (long)floor;
-        double t = SmoothStep(x - floor);
-        double a = Hashed(seed, channel, knot), b = Hashed(seed, channel, knot + 1);
-        return a + (b - a) * t;
-    }
-
-    // A random value from -1 to 1 for a seed, channel, and knot (SplitMix64's mixing).
-    private static double Hashed(ulong seed, int channel, long knot)
-    {
-        ulong z = seed ^ ((ulong)channel * 0x9E3779B97F4A7C15UL)
-            ^ ((ulong)knot * 0xBF58476D1CE4E5B9UL);
-        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
-        z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
-        z ^= z >> 31;
-        return (z >> 11) * (2.0 / (1UL << 53)) - 1;
-    }
+    // What a path or track can climb (straight, and in its switchbacks), how far its
+    // switchbacks swing either side and how far their corners are rounded, and how wide its
+    // crossings' road and boardwalks are to each side, in meters.
+    private sealed record Limits(double MaxGrade, double SwitchbackGrade, double SwingMeters,
+        double HairpinMeters, double RoadHalfMeters, double BoardwalkHalfMeters);
 
     // A run of points, from its first to its last.
     private readonly record struct Run(int First, int Last);

@@ -241,6 +241,9 @@ public partial class FirstPersonMode
             coverVersion,
             tiles.ShownHeights(),
             OnBanksOrPaths(carving, Strands, toDirection),
+            carving is null
+                ? static _ => false
+                : point => carving.OnOldPaving(toDirection(point)),
             hasWater
                 ? (point, height) => globe.WaterRadiusAt(toDirection(point)) is double water
                     && baseHeight + water - 1 > height
@@ -254,8 +257,8 @@ public partial class FirstPersonMode
                 : (PlantCover.None, default));
     }
 
-    // Whether a point (as plants are placed) is on a river's banks, a road, or near a dirt
-    // path's worn strand, where plants don't grow.
+    // Whether a point (as plants are placed) is on a river's banks, a road (but an old one),
+    // or near a dirt path's worn strand or a cart track, where plants don't grow.
     private static Func<Vector3D, bool> OnBanksOrPaths(GroundCarving? carving,
         PathStrands? strands, Func<Vector3D, Vector3D> toDirection)
     {
@@ -267,7 +270,8 @@ public partial class FirstPersonMode
         return point =>
         {
             Vector3D direction = toDirection(point);
-            return carving?.BeyondBanksMeters(direction, 1, tunnels: false) <= 0
+            return carving?.BeyondBanksMeters(direction, 1, tunnels: false, oldRoads: false)
+                    <= 0
                 || strands?.OnPath(direction, PathPlantsMeters) == true;
         };
     }

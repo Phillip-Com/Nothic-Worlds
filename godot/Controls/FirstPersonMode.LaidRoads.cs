@@ -15,7 +15,8 @@ namespace NothicWorlds.Controls;
 /// wooden bridges, and boardwalks shaping the ground as highways do. The strips, ribbons, and
 /// bridges near the eye are worked out with the rivers' banks (StartBanks), and the highways'
 /// tunnels with them (the coarser ground at their portals sunk out of sight, as
-/// RoadCarving does it); walkers who come in by a portal walk on their road (Walked).
+/// RoadCarving does it); walkers who come in by a portal walk on their road (Walked). An old
+/// road is laid as a highway is, and a cart track as a dirt path.
 /// </summary>
 public partial class FirstPersonMode
 {
