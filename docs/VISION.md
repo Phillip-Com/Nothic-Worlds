@@ -225,7 +225,7 @@ screen filter; stored per world (format v25); Painterly the default for every wo
 Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 (`WorldSession.SetStyle`, one undo step).
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120; ground materials: PR #121; plants: PR #122; drawn in meters: PR #123; lighting: PR #124; loading speed: PR #131) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120; ground materials: PR #121; plants: PR #122; drawn in meters: PR #123; lighting: PR #124; loading speed: PR #131; loading screen: PR #132) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Owner's choices:** walk or fly; the sky at true size and place with a magnify switch; day and
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
@@ -286,6 +286,17 @@ so distant mountains keep their shape and rough features; tiles past the Low rea
 after all nearer ones (`GroundTileSelection.Choose`'s `nearReach`); at Low and on flat worlds they reach
 a little past the eye's horizon (~19 km). The rim and underside of a flat world are still a
   `Rendering/FlatPatch.cs` of bare rock.
+- **Loading screen** (owner's choice, 2026-10-12; PR #132): `UI/AreaLoadingScreen.cs` covers
+  the view on standing (or travelling on the minimap) with "Preparing the area…", a bar, the
+  stage, and "Esc goes back to the map" (all other input is held) until the roads are laid, the
+  tiles not wholly past the near reach are built and drawn (`GroundTileChoice.NearMissing`; a
+  tile that couldn't be built doesn't count), and the rivers' banks and the near plants have been
+  placed once since then; Core `Geometry/AreaLoading.cs` keeps the stage and a bar that never
+  goes back, then a "Loading the distance…" note under the switches while the far ground and
+  trees load (shown and hidden after 0.5 s, so walking doesn't flicker it). The roads are laid
+  on a worker (`FirstPersonMode.LaidRoads.cs`), the tiles waiting for them so none is built
+  twice. Limits: the ground materials and plant models still load on the main thread, so the
+  screen stops for up to a second at first (it's drawn two frames before they load).
 - `Rendering/SurfaceSky.cs` + `surface_sky.gdshader` (a copy of the environment while standing;
   sky gradient, bodies as lit discs, clouds from the live weather via
   `PlanetSurface.CopyCloudsTo` and `cloud_layer.gdshaderinc`, haze as fog), `cloud_deck.gdshader`
