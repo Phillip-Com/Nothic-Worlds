@@ -124,9 +124,7 @@ public partial class FirstPersonMode
     private void KeepPlants(PlanetSurface globe, Body body, GroundTiles tiles, Vector3D eye,
         Vector3D eyeBase, double heightMeters)
     {
-        bool wanted = _standingPlants != StandingPlantDetail.Off && tiles.Visible
-            && tiles.HasGround && AppSettings.ShowPlants;
-        if (!wanted)
+        if (!PlantsWanted(tiles))
         {
             if (_plants is not null)
             {
@@ -145,6 +143,12 @@ public partial class FirstPersonMode
         _plants.Update(eye, eyeBase, heightMeters,
             PlantGroundFor(globe, body, tiles, PlantCoverVersion(body)));
     }
+
+    // Whether plants are wanted on the ground tiles: they're on, and the tiles are shown and
+    // have ground to grow on.
+    private bool PlantsWanted(GroundTiles? tiles) =>
+        _standingPlants != StandingPlantDetail.Off && tiles is { Visible: true, HasGround: true }
+        && AppSettings.ShowPlants;
 
     // Hides the plants (where the ground tiles are hidden).
     private void HidePlants()

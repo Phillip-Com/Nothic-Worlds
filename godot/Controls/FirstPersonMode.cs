@@ -121,6 +121,8 @@ public partial class FirstPersonMode : Node
     private double _channelsReach;     // ... and how far they reach from it, in radians
     private bool _nearEyeDue = true;   // The globe's water hasn't stepped aside for them yet
     private int _banksShownVersion = -1;  // The ground shown when the banks were last built
+    private int _banksStarts;  // How many times the banks have begun to be worked out
+    private int _banksShown;   // ... the latest of those taken in (0 before any)
     private bool _banksStale = true;   // The banks don't match the channels yet
     private PendingBanks? _pendingBanks;  // The banks being worked out on a worker
     private Task<(RiverChannels?, RiverWater.Surface?)>? _pendingChannels;  // ... the channels
@@ -235,6 +237,7 @@ public partial class FirstPersonMode : Node
         ProcessPriority = -10;
         _hud = new FirstPersonHud();
         AddChild(_hud);
+        AddChild(_loadingScreen);
         AddChild(_underwater);
         _hud.Minimap.Zoomed += step =>
             _mapSpan = Math.Clamp(_mapSpan + step, 0, _mapSpans.Length - 1);
@@ -422,6 +425,7 @@ public partial class FirstPersonMode : Node
         _channels = null;
         _profiles = null;
         _roadProfiles = null;
+        _pendingRoads = null;
         _carving = null;
         _pendingBanks = null;
         _pendingChannels = null;
@@ -464,6 +468,7 @@ public partial class FirstPersonMode : Node
 
         _hiddenItems.Clear();
         _hiddenLayers.Clear();
+        EndLoading();
         _hud!.Visible = false;
     }
 
@@ -578,12 +583,25 @@ public partial class FirstPersonMode : Node
         SyncPlantsSwitch();
         _hud.NightVisionSwitch.SetPressedNoSignal(_sky.NightVision);
         ShowHelp();
+        BeginLoading();
     }
 
     public override void _UnhandledInput(InputEvent @event)
     {
         if (_bodyId is null)
         {
+            return;
+        }
+
+        if (_loadingScreen.Covers && @event is InputEventMouse or InputEventKey)
+        {
+            // While the area loads, only Esc (back to the map) does anything.
+            if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.Escape })
+            {
+                Leave();
+            }
+
+            GetViewport().SetInputAsHandled();
             return;
         }
 
@@ -665,7 +683,17 @@ public partial class FirstPersonMode : Node
             return;
         }
 
-        Move(globe, body, delta);
+        if (_coverFramesLeft > 0)
+        {
+            _coverFramesLeft--;  // The loading screen is drawn before the area starts loading
+            return;
+        }
+
+        if (!_loadingScreen.Covers)
+        {
+            Move(globe, body, delta);
+        }
+
         AgePlantsNote(delta);
         _sinceGroundBuilt += delta;
         _sinceBanksBuilt += delta;
@@ -721,6 +749,7 @@ public partial class FirstPersonMode : Node
             PlaceGround(body, time, eye, place.Radius);
         }
 
+        KeepLoading(delta);
         UpdateWeather(id, time, delta);
         double eyeKm = (_groundMeters + _heightMeters) / 1000;
         SkyView? seen = _flat is FlatSpot spot
@@ -1047,6 +1076,7 @@ public partial class FirstPersonMode : Node
         }
 
         double reachMeters = _channelsReach * radiusMeters;
+        _banksStarts++;
         _pendingBanks = new PendingBanks(Task.Run(() =>
         {
             List<List<BankPoint[]>> strips = channels is null ? [] : RiverBanks.Strips(
@@ -1084,6 +1114,7 @@ public partial class FirstPersonMode : Node
         }
 
         _pendingBanks = null;
+        _banksShown = _banksStarts;  // One at a time: this is the latest begun
         if (pending.Strips.Exception is { } error)
         {
             GD.PushError("Couldn't work out the rivers' banks and the roads: "
@@ -1401,6 +1432,7 @@ public partial class FirstPersonMode : Node
         Vector3D Lifted(Vector3D direction, double meters) =>
             direction * (1 + meters / radiusMeters);
         TakeInChannels();
+        TakeInRoads(globe, body);
         double moved = Math.Acos(Math.Clamp(_channelsAround.Dot(_spot), -1, 1));
         if (ChannelsDue(globe, moved > Math.Max(height * 0.25, 1e-7), moved > outer * 0.3)
             || RoadsChangedOn(body))
@@ -1429,9 +1461,13 @@ public partial class FirstPersonMode : Node
                 smallest => globe.GroundLiftAt(direction, body.RadiusKm, smallest), under - 1,
                 cell, radiusMeters, farThinning) + 1);
         // The ground out past `outer` to the farthest peak is built after the ground within it
-        // (owner's choice, 2026-10-09).
-        tiles.Update(_spot * (ground + height), _spot, reach, outer, RecipesVersion(globe),
-            recipes);
+        // (owner's choice, 2026-10-09); none while the roads it's shaped to are being laid.
+        if (_pendingRoads is null)
+        {
+            tiles.Update(_spot * (ground + height), _spot, reach, outer, RecipesVersion(globe),
+                recipes);
+        }
+
         if (_nearEyeDue && tiles.HasGround)
         {
             // The globe's own water steps aside for the water drawn on the tiles.
@@ -1511,7 +1547,7 @@ public partial class FirstPersonMode : Node
     private bool BanksDue(GroundTiles tiles)
     {
         if (_sinceBanksBuilt < MinBanksRebuildSeconds || _pendingBanks is not null
-            || _pendingChannels is not null)
+            || _pendingChannels is not null || _pendingRoads is not null)
         {
             return false;
         }
@@ -1682,6 +1718,7 @@ public partial class FirstPersonMode : Node
             FlatDisc.TopPointFor(direction) + new Vector3D(0, FlatGroundLift
                 + Math.Max(meters / radiusMeters, PlanetSurface.FlatDeepestLift), 0);
         TakeInChannels();
+        TakeInRoads(globe, body);
         double moved = (underfoot - _channelsMiddle).Length;
         bool otherFace = flat.Face != _flatBuiltFace;
         if (ChannelsDue(globe, moved > Math.Max(height * 0.25, 1e-7), otherFace) || otherFace
@@ -1726,7 +1763,12 @@ public partial class FirstPersonMode : Node
                         smallest => FlatGroundAt(globe, point, radiusKm, smallest),
                         under - FlatGroundLift, cell, radiusMeters, true),
                     PlanetSurface.FlatDeepestLift));
-            tiles.Update(eye, FlatWalk.Point(flat), outer, outer, RecipesVersion(globe), recipes);
+            if (_pendingRoads is null)
+            {
+                tiles.Update(eye, FlatWalk.Point(flat), outer, outer, RecipesVersion(globe),
+                    recipes);
+            }
+
             if (_nearEyeDue && tiles.HasGround)
             {
                 _nearEyeDue = false;
@@ -2045,12 +2087,14 @@ public partial class FirstPersonMode : Node
         if (_flat is FlatSpot flat)
         {
             _flat = FlatWalk.Walk(flat, bearing, meters / radiusMeters);
-            _sinceGroundBuilt = MinGroundRebuildSeconds;  // Its channels straight away
-            return;
+        }
+        else
+        {
+            _spot = GlobeWalk.FromOverhead(_spot, bearing, meters / radiusMeters);
         }
 
-        _spot = GlobeWalk.FromOverhead(_spot, bearing, meters / radiusMeters);
         _sinceGroundBuilt = MinGroundRebuildSeconds;  // Its channels straight away
+        BeginLoading();  // A new area, as on standing there
     }
 
     // Opens or closes the calendar over the view (VISION.md REN-08).

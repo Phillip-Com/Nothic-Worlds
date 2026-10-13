@@ -9,8 +9,9 @@ namespace NothicWorlds.UI;
 /// the ground there under it; the distance under the mouse goes in the hover readout), the
 /// name and place of the body under the mouse, the time and weather at the spot in
 /// the bottom left, the rain or snow falling over everything, and (REN-08) the minimap, a
-/// Calendar button, and switches for fog, clouds, and night vision, in the top right. It only
-/// shows what it's given; <see cref="Controls.FirstPersonMode"/> works it out.
+/// Calendar button, and switches for fog, clouds, and night vision, in the top right, with a
+/// note under them while the far ground and trees still load. It only shows what it's given;
+/// <see cref="Controls.FirstPersonMode"/> works it out.
 /// </summary>
 public partial class FirstPersonHud : CanvasLayer
 {
@@ -24,6 +25,7 @@ public partial class FirstPersonHud : CanvasLayer
     private readonly Label _hover;
     private readonly Label _range;
     private readonly Label _info;
+    private readonly Label _loadingNote;
 
     /// <summary>Makes the overlay, hidden until shown.</summary>
     public FirstPersonHud()
@@ -128,6 +130,14 @@ public partial class FirstPersonHud : CanvasLayer
         NightVisionSwitch = Switch("Night Vision (N)",
             "Light up the night (and dim places) as if at dusk, to see the ground");
         corner.AddChild(NightVisionSwitch);
+        _loadingNote = Outlined(new Label
+        {
+            Text = "Loading the distance…",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Visible = false,
+        });
+        _loadingNote.Modulate = new Color(1, 1, 1, 0.85f);
+        corner.AddChild(_loadingNote);
         AddChild(corner);
     }
 
@@ -183,6 +193,9 @@ public partial class FirstPersonHud : CanvasLayer
 
     /// <summary>The time and weather at the spot, in the bottom left.</summary>
     public void SetInfo(string text) => _info.Text = text;
+
+    /// <summary>Shows or hides the note that the far ground and trees are still loading.</summary>
+    public void SetLoadingNote(bool shown) => _loadingNote.Visible = shown;
 
     /// <summary>
     /// Rain and snow falling, each 0 (none) to 1 (as hard as it gets), drifting

@@ -93,6 +93,7 @@ public partial class StandingPlants : Node3D
     private Task<Placed>? _placing;
     private bool _failed;
     private bool _sheetShown;  // The trees' pictures are drawn, so far trees can show
+    private long? _groundVersion;  // The ground last given
 
     /// <summary>
     /// Makes the plants for a surface (as <see cref="GroundTiles"/>) of a body
@@ -165,6 +166,24 @@ public partial class StandingPlants : Node3D
             castsShadow: false);
     }
 
+    /// <summary>
+    /// Whether the near plants are placed on the ground last given (or can't be placed).
+    /// </summary>
+    public bool NearPlaced => _failed
+        || (_groundVersion is long version && _nearGroup.ShownVersion == version);
+
+    /// <summary>How many times the near plants have begun to be placed.</summary>
+    public int NearStarts { get; private set; }
+
+    /// <summary>
+    /// The latest of those (counting from 1) whose plants are shown; 0 before any are.
+    /// </summary>
+    public int NearShown { get; private set; }
+
+    /// <summary>Whether any plants, near or far, are still to place on the ground given.</summary>
+    public bool IsBusy => !_failed && (_placing is not null || !NearPlaced
+        || (_sheetShown && _farGroup.ShownVersion != _groundVersion));
+
     /// <summary>Required by Godot; the plants are made with the other constructor.</summary>
     public StandingPlants()
         : this(PlantModels.Load(), new GlobeTileSurface(), 6371000, 0,
@@ -190,6 +209,7 @@ public partial class StandingPlants : Node3D
             _farGroup.PlacedFor = null;
         }
 
+        _groundVersion = ground.Version;
         TakeInPlaced();
         if (_placing is not null || _failed)
         {
@@ -215,6 +235,11 @@ public partial class StandingPlants : Node3D
 
         Group group = far ? _farGroup : _nearGroup;
         group.Start(eye, ground.Version);
+        if (!far)
+        {
+            NearStarts++;
+        }
+
         Placed placed = group.Spare;
         CancellationToken stop = _stop.Token;
         _placing = Task.Run(
@@ -329,6 +354,7 @@ public partial class StandingPlants : Node3D
 
         _grass.Show(placed.Grass);
         _nearGroup.Shown(placed);
+        NearShown = NearStarts;  // One placing at a time: this is the latest begun
     }
 
     // Places the near plants (grass, undergrowth, and trees' shapes) or the far ones (trees'
@@ -576,6 +602,9 @@ public partial class StandingPlants : Node3D
 
         public Placed Spare { get; private set; } = new();
 
+        // The ground the plants shown were placed on.
+        public long? ShownVersion { get; private set; }
+
         // Whether they should be placed again: never yet, moved `moveMeters`, or the ground
         // changed `groundSeconds` ago or more.
         public bool Due(Vector3D eye, long version, double radiusMeters, double moveMeters,
@@ -594,6 +623,7 @@ public partial class StandingPlants : Node3D
         {
             Origin = placed.Origin;
             Spare = placed;
+            ShownVersion = PlacedFor?.Version;
         }
     }
 
