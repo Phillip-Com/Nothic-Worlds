@@ -289,7 +289,8 @@ a little past the eye's horizon (~19 km). The rim and underside of a flat world 
 - **Loading screen** (owner's choice, 2026-10-12; PR #132): `UI/AreaLoadingScreen.cs` covers
   the view on standing (or travelling on the minimap) with "Preparing the area…", a bar, the
   stage, and "Esc goes back to the map" (all other input is held) until the roads are laid, the
-  tiles not wholly past the near reach are built and drawn (`GroundTileChoice.NearMissing`; a
+  tiles not wholly past the near reach (~19 km; owner's choice, not just the horizon) are built
+  and drawn (`GroundTileChoice.NearMissing`; a
   tile that couldn't be built doesn't count), and the rivers' banks and the near plants have been
   placed once since then; Core `Geometry/AreaLoading.cs` keeps the stage and a bar that never
   goes back, then a "Loading the distance…" note under the switches while the far ground and
