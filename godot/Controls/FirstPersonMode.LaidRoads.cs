@@ -23,8 +23,11 @@ public partial class FirstPersonMode
     // The roads' profiles and the ground they shape, and the dirt paths' strands, worked out
     // for the ways, ground, rivers, and plants (where marsh is) they were worked out from
     // (they change rarely).
-    private (IReadOnlyList<RoadCourseShown> Courses, int Relief, RiverCarving? Rivers,
-        long Plants, RoadCarving? Carving, PathStrands? Strands)? _roadProfiles;
+    private (RoadsFor For, RoadCarving? Carving, PathStrands? Strands)? _roadProfiles;
+
+    // The roads being laid on a worker (LayRoads), and what for: the ground tiles wait for
+    // them, so none is built twice.
+    private (RoadsFor For, Task<LaidRoads> Laying)? _pendingRoads;
 
     // The dirt paths' strands (none: null).
     private PathStrands? Strands => _roadProfiles?.Strands;
@@ -46,36 +49,50 @@ public partial class FirstPersonMode
             ? floor
             : groundMeters;
 
-    // Works out the roads' profiles and the dirt paths' strands again if the ways, the ground,
-    // the rivers they cross, or where marsh is have changed, and with them the ground carving
-    // everything up close follows (after the rivers': RiversOn). When the roads change, every
-    // tile's built again.
+    // Starts working out the roads' profiles and the dirt paths' strands again, on a worker,
+    // if the ways, the ground, the rivers they cross, or where marsh is have changed since
+    // they were (or are being) laid (TakeInRoads takes them in).
     private void KeepCarving(PlanetSurface globe, Body body)
     {
-        RiverCarving? rivers = _profiles?.Carving;
-        IReadOnlyList<RoadCourseShown> courses = Session?.RoadsOn(body.Id) ?? [];
-        long plants = PlantCoverVersion(body);
-        bool roadsChanged = false;
-        if (_roadProfiles is not var (known, relief, under, plantsKnown, _, _)
-            || !ReferenceEquals(known, courses) || relief != globe.ReliefVersion
-            || !ReferenceEquals(under, rivers) || plantsKnown != plants)
+        var wanted = new RoadsFor(Session?.RoadsOn(body.Id) ?? [], globe.ReliefVersion,
+            _profiles?.Carving, PlantCoverVersion(body));
+        if ((_pendingRoads?.For ?? _roadProfiles?.For) is { } known && known.Same(wanted))
         {
-            (RoadCarving? carving, PathStrands? strands, _tunnelSpans) = LayRoads(globe, body,
-                courses, rivers);
-            bool hadRoads = _roadProfiles?.Carving is not null
-                || _roadProfiles?.Strands is not null;
-            _roadProfiles = (courses, globe.ReliefVersion, rivers, plants, carving, strands);
-            roadsChanged = hadRoads || carving is not null || strands is not null;
+            return;
         }
 
-        if (roadsChanged || _carving is null
-            || !ReferenceEquals(_carving.Rivers, rivers is { IsEmpty: false } ? rivers : null))
+        (TerrainGrid, TerrainType[]) cover = _plantCover!.Value;
+        _pendingRoads = (wanted, Task.Run(() => LayRoads(globe, body.RadiusKm, wanted, cover)));
+    }
+
+    // Takes in the roads once they're laid (KeepCarving), and with them the ground carving
+    // everything up close follows (after the rivers': RiversOn). When the roads change,
+    // every tile's built again.
+    private void TakeInRoads(PlanetSurface globe, Body body)
+    {
+        if (_pendingRoads is not ({ } wanted, { IsCompleted: true } laying))
         {
-            _carving = GroundCarving.Of(rivers, _roadProfiles!.Value.Carving);
-            FadeRoughness(globe, _carving, body.RadiusKm);
+            return;
         }
 
-        if (roadsChanged)
+        _pendingRoads = null;
+        LaidRoads laid = new(null, null, []);
+        if (laying.Exception is { } error)
+        {
+            // Without them the ground goes on unshaped, and the log says why.
+            GD.PushError($"Couldn't lay the roads: {error.GetBaseException()}");
+        }
+        else
+        {
+            laid = laying.Result;
+        }
+
+        bool hadRoads = _roadProfiles?.Carving is not null || _roadProfiles?.Strands is not null;
+        _roadProfiles = (wanted, laid.Carving, laid.Strands);
+        _tunnelSpans = laid.Tunnels;
+        _carving = GroundCarving.Of(wanted.Rivers, laid.Carving);
+        FadeRoughness(globe, _carving, body.RadiusKm);
+        if (hadRoads || laid.Carving is not null || laid.Strands is not null)
         {
             _tileHeights++;
             _banksStale = true;
@@ -83,17 +100,18 @@ public partial class FirstPersonMode
     }
 
     // Lays the body's highways and dirt paths (on workers, one road each) over its smooth
-    // ground, crossing `rivers`: the ground they shape (the highways and the dirt paths'
-    // crossings; none: null), the dirt paths' strands (none: null), and the highways' tunnels
-    // (as _tunnelSpans).
-    private (RoadCarving? Carving, PathStrands? Strands,
-        Dictionary<Guid, List<(double From, double To)>> Tunnels) LayRoads(PlanetSurface globe,
-        Body body, IReadOnlyList<RoadCourseShown> courses, RiverCarving? rivers)
+    // ground, crossing the rivers it's laid `for`, marsh where `cover` has it: the ground they
+    // shape (the highways and the dirt paths' crossings; none: null), the dirt paths' strands
+    // (none: null), and the highways' tunnels (for _tunnelSpans). On a worker.
+    private static LaidRoads LayRoads(PlanetSurface globe, double radiusKm, RoadsFor @for,
+        (TerrainGrid Terrain, TerrainType[] Types) cover)
     {
-        double radiusKm = body.RadiusKm, radiusMeters = radiusKm * 1000;
+        IReadOnlyList<RoadCourseShown> courses = @for.Courses;
+        RiverCarving? rivers = @for.Rivers;
+        double radiusMeters = radiusKm * 1000;
         double Ground(Vector3D direction) =>
             globe.SmoothGroundLiftAt(direction, radiusKm) * radiusMeters;
-        (TerrainGrid terrain, TerrainType[] types) = _plantCover!.Value;
+        (TerrainGrid terrain, TerrainType[] types) = cover;
         HashSet<int> marshCodes = [.. types.Where(type => type.Plants == PlantCover.Marsh)
             .Select(type => type.Code)];
         bool IsMarsh(Vector3D direction) =>
@@ -120,13 +138,30 @@ public partial class FirstPersonMode
             }
         }
 
-        return (laid.Count == 0 ? null : RoadCarving.For(laid, radiusKm),
+        return new LaidRoads(laid.Count == 0 ? null : RoadCarving.For(laid, radiusKm),
             strands.IsEmpty ? null : strands, tunnels);
     }
 
-    // Whether the body's roads have been worked out again since they were laid here (so the
-    // ground near them is due to be built again).
+    // Whether the body's roads have been worked out again since they were laid (or began to
+    // be) here, so the ground near them is due to be built again.
     private bool RoadsChangedOn(Body body) =>
-        Session is { } session && _roadProfiles is { } known
+        Session is { } session && (_pendingRoads?.For ?? _roadProfiles?.For) is { } known
         && !ReferenceEquals(known.Courses, session.RoadsOn(body.Id));
+
+    // What the roads are laid for: the ways, the ground's version, the rivers they cross, and
+    // where marsh is.
+    private sealed record RoadsFor(IReadOnlyList<RoadCourseShown> Courses, int Relief,
+        RiverCarving? Rivers, long Plants)
+    {
+        // Whether the roads laid for this are those for `other` (the ways and rivers are the
+        // same objects as long as they haven't changed).
+        public bool Same(RoadsFor other) => ReferenceEquals(Courses, other.Courses)
+            && Relief == other.Relief && ReferenceEquals(Rivers, other.Rivers)
+            && Plants == other.Plants;
+    }
+
+    // The roads laid (LayRoads): the ground they shape, the dirt paths' strands, and each
+    // highway's tunnels, as spans along its way, by its road's id.
+    private sealed record LaidRoads(RoadCarving? Carving, PathStrands? Strands,
+        Dictionary<Guid, List<(double From, double To)>> Tunnels);
 }

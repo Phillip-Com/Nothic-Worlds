@@ -12,7 +12,9 @@ public enum AreaLoadingStage
     /// <summary>The ground round the eye is being built.</summary>
     Ground,
 
-    /// <summary>The rivers' water, beds, and banks, and the roads' paving, are being drawn.</summary>
+    /// <summary>
+    /// The rivers' water, beds, and banks, and the roads' paving, are being drawn.
+    /// </summary>
     Rivers,
 
     /// <summary>The plants near the eye are being placed.</summary>

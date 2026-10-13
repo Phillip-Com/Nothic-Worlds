@@ -74,6 +74,8 @@ public partial class GroundTiles : Node3D
     private Dictionary<GroundTile, TileMeshes> _joinedTiles = [];  // The tiles last shown
     private bool _joinDue;           // The tiles drawn have changed since they were last joined
     private bool _joining;           // A joining is under way on a worker
+    private int _nearLeft = -1;      // Near tiles still to build, as last chosen (-1: not yet)
+    private int _wantedLeft;         // ... and all tiles, stale ones too
     private long _frame;
 
     /// <summary>
@@ -122,6 +124,22 @@ public partial class GroundTiles : Node3D
 
     /// <summary>Whether any ground is drawn yet (none until the first tiles are built).</summary>
     public bool HasGround => _ground.Mesh is not null;
+
+    /// <summary>
+    /// How many tiles not wholly beyond the near reach are still to build (one that couldn't
+    /// be built isn't counted: it's reported, and the ground goes on without it); -1 before
+    /// any are chosen.
+    /// </summary>
+    public int NearTilesLeft => _nearLeft;
+
+    /// <summary>
+    /// Whether the ground within the near reach is built and drawn, finest at the eye.
+    /// </summary>
+    public bool NearGroundShown => _nearLeft == 0 && !_joinDue && !_joining;
+
+    /// <summary>Whether any tile, near or far, is still to build or to draw.</summary>
+    public bool IsBusy => _nearLeft != 0 || _wantedLeft > 0 || _building.Count > 0 || _joinDue
+        || _joining;
 
     /// <summary>The material the ground is drawn with (the globe's own).</summary>
     public Material? GroundMaterial
@@ -279,6 +297,10 @@ public partial class GroundTiles : Node3D
             tile => extents[tile] = ExtentOf(tile),
             tile => NeedOf(tile, extents[tile], recipes, recipeFor), nearReach);
         StartBuilding(choice.Wanted, recipes);
+        bool Left(GroundTile tile) =>
+            !(_failed.TryGetValue(tile, out long failed) && failed == recipes[tile].Stamp);
+        _nearLeft = choice.NearMissing.Count(Left);
+        _wantedLeft = choice.Wanted.Count(Left);
         var drawn = new HashSet<GroundTile>(choice.Drawn);
         if (!drawn.SetEquals(_drawn))
         {

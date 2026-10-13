@@ -20,9 +20,13 @@ public sealed class AreaLoading
     private const double RiversShare = 0.1;
 
     private int _mostTilesLeft;
+    private bool _ready;
     private double _sinceChanged;  // Seconds the loading's been going on, or stopped, as now
 
-    /// <summary>What it's waiting on (Done once ready).</summary>
+    /// <summary>
+    /// What it's waiting on, the furthest yet: a stage once passed (the ground, say) can be
+    /// due again for a moment as more comes in, but it isn't said again. Done once ready.
+    /// </summary>
     public AreaLoadingStage Stage { get; private set; }
 
     /// <summary>How much is done, 0 to 1; it never goes back.</summary>
@@ -31,7 +35,7 @@ public sealed class AreaLoading
     /// <summary>
     /// Whether the area round the eye is in. Once it is, it stays so, whatever loads after.
     /// </summary>
-    public bool IsReady => Stage == AreaLoadingStage.Done;
+    public bool IsReady => _ready;
 
     /// <summary>
     /// How many pieces of the ground round the eye were still to build, last reported.
@@ -53,25 +57,29 @@ public sealed class AreaLoading
         }
 
         TilesLeft = Math.Max(report.NearTilesLeft, 0);
-        Stage = !report.RoadsLaid ? AreaLoadingStage.Roads
+        AreaLoadingStage due = !report.RoadsLaid ? AreaLoadingStage.Roads
             : !report.NearGroundShown ? AreaLoadingStage.Ground
             : !report.RiversShown ? AreaLoadingStage.Rivers
             : !report.PlantsPlaced ? AreaLoadingStage.Plants
             : AreaLoadingStage.Done;
-        if (IsReady)
+        if (due == AreaLoadingStage.Done)
         {
-            Done = 1;
+            (_ready, Stage, Done) = (true, AreaLoadingStage.Done, 1);
             return;
         }
+
+        // Only all of it in at once is ready; Done isn't said before then.
+        Stage = (AreaLoadingStage)Math.Min(Math.Max((int)Stage, (int)due),
+            (int)AreaLoadingStage.Plants);
 
         // The ground's share: building coarse tiles shows finer ones wanted, so the count of
         // those left can rise; the bar follows the share of the most there were that's done.
         _mostTilesLeft = Math.Max(_mostTilesLeft, TilesLeft);
-        double ground = Stage > AreaLoadingStage.Ground ? 1
-            : Stage < AreaLoadingStage.Ground || _mostTilesLeft == 0 ? 0
+        double ground = due > AreaLoadingStage.Ground ? 1
+            : due < AreaLoadingStage.Ground || _mostTilesLeft == 0 ? 0
             : 1 - (double)TilesLeft / _mostTilesLeft;
         double done = (report.RoadsLaid ? RoadsShare : 0) + GroundShare * ground
-            + (Stage > AreaLoadingStage.Rivers ? RiversShare : 0);
+            + (due > AreaLoadingStage.Rivers ? RiversShare : 0);
         Done = Math.Max(Done, Math.Min(done, 1));
     }
 
