@@ -295,8 +295,9 @@ a little past the eye's horizon (~19 km). The rim and underside of a flat world 
   `Geometry/AreaLoading.cs` keeps the stage and a bar that never goes back, then a "Loading the
   distance…" note under the switches while the far ground and trees load (shown and hidden
   after 0.5 s, so walking doesn't flicker it). The roads are laid on a worker
-  (`FirstPersonMode.LaidRoads.cs`), the tiles waiting for them so none is built twice. Limits: the ground materials and plant models still load on the main thread, so the
-  screen stops for up to a second at first (it's drawn two frames before they load).
+  (`FirstPersonMode.LaidRoads.cs`), the tiles waiting for them so none is built twice.
+  Limits: the ground materials and plant models still load on the main thread, so the screen
+  stops for up to a second at first (it's drawn two frames before they load).
 - `Rendering/SurfaceSky.cs` + `surface_sky.gdshader` (a copy of the environment while standing;
   sky gradient, bodies as lit discs, clouds from the live weather via
   `PlanetSurface.CopyCloudsTo` and `cloud_layer.gdshaderinc`, haze as fog), `cloud_deck.gdshader`
