@@ -16,14 +16,16 @@ public partial class OrbitGuideVisual : Node3D
 {
     private const int Segments = 192;
 
-    private static readonly Color _steadyColor = new(SteadyColor, 0.16f);
-    private static readonly Color _unsteadyColor = new(UnsteadyColor, 0.22f);
-
     /// <summary>The color of the rings where an orbit would stay steady (fully opaque).</summary>
     public static readonly Color SteadyColor = new(0.3f, 0.9f, 0.4f);
 
     /// <summary>The color of the rings where an orbit wouldn't stay steady.</summary>
     public static readonly Color UnsteadyColor = new(1.0f, 0.3f, 0.25f);
+
+    // After the colors above: static fields are set in the order written, and before them these
+    // would read the colors while still unset (black).
+    private static readonly Color _steadyColor = new(SteadyColor, 0.16f);
+    private static readonly Color _unsteadyColor = new(UnsteadyColor, 0.22f);
 
     private readonly StandardMaterial3D _material = new()
     {
