@@ -107,6 +107,61 @@ public sealed class OrbitGuideTests
         Assert.Equal(expected, SystemLayout.DisplayDistance(offset.Length, 6.5, 1, scale), 9);
     }
 
+    [Fact]
+    public void RingsAroundTheParent_LieInTheBodysOrbit_AndAroundItInItsEquator()
+    {
+        (_, Body sun, Body earth) = SunAndEarth();
+        earth.Orbit = earth.Orbit! with { TiltDegrees = 30, TiltDirectionDegrees = 70 };
+        earth.AxialTiltDegrees = 23.4;
+
+        Assert.Equal(OrbitMath.PlaneNormal(earth.Orbit), OrbitGuide.PlaneNormal(earth, sun.Id));
+        Assert.Equal(BodyOrientation.NorthPole(earth), OrbitGuide.PlaneNormal(earth, earth.Id));
+    }
+
+    [Fact]
+    public void ARoundOrbitInTheClear_IsSteadyAllAlong()
+    {
+        (World world, _, Body earth) = SunAndEarth();
+
+        IReadOnlyList<bool>? steady =
+            OrbitGuide.SteadyAlongOrbit(world.Bodies, earth, Times(earth));
+
+        Assert.NotNull(steady);
+        Assert.All(steady, Assert.True);
+    }
+
+    [Fact]
+    public void AnElongatedOrbit_IsUnsteadyWhereItSwingsIntoANeighborsReach()
+    {
+        (World world, Body sun, Body earth) = SunAndEarth();
+        Body outer = Planet(world, sun, "Outer", 250_000_000, 6371);
+        earth.Orbit = earth.Orbit! with { Eccentricity = 0.7 };
+        NeighborReach reach = OrbitStability.Reaches(world.Bodies, sun)
+            .Single(r => r.BodyId == outer.Id);
+        IReadOnlyList<double> times = Times(earth);
+
+        IReadOnlyList<bool> steady = OrbitGuide.SteadyAlongOrbit(world.Bodies, earth, times)!;
+
+        Assert.Contains(true, steady);
+        Assert.Contains(false, steady);
+        for (int i = 0; i < times.Count; i++)
+        {
+            double distance = OrbitMath.OffsetFromParent(earth.Orbit, times[i]).Length;
+            Assert.Equal(distance <= reach.InnerKm, steady[i]);
+        }
+    }
+
+    [Fact]
+    public void ABodyWithoutAnOrbit_GetsNoPathCheck()
+    {
+        (World world, Body sun, _) = SunAndEarth();
+
+        Assert.Null(OrbitGuide.SteadyAlongOrbit(world.Bodies, sun, [0.0]));
+    }
+
+    private static IReadOnlyList<double> Times(Body body) =>
+        OrbitMath.EvenlySpacedTimes(body.Orbit!, 64);
+
     private static (World World, Body Sun, Body Earth) SunAndEarth()
     {
         World world = World.CreateNew();

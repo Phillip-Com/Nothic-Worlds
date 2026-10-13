@@ -502,7 +502,11 @@ public partial class SystemView : Node3D
             FallbackLight.Visible = !anyStar;
         }
 
-        _guide?.Update(ShowOrbitGuide ? HighlightedOrbit : null, _layout, _scale, ToScene);
+        if (_guide is not null)
+        {
+            _guide.ShowPath = !FollowsPhysics;
+            _guide.Update(ShowOrbitGuide ? HighlightedOrbit : null, _layout, _scale, ToScene);
+        }
         if (StandingOn is not null)
         {
             // The globe's camera is set aside while standing: fitted to the scaled scene, it
@@ -585,8 +589,10 @@ public partial class SystemView : Node3D
             bool highlighted = body.Id == HighlightedOrbit;
             line.MaterialOverride = highlighted ? _highlightMaterial : null;
             // In physics mode bodies leave their designed orbits, so the lines would mislead.
+            // The orbit guide draws the highlighted path itself, colored, when it's on.
             line.Visible = !FollowsPhysics && (highlighted || body.Id != _focusId
-                || (Camera?.CurrentAltitude ?? float.MaxValue) > OwnOrbitLineAltitude);
+                || (Camera?.CurrentAltitude ?? float.MaxValue) > OwnOrbitLineAltitude)
+                && !(highlighted && _guide?.ShowsPath == true);
         }
     }
 

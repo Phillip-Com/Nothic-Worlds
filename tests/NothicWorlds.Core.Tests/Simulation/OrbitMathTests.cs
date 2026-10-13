@@ -124,6 +124,32 @@ public class OrbitMathTests
             OrbitMath.OffsetFromParent(orbit, 1234.5678));
     }
 
+    [Fact]
+    public void PlaneNormal_OfAFlatOrbit_PointsStraightUp()
+    {
+        AssertNear(new Vector3D(0, 1, 0), OrbitMath.PlaneNormal(Circle(startAngle: 0)));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(20)]
+    [InlineData(55)]
+    [InlineData(80)]
+    public void PlaneNormal_IsSquareToATiltedElongatedPath(double time)
+    {
+        Orbit orbit = Circle(startAngle: 10) with
+        {
+            Eccentricity = 0.4,
+            ClosestApproachDegrees = 20,
+            TiltDegrees = 30,
+            TiltDirectionDegrees = 70,
+        };
+        Vector3D normal = OrbitMath.PlaneNormal(orbit);
+
+        Assert.Equal(1, normal.Length, 1e-9);
+        Assert.Equal(0, OrbitMath.OffsetFromParent(orbit, time).Dot(normal), 1e-6);
+    }
+
     private static Orbit Circle(double startAngle)
     {
         return new Orbit

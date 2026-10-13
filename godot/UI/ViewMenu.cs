@@ -130,7 +130,8 @@ public partial class ViewMenu : Node
             "with distances compressed and small bodies enlarged.");
         menu.SetItemTooltip(menu.GetItemIndex((int)MenuItem.OrbitGuide),
             "While the System panel is open: green rings where orbits around the selected " +
-            "body (and around what it circles) would stay steady, red where they wouldn't.");
+            "body (and around what it circles) would stay steady, red where they wouldn't. " +
+            "Its orbit line turns red where it swings into an unsteady ring.");
         menu.AboutToPopup += () => ShowChecks(menu);
         menu.IdPressed += id =>
         {
