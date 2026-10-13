@@ -39,8 +39,8 @@ public partial class OrbitGuideSection : VBoxContainer
     {
         var row = new HBoxContainer
         {
-            TooltipText = "The rings drawn round the selected body and what it circles " +
-                "(View ▸ Orbit Guide turns them off)",
+            TooltipText = "The rings drawn round the selected body and what it circles, " +
+                "and its orbit line (View ▸ Orbit Guide turns them off)",
             MouseFilter = MouseFilterEnum.Pass,
         };
         foreach ((Color color, string name) in new[]

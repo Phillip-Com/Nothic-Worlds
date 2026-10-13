@@ -41,6 +41,15 @@ public static class OrbitMath
     }
 
     /// <summary>
+    /// The axis of an orbit's plane (unit length): straight up for an untilted orbit, leaning by
+    /// its tilt toward its tilt direction, as <see cref="OffsetFromParent"/> tilts the orbit.
+    /// </summary>
+    public static Vector3D PlaneNormal(Orbit orbit) =>
+        new Vector3D(0, 1, 0)
+            .RotatedAroundX(orbit.TiltDegrees)
+            .RotatedAroundY(orbit.TiltDirectionDegrees);
+
+    /// <summary>
     /// Times (in days, from 0 up to one period) to sample one full trip around an orbit so the
     /// points are spread evenly along the curve, not evenly in time. On an elongated orbit the
     /// body rushes through its closest approach; even time steps would leave only a few points

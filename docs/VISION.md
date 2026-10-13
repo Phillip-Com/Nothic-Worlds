@@ -1036,11 +1036,15 @@ its own thread and publishes `PhysicsSnapshot`s; the main thread never waits.
 **Owner's choices:** mass from a **Density** per body (typical for its kind and size until set);
 show the moon zone (Roche limit to half the Hill sphere), neighbors' reach, warnings, and
 gravity's period with a button to use it; shaded bands in the 3D view (green steady, red not),
-switched in the View menu.
+switched in the View menu; the rings round the parent lie in the body's tilted orbit and the
+moon rings in its equator; the body's orbit line turns red where an elongated orbit swings into
+an unsteady band.
 **Built:** `Body.DensityGramsPerCm3` (format v22); Core `Simulation/BodyMass.cs`,
 `Simulation/OrbitStability.cs` (Roche limit, Hill sphere, `MoonZone`, `Reaches`,
-`NaturalPeriodDays`, `Warnings`), `Simulation/OrbitGuide.cs` (the rings);
-`Rendering/OrbitGuideVisual.cs`; `UI/OrbitGuideSection.cs`; `WorldSession.SetDensity`.
+`NaturalPeriodDays`, `Warnings`), `Simulation/OrbitGuide.cs` (the rings, `PlaneNormal`,
+`SteadyAlongOrbit`), `OrbitMath.PlaneNormal`; `Rendering/OrbitGuideVisual.cs`;
+`UI/OrbitGuideSection.cs`; `WorldSession.SetDensity`. Limit: a lifted orbit's rings stay
+centered on the parent, not raised with it.
 **Reuse:** `BodyMass` and `OrbitStability` for anything that needs real gravity.
 
 ### 4.6 Time & Calendar (`CAL`)

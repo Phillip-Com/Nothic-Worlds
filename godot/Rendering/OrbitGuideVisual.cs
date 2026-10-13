@@ -7,14 +7,17 @@ using NothicWorlds.Session;
 namespace NothicWorlds.Rendering;
 
 /// <summary>
-/// The stable orbit guide in the system view (VISION.md SIM-04): see-through rings, flat in the
-/// orbit plane, around a body and around what it circles, green where an orbit would stay
-/// steady and red where it wouldn't (from <see cref="OrbitGuide"/>). The rings are rebuilt only
-/// when the world, the body, or the scale changes; each frame just moves them with the bodies.
+/// The stable orbit guide in the system view (VISION.md SIM-04): see-through rings around a body
+/// (in its equator) and around what it circles (in the body's own orbit), green where an orbit
+/// would stay steady and red where it wouldn't (from <see cref="OrbitGuide"/>), and the body's
+/// orbit line colored the same way, red where an elongated orbit swings into trouble. Rebuilt
+/// only when the world, the body, or the scale changes; each frame just moves it with the
+/// bodies.
 /// </summary>
 public partial class OrbitGuideVisual : Node3D
 {
     private const int Segments = 192;
+    private const int PathSamples = 256;
 
     private static readonly Color _steadyColor = new(SteadyColor, 0.16f);
     private static readonly Color _unsteadyColor = new(UnsteadyColor, 0.22f);
@@ -34,14 +37,34 @@ public partial class OrbitGuideVisual : Node3D
         DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled,
     };
 
+    // The body's own orbit, colored by the rings it passes through: solid, like an orbit line.
+    private readonly StandardMaterial3D _pathMaterial = new()
+    {
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        VertexColorUseAsAlbedo = true,
+    };
+
     // One mesh of rings per body they're around, by that body.
     private readonly Dictionary<Guid, MeshInstance3D> _rings = [];
+    private MeshInstance3D? _path;
+    private Guid _pathParentId;
     private Guid? _bodyId;
     private SystemScale _scale;
     private bool _stale = true;
 
     /// <summary>The open world. Set it before adding the guide to the tree.</summary>
     public WorldSession Session { get; init; } = null!;
+
+    /// <summary>
+    /// Whether the body's orbit line is drawn colored (off in physics mode, where bodies leave
+    /// their designed orbits).
+    /// </summary>
+    public bool ShowPath { get; set; } = true;
+
+    /// <summary>
+    /// Whether the guide is drawing the body's orbit line, so the plain one can stay hidden.
+    /// </summary>
+    public bool ShowsPath => _path is not null && ShowPath;
 
     public override void _EnterTree()
     {
@@ -77,6 +100,15 @@ public partial class OrbitGuideVisual : Node3D
                 rings.Position = toScene(center.Position);
             }
         }
+
+        if (_path is not null)
+        {
+            _path.Visible = ShowPath && layout.ContainsKey(_pathParentId);
+            if (layout.TryGetValue(_pathParentId, out DisplayBody parent))
+            {
+                _path.Position = toScene(parent.Position);
+            }
+        }
     }
 
     private void MarkStale() => _stale = true;
@@ -93,6 +125,8 @@ public partial class OrbitGuideVisual : Node3D
         }
 
         _rings.Clear();
+        _path?.QueueFree();
+        _path = null;
         List<Body> bodies = Session.World.Bodies;
         if (bodies.Find(b => b.Id == bodyId) is not Body body
             || !layout.TryGetValue(body.Id, out DisplayBody selected))
@@ -113,10 +147,69 @@ public partial class OrbitGuideVisual : Node3D
                 Mesh = RingMesh(around, center, layout[center.Id].Radius, childRadius, scale),
                 MaterialOverride = _material,
                 CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                Basis = PlaneBasis(OrbitGuide.PlaneNormal(body, center.Id)),
             };
             AddChild(rings);
             _rings[center.Id] = rings;
         }
+
+        AddPath(bodies, body, scale);
+    }
+
+    // Turns the rings' flat plane (Y up) to the plane with this axis. A ring looks the same
+    // either way up, so an axis pointing down is flipped rather than turned all the way over.
+    private static Basis PlaneBasis(Vector3D normal)
+    {
+        var axis = new Vector3((float)normal.X, (float)normal.Y, (float)normal.Z);
+        axis = (axis.Y < 0 ? -axis : axis).Normalized();
+        return axis.IsEqualApprox(Vector3.Up)
+            ? Basis.Identity
+            : new Basis(new Quaternion(Vector3.Up, axis));
+    }
+
+    // The body's own orbit, green where it's steady and red where it swings into an unsteady
+    // ring, at the same points the system view draws its orbit line through.
+    private void AddPath(List<Body> bodies, Body body, SystemScale scale)
+    {
+        if (body.Orbit is not Orbit orbit
+            || bodies.Find(b => b.Id == orbit.ParentId) is not Body parent)
+        {
+            return;
+        }
+
+        IReadOnlyList<double> times = OrbitMath.EvenlySpacedTimes(orbit, PathSamples);
+        if (times.Count == 0
+            || OrbitGuide.SteadyAlongOrbit(bodies, body, times) is not IReadOnlyList<bool> steady)
+        {
+            return;
+        }
+
+        // Back to the first point, to close the loop.
+        var vertices = new Vector3[times.Count + 1];
+        var colors = new Color[times.Count + 1];
+        for (int i = 0; i <= times.Count; i++)
+        {
+            int at = i % times.Count;
+            Vector3D point = SystemLayout.OrbitPoint(body, parent, times[at], scale);
+            vertices[i] = new Vector3((float)point.X, (float)point.Y, (float)point.Z);
+            colors[i] = steady[at] ? SteadyColor : UnsteadyColor;
+        }
+
+        var arrays = new Godot.Collections.Array();
+        arrays.Resize((int)Mesh.ArrayType.Max);
+        arrays[(int)Mesh.ArrayType.Vertex] = vertices;
+        arrays[(int)Mesh.ArrayType.Color] = colors;
+        var mesh = new ArrayMesh();
+        mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.LineStrip, arrays);
+        _path = new MeshInstance3D
+        {
+            Name = $"Orbit check for {body.Name}",
+            Mesh = mesh,
+            MaterialOverride = _pathMaterial,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        };
+        AddChild(_path);
+        _pathParentId = parent.Id;
     }
 
     private ArrayMesh RingMesh(IEnumerable<GuideBand> bands, Body center, double centerRadius,

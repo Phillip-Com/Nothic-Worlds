@@ -1,3 +1,4 @@
+using NothicWorlds.Core.Geometry;
 using NothicWorlds.Core.Model;
 
 namespace NothicWorlds.Core.Simulation;
@@ -25,15 +26,59 @@ public static class OrbitGuide
     {
         var bands = new List<GuideBand>();
         AddBandsAround(bands, bodies, selected, movingId: null);
-        if (selected.Branch is null && selected.Orbit is Orbit orbit
-            && bodies.FirstOrDefault(b => b.Id == orbit.ParentId) is Body parent
-            && BodyMass.Kg(parent) >= BodyMass.Kg(selected))
+        if (GuidedParent(bodies, selected) is Body parent)
         {
             AddBandsAround(bands, bodies, parent, selected.Id);
         }
 
         return bands;
     }
+
+    /// <summary>
+    /// The axis of the plane the rings around <paramref name="centerId"/> lie in (unit length):
+    /// around the selected body, its equator, where moons mostly settle; around its parent, the
+    /// selected body's own orbit, so the rings follow its path.
+    /// </summary>
+    public static Vector3D PlaneNormal(Body selected, Guid centerId) =>
+        centerId != selected.Id && selected.Orbit is Orbit orbit
+            ? OrbitMath.PlaneNormal(orbit)
+            : BodyOrientation.NorthPole(selected);
+
+    /// <summary>
+    /// Whether the selected body's own orbit is steady at each of <paramref name="timesDays"/>,
+    /// by the rings around its parent: false where it dips into an unsteady band (too close,
+    /// past where the parent could hold it, or within a neighbor's reach), as an elongated
+    /// orbit can near its closest or farthest point. Null when there are no rings around its
+    /// parent.
+    /// </summary>
+    public static IReadOnlyList<bool>? SteadyAlongOrbit(
+        IReadOnlyList<Body> bodies, Body selected, IReadOnlyList<double> timesDays)
+    {
+        if (GuidedParent(bodies, selected) is not Body parent)
+        {
+            return null;
+        }
+
+        Orbit orbit = selected.Orbit!;
+        OrbitZone? zone = OrbitStability.MoonZone(bodies, parent);
+        List<NeighborReach> reaches = [.. OrbitStability.Reaches(bodies, parent)
+            .Where(reach => reach.BodyId != selected.Id)];
+        return [.. timesDays.Select(time =>
+        {
+            double distance = OrbitMath.OffsetFromParent(orbit, time).Length;
+            return zone is not null && distance >= zone.InnerKm && distance <= zone.OuterKm
+                && !reaches.Any(reach => distance > reach.InnerKm && distance < reach.OuterKm);
+        })];
+    }
+
+    // What the selected body circles, if the guide shows where it could: not for a realm (its
+    // branch puts it where it is) nor for a body heavier than what it circles.
+    private static Body? GuidedParent(IReadOnlyList<Body> bodies, Body selected) =>
+        selected.Branch is null && selected.Orbit is Orbit orbit
+            && bodies.FirstOrDefault(b => b.Id == orbit.ParentId) is Body parent
+            && BodyMass.Kg(parent) >= BodyMass.Kg(selected)
+                ? parent
+                : null;
 
     private static void AddBandsAround(
         List<GuideBand> bands, IReadOnlyList<Body> bodies, Body center, Guid? movingId)
