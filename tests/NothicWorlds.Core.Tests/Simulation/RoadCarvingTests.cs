@@ -155,4 +155,79 @@ public sealed class RoadCarvingTests
         Assert.Equal(1_000, old.BeyondSidesMeters(Beside(0), 1_000, oldRoads: false));
         Assert.Equal(0, _level.BeyondSidesMeters(Beside(0), 1_000, oldRoads: false));
     }
+
+    [Fact]
+    public void BeyondSides_IsTheNearestRoadsAsMeasuredOnEverySegment()
+    {
+        // Rough terrain asks this for every height, out to tens of km: measuring every road
+        // segment that far out took most of each frame beside a road on the owner's world.
+        RoadProfile[] roads =
+        [
+            RoadProfile.For(RoadProfileTests.Highway(), RadiusKm, _ => 100, null)!,
+            RoadProfile.For(RoadProfileTests.Highway(), RadiusKm, RoadProfileTests.Mesa(),
+                null)!,
+            _bridged,
+            RoadProfile.For(RoadProfileTests.Highway(style: RoadStyle.OldRoad), RadiusKm,
+                _ => 100, null)!,
+        ];
+        var random = new Random(3);
+        foreach (RoadProfile[] some in (RoadProfile[][])[[roads[0]], [roads[1]], roads])
+        {
+            RoadCarving carving = RoadCarving.For(some, RadiusKm);
+            for (int i = 0; i < 300; i++)
+            {
+                Vector3D point = Beside((random.NextDouble() - 0.5) * 3_000,
+                    (random.NextDouble() - 0.2) * 3_000);
+                foreach (double within in (double[])[30, 1_000, 50_000])
+                {
+                    foreach ((bool tunnels, bool oldRoads) in (ReadOnlySpan<(bool, bool)>)
+                        [(true, true), (false, true), (true, false)])
+                    {
+                        Assert.Equal(EverySegment(some, point, within, tunnels, oldRoads),
+                            carving.BeyondSidesMeters(point, within, tunnels, oldRoads), 6);
+                    }
+                }
+            }
+        }
+    }
+
+    // BeyondSidesMeters measured on every segment of every road: past the sides of each
+    // road's nearest segment (by its middle line), unless the point is past the road's ends,
+    // or that segment is in a tunnel (without `tunnels`) or the road old (without `oldRoads`).
+    private static double EverySegment(IReadOnlyList<RoadProfile> roads, Vector3D point,
+        double within, bool tunnels, bool oldRoads)
+    {
+        double radiusMeters = RadiusKm * 1000, nearest = within;
+        foreach (RoadProfile road in roads)
+        {
+            (double Away, double Raw, int Segment) best = (double.MaxValue, 0, -1);
+            for (int s = 0; s < road.Points.Count - 1; s++)
+            {
+                Vector3D from = road.Points[s], along = road.Points[s + 1] - from;
+                double raw = (point - from).Dot(along) / along.Dot(along);
+                double away = (point - (from + along * Math.Clamp(raw, 0, 1))).Length
+                    * radiusMeters;
+                if (away < best.Away)
+                {
+                    best = (away, raw, s);
+                }
+            }
+
+            int last = road.Points.Count - 2;
+            if ((best.Segment == 0 && best.Raw < 0) || (best.Segment == last && best.Raw > 1)
+                || (!tunnels && road.InTunnel(best.Segment))
+                || (!oldRoads && road.Surface == RoadSurface.OldPaving))
+            {
+                continue;
+            }
+
+            int seg = best.Segment;
+            double height = Math.Max(Math.Abs(road.RoadMeters[seg] - road.GroundMeters[seg]),
+                Math.Abs(road.RoadMeters[seg + 1] - road.GroundMeters[seg + 1]));
+            nearest = Math.Min(nearest, Math.Max(0,
+                best.Away - RoadCarving.ReachMeters(road.HalfWidthMeters, height)));
+        }
+
+        return nearest;
+    }
 }

@@ -7,7 +7,8 @@ namespace NothicWorlds.Core.Geometry;
 /// within reach of the eye are kept. Tiles are built a while after they're asked for, so until
 /// a tile's quarters are all built it's drawn whole, and until it's built its parent stands in:
 /// there's never a hole (but in the far part of the reach, past the horizon, where a tile just
-/// come into reach is left out until it's built), and never two tiles drawn over each other.
+/// come into reach, or one beyond the near reach, is left out until it's built), and never two
+/// tiles drawn over each other.
 /// </summary>
 /// <param name="surface">The surface tiled.</param>
 /// <param name="splitFactor">How many tile widths away from the eye a tile is split.</param>
@@ -65,7 +66,8 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
     /// point); <paramref name="extentOf"/> gives the space a tile takes up (for one not built
     /// yet, a guess: see <see cref="Estimate"/>), and <paramref name="needOf"/> what it needs.
     /// Tiles wholly beyond <paramref name="nearReach"/> (all within reach, if null) are wanted
-    /// after every nearer one, so the far ground never holds up the ground around the eye.
+    /// after every nearer one, and left out until they're built, so the far ground never holds
+    /// up the ground around the eye.
     /// </summary>
     public GroundTileChoice Choose(Vector3D eye, Vector3D reachCenter, double reach,
         Func<GroundTile, TileExtent> extentOf, Func<GroundTile, TileNeed> needOf,
@@ -87,12 +89,16 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
         List<GroundTile> wanted = [.. Wanted(far: false), .. Wanted(far: true)];
         return new GroundTileChoice(drawn, wanted, kept);
 
-        // The near or far tiles wanted: missing ones coarsest first (they stand in for the
-        // rest), then stale ones, each nearest first.
+        // The near or far tiles wanted: missing ones nearest first as measured in their own
+        // widths, so the tiles under the eye come first, coarsest to finest, and then each
+        // ring out from it (a tile always before its quarters: they're no nearer, and half as
+        // wide); then stale ones, nearest first. Coarsest first, every tile of a level was
+        // built before any finer one, and the ground at the eye came last.
         IEnumerable<GroundTile> Wanted(bool far) =>
         [
-            .. missing.Where(entry => entry.Far == far).OrderBy(entry => entry.Tile.Level)
-                .ThenBy(entry => entry.Away).Select(entry => entry.Tile),
+            .. missing.Where(entry => entry.Far == far)
+                .OrderBy(entry => entry.Away / Width(entry.Tile))
+                .ThenBy(entry => entry.Tile.Level).Select(entry => entry.Tile),
             .. stale.Where(entry => entry.Far == far).OrderBy(entry => entry.Away)
                 .Select(entry => entry.Tile),
         ];
@@ -115,8 +121,10 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
             // A tile not built yet in the far half of the reach (one just come into it, as the
             // eye rises and the reach grows) is left out until it is, rather than its parent
             // standing in for all its built neighbors too: out there, well past the horizon, a
-            // gap goes unseen, but the whole ground dropping to a coarse tile would not.
-            bool leftOut = !built && AllBeyond(tile, reachCenter, reach * FarShare);
+            // gap goes unseen, but the whole ground dropping to a coarse tile would not. So is
+            // one beyond the near reach, wanted after every nearer one: stood in for, it held
+            // its parent, and the ground round the eye with it, coarse until all that was built.
+            bool leftOut = !built && (far || AllBeyond(tile, reachCenter, reach * FarShare));
             GroundTile[] quarters = ShouldSplit(tile, away)
                 ? [.. tile.Children().Where(child => surface.Covers(child)
                     && InReach(child, reachCenter, reach))]

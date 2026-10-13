@@ -132,18 +132,30 @@ public sealed class RoadCarving
     public double BeyondSidesMeters(Vector3D direction, double withinMeters,
         bool tunnels = true, bool oldRoads = true)
     {
+        // Rough terrain asks this for every height it gives, out to tens of kilometers: each
+        // road's nearest segment is found down its tree, nearest first, skipping groups that
+        // can't be nearer, not by measuring every segment that far out.
         double nearest = withinMeters;
-        foreach (Closeness near in NearestEach(Gather(direction, withinMeters / _radiusMeters,
-            0), direction))
+        for (int r = 0; r < _trees.Length && nearest > 0; r++)
         {
-            if ((!tunnels && _tunneled[near.Road][near.Segment])
-                || (!oldRoads && _roads[near.Road].Surface == RoadSurface.OldPaving))
+            Level[] tree = _trees[r];
+            Level top = tree[^1];
+            if ((!oldRoads && _roads[r].Surface == RoadSurface.OldPaving)
+                || BoundMeters(top, 0, direction) - top.ReachMeters[0] >= nearest)
+            {
+                continue;
+            }
+
+            var closest = new Closeness(r, -1, double.MaxValue, 0);
+            double raw = 0;
+            NearestMiddle(tree, tree.Length - 1, 0, direction, ref closest, ref raw);
+            if (PastEnd(closest, raw) || (!tunnels && _tunneled[r][closest.Segment]))
             {
                 continue;
             }
 
             nearest = Math.Min(nearest,
-                Math.Max(0, near.Away - _trees[near.Road][0].ReachMeters[near.Segment]));
+                Math.Max(0, closest.Away - tree[0].ReachMeters[closest.Segment]));
         }
 
         return nearest;
@@ -368,12 +380,8 @@ public sealed class RoadCarving
         double bestRaw = 0;
         foreach ((int r, int s) in segments)
         {
-            Vector3D from = _roads[r].Points[s], along = _roads[r].Points[s + 1] - from;
-            double lengthSquared = along.Dot(along);
-            double raw = lengthSquared > 0 ? (point - from).Dot(along) / lengthSquared : 0.5;
-            double t = Math.Clamp(raw, 0, 1);
-            var near = new Closeness(r, s, (point - (from + along * t)).Length * _radiusMeters,
-                t);
+            (double away, double t, double raw) = Measure(r, s, point);
+            var near = new Closeness(r, s, away, t);
             if (best is not { } known || known.Road != r)
             {
                 AddUnlessPastEnd(each, best, bestRaw);
@@ -393,10 +401,71 @@ public sealed class RoadCarving
     // ends (`raw`: how far along the segment its nearest point would be, unclamped).
     private void AddUnlessPastEnd(List<Closeness> each, Closeness? nearest, double raw)
     {
-        if (nearest is { } near && !(near.Segment == 0 && raw < 0)
-            && !(near.Segment == _roads[near.Road].Points.Count - 2 && raw > 1))
+        if (nearest is { } near && !PastEnd(near, raw))
         {
             each.Add(near);
+        }
+    }
+
+    // Whether a point whose nearest segment of a road is `near` is past the road's ends.
+    private bool PastEnd(Closeness near, double raw) =>
+        (near.Segment == 0 && raw < 0)
+        || (near.Segment == _roads[near.Road].Points.Count - 2 && raw > 1);
+
+    // How a point lies to a segment of a road: how far its nearest point on it is, in meters,
+    // and how far along it that is, clamped (T) and not (Raw).
+    private (double Away, double T, double Raw) Measure(int road, int segment, Vector3D point)
+    {
+        Vector3D from = _roads[road].Points[segment];
+        Vector3D along = _roads[road].Points[segment + 1] - from;
+        double lengthSquared = along.Dot(along);
+        double raw = lengthSquared > 0 ? (point - from).Dot(along) / lengthSquared : 0.5;
+        double t = Math.Clamp(raw, 0, 1);
+        return ((point - (from + along * t)).Length * _radiusMeters, t, raw);
+    }
+
+    // The nearest a point can be to anything inside a ball of a tree's level, in meters.
+    private double BoundMeters(Level nodes, int index, Vector3D point) =>
+        ((point - nodes.Centers[index]).Length - nodes.Radii[index]) * _radiusMeters;
+
+    // Keeps `closest` the nearest of it and the segments under a node of its road's tree to
+    // a point (by their middle lines), with its unclamped `raw` share along: down the tree,
+    // the children nearest first, skipping those that can't be nearer.
+    private void NearestMiddle(Level[] tree, int level, int index, Vector3D point,
+        ref Closeness closest, ref double raw)
+    {
+        if (BoundMeters(tree[level], index, point) >= closest.Away)
+        {
+            return;
+        }
+
+        if (level == 0)
+        {
+            (double away, double t, double unclamped) = Measure(closest.Road, index, point);
+            if (away < closest.Away)
+            {
+                closest = new Closeness(closest.Road, index, away, t);
+                raw = unclamped;
+            }
+
+            return;
+        }
+
+        Level below = tree[level - 1];
+        int first = index * GroupSize, count = Math.Min(first + GroupSize, below.Centers.Length)
+            - first;
+        Span<double> bounds = stackalloc double[GroupSize];
+        Span<int> order = stackalloc int[GroupSize];
+        for (int i = 0; i < count; i++)
+        {
+            bounds[i] = BoundMeters(below, first + i, point);
+            order[i] = first + i;
+        }
+
+        bounds[..count].Sort(order[..count]);
+        for (int i = 0; i < count && bounds[i] < closest.Away; i++)
+        {
+            NearestMiddle(tree, level - 1, order[i], point, ref closest, ref raw);
         }
     }
 

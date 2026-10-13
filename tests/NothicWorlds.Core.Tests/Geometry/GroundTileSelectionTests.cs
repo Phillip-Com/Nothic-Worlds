@@ -53,7 +53,7 @@ public sealed class GroundTileSelectionTests
     }
 
     [Fact]
-    public void NothingBuilt_NothingIsDrawnAndTheRootsAreWantedFirst()
+    public void NothingBuilt_NothingIsDrawnAndEachTileIsWantedAfterItsParent()
     {
         (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
 
@@ -63,7 +63,31 @@ public sealed class GroundTileSelectionTests
         Assert.Empty(choice.Drawn);
         Assert.Equal(0, choice.Wanted[0].Level);
         Assert.True(choice.Wanted.Max(tile => tile.Level) > 10);
-        Assert.Equal(choice.Wanted.OrderBy(tile => tile.Level), choice.Wanted);
+        var order = choice.Wanted.Select((tile, index) => (tile, index))
+            .ToDictionary(entry => entry.tile, entry => entry.index);
+        Assert.All(choice.Wanted.Where(tile => tile.Level > 0),
+            tile => Assert.True(order[tile.Parent()] < order[tile]));
+    }
+
+    [Fact]
+    public void NothingBuilt_TheTilesUnderTheEyeAreWantedBeforeThoseAwayFromIt()
+    {
+        // Coarsest first, every tile of a level was built before any finer one: beside a road
+        // on the owner's world the ground at the eye took over a minute to come in.
+        (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
+        ITileSurface surface = selection.Surface;
+
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
+            _ => TileNeed.Missing);
+
+        (int root, double u, double v) = surface.Locate(spot)!.Value;
+        List<GroundTile> wanted = [.. choice.Wanted];
+        int finest = wanted.FindLastIndex(tile => Holds(tile, root, u, v));
+        Assert.True(selection.Width(choice.Wanted[finest]) < 2 * FinestWidth);
+        int firstAway = wanted.FindIndex(tile =>
+            NearestOf(surface, tile, spot) > 2 * selection.Width(tile));
+        Assert.True(finest < firstAway, $"finest under the eye {finest}, away {firstAway}");
+        Assert.True(finest < choice.Wanted.Count / 4);
     }
 
     [Fact]
@@ -94,6 +118,26 @@ public sealed class GroundTileSelectionTests
 
         GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
             tile => tile == far ? TileNeed.Missing : TileNeed.None);
+
+        Assert.Equal(all.Drawn.Where(tile => tile != far).ToHashSet(), choice.Drawn.ToHashSet());
+        Assert.Contains(far, choice.Wanted);
+    }
+
+    [Fact]
+    public void TileBeyondTheNearReachNotBuilt_DoesNotHoldUpTheGroundAtTheEye()
+    {
+        // Wanted after every nearer tile but stood in for by its parent, one such tile held
+        // that parent, and the eye's ground with it, at a tile hundreds of km wide.
+        (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
+        ITileSurface surface = selection.Surface;
+        const double nearReach = Reach / 8;
+        GroundTileChoice all = selection.Choose(eye, spot, Reach, Guess(selection),
+            _ => TileNeed.None, nearReach);
+        GroundTile far = all.Drawn.First(tile => NearestOf(surface, tile, spot) > nearReach * 2
+            && NearestOf(surface, tile, spot) < Reach * 0.4);
+
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
+            tile => tile == far ? TileNeed.Missing : TileNeed.None, nearReach);
 
         Assert.Equal(all.Drawn.Where(tile => tile != far).ToHashSet(), choice.Drawn.ToHashSet());
         Assert.Contains(far, choice.Wanted);
