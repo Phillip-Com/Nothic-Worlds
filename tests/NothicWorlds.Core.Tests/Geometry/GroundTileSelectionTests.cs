@@ -141,6 +141,28 @@ public sealed class GroundTileSelectionTests
 
         Assert.Equal(all.Drawn.Where(tile => tile != far).ToHashSet(), choice.Drawn.ToHashSet());
         Assert.Contains(far, choice.Wanted);
+        Assert.Empty(choice.NearMissing);
+    }
+
+    [Fact]
+    public void NothingBuilt_TheNearMissingAreThoseNotWhollyBeyondTheNearReach()
+    {
+        // The "Preparing the area…" screen waits on these, not on the far ground.
+        (GroundTileSelection selection, Vector3D spot, Vector3D eye) = Setup("globe");
+        ITileSurface surface = selection.Surface;
+        const double nearReach = Reach / 8;
+
+        GroundTileChoice choice = selection.Choose(eye, spot, Reach, Guess(selection),
+            _ => TileNeed.Missing, nearReach);
+
+        Assert.NotEmpty(choice.NearMissing);
+        Assert.Contains(choice.Wanted, tile => !choice.NearMissing.Contains(tile));
+        Assert.All(choice.NearMissing, tile => Assert.Contains(tile, choice.Wanted));
+        Assert.All(choice.NearMissing, tile => Assert.True(
+            NearestOf(surface, tile, spot) <= nearReach + selection.Width(tile)));
+        (int root, double u, double v) = surface.Locate(spot)!.Value;
+        Assert.Contains(choice.NearMissing, tile =>
+            selection.Width(tile) < 2 * FinestWidth && Holds(tile, root, u, v));
     }
 
     [Fact]

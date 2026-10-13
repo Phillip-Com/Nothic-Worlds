@@ -87,7 +87,8 @@ public sealed class GroundTileSelection(ITileSurface surface, double splitFactor
         }
 
         List<GroundTile> wanted = [.. Wanted(far: false), .. Wanted(far: true)];
-        return new GroundTileChoice(drawn, wanted, kept);
+        return new GroundTileChoice(drawn, wanted, kept,
+            [.. missing.Where(entry => !entry.Far).Select(entry => entry.Tile)]);
 
         // The near or far tiles wanted: missing ones nearest first as measured in their own
         // widths, so the tiles under the eye come first, coarsest to finest, and then each
