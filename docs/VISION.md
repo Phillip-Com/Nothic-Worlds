@@ -225,7 +225,7 @@ screen filter; stored per world (format v25); Painterly the default for every wo
 Shaped worlds' rock uses toon light (`ShapedGlobe.UseStyle`). View ▸ Style
 (`WorldSession.SetStyle`, one undo step).
 
-**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120; ground materials: PR #121; plants: PR #122; drawn in meters: PR #123; lighting: PR #124) · Base (owner's choice, 2026-10-05; was Advanced, probably)
+**REN-06 — First-person surface view** · Implemented (M30: PRs #77–#79; M33: PRs #85–#86; M34: PR #90; ground tiles: PR #110; far ground: PR #115; clearance: PR #118; terrain switch: PR #119; scale: PR #120; ground materials: PR #121; plants: PR #122; drawn in meters: PR #123; lighting: PR #124; loading speed: PR #131) · Base (owner's choice, 2026-10-05; was Advanced, probably)
 **Intent:** View the world from the surface in first person. It's a nice-to-have if it proves possible.
 **Owner's choices:** walk or fly; the sky at true size and place with a magnify switch; day and
 night skies (black on airless worlds), live weather overhead, a compass and readouts; on flat
@@ -267,7 +267,9 @@ around the sun and haze that matches the sky, lit toward the sun and thinner hig
 - **Ground tiles** (owner's plan, 2026-10-08): Core `Geometry/GroundTile.cs`,
   `GroundTileGrid` (layout, skirt, morph pairs), `GroundTileSelection` (which tiles, finer near
   the eye, a parent standing in until all four quarters are built, but a tile just come into
-  the far half of the reach left out until it's built: PR #111), `GlobeTileSurface` (the six
+  the far half of the reach, or one past the near reach, left out until it's built: PR #111,
+  PR #131; missing tiles wanted nearest first in their own widths, so the ground at the eye
+  comes in first: PR #131), `GlobeTileSurface` (the six
   cube faces) and `FlatTopTileSurface` (a flat world's top face). `Rendering/GroundTiles.cs`
   builds tiles on worker threads from a `GroundTileRecipe` (heights, and the water's over
   them), keeps 850 for reuse, and joins the drawn ones into one ground mesh and one water mesh
